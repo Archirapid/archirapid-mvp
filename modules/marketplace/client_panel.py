@@ -14,6 +14,77 @@ import os
 from pathlib import Path
 from modules.marketplace.compatibilidad import get_proyectos_compatibles
 
+def generate_3d_viewer_html(model_url):
+    return f'''
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <style>
+            body {{ margin: 0; background-color: #f0f0f0; }}
+            canvas {{ display: block; }}
+            #info {{ position: absolute; top: 10px; width: 100%; text-align: center; font-family: sans-serif; pointer-events: none; }}
+        </style>
+    </head>
+    <body>
+        <div id="info">Cargando Proyecto 3D...</div>
+        <script type="module">
+            import * as THREE from 'https://cdn.skypack.dev/three@0.128.0';
+            import {{ GLTFLoader }} from 'https://cdn.skypack.dev/three@0.128.0/examples/jsm/loaders/GLTFLoader.js';
+            import {{ OrbitControls }} from 'https://cdn.skypack.dev/three@0.128.0/examples/jsm/controls/OrbitControls.js';                                                                                                                  
+            const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xeeeeee);
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 10000);
+        const renderer = new THREE.WebGLRenderer({{ antialias: true }});
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.outputEncoding = THREE.sRGBEncoding;
+        document.body.appendChild(renderer.domElement);                                        
+        // LUCES (Una ambiental y dos direccionales para evitar sombras negras)
+        scene.add(new THREE.AmbientLight(0xffffff, 1.0));
+        const light1 = new THREE.DirectionalLight(0xffffff, 0.8);
+        light1.position.set(100, 100, 100);
+        scene.add(light1);                                                                                            
+        const controls = new OrbitControls(camera, renderer.domElement);
+        
+        const loader = new GLTFLoader();
+        console.log("Intentando cargar:", "{model_url}");                                                                                                    
+        loader.load("{model_url}", (gltf) => {{
+            const model = gltf.scene;
+            scene.add(model);                                                                                      
+            // --- EL TRUCO DEL CENTRADO ---
+            const box = new THREE.Box3().setFromObject(model);
+            const center = box.getCenter(new THREE.Vector3());
+            const size = box.getSize(new THREE.Vector3());
+            const maxDim = Math.max(size.x, size.y, size.z);
+            
+            // Ajustamos la cámara según el tamaño real del modelo
+            const cameraZ = maxDim * 2; 
+            camera.position.set(center.x + maxDim, center.y + maxDim, center.z + cameraZ);
+            camera.lookAt(center);
+            
+            controls.target.copy(center);
+            controls.update();
+            
+            document.getElementById('info').innerText = "Modelo Cargado Correctamente";
+            console.log("Modelo centrado en:", center, "Tamaño:", size);
+        }}, undefined, (error) => {{
+            console.error("Error cargando GLB:", error);
+            document.getElementById('info').innerText = "Error al visualizar el modelo";
+        }});                                                                                                                   
+        function animate() {{
+            requestAnimationFrame(animate);
+            renderer.render(scene, camera);
+        }}
+        animate();                                                                                                       
+        window.addEventListener('resize', () => {{
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }});
+    </script>
+</body>
+</html>
+'''
+
 def show_full_client_dashboard(client_email):
     """Muestra el panel completo del cliente para usuarios ya logueados"""
     # Panel de cliente logueado
@@ -451,102 +522,10 @@ def show_selected_project_panel(client_email, project_id):
                 if project.get("modelo_3d_glb"):
                     # Mostrar visor 3D completo
                     rel_path = str(project["modelo_3d_glb"]).replace("\\", "/").lstrip("/")
-                    model_url = f"http://localhost:8765/{rel_path}".replace(" ", "%20")
+                    model_url = f"http://localhost:8000/{rel_path}".replace(" ", "%20")
 
-                    # HTML con Three.js para visor 3D
-                    three_html = f"""
-                    <div id="container3d" style="width: 100%; height: 700px; border: 1px solid #ccc;"></div>
-                    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-                    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-                    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
-                    <script>
-                        // Inicializar escena, cámara y renderer
-                        const scene = new THREE.Scene();
-                        scene.background = new THREE.Color(0xf0f0f0);
-
-                        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-                        camera.position.set(5, 5, 5);
-
-                        const renderer = new THREE.WebGLRenderer({{ antialias: true }});
-                        renderer.setSize(document.getElementById('container3d').clientWidth, 700);
-                        renderer.shadowMap.enabled = true;
-                        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-                        document.getElementById('container3d').appendChild(renderer.domElement);
-
-                        // Controles de órbita
-                        const controls = new THREE.OrbitControls(camera, renderer.domElement);
-                        controls.enableDamping = true;
-                        controls.dampingFactor = 0.05;
-
-                        // Luces
-                        const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
-                        scene.add(ambientLight);
-
-                        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-                        directionalLight.position.set(10, 10, 5);
-                        directionalLight.castShadow = true;
-                        scene.add(directionalLight);
-
-                        // Cargar modelo GLTF
-                        const loader = new THREE.GLTFLoader();
-                        loader.load(
-                            '{model_url}',
-                            function (gltf) {{
-                                const model = gltf.scene;
-                                scene.add(model);
-
-                                // Calcular bounding box para centrar la cámara
-                                const box = new THREE.Box3().setFromObject(model);
-                                const center = box.getCenter(new THREE.Vector3());
-                                const size = box.getSize(new THREE.Vector3());
-
-                                // Centrar modelo en origen
-                                model.position.sub(center);
-
-                                // Ajustar cámara para ver todo el modelo
-                                const maxDim = Math.max(size.x, size.y, size.z);
-                                const fov = camera.fov * (Math.PI / 180);
-                                let cameraZ = Math.abs(maxDim / Math.sin(fov / 2));
-
-                                camera.position.set(center.x, center.y, center.z + cameraZ * 1.5);
-                                camera.lookAt(center);
-
-                                controls.target.copy(center);
-                                controls.update();
-
-                                // Habilitar sombras si el modelo las soporta
-                                model.traverse(function (child) {{
-                                    if (child.isMesh) {{
-                                        child.castShadow = true;
-                                        child.receiveShadow = true;
-                                    }}
-                                }});
-                            }},
-                            function (xhr) {{
-                                console.log((xhr.loaded / xhr.total * 100) + '% loaded');
-                            }},
-                            function (error) {{
-                                console.error('Error loading GLTF:', error);
-                                alert('Error cargando el modelo 3D. Verifica que el archivo exista.');
-                            }}
-                        );
-
-                        // Función de animación
-                        function animate() {{
-                            requestAnimationFrame(animate);
-                            controls.update();
-                            renderer.render(scene, camera);
-                        }}
-                        animate();
-
-                        // Ajustar tamaño al cambiar ventana
-                        window.addEventListener('resize', function() {{
-                            camera.aspect = document.getElementById('container3d').clientWidth / 700;
-                            camera.updateProjectionMatrix();
-                            renderer.setSize(document.getElementById('container3d').clientWidth, 700);
-                        }});
-                    </script>
-                    """
+                    # Usar la función dedicada para generar el HTML del visor 3D
+                    three_html = generate_3d_viewer_html(model_url)
 
                     st.components.v1.html(three_html, height=700, scrolling=False)
                 else:
@@ -556,8 +535,8 @@ def show_selected_project_panel(client_email, project_id):
                 # Verificar si el proyecto tiene modelo 3D para VR
                 if project.get("modelo_3d_glb"):
                     rel = str(project["modelo_3d_glb"]).replace("\\", "/").lstrip("/")
-                    glb_url = f"http://localhost:8765/{rel}".replace(" ", "%20")
-                    viewer_url = f"http://localhost:8765/static/vr_viewer.html?model={glb_url}"
+                    glb_url = f"http://localhost:8000/{rel}".replace(" ", "%20")
+                    viewer_url = f"http://localhost:8000/static/vr_viewer.html?model={glb_url}"
                     st.markdown(
                         f'<a href="{viewer_url}" target="_blank">'
                         f'<button style="padding:10px 16px;border-radius:6px;background:#0b5cff;color:#fff;border:none;">'

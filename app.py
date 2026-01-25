@@ -49,11 +49,11 @@ def panel_cliente_v2():
     # Iniciar servidor estático para VR y archivos
     from pathlib import Path
     STATIC_ROOT = Path(r"C:/ARCHIRAPID_PROYECT25")
-    STATIC_PORT = _start_static_server(STATIC_ROOT, port=8765)
+    STATIC_PORT = _start_static_server(STATIC_ROOT, port=8000)
     if STATIC_PORT:
         STATIC_URL = f"http://localhost:{STATIC_PORT}/"
     else:
-        STATIC_URL = "http://localhost:8765/"
+        STATIC_URL = "http://localhost:8000/"
 
     st.title("👤 Panel de Cliente - ARCHIRAPID V2")
 
@@ -1153,6 +1153,7 @@ def _start_static_server(root_dir: Path, port: int = 8765):
                 self.send_header('Access-Control-Allow-Origin', '*')
                 self.send_header('Access-Control-Allow-Methods', 'GET, OPTIONS')
                 self.send_header('Access-Control-Allow-Headers', '*')
+                self.send_header('Cache-Control', 'no-store, no-cache, must-revalidate')
                 super().end_headers()
             def do_OPTIONS(self):
                 self.send_response(200, "OK")
@@ -1240,8 +1241,8 @@ def render_portal_cliente_proyecto():
 
         if model_glb:
             rel = str(model_glb).replace("\\", "/").lstrip("/")
-            glb_url = f"http://localhost:8765/{rel}".replace(" ", "%20") + "?v=123"
-            viewer_url = f"http://localhost:8765/static/vr_viewer.html?model={glb_url}"
+            glb_url = f"http://localhost:8000/{rel}".replace(" ", "%20") + "?v=123"
+            viewer_url = f"http://localhost:8000/static/vr_viewer.html?model={glb_url}"
 
             st.markdown(
                 f'<iframe src="{viewer_url}" width="100%" height="600" allow="accelerometer; gyroscope; xr-spatial-tracking; vr" frameborder="0"></iframe>',
@@ -1365,12 +1366,12 @@ if st.session_state.get('selected_page') == "🔍 Detalle de Finca":
 
 if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
     STATIC_ROOT = Path(r"C:/ARCHIRAPID_PROYECT25")
-    STATIC_PORT = _start_static_server(STATIC_ROOT, port=8765)
+    STATIC_PORT = _start_static_server(STATIC_ROOT, port=8000)
     # URL base del servidor estático (definida temprano para usar en el header de diagnóstico)
     if STATIC_PORT:
         STATIC_URL = f"http://localhost:{STATIC_PORT}/"
     else:
-        STATIC_URL = "http://localhost:8765/"
+        STATIC_URL = "http://localhost:8000/"
 
     # Header
     with st.container():
