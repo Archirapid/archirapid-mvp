@@ -204,20 +204,39 @@ def setup_filters():
     q = st.sidebar.text_input("Buscar (provincia, título)")
     return min_m, max_m, q
 
+def get_available_plots():
+    """Obtiene todas las fincas disponibles: status='disponible' y sin reservas activas."""
+    from modules.marketplace.utils import db_conn
+    
+    # Obtener todas las fincas con status='disponible'
+    conn = db_conn()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM plots WHERE status = 'disponible'")
+    plots = cursor.fetchall()
+    
+    # Obtener plot_ids con reservas activas
+    cursor.execute("SELECT DISTINCT plot_id FROM reservations")
+    reserved_plot_ids = {row[0] for row in cursor.fetchall()}
+    conn.close()
+    
+    # Filtrar fincas que no estén reservadas
+    available_plots = [plot for plot in plots if plot['id'] not in reserved_plot_ids]
+    
+    return available_plots
+
 def get_filtered_plots(min_surface, max_surface, search_query):
     """Obtiene las fincas filtradas según los criterios especificados.
     
-    Nota: min_surface y max_surface ahora corresponden a superficie en m²,
-    no a precio. La función db.list_fincas_filtradas filtra por precio,
-    pero aquí asumimos que los valores son para superficie.
+    Solo incluye fincas disponibles (status='disponible' y sin reservas).
     """
-    # Por ahora no filtramos por provincia
-    prov_param = None
-    # Si max_surface es 0 (valor por defecto), tratamos como sin máximo
+    # Obtener fincas disponibles
+    plots_all = get_available_plots()
+    
+    # Filtrar por superficie
     if max_surface == 0:
-        max_surface = 999999  # Valor alto para representar sin límite
-    plots_all = db.list_fincas_filtradas(prov_param, float(min_surface), float(max_surface))
-
+        max_surface = 999999  # Sin límite superior
+    plots_all = [p for p in plots_all if min_surface <= p.get('surface_m2', 0) <= max_surface]
+    
     # Aplicar búsqueda de texto si existe (incluye provincia, título y referencia)
     if search_query:
         plots_all = [p for p in plots_all if search_query.lower() in
@@ -307,33 +326,17 @@ def render_map(plots):
     # Crear mapa con Folium
     m = folium.Map(location=[center_lat, center_lon], zoom_start=zoom_level, tiles="CartoDB positron")
 
-    # Obtener fincas vendidas/reservadas para marcar en el mapa
-    from modules.marketplace.utils import db_conn
-    conn = db_conn()
-    cursor = conn.cursor()
-    cursor.execute("SELECT DISTINCT plot_id FROM reservations")
-    sold_plot_ids = {row[0] for row in cursor.fetchall()}
-    conn.close()
-
+    # Todas las plots en esta lista son disponibles (ya filtradas por get_available_plots)
     for plot in plots_with_coords:
         lat = float(plot['lat'])
         lon = float(plot['lon'])
         plot_id = plot['id']
         img_path = get_plot_image_path(plot)
 
-        # VERIFICAR SI LA FINCA ESTÁ VENDIDA/RESERVADA
-        is_sold = plot_id in sold_plot_ids
-
-        if is_sold:
-            # FINCA VENDIDA/RESERVADA: Color ROJO con icono de prohibido
-            icon = folium.Icon(color='red', icon='ban', prefix='fa', icon_color='white')
-            status_text = "🏠 VENDIDA / RESERVADA"
-            button_disabled = True
-        else:
-            # FINCA DISPONIBLE: Color AZUL con icono de casa
-            icon = folium.Icon(color='blue', icon='home', prefix='fa', icon_color='white')
-            status_text = ""
-            button_disabled = False
+        # Todas las fincas en esta lista son disponibles (filtradas previamente)
+        icon = folium.Icon(color='blue', icon='home', prefix='fa', icon_color='white')
+        status_text = ""
+        button_disabled = False
 
         # Crear popup HTML con imagen y enlace a detalles
         img_src = get_popup_image_url(plot)  # URL completa o relativa para la imagen
@@ -582,3 +585,6 @@ def main():
 
     # Sección de proyectos adicionales
     render_projects_section()
+
+    # Limpiar caché para asegurar sincronización
+    st.cache_data.clear()
