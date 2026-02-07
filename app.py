@@ -1,3 +1,25 @@
+"""
+BLOQUEO DOCUMENTAL - SECCIÓN "PROYECTOS DISPONIBLES"
+
+Esta sección está BLINDADA y protegida contra modificaciones no autorizadas.
+
+INPUTS (lectura):
+- Parámetros: client_email (email del cliente logueado)
+- Session State: last_search_params_v2 (parámetros de búsqueda previos), client_logged_in (estado de login)
+- DB Reads: projects (lista de proyectos), ventas_proyectos (verificación de compras previas)
+- Dependencias: get_proyectos_compatibles() (función de filtrado)
+
+OUTPUTS (efectos):
+- Session State: last_search_params_v2 (actualización de filtros)
+- Query Params: selected_project_v2 (ID de proyecto seleccionado para navegación)
+- DB Writes: ventas_proyectos (registro de compras PDF/CAD)
+- UI Effects: Grid de proyectos, filtros, mensajes de compra, reruns
+
+ADVERTENCIA: NO modificar lógica interna sin romper contrato.
+Cualquier cambio debe pasar por el wrapper render_projects_available(ctx).
+Usar solo el wrapper como punto de entrada desde fuera de la sección.
+"""
+
 from dotenv import load_dotenv
 load_dotenv()
 
