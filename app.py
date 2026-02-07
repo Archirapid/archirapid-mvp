@@ -43,6 +43,48 @@ init_db()
 import streamlit as st
 st.set_page_config(layout='wide')
 
+# HARDCODE DE ROL PARA PRUEBA
+if st.session_state.get('email') == 'asdfg@lkj.com': st.session_state['role'] = 'owner'
+
+# El Script de Limpieza Absoluta
+import sqlite3
+from modules.marketplace.utils import DB_PATH
+import streamlit as st
+
+def super_reset_sincronizado():
+    try:
+        conn = sqlite3.connect(str(DB_PATH))
+        cur = conn.cursor()
+        
+        # 1. Limpiamos las reservas (El origen del mal)
+        cur.execute("DELETE FROM reservations")
+        
+        # 2. Reseteamos los estados en la tabla maestra de fincas
+        cur.execute("""
+            UPDATE plots 
+            SET status = 'disponible', 
+                buyer_email = NULL, 
+                reserved_by = NULL
+        """)
+        
+        conn.commit()
+        conn.close()
+        
+        # 3. 🔥 EL CABLE: Limpieza total de la memoria de Streamlit
+        st.cache_data.clear()
+        st.cache_resource.clear()
+        
+        return True
+    except Exception as e:
+        st.error(f"Error técnico: {e}")
+        return False
+
+# Colocamos el botón en la barra lateral para que no estorbe
+if st.sidebar.button("🚨 FORZAR RESINCRONIZACIÓN TOTAL"):
+    if super_reset_sincronizado():
+        st.sidebar.success("¡Cable reparado! Todo disponible.")
+        st.rerun()
+
 # === FUNCIONES AUXILIARES V2 ===
 
 def detalles_proyecto_v2(project_id: str):
@@ -199,6 +241,7 @@ def panel_cliente_v2():
                         st.session_state["user_role"] = user_role
                         st.session_state["has_transactions"] = len(transactions) > 0
                         st.session_state["has_properties"] = len(owner_plots) > 0
+                        st.session_state["role"] = 'owner' if user_role == "owner" else 'client'
 
                         st.success(f"✅ Acceso concedido como {role_text} para {email}")
                         st.rerun()
@@ -483,7 +526,7 @@ def show_selected_project_panel_v2(client_email: str, project_id: str):
                 with col2:
                     if compatible:
                         st.success("🎯 **¡Perfecto match!** Este proyecto cabe en tu finca")
-                        if st.button(f"🚀 Diseñar en {finca_title}", key=f"design_v2_{finca_id}", use_container_width=True):
+                        if st.button(f"🚀 Diseñar en {finca_title}", key=f"design_v2_{finca_id}", width="stretch"):
                             st.info("🎨 Redirigiendo al diseñador... (próximamente)")
                     else:
                         deficit = m2_proyecto - superficie_edificable
@@ -497,7 +540,7 @@ def show_selected_project_panel_v2(client_email: str, project_id: str):
     col1, col2, col3 = st.columns(3)
 
     with col1:
-        if st.button("📋 Ver Más Proyectos", use_container_width=True):
+        if st.button("📋 Ver Más Proyectos", width="stretch"):
             st.query_params.clear()
             st.query_params["page"] = "🏠 HOME"
             st.rerun()
@@ -1387,6 +1430,11 @@ if st.session_state.get('selected_page') == "🔍 Detalle de Finca":
         st.rerun()
 
 if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
+    # Redirigir propietarios a su panel
+    if st.session_state.get('role') == 'owner':
+        st.session_state['selected_page'] = "🏠 Propietarios"
+        st.rerun()
+    
     STATIC_ROOT = Path(r"C:/ARCHIRAPID_PROYECT25")
     STATIC_PORT = _start_static_server(STATIC_ROOT, port=8000)
     # URL base del servidor estático (definida temprano para usar en el header de diagnóstico)
@@ -1414,7 +1462,7 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
 
         with access_col:
             if st.button("🔑 Acceder", key="btn_acceder"):
-                if st.session_state.get('rol') == 'admin':
+                if st.session_state.get('role') == 'admin':
                     st.session_state['selected_page'] = 'Intranet'
                     st.rerun()
                 else:
@@ -1613,6 +1661,13 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
             import traceback
             st.error(f"❌ Error cargando marketplace:  {e}")
             st.code(traceback.format_exc())
+
+        # RADAR DE FINCAS
+        from modules.marketplace.marketplace import get_filtered_plots
+        plots = get_filtered_plots()
+        st.sidebar.info(f"🔍 RADAR: {len(plots)} fincas detectadas")
+        if len(plots) > 0:
+            st.sidebar.write(f"Última: {plots[-1].get('title')} | m2: {plots[-1].get('m2')}")
 
         # PASO 3: Renderizar PROYECTOS ARQUITECTÓNICOS
         st.markdown("---")

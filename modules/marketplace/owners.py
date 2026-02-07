@@ -553,7 +553,7 @@ def main():
                 db.insert_plot(finca.a_dict())
                 # 6. Feedback y recarga
                 st.success(f"✅ Finca Publicada. Precio: {price}€ (Comisión est.: {commission_val}€). Disponible en mapa y gestión.")
-                st.session_state['selected_page'] = "🏠 Inicio / Marketplace"
+                st.session_state['selected_page'] = "🏠 Propietarios"
                 sleep(1.5)
                 st.rerun()
 
@@ -566,7 +566,7 @@ def main():
             # Mostrar tabla interactiva
             st.dataframe(
                 my_plots[['title', 'price', 'm2', 'type', 'status', 'created_at']],
-                use_container_width=True,
+                width="stretch",
                 hide_index=True
             )
             

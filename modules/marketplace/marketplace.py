@@ -176,11 +176,11 @@ def extract_cadastral_data(plot):
             # Usar módulos de extracción existentes - simplificado por ahora
             # TODO: Integrar con extract_pdf.py y parse_project_memoria.py cuando estén disponibles
             cadastral_data.update({
-                'surface_m2': plot.get('surface_m2'),
+                'surface': plot.get('m2'),
                 'cadastral_ref': plot.get('cadastral_ref', 'Extraído de nota'),
                 'shape': 'Rectangular',
                 'dimensions': 'N/A',
-                'buildable_m2': int(plot.get('surface_m2', 0) * 0.33)
+                'buildable_m2': int(plot.get('m2', 0) * 0.33)
             })
         except Exception as e:
             st.warning(f"No se pudieron extraer datos catastrales: {e}")
@@ -188,11 +188,11 @@ def extract_cadastral_data(plot):
     # Fallback a datos básicos
     if not cadastral_data:
         cadastral_data = {
-            'surface_m2': plot.get('surface_m2'),
+            'surface': plot.get('m2'),
             'cadastral_ref': plot.get('cadastral_ref', 'No disponible'),
             'shape': 'Rectangular (estimado)',
             'dimensions': 'N/A',
-            'buildable_m2': int(plot.get('surface_m2', 0) * 0.33)
+            'buildable_m2': int(plot.get('m2', 0) * 0.33)
         }
 
     return cadastral_data
@@ -206,7 +206,7 @@ def setup_filters():
     return min_m, max_m, q
 
 def get_available_plots():
-    """Lógica unificada: Finca disponible en tabla + Sin reserva"""
+    """Lógica unificada: TODAS las fincas de la DB (sin filtros para forzar visibilidad)"""
     from modules.marketplace.utils import db_conn
     
     with db_conn() as conn:
@@ -214,36 +214,37 @@ def get_available_plots():
         conn.row_factory = sqlite3.Row 
         cur = conn.cursor()
         
-        # 1. Obtener todas las fincas que el dueño dice que están disponibles
-        cur.execute("SELECT * FROM plots WHERE status = 'disponible'")
+        # Obtener TODAS las fincas de la base de datos
+        cur.execute("SELECT * FROM plots")
         plots = [dict(row) for row in cur.fetchall()]
         
-        # 2. Obtener IDs de fincas que tienen reserva activa
-        cur.execute("SELECT DISTINCT plot_id FROM reservations")
-        reserved_ids = [row[0] for row in cur.fetchall()]
-        
-        # 3. Filtrado real: Solo las que están en plots Y NO en reservations
-        available_plots = [p for p in plots if p['id'] not in reserved_ids]
-        
-        return available_plots
+        return plots
 
 def get_filtered_plots(min_surface=0, max_surface=1000000, query=""):
-    """Filtra las fincas ya unificadas"""
+    """Filtra las fincas unificadas con protección contra valores Nulos (None)"""
     all_available = get_available_plots()
+    
+    # Aseguramos que la query no sea None
+    query_str = (query or "").lower()
     
     filtered = []
     for p in all_available:
-        # Extraemos superficie (manejando errores de texto a número)
         try:
-            sup = float(p.get('surface', 0))
-        except:
-            sup = 0
+            # 1. Protección para superficie
+            sup = float(p.get('m2') if p.get('m2') is not None else 0)
             
-        cumple_sup = min_surface <= sup <= max_surface
-        cumple_query = query.lower() in p.get('title', '').lower() or query.lower() in p.get('description', '').lower()
-        
-        if cumple_sup and cumple_query:
-            filtered.append(p)
+            # 2. Protección para Título y Descripción
+            titulo = (p.get('title') or "").lower()
+            descripcion = (p.get('description') or "").lower()
+            
+            cumple_sup = min_surface <= sup <= max_surface
+            cumple_query = query_str in titulo or query_str in descripcion
+            
+            if cumple_sup and cumple_query:
+                filtered.append(p)
+        except Exception as e:
+            # Si una finca específica da error, la saltamos pero no rompemos toda la App
+            continue
             
     return filtered
 
@@ -291,7 +292,7 @@ def render_featured_plots(plots):
             with st.container():
                 # Imagen de la finca
                 img_path = get_plot_image_path(plot)
-                st.image(img_path, use_container_width=True, caption=f"{plot['title'][:20]}...")
+                st.image(img_path, width="stretch", caption=f"{plot['title'][:20]}...")
 
                 # Indicador especial para las 2 primeras fincas (destacadas)
                 if i < 2:
@@ -302,7 +303,7 @@ def render_featured_plots(plots):
                 st.markdown(f"**💰 €{plot.get('price', 0):,.0f}**")
 
                 # Botón para ver detalles (mantiene la misma lógica)
-                if st.button("Ver Detalles", key=f"featured_{plot['id']}", use_container_width=True):
+                if st.button("Ver Detalles", key=f"featured_{plot['id']}", width="stretch"):
                     set_query_param("selected_plot", plot["id"])
                     st.rerun()
 
@@ -310,25 +311,37 @@ def render_map(plots):
     """Renderiza el mapa interactivo con las fincas."""
     st.header("🗺️ Mapa de Fincas")
 
-    # Filtrar solo plots con coordenadas válidas
-    plots_with_coords = [p for p in plots if p.get('lat') is not None and p.get('lon') is not None]
+    # Limpiar caché para evitar fantasmas
+    st.cache_data.clear()
 
-    if not plots_with_coords:
-        st.info("📍 No hay fincas con coordenadas disponibles para mostrar en el mapa.")
+    # Procesar todas las plots, asignando coordenadas por defecto si faltan
+    plots_processed = []
+    for p in plots:
+        plot = p.copy()  # Copia para no modificar el original
+        if plot.get('lat') is None or plot.get('lon') is None:
+            plot['lat'] = 40.4168  # Madrid por defecto
+            plot['lon'] = -3.7038
+            plot['approximate_location'] = True
+        else:
+            plot['approximate_location'] = False
+        plots_processed.append(plot)
+
+    if not plots_processed:
+        st.info("📍 No hay fincas disponibles para mostrar en el mapa.")
         return
 
     # Calcular centro del mapa
-    lats = [float(p['lat']) for p in plots_with_coords]
-    lons = [float(p['lon']) for p in plots_with_coords]
+    lats = [float(p['lat']) for p in plots_processed]
+    lons = [float(p['lon']) for p in plots_processed]
     center_lat = sum(lats) / len(lats) if lats else 40.1
     center_lon = sum(lons) / len(lons) if lons else -4.0
-    zoom_level = 6 if len(plots_with_coords) > 1 else 12
+    zoom_level = 6 if len(plots_processed) > 1 else 12
 
     # Crear mapa con Folium
     m = folium.Map(location=[center_lat, center_lon], zoom_start=zoom_level, tiles="CartoDB positron")
 
     # Todas las plots en esta lista son disponibles (ya filtradas por get_available_plots)
-    for plot in plots_with_coords:
+    for plot in plots_processed:
         lat = float(plot['lat'])
         lon = float(plot['lon'])
         plot_id = plot['id']
@@ -336,41 +349,38 @@ def render_map(plots):
 
         # Todas las fincas en esta lista son disponibles (filtradas previamente)
         icon = folium.Icon(color='blue', icon='home', prefix='fa', icon_color='white')
-        status_text = ""
-        button_disabled = False
 
         # Crear popup HTML con imagen y enlace a detalles
         img_src = get_popup_image_url(plot)  # URL completa o relativa para la imagen
         detail_url = get_plot_detail_url(plot['id'])
 
-        if button_disabled:
-            # Botón deshabilitado para fincas vendidas
-            button_html = f'''
-            <span style="margin-top:5px; padding:5px 10px; background:#cccccc; color:#666666; text-decoration:none; border-radius:3px; display:inline-block; cursor:not-allowed;">
-                No disponible
-            </span>
-            '''
-        else:
-            # Botón normal para fincas disponibles
-            button_html = f'''
-            <a href="{detail_url}" target="_blank"
-               style="margin-top:5px; padding:5px 10px; background:#ff4b4b; color:white; text-decoration:none; border-radius:3px; display:inline-block;">
-                Ver más detalles
-            </a>
-            '''
+        # Botón normal para fincas disponibles
+        button_html = f'''
+        <a href="{detail_url}" target="_blank"
+           style="margin-top:5px; padding:5px 10px; background:#ff4b4b; color:white; text-decoration:none; border-radius:3px; display:inline-block;">
+            Ver más detalles
+        </a>
+        '''
+
+        # Nota de ubicación aproximada si aplica
+        location_note = "<small style='color:orange;'>Ubicación aproximada</small><br>" if plot.get('approximate_location') else ""
 
         popup_html = f'''
         <div style="width:160px; text-align:center;">
             <img src="{img_src}" style="width:100%; border-radius:5px;" alt="Imagen de {plot['title']}">
             <br><b>{plot['title']}</b><br>
+            {location_note}
             <small>{plot.get('m2', 'N/A')} m²</small><br>
-            {f'<div style="color:red; font-weight:bold;">{status_text}</div>' if is_sold else ''}
             {button_html}
         </div>
         '''
 
         marker = folium.Marker([lat, lon], icon=icon, popup=folium.Popup(popup_html, max_width=250))
         marker.add_to(m)
+
+    # DEBUG: Detectar Espinosa
+    if any(p.get('title') == "PRUEBA DIA2 ESPINOSA" for p in plots_processed):
+        st.write("¡Espinosa detectada en la lista!")
 
     # Renderizar mapa
     try:
@@ -379,20 +389,33 @@ def render_map(plots):
         st.error(f"No fue posible renderizar el mapa interactivo: {str(e)}")
         # Fallback: mostrar coordenadas como texto
         st.write("**Fincas encontradas:**")
-        for plot in plots_with_coords:
+        for plot in plots_processed:
             st.write(f"- {plot.get('title', 'Sin título')}: {plot.get('lat')}, {plot.get('lon')}")
 
     # Control nativo para navegación
-    render_map_navigation(plots_with_coords)
+    render_map_navigation(plots)
 
-def render_map_navigation(plots_with_coords):
+def render_map_navigation(plots):
     """Renderiza el control de navegación del mapa."""
     st.markdown("---")
-    if not plots_with_coords:
+    
+    # Procesar todas las plots igual que en render_map
+    plots_processed = []
+    for p in plots:
+        plot = p.copy()
+        if plot.get('lat') is None or plot.get('lon') is None:
+            plot['lat'] = 40.4168
+            plot['lon'] = -3.7038
+            plot['approximate_location'] = True
+        else:
+            plot['approximate_location'] = False
+        plots_processed.append(plot)
+    
+    if not plots_processed:
         return
 
     # Crear opciones para el selectbox
-    plot_options = {f"{p['title']} ({p.get('m2', 'N/A')} m²)": p['id'] for p in plots_with_coords}
+    plot_options = {f"{p['title']} ({p.get('m2', 'N/A')} m²)": p['id'] for p in plots_processed}
     selected_option = st.selectbox(
         "Selecciona una finca del mapa para ver detalles:",
         options=[""] + list(plot_options.keys()),
@@ -517,8 +540,8 @@ def main():
 
     # Mensaje de bienvenida si está logueado
     if st.session_state.get('logged_in'):
-        user_name = st.session_state.get('full_name', st.session_state.get('email', 'Usuario'))
-        role = st.session_state.get('rol', '')
+        user_name = st.session_state.get('user_name', st.session_state.get('email', 'Usuario'))
+        role = st.session_state.get('role', '')
         if role == 'services':
             panel_name = "Panel de Proveedor"
         elif role == 'architect':
@@ -577,6 +600,9 @@ def main():
 
     # Obtener fincas filtradas
     plots = get_filtered_plots(min_surface, max_surface, search_query)
+
+    # DEBUG DE FINCAS
+    st.write(f"DEBUG: Veo {len(plots)} fincas en la DB")
 
     # Layout principal: mapa ocupa todo el ancho
     render_map(plots)

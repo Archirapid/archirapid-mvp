@@ -40,7 +40,7 @@ def show_login():
             if user:
                 st.session_state["logged_in"] = True
                 st.session_state["user_email"] = email
-                st.session_state["user_name"] = user['full_name']  # Guardar nombre del usuario
+                st.session_state["user_name"] = user['name']  # Guardar nombre del usuario
                 st.session_state["role"] = user['role']
 
                 user_role = user.get('role')
@@ -73,7 +73,7 @@ def authenticate_user(email, password):
     try:
         conn = db_conn()
         c = conn.cursor()
-        c.execute("SELECT id, email, full_name, role, password_hash FROM users WHERE email = ?", (email,))
+        c.execute("SELECT id, email, name, role, password_hash FROM users WHERE email = ?", (email,))
         row = c.fetchone()
         conn.close()
 
@@ -81,7 +81,7 @@ def authenticate_user(email, password):
             return {
                 "id": row[0],
                 "email": row[1],
-                "full_name": row[2],
+                "name": row[2],
                 "role": row[3]
             }
     except Exception as e:
@@ -152,7 +152,7 @@ def show_registration():
                 c = conn.cursor()
 
                 c.execute("""
-                    INSERT INTO users (email, full_name, role, is_professional, password_hash, phone, address, company, specialty, created_at)
+                    INSERT INTO users (email, name, role, is_professional, password_hash, phone, address, company, specialty, created_at)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
                 """, (
                     email, nombre, role,
@@ -167,7 +167,7 @@ def show_registration():
 
                 st.session_state["logged_in"] = True
                 st.session_state["email"] = email
-                st.session_state["rol"] = role
+                st.session_state["role"] = role
 
                 if role == 'admin':
                     navigate_to("Intranet")

@@ -6,7 +6,7 @@ from datetime import datetime
 
 BASE = Path.cwd()
 UPLOADS = BASE / "uploads"
-DB_PATH = BASE / "database.db"
+DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "database.db")
 UPLOADS.mkdir(parents=True, exist_ok=True)
 
 def save_upload(uploaded_file, prefix="file"):
@@ -49,7 +49,7 @@ def insert_user(user):
 def get_user_by_email(email):
     conn = db_conn(); c=conn.cursor()
     # Check users table first (new unified table)
-    c.execute("SELECT id, full_name, email, role FROM users WHERE email=?", (email,))
+    c.execute("SELECT id, name, email, role FROM users WHERE email=?", (email,))
     row = c.fetchone()
     if row:
         conn.close()
@@ -189,7 +189,7 @@ def reserve_plot(plot_id, buyer_name, buyer_email, amount, kind="reservation"):
     conn.commit(); conn.close()
     return rid
 
-def create_client_user_if_not_exists(email, full_name, transaction_id=None):
+def create_client_user_if_not_exists(email, name, transaction_id=None):
     """
     Crea un usuario cliente automáticamente si no existe.
     Retorna True si se creó el usuario, False si ya existía.
@@ -216,9 +216,9 @@ def create_client_user_if_not_exists(email, full_name, transaction_id=None):
     password_hash = hashlib.sha256(temp_password.encode()).hexdigest()
 
     c.execute("""
-        INSERT INTO users (id, email, full_name, role, password_hash, created_at)
+        INSERT INTO users (id, email, name, role, password_hash, created_at)
         VALUES (?, ?, ?, ?, ?, ?)
-    """, (user_id, email, full_name, 'client', password_hash, datetime.utcnow().isoformat()))
+    """, (user_id, email, name, 'client', password_hash, datetime.utcnow().isoformat()))
 
     conn.commit()
     conn.close()
@@ -314,7 +314,7 @@ def init_db():
         CREATE TABLE IF NOT EXISTS users (
             id TEXT PRIMARY KEY,
             email TEXT UNIQUE,
-            full_name TEXT,
+            name TEXT,
             role TEXT,
             is_professional INTEGER DEFAULT 0,
             password_hash TEXT,
@@ -348,7 +348,7 @@ def create_or_update_client_user(email, name, password=None):
 
     if existing_user:
         # Usuario existe - actualizar rol y nombre
-        c.execute("UPDATE users SET role = 'client', full_name = ? WHERE email = ?", (name, email))
+        c.execute("UPDATE users SET role = 'client', name = ? WHERE email = ?", (name, email))
 
         # Si se proporciona nueva password, actualizarla
         if password:
@@ -363,7 +363,7 @@ def create_or_update_client_user(email, name, password=None):
         password_hash = generate_password_hash(password)
 
         c.execute("""
-            INSERT INTO users (id, email, full_name, role, password_hash, created_at)
+            INSERT INTO users (id, email, name, role, password_hash, created_at)
             VALUES (?, ?, ?, ?, ?, ?)
         """, (user_id, email, name, 'client', password_hash, datetime.utcnow().isoformat()))
 

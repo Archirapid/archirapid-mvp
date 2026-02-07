@@ -1,14 +1,15 @@
 """Base de datos centralizada para ArchiRapid (SQLite)."""
 from __future__ import annotations
+import os
 import sqlite3
 import json
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Dict, Optional, Iterator
 
-BASE_PATH = Path(__file__).parent.parent
+BASE_PATH = Path.cwd()
 # Use a fixed absolute database path to ensure all modules use the same DB file
-DB_PATH = BASE_PATH / "database.db"
+DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "database.db")
 
 def get_conn():
     """Devuelve conexión SQLite con row_factory habilitado para acceder por nombre de columna.
