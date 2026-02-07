@@ -187,7 +187,10 @@ def show_registration():
                 elif role == 'architect':
                     navigate_to("Arquitectos (Marketplace)")
                 elif role == 'owner':
-                    navigate_to("🏠 Propietarios")
+                    st.session_state["selected_page"] = "🏠 Propietarios"
+                    st.session_state['role'] = "owner"
+                    st.session_state['logged_in'] = True
+                    st.rerun()
                 elif role == 'client':
                     navigate_to("👤 Panel de Cliente")
                 else:
