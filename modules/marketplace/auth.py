@@ -109,10 +109,11 @@ def show_registration():
         password_confirm = st.text_input("Confirmar contraseña *", type="password", placeholder="Repite tu contraseña")
 
         st.subheader("👤 Tipo de Usuario")
+        role_to_index = {'client': 0, 'architect': 1, 'owner': 2}
         tipo_usuario = st.selectbox(
             "Selecciona tu perfil *",
             ["Cliente (Busco proyectos)", "Arquitecto (Vendo proyectos)", "Propietario (Subo fincas)"],
-            index=0
+            index=role_to_index.get(st.session_state.get('login_role'), 0)
         )
 
         if tipo_usuario == "Arquitecto (Vendo proyectos)":
