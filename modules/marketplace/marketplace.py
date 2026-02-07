@@ -1,4 +1,5 @@
 import streamlit as st
+import sqlite3
 from modules.marketplace.utils import list_published_plots, save_upload, reserve_plot, list_projects, calculate_edificability
 from src import db
 import folium
@@ -205,46 +206,46 @@ def setup_filters():
     return min_m, max_m, q
 
 def get_available_plots():
-    """Obtiene todas las fincas disponibles: status='disponible' y sin reservas activas."""
+    """Lógica unificada: Finca disponible en tabla + Sin reserva"""
     from modules.marketplace.utils import db_conn
     
-    # Obtener todas las fincas con status='disponible'
-    conn = db_conn()
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM plots WHERE status = 'disponible'")
-    plots = cursor.fetchall()
-    
-    # Obtener plot_ids con reservas activas
-    cursor.execute("SELECT DISTINCT plot_id FROM reservations")
-    reserved_plot_ids = {row[0] for row in cursor.fetchall()}
-    conn.close()
-    
-    # Filtrar fincas que no estén reservadas
-    available_plots = [plot for plot in plots if plot['id'] not in reserved_plot_ids]
-    
-    return available_plots
+    with db_conn() as conn:
+        # Forzamos que la conexión devuelva diccionarios (el cable que falta)
+        conn.row_factory = sqlite3.Row 
+        cur = conn.cursor()
+        
+        # 1. Obtener todas las fincas que el dueño dice que están disponibles
+        cur.execute("SELECT * FROM plots WHERE status = 'disponible'")
+        plots = [dict(row) for row in cur.fetchall()]
+        
+        # 2. Obtener IDs de fincas que tienen reserva activa
+        cur.execute("SELECT DISTINCT plot_id FROM reservations")
+        reserved_ids = [row[0] for row in cur.fetchall()]
+        
+        # 3. Filtrado real: Solo las que están en plots Y NO en reservations
+        available_plots = [p for p in plots if p['id'] not in reserved_ids]
+        
+        return available_plots
 
-def get_filtered_plots(min_surface, max_surface, search_query):
-    """Obtiene las fincas filtradas según los criterios especificados.
+def get_filtered_plots(min_surface=0, max_surface=1000000, query=""):
+    """Filtra las fincas ya unificadas"""
+    all_available = get_available_plots()
     
-    Solo incluye fincas disponibles (status='disponible' y sin reservas).
-    """
-    # Obtener fincas disponibles
-    plots_all = get_available_plots()
-    
-    # Filtrar por superficie
-    if max_surface == 0:
-        max_surface = 999999  # Sin límite superior
-    plots_all = [p for p in plots_all if min_surface <= p.get('surface_m2', 0) <= max_surface]
-    
-    # Aplicar búsqueda de texto si existe (incluye provincia, título y referencia)
-    if search_query:
-        plots_all = [p for p in plots_all if search_query.lower() in
-                    ((p.get("title", "") or "") + " " +
-                     (p.get("province", "") or "") + " " +
-                     str(p.get("cadastral_ref", "") or "")).lower()]
-
-    return plots_all
+    filtered = []
+    for p in all_available:
+        # Extraemos superficie (manejando errores de texto a número)
+        try:
+            sup = float(p.get('surface', 0))
+        except:
+            sup = 0
+            
+        cumple_sup = min_surface <= sup <= max_surface
+        cumple_query = query.lower() in p.get('title', '').lower() or query.lower() in p.get('description', '').lower()
+        
+        if cumple_sup and cumple_query:
+            filtered.append(p)
+            
+    return filtered
 
 def render_featured_plots(plots):
     """Renderiza la sección de fincas destacadas en grid de 3 columnas (2 filas = 6 fincas)."""
