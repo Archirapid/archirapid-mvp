@@ -1474,7 +1474,7 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
     # Mostrar formulario de login si viewing_login es True
     if st.session_state.get('viewing_login', False):
         st.markdown("---")
-        st.header(f"🔐 Iniciar Sesión - {st.session_state.get('login_role', '').title()}")
+        st.header("🔐 Iniciar Sesión - Owner")
         
         modo_registro = st.checkbox("¿Es tu primera vez? Activa el modo registro", key="modo_registro")
         
