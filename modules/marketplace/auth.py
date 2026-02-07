@@ -138,12 +138,16 @@ def show_registration():
                 st.error("La contraseña debe tener al menos 6 caracteres.")
                 return
 
-            if tipo_usuario == "Cliente (Busco proyectos)":
-                role = "client"
-            elif tipo_usuario == "Arquitecto (Vendo proyectos)":
-                role = "architect"
-            else:
+            if st.session_state.get('login_role') == 'owner':
+                tipo_usuario = "Propietario (Subo fincas)"
                 role = "owner"
+            else:
+                if tipo_usuario == "Cliente (Busco proyectos)":
+                    role = "client"
+                elif tipo_usuario == "Arquitecto (Vendo proyectos)":
+                    role = "architect"
+                else:
+                    role = "owner"
 
             try:
                 from werkzeug.security import generate_password_hash
