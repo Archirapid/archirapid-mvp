@@ -1177,7 +1177,7 @@ if "selected_plot" in st.query_params and not page_from_query:
         st.error(f"Error procesando finca seleccionada: {e}")
     st.stop()  # Detener la ejecución para no mostrar el resto de la app
 
-if st.query_params.get("page") == "👤 Panel de Cliente":
+if st.query_params.get("page") == "👤 Panel de Cliente" and st.session_state.get('selected_page') != "🏠 Propietarios":
     try:
         panel_cliente_v2()
         st.stop()
