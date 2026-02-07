@@ -109,19 +109,24 @@ def show_registration():
         password_confirm = st.text_input("Confirmar contraseña *", type="password", placeholder="Repite tu contraseña")
 
         st.subheader("👤 Tipo de Usuario")
-        role_to_index = {'client': 0, 'architect': 1, 'owner': 2}
-        tipo_usuario = st.selectbox(
-            "Selecciona tu perfil *",
-            ["Cliente (Busco proyectos)", "Arquitecto (Vendo proyectos)", "Propietario (Subo fincas)"],
-            index=role_to_index.get(st.session_state.get('login_role'), 0)
-        )
-
-        if tipo_usuario == "Arquitecto (Vendo proyectos)":
-            empresa = st.text_input("Empresa/Estudio", placeholder="Nombre de tu empresa")
-            especialidad = st.selectbox("Especialidad", ["Arquitectura Residencial", "Arquitectura Comercial", "Urbanismo", "Interiorismo", "Otros"])
-        else:
+        if st.session_state.get('login_role') == 'owner':
+            st.info("Registrándote como Propietario")
+            tipo_usuario = "Propietario (Subo fincas)"
             empresa = ""
             especialidad = ""
+        else:
+            role_to_index = {'client': 0, 'architect': 1, 'owner': 2}
+            tipo_usuario = st.selectbox(
+                "Selecciona tu perfil *",
+                ["Cliente (Busco proyectos)", "Arquitecto (Vendo proyectos)", "Propietario (Subo fincas)"],
+                index=role_to_index.get(st.session_state.get('login_role'), 0)
+            )
+            if tipo_usuario == "Arquitecto (Vendo proyectos)":
+                empresa = st.text_input("Empresa/Estudio", placeholder="Nombre de tu empresa")
+                especialidad = st.selectbox("Especialidad", ["Arquitectura Residencial", "Arquitectura Comercial", "Urbanismo", "Interiorismo", "Otros"])
+            else:
+                empresa = ""
+                especialidad = ""
 
         submitted = st.form_submit_button("🚀 Registrarme y Acceder", type="primary")
 
@@ -139,7 +144,6 @@ def show_registration():
                 return
 
             if st.session_state.get('login_role') == 'owner':
-                tipo_usuario = "Propietario (Subo fincas)"
                 role = "owner"
             else:
                 if tipo_usuario == "Cliente (Busco proyectos)":
