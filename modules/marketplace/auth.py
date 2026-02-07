@@ -4,8 +4,12 @@ from werkzeug.security import check_password_hash
 
 # Función de navegación unificada
 def navigate_to(page_name):
-    st.query_params["page"] = page_name
     st.session_state["selected_page"] = page_name
+    if page_name == "🏠 Propietarios":
+        st.session_state['role'] = "owner"
+        st.session_state['logged_in'] = True
+    elif page_name in ["👤 Panel de Cliente", "Registro de Usuario", "Arquitectos (Marketplace)", "Intranet"]:
+        st.query_params["page"] = page_name
     st.rerun()
 
 def show_login():
