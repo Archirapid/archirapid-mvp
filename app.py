@@ -104,6 +104,11 @@ def detalles_proyecto_v2(project_id: str):
 
 def panel_cliente_v2():
     """Panel de cliente - VERSIÓN V2 (copia exacta del contenido original)"""
+    # Si es propietario, mostrar panel de propietarios
+    if st.session_state.get('role') == 'owner':
+        from modules.marketplace import owners
+        owners.main()
+        return
     # modules/marketplace/client_panel.py
     from modules.marketplace.utils import db_conn
     import json
