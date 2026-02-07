@@ -1586,6 +1586,8 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
                                 st.session_state['selected_page'] = "Arquitectos (Marketplace)"
                             elif st.session_state['role'] == 'services':
                                 st.session_state['selected_page'] = "👤 Panel de Proveedor"
+                            elif st.session_state['role'] == 'owner':
+                                st.session_state['selected_page'] = "🏠 Propietarios"
                             elif st.session_state['role'] == 'admin':
                                 st.session_state['selected_page'] = "Intranet"
                             

@@ -173,6 +173,8 @@ def show_registration():
                     navigate_to("Intranet")
                 elif role == 'architect':
                     navigate_to("Arquitectos (Marketplace)")
+                elif role == 'owner':
+                    navigate_to("🏠 Propietarios")
                 elif role == 'client':
                     navigate_to("👤 Panel de Cliente")
                 else:

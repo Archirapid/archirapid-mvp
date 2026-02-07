@@ -140,7 +140,7 @@ def main():
     st.info("📢 ARCHIRAPID gestiona la venta y el desarrollo de tu finca. Por el uso de la plataforma y la gestión comercial, se aplicará una comisión del 7% al 10% sobre el precio de venta final.")
 
     # --- 1. LOGIN / IDENTIFICACIÓN ---
-    if not (st.session_state.get('logged_in') and st.session_state.get('role') == 'client'):
+    if not (st.session_state.get('logged_in') and st.session_state.get('role') == 'owner'):
         st.info("Para empezar, identifícate como propietario.")
         
         col_a, col_b = st.columns(2)
@@ -173,12 +173,14 @@ def main():
                         "id": new_id, 
                         "name": name, 
                         "email": email, 
-                        "role": "client", 
+                        "role": "owner", 
                         "company": "",
                         "phone": phone,
                         "address": address
                     })
                     st.success("Cuenta creada. Bienvenido.")
+                    st.session_state['logged_in'] = True
+                    st.session_state['role'] = 'owner'
                     st.session_state["owner_id"] = new_id
                     st.session_state["owner_email"] = email
                     st.session_state["owner_name"] = name
