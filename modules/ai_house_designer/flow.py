@@ -26,6 +26,100 @@ def main():
 def render_step1():
     st.header("Paso 1 – Necesidades y preferencias del cliente")
     
+    # Inicializar requisitos si no existen
+    if "ai_house_requirements" not in st.session_state:
+        st.session_state["ai_house_requirements"] = {
+            "target_area_m2": 120.0,
+            "budget_limit": None,
+            "bedrooms": 3,
+            "bathrooms": 2,
+            "wants_pool": False,
+            "wants_porch": True,
+            "wants_garage": False,
+            "wants_outhouse": False,
+            "max_floors": 1,
+            "style": "moderna",
+            "materials": ["hormigón"],
+            "notes": ""
+        }
+    
+    req = st.session_state["ai_house_requirements"]
+    
+    # Formulario en dos columnas
+    col_left, col_right = st.columns(2)
+    
+    with col_left:
+        st.subheader("📐 Dimensiones y habitaciones")
+        
+        req["target_area_m2"] = st.number_input(
+            "Superficie objetivo (m²)",
+            min_value=40,
+            max_value=400,
+            value=req["target_area_m2"],
+            step=5
+        )
+        
+        req["budget_limit"] = st.number_input(
+            "Presupuesto máximo (€)",
+            min_value=0,
+            value=req["budget_limit"] or 0.0,
+            step=10000.0,
+            help="0 = sin límite"
+        )
+        
+        req["bedrooms"] = st.number_input(
+            "Dormitorios",
+            min_value=1,
+            max_value=6,
+            value=req["bedrooms"]
+        )
+        
+        req["bathrooms"] = st.number_input(
+            "Baños",
+            min_value=1,
+            max_value=4,
+            value=req["bathrooms"]
+        )
+        
+        req["max_floors"] = st.selectbox(
+            "Número máximo de plantas",
+            options=[1, 2, 3],
+            index=req["max_floors"] - 1
+        )
+    
+    with col_right:
+        st.subheader("🎨 Estilo y extras")
+        
+        req["style"] = st.selectbox(
+            "Estilo preferido",
+            options=["moderna", "rústica", "minimalista", "mediterránea"],
+            index=["moderna", "rústica", "minimalista", "mediterránea"].index(req["style"])
+        )
+        
+        req["materials"] = st.multiselect(
+            "Materiales principales",
+            options=["hormigón", "madera", "piedra", "ladrillo"],
+            default=req["materials"]
+        )
+        
+        st.markdown("**Extras deseados:**")
+        req["wants_pool"] = st.checkbox("Piscina", value=req["wants_pool"])
+        req["wants_porch"] = st.checkbox("Porche", value=req["wants_porch"])
+        req["wants_garage"] = st.checkbox("Garaje", value=req["wants_garage"])
+        req["wants_outhouse"] = st.checkbox("Casa de aperos separada", value=req["wants_outhouse"])
+        
+        req["notes"] = st.text_area(
+            "Cuéntanos qué te gustaría (texto libre)",
+            value=req["notes"],
+            height=100
+        )
+    
+    # Actualizar session state con los valores introducidos
+    st.session_state["ai_house_requirements"] = req
+    
+    # Separador visual
+    st.markdown("---")
+    
     # Crear un diseño de ejemplo
     design = create_example_design()
     
