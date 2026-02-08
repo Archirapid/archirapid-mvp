@@ -53,32 +53,32 @@ def render_step1():
         
         req["target_area_m2"] = st.number_input(
             "Superficie objetivo (m²)",
-            min_value=40,
-            max_value=400,
-            value=req["target_area_m2"],
-            step=5
+            min_value=40.0,
+            max_value=400.0,
+            value=float(req["target_area_m2"]),
+            step=5.0
         )
         
         req["budget_limit"] = st.number_input(
             "Presupuesto máximo (€)",
-            min_value=0,
-            value=req["budget_limit"] or 0.0,
+            min_value=0.0,
+            value=float(req["budget_limit"] or 0.0),
             step=10000.0,
             help="0 = sin límite"
         )
         
         req["bedrooms"] = st.number_input(
             "Dormitorios",
-            min_value=1,
-            max_value=6,
-            value=req["bedrooms"]
+            min_value=1.0,
+            max_value=6.0,
+            value=float(req["bedrooms"])
         )
         
         req["bathrooms"] = st.number_input(
             "Baños",
-            min_value=1,
-            max_value=4,
-            value=req["bathrooms"]
+            min_value=1.0,
+            max_value=4.0,
+            value=float(req["bathrooms"])
         )
         
         req["max_floors"] = st.selectbox(
