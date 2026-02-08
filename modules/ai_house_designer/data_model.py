@@ -79,7 +79,7 @@ def create_example_design() -> HouseDesign:
         requires_window=True,
         requires_exterior_wall=True,
         can_be_upstairs=True,
-        base_cost_per_m2=800.0,
+        base_cost_per_m2=1400.0,
         extra_cost_factors={"premium_finish": 200.0}
     )
 
@@ -92,7 +92,7 @@ def create_example_design() -> HouseDesign:
         requires_window=True,
         requires_exterior_wall=False,
         can_be_upstairs=True,
-        base_cost_per_m2=600.0
+        base_cost_per_m2=1100.0
     )
 
     living_kitchen_type = RoomType(
@@ -104,8 +104,41 @@ def create_example_design() -> HouseDesign:
         requires_window=True,
         requires_exterior_wall=True,
         can_be_upstairs=False,
-        base_cost_per_m2=700.0,
+        base_cost_per_m2=1200.0,
         extra_cost_factors={"kitchen_equipment": 300.0}
+    )
+
+    # RoomType extras
+    casa_apero_type = RoomType(
+        code="casa_apero",
+        name="Casa de aperos",
+        min_m2=15.0,
+        max_m2=30.0,
+        base_cost_per_m2=800.0
+    )
+
+    bodega_type = RoomType(
+        code="bodega",
+        name="Bodega",
+        min_m2=6.0,
+        max_m2=12.0,
+        base_cost_per_m2=600.0
+    )
+
+    piscina_type = RoomType(
+        code="piscina",
+        name="Piscina",
+        min_m2=20.0,
+        max_m2=40.0,
+        base_cost_per_m2=2500.0
+    )
+
+    garaje_type = RoomType(
+        code="garaje",
+        name="Garaje",
+        min_m2=12.0,
+        max_m2=25.0,
+        base_cost_per_m2=900.0
     )
 
     # Tres rooms que sumen menos de 165 m²

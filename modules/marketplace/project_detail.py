@@ -515,7 +515,7 @@ def show_project_detail_page(project_id: str):
                         st.session_state["user_email"] = email
                         st.session_state["user_name"] = full_name
                         st.session_state["role"] = "client"
-                        st.session_state["user_role"] = "buyer"
+                        # st.session_state["user_role"] = "buyer"  # DESACTIVADO: Asignación ilegal
                         st.session_state["has_transactions"] = False
                         st.session_state["has_properties"] = False
                         st.session_state["just_registered"] = True

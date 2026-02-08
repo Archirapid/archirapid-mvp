@@ -1,0 +1,13 @@
+PUNTO DE RESTAURACION DIA 4B FOTOS - 02/04/2026 17:56:14
+COMMIT: 1a1de8e1ba6871eb3b2a713eae8cf6355d60b013
+ARCHIVOS MODIFICADOS:
+commit 1a1de8e1ba6871eb3b2a713eae8cf6355d60b013
+Author: ARCHIRAPID Developer <archirapid@project.local>
+Date:   Wed Feb 4 14:16:18 2026 +0100
+
+    DIA 4B FOTOS: Fix UnboundLocalError 'os' in client_panel.py - Remove local import os statements shadowing global module. Fix photo display in client panel for reserved plots. Add test data and verification scripts.
+
+check_db2.py
+check_db_temp.py
+check_users.py
+API KEYS STATUS:

@@ -4,6 +4,26 @@ Marketplace de proyectos para arquitectos - ARCHIRAPID MVP
 Permite subir proyectos completos al catálogo
 """
 
+"""
+⚠️ SECCIÓN BLINDADA – ARQUITECTOS (NO MODIFICAR SIN REVISIÓN)
+
+Este archivo forma parte del núcleo Arquitectos.
+- No debe ser importado directamente por otras secciones.
+- El acceso debe hacerse exclusivamente vía:
+  render_architects_panel(ctx)
+
+Cambios permitidos:
+- Añadir campos opcionales a proyectos
+- Ajustes menores de UI internos
+
+Cambios PROHIBIDOS:
+- Importar lógica de clientes, IA o compras
+- Acceder a st.session_state fuera del flujo actual
+- Cambiar contratos de datos sin versión nueva
+
+Responsable técnico: CORE MARKETPLACE
+"""
+
 import streamlit as st
 import json
 import os

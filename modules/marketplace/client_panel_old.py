@@ -31,7 +31,7 @@ def main():
         if transactions or owner_plots:
             st.session_state["client_logged_in"] = True
             st.session_state["client_email"] = auto_email
-            st.session_state["user_role"] = "buyer" if transactions else "owner"
+            # st.session_state["user_role"] = "buyer" if transactions else "owner"  # DESACTIVADO: Asignación ilegal
             st.session_state["has_transactions"] = len(transactions) > 0
             st.session_state["has_properties"] = len(owner_plots) > 0
             
@@ -74,7 +74,7 @@ def main():
                 if transactions or owner_plots:
                     st.session_state["client_logged_in"] = True
                     st.session_state["client_email"] = email
-                    st.session_state["user_role"] = "buyer" if transactions else "owner"
+                    # st.session_state["user_role"] = "buyer" if transactions else "owner"  # DESACTIVADO: Asignación ilegal
                     st.session_state["has_transactions"] = len(transactions) > 0
                     st.session_state["has_properties"] = len(owner_plots) > 0
                     

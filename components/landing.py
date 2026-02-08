@@ -85,8 +85,9 @@ def render_landing():
         </div>
         """, unsafe_allow_html=True)
         st.markdown('<div class="role-btn">', unsafe_allow_html=True)
-        if st.button("Acceso Propietarios", key="btn_prop"):
-            st.query_params["page"] = "Propietarios (Subir Fincas)"
+        if st.button("Subir Mi Finca", key="btn_prop"):
+            st.session_state['login_role'] = 'owner'
+            st.session_state['viewing_login'] = True
             st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
 

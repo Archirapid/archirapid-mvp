@@ -1038,7 +1038,7 @@ if st.query_params.get("page") == "Diseñador de Vivienda":
     try:
         with st.container():
             ai_house_flow.main()
-        st.stop()
+            st.stop()
     except Exception as e:
         st.error(f"Error mostrando diseñador de vivienda: {e}")
 

@@ -13,6 +13,9 @@ def navigate_to(page_name):
     st.rerun()
 
 def show_login():
+    # 🛑 BLINDAJE: si ya hay rol, no volver a registrar
+    if st.session_state.get("role"):
+        return
     if st.session_state.get('login_role') == 'admin':
         # Login especial para admin
         st.title("🔐 Acceso Administrativo")
@@ -54,6 +57,9 @@ def show_login():
                 elif user_role == 'architect':
                     st.query_params["page"] = "Arquitectos (Marketplace)"
                     st.session_state['selected_page'] = "Arquitectos (Marketplace)"
+                elif user_role == 'owner':
+                    st.query_params["page"] = "🏠 Propietarios"
+                    st.session_state['selected_page'] = "🏠 Propietarios"
                 elif user_role == 'services':
                     st.query_params["page"] = "👤 Panel de Proveedor"
                     st.session_state['selected_page'] = "👤 Panel de Proveedor"
@@ -94,6 +100,11 @@ def authenticate_user(email, password):
     return None
 
 def show_registration():
+    # 🛑 BLINDAJE: si ya hay rol, no volver a registrar
+    if st.session_state.get("role"):
+        return
+    if st.session_state.get("authenticated"):
+        return
     st.title("📝 Registro de Usuario")
 
     with st.form("registro_form"):
@@ -178,24 +189,19 @@ def show_registration():
 
                 st.success("🎉 ¡Registro completado exitosamente!")
 
+                # FORZADO BRUTO PARA EL JEFE
                 st.session_state["logged_in"] = True
                 st.session_state["email"] = email
                 st.session_state["role"] = role
-
-                if role == 'admin':
-                    navigate_to("Intranet")
-                elif role == 'architect':
-                    navigate_to("Arquitectos (Marketplace)")
-                elif role == 'owner':
-                    st.query_params.clear()
+                if role == 'owner':
+                    st.query_params["page"] = "🏠 Propietarios"
                     st.session_state["selected_page"] = "🏠 Propietarios"
-                    st.session_state['role'] = "owner"
-                    st.session_state['logged_in'] = True
-                    st.rerun()
-                elif role == 'client':
-                    navigate_to("👤 Panel de Cliente")
+                    # 🛡️ Marca sesión como autenticada
+                    st.session_state["authenticated"] = True
                 else:
-                    navigate_to("👤 Panel de Cliente")
+                    st.query_params["page"] = "🏠 Inicio / Marketplace"
+                    st.session_state["selected_page"] = "🏠 Inicio / Marketplace"
+                st.rerun()
 
             except Exception as e:
                 st.error(f"Error en el registro: {e}")
