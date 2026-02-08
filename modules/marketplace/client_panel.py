@@ -13,6 +13,7 @@ import json
 import os
 from pathlib import Path
 from modules.marketplace.compatibilidad import get_proyectos_compatibles
+from modules.ai_house_designer import flow as ai_house_flow
 
 def generate_3d_viewer_html(model_url):
     return f'''
@@ -132,6 +133,12 @@ def show_full_client_dashboard(client_email):
 def main():
     st.title("👤 Panel de Cliente - ARCHIRAPID")
 
+    # REDIRECT OWNERS: Si un propietario accede aquí por error, redirigirlo a su panel
+    if st.session_state.get('logged_in') and st.session_state.get('role') == 'owner':
+        from modules.marketplace import owners
+        owners.main()
+        return
+
     # BYPASS TOTAL: Si venimos de un pago o estamos logueados, entramos directo
     email_final = st.session_state.get('user_email') or st.session_state.get('auto_owner_email')
 
@@ -159,7 +166,7 @@ def main():
         if transactions:
             st.session_state["client_logged_in"] = True
             st.session_state["client_email"] = auto_email
-            st.session_state["user_role"] = "buyer"
+            # st.session_state["user_role"] = "buyer"  # DESACTIVADO: Asignación ilegal
             st.session_state["has_transactions"] = len(transactions) > 0
             st.session_state["has_properties"] = False
 
@@ -205,7 +212,7 @@ def main():
                 if transactions:
                     st.session_state["client_logged_in"] = True
                     st.session_state["client_email"] = email
-                    st.session_state["user_role"] = "buyer"
+                    # st.session_state["user_role"] = "buyer"  # DESACTIVADO: Asignación ilegal
                     st.session_state["has_transactions"] = len(transactions) > 0
                     st.session_state["has_properties"] = False  # No es propietario en este panel
                     
@@ -1228,8 +1235,10 @@ def show_buyer_panel(client_email):
 
             with col1:
                 if st.button("🎨 DISEÑAR CON IA", type="primary", use_container_width=True):
-                    st.info("🎨 Función de diseño con IA próximamente disponible")
-                    # TODO: Implementar navegación a diseñador IA
+                    st.session_state["design_plot_id"] = plot_data[0]
+                    st.session_state["ai_house_step"] = 1
+                    st.query_params["page"] = "Diseñador de Vivienda"
+                    st.rerun()
 
             with col2:
                 if st.button("📐 VER PROYECTOS COMPATIBLES", type="secondary", use_container_width=True):

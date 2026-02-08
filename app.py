@@ -35,6 +35,7 @@ from pathlib import Path
 from src import db as _db
 from modules.marketplace.utils import init_db, db_conn
 from modules.marketplace.marketplace import get_project_display_image
+from modules.ai_house_designer import flow as ai_house_flow
 
 # Inicializar base de datos
 init_db()
@@ -45,6 +46,12 @@ st.set_page_config(layout='wide')
 
 # HARDCODE DE ROL PARA PRUEBA
 if st.session_state.get('email') == 'asdfg@lkj.com': st.session_state['role'] = 'owner'
+
+# 🛡️ BLINDAJE ABSOLUTO OWNER
+if st.session_state.get("role") == "owner":
+    from modules.marketplace import owners
+    owners.main()
+    st.stop()
 
 # El Script de Limpieza Absoluta
 import sqlite3
@@ -103,198 +110,29 @@ def detalles_proyecto_v2(project_id: str):
         show_project_detail_page(project_id)
 
 def panel_cliente_v2():
-    """Panel de cliente - VERSIÓN V2 (copia exacta del contenido original)"""
-    # Si es propietario, mostrar panel de propietarios
-    if st.session_state.get('role') == 'owner':
+    from modules.marketplace import owners
+    return owners.main()
+
+
+def route_main_panel():
+    selected_page = st.session_state.get("selected_page")
+    user_role = st.session_state.get("user_role", "buyer")
+    
+    if selected_page == "🏠 Propietarios":
         from modules.marketplace import owners
         owners.main()
-        return
-    # modules/marketplace/client_panel.py
-    from modules.marketplace.utils import db_conn
-    import json
-    import os
-    from modules.marketplace.compatibilidad import get_proyectos_compatibles
-
-    # Iniciar servidor estático para VR y archivos
-    from pathlib import Path
-    STATIC_ROOT = Path(r"C:/ARCHIRAPID_PROYECT25")
-    STATIC_PORT = _start_static_server(STATIC_ROOT, port=8000)
-    if STATIC_PORT:
-        STATIC_URL = f"http://localhost:{STATIC_PORT}/"
-    else:
-        STATIC_URL = "http://localhost:8000/"
-
-    st.title("👤 Panel de Cliente - ARCHIRAPID V2")
-
-    # PRIMERO: Verificar si ya está logueado con credenciales (sistema de passwords)
-    if st.session_state.get('logged_in') and st.session_state.get('role') == 'client':
-        user_email = st.session_state.get('user_email')
-        user_name = st.session_state.get('user_name', 'Cliente')
-
-        # Mostrar directamente el panel profesional
-        show_client_dashboard(user_email, user_name)
-        return
-
-    # BYPASS PARA PAGO CONFIRMADO - Acceso inmediato sin consultas DB
-    if st.session_state.get('payment_confirmed'):
-        user_email = st.session_state.get('user_email')
-        user_name = st.session_state.get('user_name', 'Cliente')
-
-        # Limpiar el flag para evitar loops
-        del st.session_state['payment_confirmed']
-
-        # Mostrar directamente el panel profesional
-        show_client_dashboard(user_email, user_name)
-        return
-
-    # SEGUNDO: Auto-login si viene de query params con owner_email (sistema legacy)
-    # SOLO SI NO TIENE CREDENCIALES VÁLIDAS
-    if not (st.session_state.get('logged_in') and st.session_state.get('role') == 'client'):
-        if "auto_owner_email" in st.session_state and not st.session_state.get("client_logged_in", False):
-            auto_email = st.session_state["auto_owner_email"]
-            # Verificar si el email tiene transacciones O es propietario con fincas
-            conn = db_conn()
-            cursor = conn.cursor()
-
-            # Buscar transacciones (compras/reservas)
-            cursor.execute("SELECT * FROM reservations WHERE buyer_email=?", (auto_email,))
-            transactions = cursor.fetchall()
-
-            # Si no tiene transacciones, buscar si es propietario con fincas publicadas
-            if not transactions:
-                cursor.execute("SELECT * FROM plots WHERE owner_email=?", (auto_email,))
-                owner_plots = cursor.fetchall()
-            else:
-                owner_plots = []
-
-            conn.close()
-
-            # Auto-login si tiene transacciones O fincas como propietario
-            if transactions or owner_plots:
-                st.session_state["client_logged_in"] = True
-                st.session_state["client_email"] = auto_email
-                st.session_state["user_role"] = "buyer" if transactions else "owner"
-                st.session_state["has_transactions"] = len(transactions) > 0
-                st.session_state["has_properties"] = len(owner_plots) > 0
-
-                role_text = "comprador" if transactions else "propietario"
-                st.info(f"🔄 Auto-acceso concedido como {role_text} para {auto_email}")
-
-                # Limpiar el estado de auto-login
-                del st.session_state["auto_owner_email"]
-
-    # Verificar si viene de vista previa de proyecto
-    selected_project = st.query_params.get("selected_project_v2")
-    if selected_project and not st.session_state.get("client_logged_in", False):
-        st.info("🔍 Proyecto seleccionado detectado. Por favor inicia sesión para continuar.")
-
-    # Login simple por email
-    # SOLO SI NO TIENE CREDENCIALES VÁLIDAS
-    if not (st.session_state.get('logged_in') and st.session_state.get('role') == 'client'):
-        if "client_logged_in" not in st.session_state:
-            st.session_state["client_logged_in"] = False
-
-        if not st.session_state["client_logged_in"]:
-            st.subheader("🔐 Acceso al Panel de Cliente V2")
-            st.info("Introduce el email que usaste al realizar tu compra/reserva")
-
-            email = st.text_input("Email de cliente", placeholder="tu@email.com")
-
-            if st.button("Acceder", type="primary"):
-                if email:
-                    # Verificar si el email tiene transacciones, propiedades O está registrado como cliente
-                    conn = db_conn()
-                    cursor = conn.cursor()
-
-                    # Buscar transacciones (compras/reservas)
-                    cursor.execute("SELECT * FROM reservations WHERE buyer_email=?", (email,))
-                    transactions = cursor.fetchall()
-
-                    # Si no tiene transacciones, buscar si es propietario con fincas publicadas
-                    if not transactions:
-                        cursor.execute("SELECT * FROM plots WHERE owner_email=?", (email,))
-                        owner_plots = cursor.fetchall()
-                    else:
-                        owner_plots = []
-
-                    # Si no tiene transacciones ni propiedades, verificar si está registrado como cliente
-                    is_registered_client = False
-                    if not transactions and not owner_plots:
-                        cursor.execute("SELECT id, name FROM clients WHERE email = ?", (email,))
-                        client_record = cursor.fetchone()
-                        is_registered_client = client_record is not None
-
-                    conn.close()
-
-                    # Permitir acceso si tiene transacciones, fincas como propietario O está registrado como cliente
-                    if transactions or owner_plots or is_registered_client:
-                        st.session_state["client_logged_in"] = True
-                        st.session_state["client_email"] = email
-
-                        # Determinar el rol basado en la prioridad: transacciones > propiedades > cliente registrado
-                        if transactions:
-                            user_role = "buyer"
-                            role_text = "comprador"
-                        elif owner_plots:
-                            user_role = "owner"
-                            role_text = "propietario"
-                        else:
-                            # Cliente registrado sin transacciones ni propiedades
-                            user_role = "buyer"  # Por defecto buyer para poder comprar proyectos
-                            role_text = "cliente registrado"
-
-                        st.session_state["user_role"] = user_role
-                        st.session_state["has_transactions"] = len(transactions) > 0
-                        st.session_state["has_properties"] = len(owner_plots) > 0
-                        st.session_state["role"] = 'owner' if user_role == "owner" else 'client'
-
-                        st.success(f"✅ Acceso concedido como {role_text} para {email}")
-                        st.rerun()
-                    else:
-                        st.error("No se encontraron transacciones, propiedades ni registro para este email")
-                else:
-                    st.error("Por favor introduce tu email")
-
-            st.markdown("---")
-            st.info("💡 **Nota:** Si acabas de realizar una compra, usa el email que proporcionaste en el formulario de datos personales.")
-            st.info("Por favor inicia sesión para acceder al panel.")
-            # st.stop()  # Comentado para permitir que la página se cargue
-
-    if st.session_state["client_logged_in"]:
-        # Panel de cliente logueado
-        client_email = st.session_state.get("client_email")
-        user_role = st.session_state.get("user_role", "buyer")
-        has_transactions = st.session_state.get("has_transactions", False)
-        has_properties = st.session_state.get("has_properties", False)
-
-        # Botón de cerrar sesión en sidebar
-        with st.sidebar:
-            if st.button("🚪 Cerrar Sesión", key="logout_button_v2"):
-                st.session_state["client_logged_in"] = False
-                for key in ["client_email", "user_role", "has_transactions", "has_properties", "selected_project_for_panel"]:
-                    if key in st.session_state:
-                        del st.session_state[key]
-                st.rerun()
-
-        # Mostrar rol del usuario
-        role_emoji = "🛒" if user_role == "buyer" else "🏠"
-        role_text = "Comprador" if user_role == "buyer" else "Propietario"
-        # st.success(f"{role_emoji} **Bienvenido/a {role_text}** - {client_email}")
-
-        # 🔍 MODO 3: Usuario interesado en un proyecto (sin transacciones)
-        selected_project_for_panel = st.session_state.get("selected_project_for_panel")
-        if user_role == "buyer" and not has_transactions and selected_project_for_panel:
-            show_selected_project_panel_v2(client_email, selected_project_for_panel)
-            return
-
-        # Contenido diferente según el rol
+    elif selected_page == "👤 Panel de Cliente":
         if user_role == "buyer":
-            show_buyer_panel_v2(client_email)
+            from modules.marketplace import client_panel
+            client_panel.main()
         elif user_role == "owner":
-            show_owner_panel_v2(client_email)
+            from modules.marketplace import owners
+            owners.main()
+        elif user_role == "architect":
+            from modules.marketplace import architects
+            architects.main()
         else:
-            st.error("Error: No se pudo determinar el tipo de panel apropiado")
-            st.stop()
+            st.error("Error: Rol de usuario no reconocido para el panel de cliente")
 
 
 def show_selected_project_panel_v2(client_email: str, project_id: str):
@@ -1196,17 +1034,25 @@ if st.query_params.get("page") == "Registro de Usuario":
     except Exception as e:
         st.error(f"Error mostrando registro v2: {e}")
 
+if st.query_params.get("page") == "Diseñador de Vivienda":
+    try:
+        with st.container():
+            ai_house_flow.main()
+        st.stop()
+    except Exception as e:
+        st.error(f"Error mostrando diseñador de vivienda: {e}")
+
 
 # Page configuration and navigation - SIMPLIFIED VERSION
 PAGES = {
     "🏠 Inicio / Marketplace": ("modules.marketplace.marketplace", "main"),
+    "🏠 Propietarios": ("modules.marketplace.owners", "main"),
     "🔍 Detalle de Finca": ("modules.marketplace.plot_detail", "show_plot_detail_page"),
     "Intranet": ("modules.marketplace.intranet", "main"),
     "👤 Panel de Proveedor": ("modules.marketplace.service_providers", "show_service_provider_panel"),
     "📝 Registro de Proveedor de Servicios": ("modules.marketplace.service_providers", "show_service_provider_registration"),
     "Arquitectos (Marketplace)": ("modules.marketplace.marketplace_upload", "main"),
     "👤 Panel de Cliente": ("modules.marketplace.client_panel", "main"),
-    "🏠 Propietarios": ("modules.marketplace.owners", "main"),
     "Iniciar Sesión": ("modules.marketplace.auth", "show_login"),
     "Registro de Usuario": ("modules.marketplace.auth", "show_registration"),
 }
@@ -1394,6 +1240,10 @@ selected_page = st.sidebar.radio(
 
 # Sincronizamos por si el usuario cambia el radio manualmente
 st.session_state['selected_page'] = selected_page
+
+st.write("🔍 DEBUG selected_page:", st.session_state.get("selected_page"))
+st.write("🔍 DEBUG role:", st.session_state.get("role"))
+st.write("🔍 DEBUG user_role:", st.session_state.get("user_role"))
 
 # Lógica de Redirección
 if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
@@ -1730,17 +1580,17 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
 
     st.stop()  # Detener ejecución para Home
 
-if st.session_state.get('selected_page') == "Propietario (Gemelo Digital)":
-    with st.container():
-        # Flujo principal: Propietario sube finca → IA genera plan
-        from modules.marketplace import gemelo_digital
-        gemelo_digital.main()
-
 elif st.session_state.get('selected_page') == "🏠 Propietarios":
     with st.container():
         # Propietarios suben fincas al marketplace inmobiliario
         from modules.marketplace import owners
         owners.main()
+
+elif st.session_state.get('selected_page') == "Propietario (Gemelo Digital)":
+    with st.container():
+        # Flujo principal: Propietario sube finca → IA genera plan
+        from modules.marketplace import gemelo_digital
+        gemelo_digital.main()
 
 elif st.session_state.get('selected_page') == "Diseñador de Vivienda":
     with st.container():
@@ -1750,23 +1600,39 @@ elif st.session_state.get('selected_page') == "Diseñador de Vivienda":
 
 # "Inmobiliaria (Mapa)" route removed — Home now uses `marketplace.main()` directly.
 
-elif st.session_state.get('selected_page') == "👤 Panel de Cliente":
-    with st.container():
-        # Importar y ejecutar el panel de cliente
-        from modules.marketplace import client_panel
-        client_panel.main()
-
 elif st.session_state.get('selected_page') == "Arquitectos (Marketplace)":
     with st.container():
-        # Use the new main() entrypoint which handles auth, plans and upload flow
-        from modules.marketplace import marketplace_upload
-        marketplace_upload.main()
+        # Punto de entrada blindado para arquitectos
+        from src import db
+        from modules.marketplace.architects import check_subscription
+        
+        architect_id = st.session_state.get('architect_id')
+        architect_email = st.session_state.get('architect_email')
+        
+        # Verificar suscripción si hay architect_id
+        subscription_active = False
+        if architect_id:
+            sub_info = check_subscription(architect_id)
+            subscription_active = sub_info.get('active', False)
+        
+        ctx = {
+            'architect_id': architect_id,
+            'architect_email': architect_email,
+            'subscription_active': subscription_active,
+            'db': db
+        }
+        
+        from modules.marketplace.architects_entry import render_architects_panel
+        render_architects_panel(ctx)
 
 elif st.session_state.get('selected_page') == "Intranet":
     st.write("Cargando Panel de Control...")
     with st.container():
         from modules.marketplace import intranet
         intranet.main()
+
+elif st.session_state.get('selected_page') == "👤 Panel de Cliente":
+    route_main_panel()
 
 elif st.session_state.get('selected_page') == "👤 Panel de Proveedor":
     with st.container():
