@@ -203,7 +203,7 @@ def render_step2():
     ))
     
     # Dormitorios secundarios según requisitos (mínimo 1)
-    num_bedrooms = max(1, req.get("bedrooms", 3) - 1)
+    num_bedrooms = max(1, int(req.get("bedrooms", 3)) - 1)
     for i in range(num_bedrooms):
         rooms.append(RoomInstance(
             room_type=dormitorio_secundario_type,
