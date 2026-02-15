@@ -435,50 +435,86 @@ def render_step1():
                     # SIEMPRE verificar y añadir elementos obligatorios
                     missing_items = []
                     
+                    # Convertir propuesta a string para búsqueda
+                    proposal_str = json.dumps(ai_proposal).lower()
+                    
                     # Paneles solares
                     if 'Paneles solares' in req.get('sustainable_materials', []):
-                        if 'paneles_solares' not in ai_proposal and 'paneles' not in str(ai_proposal).lower():
+                        has_paneles = any([
+                            'paneles_solares' in ai_proposal,
+                            'paneles solares' in proposal_str,
+                            'paneles' in proposal_str
+                        ])
+                        if not has_paneles:
                             ai_proposal['paneles_solares'] = 6
                             missing_items.append("☀️ Paneles solares (6 m²)")
                     
                     # Bomba de calor
                     if 'Bomba de calor' in req.get('sustainable_materials', []):
-                        if 'bomba_calor' not in ai_proposal and 'bomba' not in str(ai_proposal).lower():
+                        has_bomba = any([
+                            'bomba_calor' in ai_proposal,
+                            'bomba de calor' in proposal_str,
+                            'bomba' in proposal_str
+                        ])
+                        if not has_bomba:
                             ai_proposal['bomba_calor'] = 3
                             missing_items.append("🔥 Bomba de calor (3 m²)")
                     
                     # Aislamiento natural
                     if 'Aislamiento natural' in req.get('sustainable_materials', []):
-                        if 'aislamiento_natural' not in ai_proposal and 'aislamiento' not in str(ai_proposal).lower():
+                        has_aislamiento = any([
+                            'aislamiento_natural' in ai_proposal,
+                            'aislamiento natural' in proposal_str,
+                            'aislamiento' in proposal_str
+                        ])
+                        if not has_aislamiento:
                             ai_proposal['aislamiento_natural'] = 2
                             missing_items.append("🌿 Aislamiento natural (2 m²)")
                     
                     # Recuperación de agua
                     if 'Recuperación de agua' in req.get('sustainable_materials', []):
-                        if 'recuperacion_agua' not in ai_proposal and 'recuperacion' not in str(ai_proposal).lower() and 'agua' not in str(ai_proposal).lower():
+                        has_agua = any([
+                            'recuperacion_agua' in ai_proposal,
+                            'recuperacion de agua' in proposal_str,
+                            'recuperacion' in proposal_str
+                        ])
+                        if not has_agua:
                             ai_proposal['recuperacion_agua'] = 2
                             missing_items.append("💧 Recuperación de agua (2 m²)")
                     
                     # Accesibilidad
                     if req.get('accessibility'):
-                        if 'accesibilidad' not in ai_proposal:
+                        has_accesibilidad = any([
+                            'accesibilidad' in ai_proposal,
+                            'accesible' in proposal_str,
+                            'adaptada' in proposal_str
+                        ])
+                        if not has_accesibilidad:
                             ai_proposal['accesibilidad'] = 6
                             missing_items.append("♿ Accesibilidad (6 m²)")
                 
                 except Exception as val_error:
-                    st.error(f"❌ Error en validación: {val_error}")
+                    st.error(f"❌ ERROR CRÍTICO EN VALIDACIÓN: {val_error}")
                     import traceback
-                    st.code(traceback.format_exc())
-                    missing_items = []  # Fallback vacío
+                    error_trace = traceback.format_exc()
+                    st.code(error_trace)
+                    st.warning("⚠️ La validación falló. Continuando sin añadir elementos.")
+                    missing_items = []
+                    
+                    # DEBUG: Mostrar estado
+                    st.write("🔍 Estado en el momento del error:")
+                    st.write("- ai_proposal:", ai_proposal)
+                    st.write("- req:", req)
                 
-                # DEBUG: Mostrar propuesta final
-                st.write("🔍 DEBUG - Propuesta final:", ai_proposal)
-                st.write("🔍 DEBUG - Missing items:", missing_items)
-                
-                # Guardar missing_items en session state ANTES del rerun
+                # Guardar missing_items y MOSTRAR ANTES DE RERUN
                 if missing_items:
                     st.session_state['validation_missing_items'] = missing_items
-                    st.warning(f"⚠️ Añadidos por validación: {', '.join(missing_items)}")
+                    st.warning(f"⚠️ **ELEMENTOS AÑADIDOS:** {', '.join(missing_items)}")
+                    st.write("👉 La IA omitió estos elementos. Los hemos añadido automáticamente.")
+                
+                # DEBUG: Mostrar propuesta final
+                st.write("🔍 DEBUG - Propuesta final completa:", ai_proposal)
+                st.write("🔍 DEBUG - Total elementos:", len(ai_proposal))
                 
                 # Actualizar requirements
                 req["ai_room_proposal"] = ai_proposal
@@ -583,7 +619,9 @@ def render_step1():
                 'bodega': '🍷', 'piscina': '🏊',
                 'garaje': '🚗', 'porche': '🌿',
                 'pasillo': '🚪', 'paneles': '☀️',
-                'casa_apero': '🔧', 'huerto': '🌱'
+                'casa_apero': '🔧', 'huerto': '🌱',
+                'bomba': '🔥', 'aislamiento': '🌿',
+                'recuperacion': '💧', 'accesibilidad': '♿'
             }
             
             # Agrupar por categorías
@@ -591,6 +629,7 @@ def render_step1():
             private_spaces = []
             service_spaces = []
             outdoor_spaces = []
+            sustainable_spaces = []
             
             for code, area in proposal.items():
                 if not isinstance(area, (int, float)):
@@ -615,6 +654,8 @@ def render_step1():
                     service_spaces.append((icon, name, area))
                 elif any(x in code.lower() for x in ['piscina', 'porche', 'paneles', 'huerto']):
                     outdoor_spaces.append((icon, name, area))
+                elif any(x in code.lower() for x in ['bomba', 'aislamiento', 'recuperacion', 'accesibilidad']):
+                    sustainable_spaces.append((icon, name, area))
             
             # Mostrar por categorías
             if living_spaces:
@@ -659,8 +700,17 @@ def render_step1():
                                    f"<div style='font-size: 2em;'>{icon}</div>"
                                    f"<div style='font-weight: bold;'>{name}</div>"
                                    f"<div style='color: #388E3C; font-size: 1.2em;'>{area} m²</div>"
-                                   f"</div>", unsafe_allow_html=True)
-    
+                                   f"</div>", unsafe_allow_html=True)            
+            if sustainable_spaces:
+                st.markdown("**🌱 Sostenibilidad y Accesibilidad**")
+                cols = st.columns(len(sustainable_spaces))
+                for idx, (icon, name, area) in enumerate(sustainable_spaces):
+                    with cols[idx]:
+                        st.markdown(f"<div style='background: #E8F5E9; padding: 15px; border-radius: 10px; text-align: center;'>" 
+                                   f"<div style='font-size: 2em;'>{icon}</div>"
+                                   f"<div style='font-weight: bold;'>{name}</div>"
+                                   f"<div style='color: #4CAF50; font-size: 1.2em;'>{area} m²</div>"
+                                   f"</div>", unsafe_allow_html=True)    
     if st.button("Continuar a Paso 2"):
         st.session_state["ai_house_step"] = 2
         st.rerun()
