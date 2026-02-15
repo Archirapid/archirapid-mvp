@@ -38,7 +38,7 @@ def main():
                     'title': plot_row[1],
                     'catastral_ref': plot_row[2],
                     'total_m2': plot_row[3] or 0,
-                    'buildable_m2': plot_row[4] or (plot_row[3] * 0.33 if plot_row[3] else 0),
+                    'buildable_m2': (plot_row[3] * 0.33) if plot_row[3] else 0,
                     'lat': plot_row[5],
                     'lon': plot_row[6],
                     'owner_email': plot_row[7]
@@ -731,22 +731,106 @@ def render_step2():
     # Crear plot ficticio
     plot = Plot(id="design_plot", area_m2=500.0, buildable_ratio=0.33)
     
-    # Tipos de habitación CON PRECIOS REALES
+    # Tipos de habitación CON PRECIOS REALES (formato explícito)
     room_types = {
-        "salon_cocina": RoomType("salon_cocina", "Salón-Cocina", 25,50,1200),
-        "dormitorio_principal": RoomType("dormitorio_principal", "Dormitorio Principal", 12,25,1400),
-        "dormitorio": RoomType("dormitorio", "Dormitorio", 8,15,1100),
-        "bano": RoomType("bano", "Baño", 4,8,900),
-        "bodega": RoomType("bodega", "Bodega", 6,12,600),
-        "piscina": RoomType("piscina", "Piscina", 20,40,2500),
-        "paneles_solares": RoomType("paneles_solares", "Paneles Solares", 3,10,3000),
-        "garaje": RoomType("garaje", "Garaje", 12,25,900),
-        "casa_apero": RoomType("casa_apero", "Casa de Aperos", 15,30,800),
-        "huerto": RoomType("huerto", "Huerto", 10,50,150),
-        "porche": RoomType("porche", "Porche", 10,25,700),
-        "bomba_agua": RoomType("bomba_agua", "Bomba de Agua", 2,5,5000),
-        "cubierta": RoomType("cubierta", "Cubierta Tejado", 80,150,400),
-        "accesibilidad": RoomType("accesibilidad", "Accesibilidad", 0,10,2000)
+        "salon_cocina": RoomType(
+            code="salon_cocina",
+            name="Salón-Cocina",
+            min_m2=25,
+            max_m2=50,
+            base_cost_per_m2=1200
+        ),
+        "dormitorio_principal": RoomType(
+            code="dormitorio_principal",
+            name="Dormitorio Principal",
+            min_m2=12,
+            max_m2=25,
+            base_cost_per_m2=1400
+        ),
+        "dormitorio": RoomType(
+            code="dormitorio",
+            name="Dormitorio",
+            min_m2=8,
+            max_m2=15,
+            base_cost_per_m2=1100
+        ),
+        "bano": RoomType(
+            code="bano",
+            name="Baño",
+            min_m2=4,
+            max_m2=8,
+            base_cost_per_m2=900
+        ),
+        "bodega": RoomType(
+            code="bodega",
+            name="Bodega",
+            min_m2=6,
+            max_m2=12,
+            base_cost_per_m2=600
+        ),
+        "piscina": RoomType(
+            code="piscina",
+            name="Piscina",
+            min_m2=20,
+            max_m2=40,
+            base_cost_per_m2=2500
+        ),
+        "paneles_solares": RoomType(
+            code="paneles_solares",
+            name="Paneles Solares",
+            min_m2=3,
+            max_m2=10,
+            base_cost_per_m2=3000
+        ),
+        "garaje": RoomType(
+            code="garaje",
+            name="Garaje",
+            min_m2=12,
+            max_m2=25,
+            base_cost_per_m2=900
+        ),
+        "casa_apero": RoomType(
+            code="casa_apero",
+            name="Casa de Aperos",
+            min_m2=15,
+            max_m2=30,
+            base_cost_per_m2=800
+        ),
+        "huerto": RoomType(
+            code="huerto",
+            name="Huerto",
+            min_m2=10,
+            max_m2=50,
+            base_cost_per_m2=150
+        ),
+        "porche": RoomType(
+            code="porche",
+            name="Porche",
+            min_m2=10,
+            max_m2=25,
+            base_cost_per_m2=700
+        ),
+        "bomba_agua": RoomType(
+            code="bomba_agua",
+            name="Bomba de Agua",
+            min_m2=2,
+            max_m2=5,
+            base_cost_per_m2=5000
+        ),
+        "cubierta": RoomType(
+            code="cubierta",
+            name="Cubierta Tejado",
+            min_m2=80,
+            max_m2=150,
+            base_cost_per_m2=400
+        ),
+        "accesibilidad": RoomType(
+            code="accesibilidad",
+            name="Accesibilidad",
+            min_m2=0,
+            max_m2=10,
+            base_cost_per_m2=2000
+        )
     }
     
     # Inicializar diseño editable
@@ -821,11 +905,12 @@ def render_step2():
     
     table_data = []
     for room in design.rooms:
-        cost = room.area_m2 * room.room_type.base_cost_per_m2
+        price_per_m2 = float(room.room_type.base_cost_per_m2) if hasattr(room.room_type, 'base_cost_per_m2') else 0
+        cost = room.area_m2 * price_per_m2
         table_data.append({
             "Espacio": room.room_type.code.replace("_", " ").title(),
             "m²": f"{room.area_m2:.0f}",
-            "€/m²": f"€{room.room_type.base_cost_per_m2:,.0f}",
+            "€/m²": f"€{price_per_m2:,.0f}",
             "Total": f"€{cost:,.0f}"
         })
     
@@ -882,6 +967,7 @@ def render_step2():
     total_cost = sum([r.area_m2 * r.room_type.base_cost_per_m2 for r in design.rooms])
     
     plot_data = st.session_state.get("design_plot_data")
+    
     max_allowed = plot_data['buildable_m2'] if plot_data else 400.0
     
     col1, col2, col3 = st.columns(3)
