@@ -7,6 +7,76 @@ from groq import Groq
 from .data_model import create_example_design, HouseDesign, Plot, RoomType, RoomInstance
 
 def main():
+    # ============================================
+    # 🔗 CONEXIÓN CON DATOS DE LA FINCA COMPRADA
+    # ============================================
+    
+    # Obtener ID de la finca si viene del panel de cliente
+    design_plot_id = st.session_state.get("design_plot_id")
+    
+    if design_plot_id:
+        # Consultar datos de la finca en la BD
+        try:
+            from modules.marketplace.utils import db_conn
+            conn = db_conn()
+            cursor = conn.cursor()
+            
+            cursor.execute("""
+                SELECT id, title, catastral_ref, m2, superficie_edificable, 
+                       lat, lon, owner_email
+                FROM plots 
+                WHERE id = ?
+            """, (design_plot_id,))
+            
+            plot_row = cursor.fetchone()
+            conn.close()
+            
+            if plot_row:
+                # Guardar datos de la parcela en session_state
+                st.session_state["design_plot_data"] = {
+                    'id': plot_row[0],
+                    'title': plot_row[1],
+                    'catastral_ref': plot_row[2],
+                    'total_m2': plot_row[3] or 0,
+                    'buildable_m2': plot_row[4] or (plot_row[3] * 0.33 if plot_row[3] else 0),
+                    'lat': plot_row[5],
+                    'lon': plot_row[6],
+                    'owner_email': plot_row[7]
+                }
+                
+                # Pre-configurar superficie objetivo según edificabilidad
+                if "ai_house_requirements" not in st.session_state:
+                    max_buildable = st.session_state["design_plot_data"]['buildable_m2']
+                    st.session_state["ai_house_requirements"] = {
+                        "target_area_m2": min(120.0, max_buildable),  # 120m² o el máximo edificable
+                        "max_buildable_m2": max_buildable,  # NUEVO: límite máximo
+                        "budget_limit": None,
+                        "bedrooms": 3,
+                        "bathrooms": 2,
+                        "wants_pool": False,
+                        "wants_porch": True,
+                        "wants_garage": False,
+                        "wants_outhouse": False,
+                        "max_floors": 1,
+                        "style": "moderna",
+                        "materials": ["hormigón"],
+                        "notes": "",
+                        "orientation": "Sur",
+                        "roof_type": "A dos aguas",
+                        "energy_rating": "B",
+                        "accessibility": False,
+                        "sustainable_materials": []
+                    }
+            else:
+                st.warning("⚠️ No se encontraron datos de la finca. Usando valores por defecto.")
+        
+        except Exception as e:
+            st.error(f"❌ Error cargando datos de la finca: {e}")
+            import traceback
+            st.code(traceback.format_exc())
+    
+    # ============================================
+    
     # Inicializar el paso si no existe
     if "ai_house_step" not in st.session_state:
         st.session_state["ai_house_step"] = 1
@@ -14,7 +84,7 @@ def main():
     ai_house_step = st.session_state["ai_house_step"]
     
     # Título principal
-    st.title("🏠 Diseñador de Vivienda con IA (MVP)")
+    st.title("🏠 Diseñador de Vivienda con IA (MVP) v2.1 🔧")
     
     # Mostrar paso actual
     st.subheader(f"Paso {ai_house_step} de 3")
@@ -29,6 +99,20 @@ def main():
 
 def render_step1():
     st.header("Paso 1 – Necesidades y preferencias del cliente")
+    
+    # Mostrar elementos añadidos automáticamente en la sesión anterior
+    if 'validation_missing_items' in st.session_state:
+        missing = st.session_state['validation_missing_items']
+        st.success(f"✅ **Elementos añadidos automáticamente:** {', '.join(missing)}")
+        # Limpiar para no mostrarlo de nuevo
+        del st.session_state['validation_missing_items']
+    
+    # Mostrar información de la parcela si está disponible
+    plot_data = st.session_state.get("design_plot_data")
+    if plot_data:
+        st.info(f"📍 **Diseñando para:** {plot_data['title']} | "
+                f"Parcela: {plot_data['total_m2']:.0f} m² | "
+                f"**Máximo edificable:** {plot_data['buildable_m2']:.0f} m² (33% de la parcela)")
     
     # Inicializar requisitos si no existen
     if "ai_house_requirements" not in st.session_state:
@@ -60,12 +144,17 @@ def render_step1():
     with col_left:
         st.subheader("📐 Dimensiones y habitaciones")
         
+        # Límite de edificabilidad según parcela
+        plot_data = st.session_state.get("design_plot_data")
+        max_allowed = plot_data['buildable_m2'] if plot_data else 400.0
+        
         req["target_area_m2"] = st.number_input(
             "Superficie objetivo (m²)",
             min_value=40.0,
-            max_value=400.0,
-            value=float(req["target_area_m2"]),
-            step=5.0
+            max_value=float(max_allowed),
+            value=min(float(req.get("target_area_m2", 120.0)), float(max_allowed)),
+            step=5.0,
+            help=f"Máximo edificable en esta parcela: {max_allowed:.0f} m²" if plot_data else None
         )
         
         req["budget_limit"] = st.number_input(
@@ -146,11 +235,36 @@ def render_step1():
             value=req.get("accessibility", False)
         )
         
-        req["sustainable_materials"] = st.multiselect(
-            "Materiales sostenibles",
-            options=["Paneles solares", "Bomba de calor", "Aislamiento natural", "Recuperación de agua"],
-            default=req.get("sustainable_materials", [])
-        )
+        st.markdown("**🌿 Materiales sostenibles:**")
+        
+        # Lista temporal para guardar selecciones
+        selected_sustainable = []
+        
+        col_sust1, col_sust2 = st.columns(2)
+        with col_sust1:
+            if st.checkbox("☀️ Paneles solares", 
+                          value='Paneles solares' in req.get("sustainable_materials", []),
+                          key="check_paneles"):
+                selected_sustainable.append("Paneles solares")
+            
+            if st.checkbox("🔥 Bomba de calor", 
+                          value='Bomba de calor' in req.get("sustainable_materials", []),
+                          key="check_bomba"):
+                selected_sustainable.append("Bomba de calor")
+        
+        with col_sust2:
+            if st.checkbox("🌿 Aislamiento natural", 
+                          value='Aislamiento natural' in req.get("sustainable_materials", []),
+                          key="check_aislamiento"):
+                selected_sustainable.append("Aislamiento natural")
+            
+            if st.checkbox("💧 Recuperación de agua", 
+                          value='Recuperación de agua' in req.get("sustainable_materials", []),
+                          key="check_agua"):
+                selected_sustainable.append("Recuperación de agua")
+        
+        # Guardar en req
+        req["sustainable_materials"] = selected_sustainable
     
     # Actualizar session state con los valores introducidos
     st.session_state["ai_house_requirements"] = req
@@ -159,27 +273,7 @@ def render_step1():
     st.markdown("---")
     st.info("🔗 **Gemelos Digitales UE** - Preparado para Testear fondos")
     
-    # Separador visual
     st.markdown("---")
-    
-    # Crear un diseño de ejemplo
-    design = create_example_design()
-    
-    st.caption("Vista previa con datos de ejemplo (temporal)")
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        st.metric(
-            label="Superficie máxima edificable",
-            value=f"{design.plot.max_buildable_m2:.0f} m²"
-        )
-    with col2:
-        st.metric(
-            label="Superficie diseñada (ejemplo)",
-            value=f"{design.total_area():.0f} m²"
-        )
-    
-    st.write(f"**Coste estimado:** €{design.estimated_cost():,.0f}")
     
     col_btn, col_cont = st.columns([1, 3])
     with col_btn:
@@ -189,35 +283,118 @@ def render_step1():
                 import os
                 import json
                 from groq import Groq
+                from pathlib import Path
                 
-                load_dotenv()
+                # Ruta absoluta a la raíz del proyecto
+                import sys
+                project_root = Path(__file__).parent.parent.parent
+                env_path = project_root / '.env'
+                
+                # DEBUG: Mostrar ruta calculada
+                print(f"DEBUG: Buscando .env en: {env_path}")
+                print(f"DEBUG: ¿Existe el archivo? {env_path.exists()}")
+                
+                load_dotenv(dotenv_path=env_path)
+                
+                # Verificar todas las variables de entorno que empiecen con GROQ
+                import os
+                print(f"DEBUG: Variables GROQ encontradas: {[k for k in os.environ.keys() if 'GROQ' in k]}")
+                
                 groq_api_key = os.getenv("GROQ_API_KEY")
                 
+                # DEBUG: Verificar que se cargó
                 if not groq_api_key:
-                    st.error("❌ GROQ_API_KEY no encontrada en .env")
+                    # Intentar cargar desde ruta actual
+                    load_dotenv()
+                    groq_api_key = os.getenv("GROQ_API_KEY")
+                
+                if not groq_api_key:
+                    st.error("❌ GROQ_API_KEY no encontrada. Verifica tu archivo .env")
+                    st.info(f"Buscando .env en: {env_path}")
                     st.stop()
                 
                 client = Groq(api_key=groq_api_key)
                 
-                prompt = f"""FONTANERO ESPAÑOL necesita CASA COMPLETA. 
+                prompt = f"""Eres un arquitecto español experto. Diseña una vivienda COMPLETA basándote EXACTAMENTE en estas preferencias:
 
-DATOS: {req['notes']} | Dorm: {req['bedrooms']} | Baños: {req['bathrooms']}
+**DATOS DEL CLIENTE:**
+- Superficie objetivo: {req['target_area_m2']} m² (DEBE aproximarse a esta cifra)
+- Presupuesto: €{req.get('budget_limit', 0):,.0f}
+- Dormitorios: {req['bedrooms']} (incluir 1 principal + {req['bedrooms']-1} secundarios)
+- Baños: {req['bathrooms']}
+- Plantas: {req['max_floors']}
+- Estilo: {req['style']}
+- Orientación: {req.get('orientation', 'Sur')}
+- Cubierta: {req.get('roof_type', 'A dos aguas')}
 
-**SIEMPRE INCLUIR estas 8+ habitaciones:**
-1. "salon_cocina": 35.0
-2. "dormitorio_principal": 16.0  
-3. "dormitorio": 12.0 x {int(req['bedrooms'])-1}
-4. "bano": 6.0 x {int(req['bathrooms'])}
-5. SI "bodega"/"sótano" → "bodega": 10.0
-6. SI "piscina" → "piscina": 25.0
-7. SI "paneles"/"solares" → "paneles_solares": 5.0
-8. SI "garaje"/"parking" → "garaje": 18.0
-9. SI "apero"/"caseta" → "casa_apero": 20.0
+**EXTRAS SOLICITADOS (OBLIGATORIO incluir):**
+{f"- PISCINA: 25-30 m² (obligatorio)" if req['wants_pool'] else ""}
+{f"- PORCHE: 15-20 m² (obligatorio)" if req['wants_porch'] else ""}
+{f"- GARAJE: 20-25 m² (obligatorio)" if req['wants_garage'] else ""}
+{f"- CASA DE APEROS: 20 m² (obligatorio)" if req['wants_outhouse'] else ""}
 
-**EJEMPLO "bodega 8 pax + piscina":**
-{{"salon_cocina":35,"dormitorio_principal":16,"dormitorio":12,"bano":6,"bodega":10,"piscina":25}}
+**MATERIALES Y EXTRAS OBLIGATORIOS (el cliente los marcó - INCLUIR SÍ O SÍ):**
+{f'''- ✅ PANELES SOLARES: 5-8 m² (OBLIGATORIO)
+  Código en JSON: "paneles_solares": 6''' if 'Paneles solares' in req.get('sustainable_materials', []) else ""}
+{f'''- ✅ BOMBA DE CALOR: incluir como instalación
+  Código en JSON: "bomba_calor": 3''' if 'Bomba de calor' in req.get('sustainable_materials', []) else ""}
+{f'''- ✅ AISLAMIENTO NATURAL: muros con aislamiento ecológico
+  Código en JSON: "aislamiento_natural": 2''' if 'Aislamiento natural' in req.get('sustainable_materials', []) else ""}
+{f'''- ✅ RECUPERACIÓN DE AGUA: sistema de reciclaje
+  Código en JSON: "recuperacion_agua": 2''' if 'Recuperación de agua' in req.get('sustainable_materials', []) else ""}
+{f'''- ✅ ACCESIBILIDAD: rampas, puertas anchas (90cm), baño adaptado
+  Añadir 5-8 m² extra para pasillos amplios
+  Código en JSON: "accesibilidad": 6''' if req.get('accessibility') else ""}
 
-**SOLO JSON válido sin texto extra:**"""
+**MATERIALES DE CONSTRUCCIÓN PREFERIDOS:**
+- Material principal: {', '.join(req.get('materials', ['hormigón']))}
+- Estos materiales deben mencionarse en la descripción técnica
+- Si incluye "ladrillo" → muros de carga de ladrillo cara vista
+- Si incluye "hormigón" → estructura de hormigón armado
+- Si incluye "madera" → estructura de madera laminada
+
+**NOTAS ESPECIALES DEL CLIENTE:**
+"{req['notes']}"
+
+**INSTRUCCIONES CRÍTICAS:**
+1. Si pide "bodega para X pax" → bodega de mínimo 12-15 m²
+2. Dormitorio principal: 14-18 m²
+3. Dormitorios secundarios: 10-12 m² cada uno
+4. Baño completo: 5-6 m² cada uno
+5. Salón-cocina integrado: 30-40 m² (núcleo social)
+6. SIEMPRE incluir pasillo/distribuidor: 8-10 m²
+7. La suma total debe aproximarse a {req['target_area_m2']} m²
+
+**VALIDACIÓN OBLIGATORIA:**
+- Si el cliente marcó "Paneles solares" → JSON DEBE incluir "paneles_solares": 6
+- Si el cliente marcó "Accesibilidad" → JSON DEBE incluir "accesibilidad": 6
+- Si el cliente pidió "bodega para X pax" → bodega mínimo 12-15 m²
+- La suma total debe aproximarse a {req['target_area_m2']} m² (±10%)
+
+**EJEMPLO DE RESPUESTA (para bodega 8 pax + piscina + porche + paneles):**
+{{
+  "salon_cocina": 38,
+  "dormitorio_principal": 16,
+  "dormitorio": 11,
+  "dormitorio_2": 11,
+  "bano": 6,
+  "bano_2": 5,
+  "bodega": 14,
+  "piscina": 28,
+  "porche": 18,
+  "paneles_solares": 6,
+  "pasillo": 9
+}}
+
+**RESPONDE SOLO JSON válido, sin markdown ni texto adicional.**
+"""
+                
+                # ============================================
+                # 🔍 DEBUG DE INPUTS
+                # ============================================
+                st.write("🔍 DEBUG - Materiales sostenibles marcados:", req.get('sustainable_materials', []))
+                st.write("🔍 DEBUG - Accesibilidad marcada:", req.get('accessibility', False))
+                st.write("🔍 DEBUG - Materiales construcción:", req.get('materials', []))
                 
                 response = client.chat.completions.create(
                     model="llama-3.3-70b-versatile",
@@ -251,6 +428,58 @@ DATOS: {req['notes']} | Dorm: {req['bedrooms']} | Baños: {req['bathrooms']}
                         "extras": []
                     }
                 
+                # ============================================
+                # 🔧 VALIDACIÓN PROTEGIDA (línea ~430)
+                # ============================================
+                try:
+                    # SIEMPRE verificar y añadir elementos obligatorios
+                    missing_items = []
+                    
+                    # Paneles solares
+                    if 'Paneles solares' in req.get('sustainable_materials', []):
+                        if 'paneles_solares' not in ai_proposal and 'paneles' not in str(ai_proposal).lower():
+                            ai_proposal['paneles_solares'] = 6
+                            missing_items.append("☀️ Paneles solares (6 m²)")
+                    
+                    # Bomba de calor
+                    if 'Bomba de calor' in req.get('sustainable_materials', []):
+                        if 'bomba_calor' not in ai_proposal and 'bomba' not in str(ai_proposal).lower():
+                            ai_proposal['bomba_calor'] = 3
+                            missing_items.append("🔥 Bomba de calor (3 m²)")
+                    
+                    # Aislamiento natural
+                    if 'Aislamiento natural' in req.get('sustainable_materials', []):
+                        if 'aislamiento_natural' not in ai_proposal and 'aislamiento' not in str(ai_proposal).lower():
+                            ai_proposal['aislamiento_natural'] = 2
+                            missing_items.append("🌿 Aislamiento natural (2 m²)")
+                    
+                    # Recuperación de agua
+                    if 'Recuperación de agua' in req.get('sustainable_materials', []):
+                        if 'recuperacion_agua' not in ai_proposal and 'recuperacion' not in str(ai_proposal).lower() and 'agua' not in str(ai_proposal).lower():
+                            ai_proposal['recuperacion_agua'] = 2
+                            missing_items.append("💧 Recuperación de agua (2 m²)")
+                    
+                    # Accesibilidad
+                    if req.get('accessibility'):
+                        if 'accesibilidad' not in ai_proposal:
+                            ai_proposal['accesibilidad'] = 6
+                            missing_items.append("♿ Accesibilidad (6 m²)")
+                
+                except Exception as val_error:
+                    st.error(f"❌ Error en validación: {val_error}")
+                    import traceback
+                    st.code(traceback.format_exc())
+                    missing_items = []  # Fallback vacío
+                
+                # DEBUG: Mostrar propuesta final
+                st.write("🔍 DEBUG - Propuesta final:", ai_proposal)
+                st.write("🔍 DEBUG - Missing items:", missing_items)
+                
+                # Guardar missing_items en session state ANTES del rerun
+                if missing_items:
+                    st.session_state['validation_missing_items'] = missing_items
+                    st.warning(f"⚠️ Añadidos por validación: {', '.join(missing_items)}")
+                
                 # Actualizar requirements
                 req["ai_room_proposal"] = ai_proposal
                 st.session_state["ai_house_requirements"] = req
@@ -264,17 +493,173 @@ DATOS: {req['notes']} | Dorm: {req['bedrooms']} | Baños: {req['bathrooms']}
                 st.error(f"❌ Error con IA: {e}")
     
     with col_cont:
-        st.success("🤖 **La IA propone esta casa para ti:**")
+        # ============================================
+        # 🎨 PROPUESTA DE IA - DISEÑO PROFESIONAL
+        # ============================================
+        
         if req.get("ai_room_proposal"):
-            proposal_text = []
-            for code, area in req["ai_room_proposal"].items():
-                if isinstance(area, (int, float)):
-                    name = code.replace("_", " ").replace("salon", "Salón").replace("bano", "Baño").title()
-                    proposal_text.append(f"• **{name}** ({area} m²)")
+            # Calcular totales
+            proposal = req["ai_room_proposal"]
+            total_area = sum([v for v in proposal.values() if isinstance(v, (int, float))])
+            target_area = req.get('target_area_m2', 120)
+            budget = req.get('budget_limit', 0)
+            
+            # Estimación de coste (1200€/m² promedio construcción España)
+            estimated_cost = total_area * 1200
+            budget_status = "suficiente" if budget >= estimated_cost else "insuficiente"
+            budget_diff = abs(budget - estimated_cost)
+            
+            # RESUMEN EJECUTIVO
+            st.success("🏗️ **PROPUESTA ARQUITECTÓNICA GENERADA**")
+            
+            # Métricas principales
+            col_m1, col_m2, col_m3 = st.columns(3)
+            with col_m1:
+                st.metric("Superficie Total", f"{total_area:.0f} m²", 
+                         f"{((total_area/target_area - 1) * 100):+.0f}% vs objetivo")
+            with col_m2:
+                cost_color = "🟢" if budget >= estimated_cost else "🔴"
+                st.metric("Coste Estimado", f"€{estimated_cost:,.0f}", 
+                         f"{cost_color} {budget_status.title()}")
+            with col_m3:
+                if budget > 0:
+                    if budget >= estimated_cost:
+                        st.metric("Margen Disponible", f"€{budget_diff:,.0f}", 
+                                 "Para acabados premium")
+                    else:
+                        st.metric("Déficit", f"€{budget_diff:,.0f}", 
+                                 "⚠️ Revisar presupuesto")
+            
+            st.markdown("---")
+            
+            # ANÁLISIS DE IA
+            st.markdown("### 🤖 Análisis del Arquitecto IA")
+            
+            analysis_parts = []
+            
+            # Analizar notas del cliente
+            client_notes = req.get('notes', '').lower()
+            if 'bodega' in client_notes:
+                bodega_area = proposal.get('bodega', 0)
+                if bodega_area >= 12:
+                    analysis_parts.append(f"✅ **Bodega dimensionada correctamente** ({bodega_area} m²) - apropiada para eventos sociales y almacenaje de vino.")
                 else:
-                    proposal_text.append(f"• **{code.title()}**")
-            for line in proposal_text:
-                st.markdown(line)
+                    analysis_parts.append(f"⚠️ **Bodega pequeña** ({bodega_area} m²) - podría ser insuficiente para 8 personas.")
+            
+            # Analizar presupuesto
+            if budget > 0:
+                if budget >= estimated_cost:
+                    surplus = budget - estimated_cost
+                    analysis_parts.append(f"💰 **Presupuesto holgado**: Dispone de €{surplus:,.0f} adicionales para acabados de lujo, domótica, o ampliar zonas exteriores.")
+                elif budget >= estimated_cost * 0.9:
+                    analysis_parts.append(f"⚠️ **Presupuesto ajustado**: El coste estimado se aproxima al límite. Recomendamos reservar 10% adicional para imprevistos.")
+                else:
+                    deficit = estimated_cost - budget
+                    analysis_parts.append(f"🔴 **Presupuesto insuficiente**: Faltan €{deficit:,.0f}. Considere reducir superficie o usar materiales más económicos.")
+            
+            # Analizar distribución
+            bedrooms_count = sum([1 for k in proposal.keys() if 'dormitorio' in k.lower()])
+            bathrooms_count = sum([1 for k in proposal.keys() if 'bano' in k.lower()])
+            
+            if bedrooms_count == req.get('bedrooms', 3):
+                analysis_parts.append(f"✅ **Dormitorios**: {bedrooms_count} habitaciones según lo solicitado - distribución óptima para familia.")
+            
+            if bathrooms_count == req.get('bathrooms', 2):
+                analysis_parts.append(f"✅ **Baños**: {bathrooms_count} baños - cumple con la demanda funcional.")
+            
+            # Mostrar análisis
+            for part in analysis_parts:
+                st.markdown(part)
+            
+            st.markdown("---")
+            
+            # DISTRIBUCIÓN DE ESPACIOS - VISUAL
+            st.markdown("### 📐 Distribución de Espacios")
+            
+            # Iconos por tipo de habitación
+            room_icons = {
+                'salon': '🏠', 'cocina': '🍳',
+                'dormitorio': '🛏️', 'bano': '🚿',
+                'bodega': '🍷', 'piscina': '🏊',
+                'garaje': '🚗', 'porche': '🌿',
+                'pasillo': '🚪', 'paneles': '☀️',
+                'casa_apero': '🔧', 'huerto': '🌱'
+            }
+            
+            # Agrupar por categorías
+            living_spaces = []
+            private_spaces = []
+            service_spaces = []
+            outdoor_spaces = []
+            
+            for code, area in proposal.items():
+                if not isinstance(area, (int, float)):
+                    continue
+                
+                # Determinar icono
+                icon = '📦'
+                for key, emoji in room_icons.items():
+                    if key in code.lower():
+                        icon = emoji
+                        break
+                
+                # Formatear nombre
+                name = code.replace("_", " ").replace("salon", "Salón").replace("bano", "Baño").title()
+                
+                # Categorizar
+                if any(x in code.lower() for x in ['salon', 'cocina']):
+                    living_spaces.append((icon, name, area))
+                elif any(x in code.lower() for x in ['dormitorio', 'bano']):
+                    private_spaces.append((icon, name, area))
+                elif any(x in code.lower() for x in ['garaje', 'bodega', 'pasillo']):
+                    service_spaces.append((icon, name, area))
+                elif any(x in code.lower() for x in ['piscina', 'porche', 'paneles', 'huerto']):
+                    outdoor_spaces.append((icon, name, area))
+            
+            # Mostrar por categorías
+            if living_spaces:
+                st.markdown("**🏠 Espacios Comunes**")
+                cols = st.columns(len(living_spaces))
+                for idx, (icon, name, area) in enumerate(living_spaces):
+                    with cols[idx]:
+                        st.markdown(f"<div style='background: #E3F2FD; padding: 15px; border-radius: 10px; text-align: center;'>"
+                                   f"<div style='font-size: 2em;'>{icon}</div>"
+                                   f"<div style='font-weight: bold;'>{name}</div>"
+                                   f"<div style='color: #1976D2; font-size: 1.2em;'>{area} m²</div>"
+                                   f"</div>", unsafe_allow_html=True)
+            
+            if private_spaces:
+                st.markdown("**🛏️ Espacios Privados**")
+                cols = st.columns(min(len(private_spaces), 4))
+                for idx, (icon, name, area) in enumerate(private_spaces):
+                    with cols[idx % 4]:
+                        st.markdown(f"<div style='background: #F3E5F5; padding: 15px; border-radius: 10px; text-align: center;'>"
+                                   f"<div style='font-size: 2em;'>{icon}</div>"
+                                   f"<div style='font-weight: bold;'>{name}</div>"
+                                   f"<div style='color: #7B1FA2; font-size: 1.2em;'>{area} m²</div>"
+                                   f"</div>", unsafe_allow_html=True)
+            
+            if service_spaces:
+                st.markdown("**🔧 Espacios de Servicio**")
+                cols = st.columns(len(service_spaces))
+                for idx, (icon, name, area) in enumerate(service_spaces):
+                    with cols[idx]:
+                        st.markdown(f"<div style='background: #FFF3E0; padding: 15px; border-radius: 10px; text-align: center;'>"
+                                   f"<div style='font-size: 2em;'>{icon}</div>"
+                                   f"<div style='font-weight: bold;'>{name}</div>"
+                                   f"<div style='color: #F57C00; font-size: 1.2em;'>{area} m²</div>"
+                                   f"</div>", unsafe_allow_html=True)
+            
+            if outdoor_spaces:
+                st.markdown("**🌿 Espacios Exteriores**")
+                cols = st.columns(len(outdoor_spaces))
+                for idx, (icon, name, area) in enumerate(outdoor_spaces):
+                    with cols[idx]:
+                        st.markdown(f"<div style='background: #E8F5E9; padding: 15px; border-radius: 10px; text-align: center;'>"
+                                   f"<div style='font-size: 2em;'>{icon}</div>"
+                                   f"<div style='font-weight: bold;'>{name}</div>"
+                                   f"<div style='color: #388E3C; font-size: 1.2em;'>{area} m²</div>"
+                                   f"</div>", unsafe_allow_html=True)
     
     if st.button("Continuar a Paso 2"):
         st.session_state["ai_house_step"] = 2
@@ -421,6 +806,39 @@ def render_step2():
         st.metric("Total diseñado", f"{total_area:.0f} m²", delta=None, delta_color=color)
     with col3:
         st.metric("Coste total", f"€{design.estimated_cost():,.0f}")
+    
+    # ============================================
+    # 🎨 VISUALIZACIÓN DEL PLANO 2D
+    # ============================================
+    st.markdown("---")
+    st.subheader("📐 Visualización del Plano")
+
+    # Botón para generar/actualizar plano
+    if st.button("🎨 Generar Plano 2D", type="primary", key="generate_plan"):
+        with st.spinner("Generando plano..."):
+            try:
+                from .step2_planner import FloorPlan2D
+                
+                # Generar plano
+                planner = FloorPlan2D(design.rooms, total_width=15)
+                plan_path = planner.generate_plan('plano_distribucion.png')
+                
+                # Guardar en session state
+                st.session_state['current_plan'] = plan_path
+                st.success("✅ Plano generado correctamente")
+                
+            except Exception as e:
+                st.error(f"❌ Error generando plano: {e}")
+                import traceback
+                st.code(traceback.format_exc())
+
+    # Mostrar plano si existe
+    if st.session_state.get('current_plan'):
+        st.image(st.session_state['current_plan'], 
+                 caption="Plano de distribución actual",
+                 use_container_width=True)
+
+    st.markdown("---")
     
     # Botones
     col1, col2 = st.columns(2)
