@@ -753,114 +753,233 @@ def render_step2():
     if "house_design" not in st.session_state:
         rooms = []
         for room_code, area in req["ai_room_proposal"].items():
-            room_type = room_types.get(room_code)
-            if not room_type:
-                room_type = RoomType(room_code, room_code.replace("_", " ").title(), 10, 50, 1000)
-            if isinstance(area, (int, float)):
-                rooms.append(RoomInstance(room_type, float(area)))
-            elif isinstance(area, list):
-                for sub_area in area:
-                    rooms.append(RoomInstance(room_type, float(sub_area)))
+            if not isinstance(area, (int, float)):
+                continue
+            
+            # Buscar tipo coincidente (con similitud)
+            room_type = None
+            
+            # 1. Busca coincidencia exacta
+            if room_code in room_types:
+                room_type = room_types[room_code]
+            
+            # 2. Busca por palabras clave
+            else:
+                code_lower = room_code.lower()
+                
+                # Mapeo de códigos similares
+                if 'salon' in code_lower or 'cocina' in code_lower:
+                    room_type = room_types['salon_cocina']
+                elif 'dormitorio' in code_lower and 'principal' in code_lower:
+                    room_type = room_types['dormitorio_principal']
+                elif 'dormitorio' in code_lower:
+                    room_type = room_types['dormitorio']
+                elif 'bano' in code_lower or 'baño' in code_lower:
+                    room_type = room_types['bano']
+                elif 'bodega' in code_lower:
+                    room_type = room_types['bodega']
+                elif 'piscina' in code_lower:
+                    room_type = room_types['piscina']
+                elif 'paneles' in code_lower:
+                    room_type = room_types['paneles_solares']
+                elif 'garaje' in code_lower:
+                    room_type = room_types['garaje']
+                elif 'porche' in code_lower:
+                    room_type = room_types['porche']
+                elif 'bomba' in code_lower:
+                    room_type = room_types['bomba_agua']
+                elif 'aislamiento' in code_lower:
+                    room_type = RoomType(room_code, room_code.replace("_", " ").title(), 1, 5, 1500)
+                elif 'recuperacion' in code_lower or 'recuperación' in code_lower:
+                    room_type = RoomType(room_code, room_code.replace("_", " ").title(), 1, 5, 1000)
+                elif 'accesibilidad' in code_lower:
+                    room_type = room_types['accesibilidad']
+                elif 'pasillo' in code_lower:
+                    room_type = RoomType(room_code, "Pasillo", 5, 15, 800)
+                elif 'huerto' in code_lower:
+                    room_type = room_types['huerto']
+                elif 'apero' in code_lower or 'aperos' in code_lower:
+                    room_type = room_types['casa_apero']
+                else:
+                    # Tipo genérico
+                    room_type = RoomType(room_code, room_code.replace("_", " ").title(), 5, 50, 1000)
+            
+            # Crear instancia de habitación
+            rooms.append(RoomInstance(room_type=room_type, area_m2=float(area)))
+        
         st.session_state["house_design"] = HouseDesign(plot=plot, rooms=rooms)
     
     design = st.session_state["house_design"]
     
-    # Tabla FONTANERO SIMPLE (sin bugs Streamlit)
-    room_data = []
-    room_names = {
-        "salon_cocina": "🏠 Salón-Cocina",
-        "dormitorio_principal": "🛏️ Dorm. Principal", 
-        "dormitorio": "🛏️ Dormitorio",
-        "bano": "🚿 Baño",
-        "bodega": "🍷 Bodega",
-        "piscina": "🏊 Piscina",
-        "paneles_solares": "☀️ Paneles Solares",
-        "garaje": "🚗 Garaje"
-    }
-    
-    for room in design.rooms:
-        name = room_names.get(room.room_type.code, f"📦 {room.room_type.code.title()}")
-        total_cost = room.area_m2 * getattr(room.room_type, 'base_cost_per_m2', 1000)
-        
-        room_data.append({
-            "Habitación": name,
-            "m²": f"{room.area_m2:.0f}",
-            "€/m²": f"€{getattr(room.room_type, 'base_cost_per_m2', 1000):,.0f}",
-            "Total": f"€{total_cost:,.0f}"
-        })
-    
+    # ============================================
+    # 📊 RESUMEN DE DISTRIBUCIÓN (COMPACTO)
+    # ============================================
     st.subheader("📊 Tu propuesta actual")
     
+    # Crear DataFrame para tabla compacta
+    import pandas as pd
+    
+    table_data = []
     for room in design.rooms:
-        code = room.room_type.code
-        
-        # HARDCODE precios por código
-        if code == "salon_cocina":
-            icon, name, price_m2 = "🏠", "Salón Cocina", 1200
-        elif code == "dormitorio_principal":
-            icon, name, price_m2 = "🛏️", "Dormitorio Principal", 1400
-        elif code == "dormitorio":
-            icon, name, price_m2 = "🛏️", "Dormitorio", 1100
-        elif code == "bano":
-            icon, name, price_m2 = "🚿", "Baño", 900
-        elif code == "bodega":
-            icon, name, price_m2 = "🍷", "Bodega", 600
-        elif code == "piscina":
-            icon, name, price_m2 = "🏊", "Piscina", 2500
-        elif code == "paneles_solares":
-            icon, name, price_m2 = "☀️", "Paneles Solares", 3000
-        elif code == "garaje":
-            icon, name, price_m2 = "🚗", "Garaje", 900
-        elif code == "casa_apero":
-            icon, name, price_m2 = "🔧", "Casa Aperos", 800
-        else:
-            icon, name, price_m2 = "📦", code.title(), 1000
-        
-        total = room.area_m2 * price_m2
-        
-        col1, col2, col3, col4 = st.columns(4)
-        with col1:
-            st.markdown(f"**{icon} {name}**")
-        with col2:
-            st.markdown(f"**{room.area_m2:.0f} m²**")
-        with col3:
-            st.markdown(f"**€{price_m2:,.0f}**")
-        with col4:
-            st.markdown(f"**€{total:,.0f}**")
-        st.markdown("---")
+        cost = room.area_m2 * room.room_type.base_cost_per_m2
+        table_data.append({
+            "Espacio": room.room_type.code.replace("_", " ").title(),
+            "m²": f"{room.area_m2:.0f}",
+            "€/m²": f"€{room.room_type.base_cost_per_m2:,.0f}",
+            "Total": f"€{cost:,.0f}"
+        })
     
-    # SLIDERS ABAJO
+    df = pd.DataFrame(table_data)
+    st.dataframe(df, use_container_width=True, hide_index=True)
+    
+    # ============================================
+    # 🔧 AJUSTA MEDIDAS (2 COLUMNAS)
+    # ============================================
+    st.markdown("---")
     st.subheader("🔧 Ajusta medidas")
-    for i, room in enumerate(design.rooms):
-        with st.container():
-            col1, col2 = st.columns([3,1])
-            with col1: st.write(f"**{room.room_type.name}**")
-            with col2: st.write(f"{room.area_m2:.0f} m²")
-            new_area = st.slider(
-                f"m² {room.room_type.name}",
-                min_value=float(room.room_type.min_m2),
-                max_value=float(room.room_type.max_m2),
-                value=float(room.area_m2),
-                step=0.5,
-                key=f"slider_{i}"
-            )
-            design.rooms[i].area_m2 = new_area
     
-    # MÉTRICOS EN TIEMPO REAL
+    # Dividir en 2 columnas
+    for i in range(0, len(design.rooms), 2):
+        col1, col2 = st.columns(2)
+        
+        # Slider izquierdo
+        with col1:
+            if i < len(design.rooms):
+                room = design.rooms[i]
+                new_area = st.slider(
+                    f"{room.room_type.code.replace('_', ' ').title()}",
+                    min_value=float(room.room_type.min_m2),
+                    max_value=float(room.room_type.max_m2),
+                    value=float(room.area_m2),
+                    step=0.5,
+                    key=f"slider_{i}",
+                    help=f"Rango: {room.room_type.min_m2}-{room.room_type.max_m2} m²"
+                )
+                design.rooms[i].area_m2 = new_area
+        
+        # Slider derecho
+        with col2:
+            if i + 1 < len(design.rooms):
+                room = design.rooms[i + 1]
+                new_area = st.slider(
+                    f"{room.room_type.code.replace('_', ' ').title()}",
+                    min_value=float(room.room_type.min_m2),
+                    max_value=float(room.room_type.max_m2),
+                    value=float(room.area_m2),
+                    step=0.5,
+                    key=f"slider_{i+1}",
+                    help=f"Rango: {room.room_type.min_m2}-{room.room_type.max_m2} m²"
+                )
+                design.rooms[i + 1].area_m2 = new_area
+    
+    # ============================================
+    # 📊 MÉTRICAS EN TIEMPO REAL
+    # ============================================
+    st.markdown("---")
+    
+    # Calcular totales MANUALMENTE
+    total_area = sum([r.area_m2 for r in design.rooms])
+    total_cost = sum([r.area_m2 * r.room_type.base_cost_per_m2 for r in design.rooms])
+    
+    plot_data = st.session_state.get("design_plot_data")
+    max_allowed = plot_data['buildable_m2'] if plot_data else 400.0
+    
     col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric("Máx. edificable", f"{design.plot.max_buildable_m2:.0f} m²")
-    with col2:
-        total_area = design.total_area()
-        color = "normal" if total_area <= design.plot.max_buildable_m2 else "inverse"
-        st.metric("Total diseñado", f"{total_area:.0f} m²", delta=None, delta_color=color)
-    with col3:
-        st.metric("Coste total", f"€{design.estimated_cost():,.0f}")
+    
+    # Máximo edificable
+    col1.metric("Máx. edificable", f"{max_allowed:.0f} m²")
+    
+    # Total diseñado (con color)
+    delta_color = "normal" if total_area <= max_allowed else "inverse"
+    col2.metric(
+        "Total diseñado", 
+        f"{total_area:.0f} m²",
+        delta=f"{total_area - max_allowed:+.0f} m²",
+        delta_color=delta_color
+    )
+    
+    # Coste total
+    col3.metric("Coste total", f"€{total_cost:,.0f}")
+    
+    # Validación de exceso
+    if total_area > max_allowed:
+        excess = total_area - max_allowed
+        st.error(f"⚠️ **EXCESO:** Te has pasado {excess:.0f} m². Reduce habitaciones o elimina elementos.")
+    elif total_area > max_allowed * 0.95:
+        st.warning(f"⚠️ Estás cerca del límite ({total_area:.0f}/{max_allowed:.0f} m²)")
+    else:
+        st.success(f"✅ Dentro del límite ({total_area:.0f}/{max_allowed:.0f} m²)")
+    
+    st.markdown("---")
+    
+    # ============================================
+    # ✂️ ELIMINAR ELEMENTOS OPCIONALES
+    # ============================================
+    st.subheader("✂️ Elementos opcionales")
+    st.caption("Desmarca para eliminar del diseño y ahorrar presupuesto")
+    
+    # Identificar elementos opcionales (no esenciales)
+    optional_elements = []
+    for i, room in enumerate(design.rooms):
+        code = room.room_type.code.lower()
+        # Solo piscina, garaje, porche, casa aperos, paneles son opcionales
+        if any(x in code for x in ['piscina', 'garaje', 'porche', 'casa', 'apero', 'paneles', 'bomba', 'aislamiento', 'recuperacion']):
+            optional_elements.append((i, room))
+    
+    if optional_elements:
+        # Mostrar en grid 2 columnas
+        cols = st.columns(2)
+        rooms_to_remove = []
+        
+        for idx, (room_idx, room) in enumerate(optional_elements):
+            with cols[idx % 2]:
+                # Nombre formateado
+                room_name = room.room_type.code.replace("_", " ").title()
+                
+                # Icono
+                icon = '📦'
+                if 'piscina' in room.room_type.code.lower():
+                    icon = '🏊'
+                elif 'garaje' in room.room_type.code.lower():
+                    icon = '🚗'
+                elif 'porche' in room.room_type.code.lower():
+                    icon = '🌿'
+                elif 'paneles' in room.room_type.code.lower():
+                    icon = '☀️'
+                elif 'bomba' in room.room_type.code.lower():
+                    icon = '🔥'
+                elif 'aislamiento' in room.room_type.code.lower():
+                    icon = '🌿'
+                elif 'recuperacion' in room.room_type.code.lower():
+                    icon = '💧'
+                
+                # Cálculo del ahorro
+                cost_savings = room.area_m2 * room.room_type.base_cost_per_m2
+                
+                # Checkbox
+                keep = st.checkbox(
+                    f"{icon} **{room_name}** ({room.area_m2:.0f} m² = €{cost_savings:,.0f})",
+                    value=True,
+                    key=f"keep_{room_idx}",
+                    help=f"Desmarcar para eliminar y ahorrar €{cost_savings:,.0f}"
+                )
+                
+                if not keep:
+                    rooms_to_remove.append(room_idx)
+        
+        # Eliminar habitaciones desmarcadas
+        if rooms_to_remove:
+            # Eliminar en orden inverso para no desajustar índices
+            for idx in sorted(rooms_to_remove, reverse=True):
+                design.rooms.pop(idx)
+            
+            st.success(f"✅ Eliminados {len(rooms_to_remove)} elemento(s). Presupuesto actualizado.")
+    
+    st.markdown("---")
     
     # ============================================
     # 🎨 VISUALIZACIÓN DEL PLANO 2D
     # ============================================
-    st.markdown("---")
     st.subheader("📐 Visualización del Plano")
 
     # Botón para generar/actualizar plano
