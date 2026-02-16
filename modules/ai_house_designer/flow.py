@@ -1179,9 +1179,138 @@ Sé conciso y práctico. Formato:
             st.rerun()
 
 def render_step3():
-    st.header("Paso 3 – Diseño volumétrico y 3D")
-    st.info("Esta funcionalidad todavía está en construcción.")
+    """Paso 3: Vista 3D y exportación"""
     
-    if st.button("Volver al Paso 2"):
-        st.session_state["ai_house_step"] = 2
-        st.rerun()
+    st.header("Paso 3 – Vista 3D y Documentación")
+    
+    # Verificar que existe propuesta
+    req = st.session_state.get("ai_house_requirements")
+    if not req or "ai_room_proposal" not in req:
+        st.warning("⚠️ Primero completa el Paso 1")
+        if st.button("← Volver al Paso 1"):
+            st.session_state["ai_house_step"] = 1
+            st.rerun()
+        return
+    
+    # Obtener diseño
+    proposal = req["ai_room_proposal"]
+    
+    # Recrear HouseDesign (igual que en Paso 2)
+    from .data_model import HouseDesign, Plot, RoomType, RoomInstance
+    
+    # Tipos de habitación
+    room_types = {
+        "salon_cocina": RoomType(code="salon_cocina", name="Salón-Cocina", min_m2=25, max_m2=50, base_cost_per_m2=1200),
+        "dormitorio_principal": RoomType(code="dormitorio_principal", name="Dormitorio Principal", min_m2=12, max_m2=25, base_cost_per_m2=1400),
+        "dormitorio": RoomType(code="dormitorio", name="Dormitorio", min_m2=8, max_m2=15, base_cost_per_m2=1100),
+        "bano": RoomType(code="bano", name="Baño", min_m2=4, max_m2=8, base_cost_per_m2=900),
+        "bodega": RoomType(code="bodega", name="Bodega", min_m2=6, max_m2=12, base_cost_per_m2=600),
+        "piscina": RoomType(code="piscina", name="Piscina", min_m2=20, max_m2=40, base_cost_per_m2=2500),
+        "paneles_solares": RoomType(code="paneles_solares", name="Paneles Solares", min_m2=3, max_m2=10, base_cost_per_m2=3000),
+        "garaje": RoomType(code="garaje", name="Garaje", min_m2=12, max_m2=25, base_cost_per_m2=900),
+        "porche": RoomType(code="porche", name="Porche", min_m2=10, max_m2=25, base_cost_per_m2=700),
+        "bomba_agua": RoomType(code="bomba_agua", name="Bomba de Agua", min_m2=2, max_m2=5, base_cost_per_m2=5000),
+        "accesibilidad": RoomType(code="accesibilidad", name="Accesibilidad", min_m2=0, max_m2=10, base_cost_per_m2=2000)
+    }
+    
+    # Obtener datos de la parcela si existen
+    plot_data = st.session_state.get("design_plot_data")
+    
+    if plot_data:
+        plot = Plot(
+            id=plot_data.get('id', 'unknown'),
+            area_m2=plot_data.get('total_m2', 400.0),
+            buildable_ratio=0.33
+        )
+    else:
+        # Fallback si no hay datos de parcela
+        plot = Plot(
+            id='temp',
+            area_m2=400.0,
+            buildable_ratio=0.33
+        )
+    
+    design = HouseDesign(plot)
+    
+    for code, area in proposal.items():
+        if not isinstance(area, (int, float)):
+            continue
+        
+        # Buscar tipo
+        room_type = None
+        code_lower = code.lower()
+        
+        if code in room_types:
+            room_type = room_types[code]
+        elif 'salon' in code_lower or 'cocina' in code_lower:
+            room_type = room_types['salon_cocina']
+        elif 'dormitorio' in code_lower and 'principal' in code_lower:
+            room_type = room_types['dormitorio_principal']
+        elif 'dormitorio' in code_lower:
+            room_type = room_types['dormitorio']
+        elif 'bano' in code_lower or 'baño' in code_lower:
+            room_type = room_types['bano']
+        elif 'bodega' in code_lower:
+            room_type = room_types['bodega']
+        elif 'piscina' in code_lower:
+            room_type = room_types['piscina']
+        elif 'paneles' in code_lower:
+            room_type = room_types['paneles_solares']
+        elif 'garaje' in code_lower:
+            room_type = room_types['garaje']
+        elif 'porche' in code_lower:
+            room_type = room_types['porche']
+        elif 'bomba' in code_lower:
+            room_type = room_types['bomba_agua']
+        elif 'accesibilidad' in code_lower:
+            room_type = room_types['accesibilidad']
+        else:
+            room_type = RoomType(code=code, name=code.replace("_", " ").title(), min_m2=5, max_m2=50, base_cost_per_m2=1000)
+        
+        design.rooms.append(RoomInstance(room_type=room_type, area_m2=float(area)))
+    
+    # ============================================
+    # 🎨 VISTA ARQUITECTÓNICA INTERACTIVA
+    # ============================================
+    st.subheader("🎨 Vista Arquitectónica")
+    
+    st.info("""
+    🚧 **Próximamente: Editor Interactivo**
+    
+    Podrás:
+    - 🖱️ Arrastrar tabiques para redimensionar habitaciones
+    - 🤖 IA te guiará en tiempo real ("Cocina muy pequeña")
+    - 🔄 Rotar la vista para ver desde diferentes ángulos
+    - 📏 Ver medidas reales mientras editas
+    - ✅ Validación automática de distribución
+    
+    Por ahora, usa el **Plano 2D del Paso 2** y las sugerencias de IA.
+    """)
+    
+    # Mostrar plano 2D si existe
+    if 'current_floor_plan' in st.session_state:
+        st.markdown("**📐 Tu plano actual:**")
+        st.image(
+            st.session_state['current_floor_plan'],
+            caption="Plano de distribución - Paso 2",
+            use_container_width=True
+        )
+    
+    st.markdown("---")
+    
+    # ============================================
+    # 📄 DOCUMENTACIÓN
+    # ============================================
+    st.subheader("📄 Generar Documentación")
+    st.info("🚧 Próximamente: Memoria técnica PDF, Presupuesto Excel, Planos DWG")
+    
+    st.markdown("---")
+    
+    # Botones de navegación
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("← Volver al Paso 2"):
+            st.session_state["ai_house_step"] = 2
+            st.rerun()
+    with col2:
+        st.button("🎉 Finalizar Diseño", type="primary", disabled=True)
