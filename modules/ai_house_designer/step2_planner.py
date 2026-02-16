@@ -1,184 +1,161 @@
 """
-Generador de planos 2D para el Diseñador de Vivienda con IA
-Autor: ARCHIRAPID
-Fecha: 2026-02-14
+Generador de planos 2D profesionales con IA
 """
-
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from matplotlib.patches import FancyBboxPatch, Rectangle
 import numpy as np
-from pathlib import Path
+from typing import List, Dict, Tuple
 import io
-from PIL import Image
 
-class FloorPlan2D:
-    """Generador profesional de planos 2D"""
+class ProfessionalFloorPlan:
+    """Generador de planos arquitectónicos profesionales"""
     
-    def __init__(self, rooms, total_width=15, grid_size=0.5):
-        """
-        Args:
-            rooms: Lista de RoomInstance (de data_model.py)
-            total_width: Ancho total del plano en metros
-            grid_size: Tamaño de la cuadrícula en metros
-        """
-        self.rooms = rooms
-        self.total_width = total_width
-        self.grid_size = grid_size
-        
-        # Colores por tipo de habitación
+    def __init__(self, design):
+        self.design = design
         self.room_colors = {
-            'salon_cocina': '#FFE5B4',  # Melocotón
-            'dormitorio_principal': '#B4D7FF',  # Azul claro
-            'dormitorio': '#C4E1FF',  # Azul más claro
-            'bano': '#D4F1F4',  # Turquesa
-            'bodega': '#E8D5C4',  # Marrón claro
-            'piscina': '#87CEEB',  # Azul cielo
-            'garaje': '#D3D3D3',  # Gris
-            'casa_apero': '#F4E4C1',  # Beige
-            'porche': '#E6F3E6',  # Verde claro
-            'pasillo': '#F5F5F5'  # Blanco grisáceo
+            'salon': '#E3F2FD',      # Azul claro
+            'cocina': '#FFF3E0',     # Naranja claro
+            'dormitorio': '#F3E5F5', # Morado claro
+            'bano': '#E0F2F1',       # Verde agua
+            'bodega': '#FFF9C4',     # Amarillo claro
+            'piscina': '#B3E5FC',    # Azul agua
+            'garaje': '#ECEFF1',     # Gris claro
+            'porche': '#E8F5E9',     # Verde claro
+            'paneles': '#FFE0B2',    # Naranja claro
+            'pasillo': '#F5F5F5'     # Gris muy claro
         }
     
-    def calculate_layout(self):
-        """
-        Calcula distribución optimizada de habitaciones.
-        Algoritmo simple: Colocar en filas, habitaciones grandes primero.
-        """
-        # Ordenar habitaciones: grandes primero
-        sorted_rooms = sorted(self.rooms, key=lambda r: r.area_m2, reverse=True)
+    def _get_room_color(self, room_code: str) -> str:
+        """Obtiene color según tipo de habitación"""
+        code_lower = room_code.lower()
+        for key, color in self.room_colors.items():
+            if key in code_lower:
+                return color
+        return '#FFFFFF'
+    
+    def _calculate_dimensions(self, area_m2: float) -> Tuple[float, float]:
+        """Calcula dimensiones aproximadas (ancho, alto) dado área"""
+        # Ratio típico 1.4:1 (más ancho que alto)
+        width = np.sqrt(area_m2 * 1.4)
+        height = area_m2 / width
+        return round(width, 1), round(height, 1)
+    
+    def _layout_rooms(self) -> List[Dict]:
+        """Distribuye habitaciones en grid inteligente"""
+        rooms_data = []
         
-        layout = []
-        current_x = 0
-        current_y = 0
-        row_height = 0
+        # Separar por tamaño
+        large_rooms = [r for r in self.design.rooms if r.area_m2 >= 20]
+        medium_rooms = [r for r in self.design.rooms if 10 <= r.area_m2 < 20]
+        small_rooms = [r for r in self.design.rooms if r.area_m2 < 10]
         
-        for room in sorted_rooms:
-            # Calcular dimensiones aproximadas (asumiendo habitaciones cuadradas)
-            width = np.sqrt(room.area_m2)
-            height = np.sqrt(room.area_m2)
+        # Ordenar cada grupo
+        large_rooms.sort(key=lambda r: r.area_m2, reverse=True)
+        medium_rooms.sort(key=lambda r: r.area_m2, reverse=True)
+        small_rooms.sort(key=lambda r: r.area_m2, reverse=True)
+        
+        # Layout: grandes abajo, medianas en medio, pequeñas arriba
+        all_rooms = large_rooms + medium_rooms + small_rooms
+        
+        x, y = 0, 0
+        max_width = 0
+        current_row_height = 0
+        row_width = 0
+        
+        for i, room in enumerate(all_rooms):
+            width, height = self._calculate_dimensions(room.area_m2)
             
-            # Si no cabe en la fila actual, nueva fila
-            if current_x + width > self.total_width and current_x > 0:
-                current_x = 0
-                current_y += row_height + 0.5  # Espacio entre filas
-                row_height = 0
+            # Si la fila actual es muy ancha, bajar
+            if row_width + width > 16 and i > 0:
+                y += current_row_height + 1.5
+                x = 0
+                row_width = 0
+                current_row_height = 0
             
-            # Guardar posición
-            layout.append({
+            rooms_data.append({
                 'room': room,
-                'x': current_x,
-                'y': current_y,
+                'x': x,
+                'y': y,
                 'width': width,
                 'height': height
             })
             
-            # Actualizar posición
-            current_x += width + 0.5  # Espacio entre habitaciones
-            row_height = max(row_height, height)
+            x += width + 1
+            row_width += width + 1
+            current_row_height = max(current_row_height, height)
+            max_width = max(max_width, row_width)
         
-        return layout
+        return rooms_data
     
-    def generate_plan(self, output_path='plano_2d.png', dpi=150):
-        """
-        Genera el plano 2D y lo guarda como imagen.
+    def generate(self) -> bytes:
+        """Genera plano y retorna como bytes PNG"""
         
-        Returns:
-            str: Ruta del archivo generado
-        """
-        layout = self.calculate_layout()
+        rooms_layout = self._layout_rooms()
         
-        # Calcular altura total del plano
-        max_y = max([r['y'] + r['height'] for r in layout])
-        total_height = max_y + 1
+        # Calcular límites del plano
+        max_x = max([r['x'] + r['width'] for r in rooms_layout]) + 3
+        max_y = max([r['y'] + r['height'] for r in rooms_layout]) + 3
         
-        # Crear figura
-        fig, ax = plt.subplots(figsize=(12, 12 * total_height / self.total_width))
-        ax.set_xlim(-1, self.total_width + 1)
-        ax.set_ylim(-1, total_height + 1)
+        # Crear figura MÁS GRANDE
+        fig, ax = plt.subplots(figsize=(18, 14), facecolor='white', dpi=150)
+        ax.set_xlim(0, max_x)
+        ax.set_ylim(0, max_y)
         ax.set_aspect('equal')
         
-        # Fondo
-        ax.set_facecolor('#FAFAFA')
+        # Título
+        total_area = sum([r.area_m2 for r in self.design.rooms])
+        ax.text(
+            max_x / 2, max_y - 0.5,
+            f'PLANO DE DISTRIBUCIÓN - {total_area:.0f} m² TOTALES',
+            ha='center', va='top',
+            fontsize=16, fontweight='bold',
+            bbox=dict(boxstyle='round,pad=0.5', facecolor='#f0f0f0', edgecolor='#333', linewidth=2)
+        )
         
-        # Cuadrícula
-        for x in np.arange(0, self.total_width + 1, self.grid_size):
-            ax.axvline(x, color='#E0E0E0', linewidth=0.3, alpha=0.5)
-        for y in np.arange(0, total_height + 1, self.grid_size):
-            ax.axhline(y, color='#E0E0E0', linewidth=0.3, alpha=0.5)
-        
-        # Dibujar habitaciones
-        for item in layout:
+        # Dibujar cada habitación
+        for item in rooms_layout:
             room = item['room']
             x, y = item['x'], item['y']
             width, height = item['width'], item['height']
             
-            # Color de la habitación
-            color = self.room_colors.get(room.code, '#FFFFFF')
+            # Color
+            color = self._get_room_color(room.room_type.code)
             
-            # Dibujar rectángulo con sombra
-            shadow = FancyBboxPatch(
-                (x + 0.05, y - 0.05), width, height,
-                boxstyle="round,pad=0.05",
-                facecolor='#CCCCCC',
-                edgecolor='none',
-                alpha=0.3,
-                zorder=1
-            )
-            ax.add_patch(shadow)
-            
-            # Habitación principal
-            rect = FancyBboxPatch(
+            # Rectángulo con borde
+            rect = Rectangle(
                 (x, y), width, height,
-                boxstyle="round,pad=0.05",
                 facecolor=color,
-                edgecolor='#333333',
-                linewidth=2,
-                zorder=2
+                edgecolor='#333',
+                linewidth=2
             )
             ax.add_patch(rect)
             
-            # Nombre de la habitación
-            room_name = room.room_type.display_name if hasattr(room, 'room_type') else room.code
+            # Nombre de habitación
+            name = room.room_type.name
             ax.text(
                 x + width/2, y + height/2 + 0.3,
-                room_name,
+                name,
                 ha='center', va='center',
-                fontsize=10,
-                fontweight='bold',
-                color='#333333',
-                zorder=3
+                fontsize=10, fontweight='bold'
             )
             
-            # Área en m²
+            # Dimensiones
             ax.text(
-                x + width/2, y + height/2 - 0.3,
-                f"{room.area_m2:.1f} m²",
+                x + width/2, y + height/2 - 0.2,
+                f'{width:.1f}m × {height:.1f}m',
                 ha='center', va='center',
-                fontsize=9,
-                color='#666666',
-                zorder=3
+                fontsize=8, color='#666'
             )
-        
-        # Título del plano
-        ax.text(
-            self.total_width/2, total_height + 0.5,
-            '📐 PLANO DE DISTRIBUCIÓN',
-            ha='center', va='center',
-            fontsize=14,
-            fontweight='bold',
-            color='#1976D2'
-        )
-        
-        # Leyenda de superficie total
-        total_area = sum([r.area_m2 for r in self.rooms])
-        ax.text(
-            self.total_width/2, -0.5,
-            f'Superficie Total: {total_area:.1f} m²',
-            ha='center', va='center',
-            fontsize=11,
-            color='#333333'
-        )
+            
+            # Área
+            ax.text(
+                x + width/2, y + height/2 - 0.6,
+                f'{room.area_m2:.0f} m²',
+                ha='center', va='center',
+                fontsize=9, fontweight='bold',
+                color='#1976D2'
+            )
         
         # Quitar ejes
         ax.set_xticks([])
@@ -188,120 +165,15 @@ class FloorPlan2D:
         ax.spines['bottom'].set_visible(False)
         ax.spines['left'].set_visible(False)
         
-        # Guardar
+        # Grid sutil
+        ax.grid(True, linestyle=':', alpha=0.3, color='#ccc')
+        
         plt.tight_layout()
-        plt.savefig(output_path, dpi=dpi, bbox_inches='tight', facecolor='white')
-        plt.close()
         
-        return output_path
-    
-    def generate_plan_to_bytes(self, dpi=150):
-        """
-        Genera el plano y lo devuelve como bytes (para Streamlit).
-        
-        Returns:
-            bytes: Imagen PNG en memoria
-        """
-        layout = self.calculate_layout()
-        max_y = max([r['y'] + r['height'] for r in layout])
-        total_height = max_y + 1
-        
-        fig, ax = plt.subplots(figsize=(12, 12 * total_height / self.total_width))
-        
-        # ... (copiar el mismo código de generate_plan para el dibujo) ...
-        
-        # Guardar en buffer de memoria
+        # Guardar en bytes
         buf = io.BytesIO()
-        plt.tight_layout()
-        plt.savefig(buf, format='png', dpi=dpi, bbox_inches='tight', facecolor='white')
+        plt.savefig(buf, format='png', dpi=150, bbox_inches='tight')
         plt.close()
-        
         buf.seek(0)
+        
         return buf.getvalue()
-
-
-def validate_distribution_with_ai(rooms, client_requirements, groq_api_key):
-    """
-    Valida la distribución con IA y sugiere mejoras.
-    
-    Args:
-        rooms: Lista de RoomInstance
-        client_requirements: Dict con preferencias del cliente
-        groq_api_key: API key de Groq
-    
-    Returns:
-        dict: {
-            'valid': bool,
-            'warnings': list,
-            'suggestions': list,
-            'score': int (0-100)
-        }
-    """
-    from groq import Groq
-    import json
-    
-    client = Groq(api_key=groq_api_key)
-    
-    # Preparar contexto
-    rooms_summary = []
-    for room in rooms:
-        rooms_summary.append({
-            'tipo': room.code,
-            'area_m2': room.area_m2
-        })
-    
-    prompt = f"""
-Eres un arquitecto experto. Valida esta distribución de vivienda:
-
-DISTRIBUCIÓN ACTUAL:
-{json.dumps(rooms_summary, indent=2)}
-
-PREFERENCIAS DEL CLIENTE:
-- Dormitorios deseados: {client_requirements.get('bedrooms', 3)}
-- Baños deseados: {client_requirements.get('bathrooms', 2)}
-- Estilo: {client_requirements.get('style', 'moderna')}
-- Superficie objetivo: {client_requirements.get('target_area_m2', 120)} m²
-
-VALIDA LO SIGUIENTE:
-1. ¿Las dimensiones de cada habitación son apropiadas? (min/max recomendados)
-2. ¿La distribución tiene sentido arquitectónicamente?
-3. ¿Falta alguna habitación esencial? (pasillo, distribuidor)
-4. ¿Hay habitaciones demasiado grandes o pequeñas?
-
-RESPONDE EN JSON:
-{{
-  "valid": true/false,
-  "score": 0-100,
-  "warnings": ["advertencia 1", "advertencia 2"],
-  "suggestions": ["sugerencia 1", "sugerencia 2"]
-}}
-
-SOLO JSON, sin texto adicional.
-"""
-    
-    try:
-        response = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.1
-        )
-        
-        response_text = response.choices[0].message.content.strip()
-        
-        # Limpiar respuesta
-        if "```json" in response_text:
-            start = response_text.find("```json") + 7
-            end = response_text.find("```", start)
-            response_text = response_text[start:end].strip()
-        
-        result = json.loads(response_text)
-        return result
-    
-    except Exception as e:
-        # Fallback en caso de error
-        return {
-            'valid': True,
-            'score': 75,
-            'warnings': [],
-            'suggestions': [f'Error al validar con IA: {str(e)}']
-        }

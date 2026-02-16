@@ -1061,37 +1061,109 @@ def render_step2():
             
             st.success(f"✅ Eliminados {len(rooms_to_remove)} elemento(s). Presupuesto actualizado.")
     
+    # ============================================
+    # 📐 VISUALIZACIÓN DEL PLANO 2D
+    # ============================================
     st.markdown("---")
-    
-    # ============================================
-    # 🎨 VISUALIZACIÓN DEL PLANO 2D
-    # ============================================
     st.subheader("📐 Visualización del Plano")
-
-    # Botón para generar/actualizar plano
-    if st.button("🎨 Generar Plano 2D", type="primary", key="generate_plan"):
-        with st.spinner("Generando plano..."):
-            try:
-                from .step2_planner import FloorPlan2D
-                
-                # Generar plano
-                planner = FloorPlan2D(design.rooms, total_width=15)
-                plan_path = planner.generate_plan('plano_distribucion.png')
-                
-                # Guardar en session state
-                st.session_state['current_plan'] = plan_path
-                st.success("✅ Plano generado correctamente")
-                
-            except Exception as e:
-                st.error(f"❌ Error generando plano: {e}")
-                import traceback
-                st.code(traceback.format_exc())
-
+    
+    if st.button("🎨 Generar Plano 2D", type="primary"):
+        try:
+            from .step2_planner import ProfessionalFloorPlan
+            
+            # Generar plano
+            planner = ProfessionalFloorPlan(design)
+            img_bytes = planner.generate()
+            
+            # Guardar en session state
+            st.session_state['current_floor_plan'] = img_bytes
+            
+            st.success("✅ Plano generado correctamente")
+            st.rerun()
+        
+        except Exception as e:
+            st.error(f"❌ Error generando plano: {e}")
+            import traceback
+            st.code(traceback.format_exc())
+    
     # Mostrar plano si existe
-    if st.session_state.get('current_plan'):
-        st.image(st.session_state['current_plan'], 
-                 caption="Plano de distribución actual",
-                 use_container_width=True)
+    if 'current_floor_plan' in st.session_state:
+        st.image(
+            st.session_state['current_floor_plan'],
+            caption="Plano de distribución profesional",
+            use_container_width=True
+        )
+        
+        # Botón para descargar
+        st.download_button(
+            label="📥 Descargar Plano PNG",
+            data=st.session_state['current_floor_plan'],
+            file_name="plano_distribucion.png",
+            mime="image/png"
+        )
+
+    # ============================================
+    # 🤖 SUGERENCIAS INTELIGENTES DE IA
+    # ============================================
+    if 'current_floor_plan' in st.session_state:
+        st.markdown("---")
+        st.subheader("🤖 Análisis del Arquitecto IA")
+        
+        # Analizar distribución con IA
+        with st.spinner("Analizando distribución..."):
+            try:
+                from groq import Groq
+                import os
+                from dotenv import load_dotenv
+                from pathlib import Path
+                
+                # Cargar API key
+                project_root = Path(__file__).parent.parent.parent
+                load_dotenv(dotenv_path=project_root / '.env')
+                groq_api_key = os.getenv("GROQ_API_KEY")
+                
+                if not groq_api_key:
+                    st.warning("⚠️ API key de Groq no encontrada")
+                else:
+                    client = Groq(api_key=groq_api_key)
+                    
+                    # Crear resumen de distribución
+                    rooms_summary = []
+                    for room in design.rooms:
+                        rooms_summary.append(f"- {room.room_type.name}: {room.area_m2:.0f} m²")
+                    
+                    prompt = f"""Eres un arquitecto experto. Analiza esta distribución de vivienda:
+
+HABITACIONES:
+{chr(10).join(rooms_summary)}
+
+TOTAL: {sum([r.area_m2 for r in design.rooms]):.0f} m²
+
+Proporciona:
+1. Evaluación general (1-2 líneas)
+2. 2-3 sugerencias concretas de mejora
+3. Alertas si algo es problemático (cocina muy pequeña, baño sin ventilación, etc.)
+
+Sé conciso y práctico. Formato:
+
+✅/⚠️/❌ [Aspecto]: [Comentario breve]
+💡 Sugerencia: [Acción específica]
+"""
+                    
+                    response = client.chat.completions.create(
+                        model="llama-3.3-70b-versatile",
+                        messages=[{"role": "user", "content": prompt}],
+                        temperature=0.3
+                    )
+                    
+                    analysis = response.choices[0].message.content.strip()
+                    
+                    # Mostrar en expander
+                    with st.expander("📋 Ver análisis detallado", expanded=True):
+                        st.markdown(analysis)
+            
+            except Exception as e:
+                st.error(f"❌ Error en análisis IA: {e}")
 
     st.markdown("---")
     
