@@ -1270,31 +1270,48 @@ def render_step3():
         design.rooms.append(RoomInstance(room_type=room_type, area_m2=float(area)))
     
     # ============================================
-    # 🎨 VISTA ARQUITECTÓNICA INTERACTIVA
+    # ✏️ EDITOR INTERACTIVO
     # ============================================
-    st.subheader("🎨 Vista Arquitectónica")
     
-    st.info("""
-    🚧 **Próximamente: Editor Interactivo**
+    try:
+        from .interactive_editor import InteractiveFloorEditor
+        
+        editor = InteractiveFloorEditor(design, ai_validator=None)
+        editor.render()
+        
+    except Exception as e:
+        st.error(f"❌ Error en editor: {e}")
+        import traceback
+        st.code(traceback.format_exc())
     
-    Podrás:
-    - 🖱️ Arrastrar tabiques para redimensionar habitaciones
-    - 🤖 IA te guiará en tiempo real ("Cocina muy pequeña")
-    - 🔄 Rotar la vista para ver desde diferentes ángulos
-    - 📏 Ver medidas reales mientras editas
-    - ✅ Validación automática de distribución
+    st.markdown("---")
     
-    Por ahora, usa el **Plano 2D del Paso 2** y las sugerencias de IA.
-    """)
+    # ============================================
+    # 📐 VISUALIZACIÓN DEL PLANO ACTUAL
+    # ============================================
+    st.subheader("📐 Tu Plano Actual")
     
     # Mostrar plano 2D si existe
     if 'current_floor_plan' in st.session_state:
-        st.markdown("**📐 Tu plano actual:**")
         st.image(
             st.session_state['current_floor_plan'],
-            caption="Plano de distribución - Paso 2",
+            caption="Plano de distribución - Genera de nuevo si hiciste cambios",
             use_container_width=True
         )
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            st.download_button(
+                label="📥 Descargar Plano Actual",
+                data=st.session_state['current_floor_plan'],
+                file_name="plano_distribucion.png",
+                mime="image/png"
+            )
+        with col2:
+            if st.button("🔄 Regenerar Plano con Cambios"):
+                st.info("💡 Vuelve al Paso 2 y pulsa 'Generar Plano 2D' de nuevo")
+    else:
+        st.warning("⚠️ Aún no has generado el plano. Vuelve al Paso 2.")
     
     st.markdown("---")
     
