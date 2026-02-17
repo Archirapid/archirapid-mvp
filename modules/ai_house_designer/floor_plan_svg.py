@@ -92,9 +92,10 @@ class FloorPlanSVG:
         current_y = 0
         max_height = 0
         
-        # Columna 1: Extras izquierda (garaje, porche)
+        # Columna 1: Extras izquierda (piscina SIEMPRE va fuera)
+        zona_piscina = [r for r in zona_extra if 'piscina' in r.room_type.code.lower()]
         extras_izq = [r for r in zona_extra if any(x in r.room_type.code.lower() 
-                      for x in ['garaje', 'porche', 'piscina'])]
+                      for x in ['garaje', 'porche']) and 'piscina' not in r.room_type.code.lower()]
         
         col1_width = 0
         col1_y = 0
@@ -168,7 +169,7 @@ class FloorPlanSVG:
         current_x += col4_width if col4_width > 0 else 0
         
         # Columna 5: Extras derecha (paneles, huerto, etc)
-        extras_der = [r for r in zona_extra if r not in extras_izq]
+        extras_der = [r for r in zona_extra if r not in extras_izq and r not in zona_piscina]
         col5_y = 0
         for room in extras_der:
             w, h = self._calculate_room_dimensions(room.area_m2, 1.2)
@@ -181,6 +182,21 @@ class FloorPlanSVG:
             })
             col5_y += h
             max_height = max(max_height, col5_y)
+        
+        # Piscina exterior: siempre abajo separada de la casa
+        pool_x = 0
+        pool_y_offset = max_height + 3  # 3 metros de separación
+        for room in zona_piscina:
+            w, h = self._calculate_room_dimensions(room.area_m2, 1.8)  # más ancha que alta
+            layout.append({
+                'room': room,
+                'x': pool_x,
+                'y': pool_y_offset,
+                'width': w,
+                'height': h
+            })
+            pool_x += w + 1
+            max_height = max(max_height, pool_y_offset + h)
         
         self.total_width = current_x + (extras_der[0].area_m2 ** 0.5 if extras_der else 0)
         self.total_height = max_height

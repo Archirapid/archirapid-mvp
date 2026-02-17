@@ -68,9 +68,10 @@ class Viewer3D:
         layout = []
         current_x = 0
         
-        # Col 1: Extras izquierda
+        # Col 1: Extras izquierda (piscina SIEMPRE va fuera)
+        zona_piscina = [r for r in zona_extra if 'piscina' in r.room_type.code.lower()]
         extras_izq = [r for r in zona_extra if any(x in r.room_type.code.lower() 
-                      for x in ['garaje', 'porche', 'piscina'])]
+                      for x in ['garaje', 'porche']) and 'piscina' not in r.room_type.code.lower()]
         col1_w, col1_y = 0, 0
         for room in extras_izq:
             w, d = self._calculate_dimensions(room.area_m2, 1.2)
@@ -107,12 +108,20 @@ class Viewer3D:
         current_x += col4_w if col4_w > 0 else 0
         
         # Col 5: Extras derecha
-        extras_der = [r for r in zona_extra if r not in extras_izq]
+        extras_der = [r for r in zona_extra if r not in extras_izq and r not in zona_piscina]
         col5_y = 0
         for room in extras_der:
             w, d = self._calculate_dimensions(room.area_m2, 1.2)
             layout.append({'room': room, 'x': current_x, 'z': col5_y, 'width': w, 'depth': d})
             col5_y += d
+        
+        # Piscina exterior: siempre abajo separada de la casa
+        pool_x = 0
+        pool_y_offset = max([item['z'] + item['depth'] for item in layout] or [0]) + 3  # 3 metros de separación
+        for room in zona_piscina:
+            w, d = self._calculate_dimensions(room.area_m2, 1.8)  # más ancha que alta
+            layout.append({'room': room, 'x': pool_x, 'z': pool_y_offset, 'width': w, 'depth': d})
+            pool_x += w + 1
         
         self.total_width = current_x + (4 if extras_der else 0)
         self.total_depth = max([item['z'] + item['depth'] for item in layout] or [10])
@@ -334,9 +343,9 @@ class Viewer3D:
     <button class="btn-view" id="btn-iso" onclick="setView('iso')">Vista 3D</button>
     <div id="controls">🖱️ Arrastrar: rotar · Scroll: zoom · Click habitación: info</div>
     
-    <!-- Botón pantalla completa -->
-    <button id="btn-fullscreen" onclick="openFullscreen()">
-        ⛶ Ver en Pantalla Completa
+    <!-- Botón abrir en nueva pestaña -->
+    <button id="btn-fullscreen" onclick="openInNewTab()">
+        ⛶ Abrir en Nueva Pestaña
     </button>
     
     <!-- Panel orientación solar -->
@@ -757,9 +766,43 @@ function closeRoomPanel() {{
 function updateRoomSize(value) {{
     const v = parseFloat(value);
     const costPerM2 = selectedRoom ? getCostPerM2(selectedRoom.name) : 1000;
+    const newCost = v * costPerM2;
+    
     document.getElementById('detail-slider-value').textContent = v.toFixed(0) + ' m²';
     document.getElementById('detail-cost').textContent = 
-        '€' + (v * costPerM2).toLocaleString('es-ES');
+        '€' + newCost.toLocaleString('es-ES');
+    
+    // Actualizar área del room seleccionado
+    if (selectedRoom) {{
+        const oldArea = selectedRoom.area;
+        selectedRoom.area = v;
+        
+        // Calcular diferencia y mostrar mensaje
+        const diff = v - oldArea;
+        const costDiff = diff * costPerM2;
+        
+        // Recalcular presupuesto total
+        let totalCost = 0;
+        rooms.forEach(r => {{
+            totalCost += r.area * getCostPerM2(r.name);
+        }});
+        
+        // Mostrar en panel info
+        const infoPanel = document.getElementById('info-panel');
+        const budgetChange = costDiff >= 0 ? 
+            '+€' + Math.abs(costDiff).toLocaleString('es-ES') : 
+            '-€' + Math.abs(costDiff).toLocaleString('es-ES');
+        
+        infoPanel.innerHTML = `
+            <strong>🏠 Vista 3D Interactiva</strong><br>
+            Superficie: ${{rooms.reduce((s,r) => s+r.area, 0).toFixed(0)}} m²<br>
+            Habitaciones: ${{rooms.length}}<br>
+            <span style="color:#F39C12">💰 Presupuesto: €${{totalCost.toLocaleString('es-ES')}}</span><br>
+            <span style="color:${{costDiff >= 0 ? '#E74C3C' : '#2ECC71'}}">
+                ${{budgetChange}} vs anterior
+            </span>
+        `;
+    }}
 }}
 
 // Controles de órbita (manual)
@@ -872,33 +915,11 @@ console.log('Center:', centerX, centerZ);
 let fullscreenRenderer = null;
 let fullscreenAnimating = false;
 
-function openFullscreen() {{
-    // Intentar pantalla completa real del navegador
-    const container = document.getElementById('canvas-container');
-    
-    if (container.requestFullscreen) {{
-        container.requestFullscreen();
-    }} else if (container.webkitRequestFullscreen) {{
-        container.webkitRequestFullscreen();
-    }} else if (container.mozRequestFullScreen) {{
-        container.mozRequestFullScreen();
-    }}
-    
-    // Adaptar renderer al tamaño completo
-    document.addEventListener('fullscreenchange', function onFSChange() {{
-        if (document.fullscreenElement) {{
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-        }} else {{
-            // Volver al tamaño normal
-            const w = container.clientWidth;
-            renderer.setSize(w, 550);
-            camera.aspect = w / 550;
-            camera.updateProjectionMatrix();
-        }}
-        document.removeEventListener('fullscreenchange', onFSChange);
-    }});
+function openInNewTab() {{
+    const htmlContent = document.documentElement.outerHTML;
+    const blob = new Blob([htmlContent], {{type: 'text/html'}});
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank');
 }}
 
 function closeFullscreen() {{

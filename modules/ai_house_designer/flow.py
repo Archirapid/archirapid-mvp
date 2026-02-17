@@ -525,7 +525,15 @@ def _generate_ai_proposal(req):
 - Extras: {', '.join(extras_list) if extras_list else 'ninguno'}
 - Energía/Sostenibilidad: {', '.join(energy_list) if energy_list else 'ninguno'}
 
-Notas especiales: {req['special_notes'] or 'ninguna'}
+PETICIONES ESPECIALES DEL CLIENTE (OBLIGATORIO INCLUIR):
+{req.get('special_notes', 'ninguna')}
+
+IMPORTANTE - Si el cliente menciona:
+- "chimenea" → añadir coste €3,000-5,000 en descripción
+- "suelo radiante" → añadir €80/m² extra al presupuesto
+- "domótica" → añadir €5,000-15,000 en sistemas inteligentes
+- Cualquier extra especial → incluirlo en el análisis y presupuesto
+NUNCA ignorar las peticiones especiales del cliente.
 
 Responde SOLO con un JSON válido (sin markdown) con habitaciones y m². Ejemplo:
 {{
