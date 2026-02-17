@@ -925,155 +925,376 @@ Máximo 150 palabras. Usa: ✅ para correcto, ⚠️ para mejorable, ❌ para pr
                     st.warning(f"Análisis IA no disponible: {e}")
 
 def render_step3():
-    """Paso 3: Vista 3D y exportación"""
+    """Paso 3: Documentación completa y monetización"""
     
-    st.header("Paso 3 – Vista 3D y Documentación")
+    st.header("Paso 3 – Tu Proyecto Completo")
+    st.caption("Documentación técnica, eficiencia energética y siguiente paso.")
     
-    # Verificar que existe propuesta
-    req = st.session_state.get("ai_house_requirements")
-    if not req or "ai_room_proposal" not in req:
-        st.warning("⚠️ Primero completa el Paso 1")
-        if st.button("← Volver al Paso 1"):
+    # Validar datos
+    req = st.session_state.get("ai_house_requirements", {})
+    proposal = req.get("ai_room_proposal", {})
+    
+    if not proposal:
+        st.warning("Primero completa el Paso 1 y 2")
+        if st.button("← Volver al inicio"):
             st.session_state["ai_house_step"] = 1
             st.rerun()
         return
     
-    # Obtener diseño
-    proposal = req["ai_room_proposal"]
+    # Calcular datos del diseño
+    budget = req.get('budget', 150000)
+    style = req.get('style', 'No especificado')
+    energy = req.get('energy', {})
+    water_systems = req.get('water_systems', [])
+    sewage_systems = req.get('sewage_systems', [])
     
-    # Recrear HouseDesign (igual que en Paso 2)
-    from .data_model import HouseDesign, Plot, RoomType, RoomInstance
+    total_area = sum(v for v in proposal.values() if isinstance(v, (int, float)))
     
-    # Tipos de habitación
-    room_types = {
-        "salon_cocina": RoomType(code="salon_cocina", name="Salón-Cocina", min_m2=25, max_m2=50, base_cost_per_m2=1200),
-        "dormitorio_principal": RoomType(code="dormitorio_principal", name="Dormitorio Principal", min_m2=12, max_m2=25, base_cost_per_m2=1400),
-        "dormitorio": RoomType(code="dormitorio", name="Dormitorio", min_m2=8, max_m2=15, base_cost_per_m2=1100),
-        "bano": RoomType(code="bano", name="Baño", min_m2=4, max_m2=8, base_cost_per_m2=900),
-        "bodega": RoomType(code="bodega", name="Bodega", min_m2=6, max_m2=12, base_cost_per_m2=600),
-        "piscina": RoomType(code="piscina", name="Piscina", min_m2=20, max_m2=40, base_cost_per_m2=2500),
-        "paneles_solares": RoomType(code="paneles_solares", name="Paneles Solares", min_m2=3, max_m2=10, base_cost_per_m2=3000),
-        "garaje": RoomType(code="garaje", name="Garaje", min_m2=12, max_m2=25, base_cost_per_m2=900),
-        "porche": RoomType(code="porche", name="Porche", min_m2=10, max_m2=25, base_cost_per_m2=700),
-        "bomba_agua": RoomType(code="bomba_agua", name="Bomba de Agua", min_m2=2, max_m2=5, base_cost_per_m2=5000),
-        "accesibilidad": RoomType(code="accesibilidad", name="Accesibilidad", min_m2=0, max_m2=10, base_cost_per_m2=2000)
-    }
+    # Costes por partidas
+    construction_cost = int(total_area * 1100)
+    foundation_cost = int(total_area * 180)
+    installation_cost = int(total_area * 150)
+    architecture_cost = int((construction_cost + foundation_cost) * 0.08)
+    total_cost = construction_cost + foundation_cost + installation_cost + architecture_cost
     
-    # Obtener datos de la parcela si existen
-    plot_data = st.session_state.get("design_plot_data")
+    # Calcular subvenciones
+    subsidy = 0
+    if energy.get('solar'): subsidy += 3000
+    if energy.get('aerotermia'): subsidy += 5000
+    if energy.get('geotermia'): subsidy += 8000
+    if energy.get('insulation'): subsidy += 2000
+    if energy.get('rainwater'): subsidy += 1000
+    if energy.get('domotic'): subsidy += 500
+    subsidy_total = min(subsidy, int(total_cost * 0.40))
     
-    if plot_data:
-        plot = Plot(
-            id=plot_data.get('id', 'unknown'),
-            area_m2=plot_data.get('total_m2', 400.0),
-            buildable_ratio=0.33
-        )
-    else:
-        # Fallback si no hay datos de parcela
-        plot = Plot(
-            id='temp',
-            area_m2=400.0,
-            buildable_ratio=0.33
-        )
+    # ============================================
+    # RESUMEN EJECUTIVO - ARRIBA
+    # ============================================
+    st.markdown("### Tu Proyecto en Números")
     
-    design = HouseDesign(plot)
+    col1, col2, col3, col4 = st.columns(4)
     
-    for code, area in proposal.items():
-        if not isinstance(area, (int, float)):
-            continue
+    col1.metric(
+        "Coste Total Estimado",
+        f"€{total_cost:,}",
+        delta=f"vs €{int(total_area * 3500):,} piso ciudad",
+        delta_color="normal"
+    )
+    col2.metric(
+        "Subvenciones Estimadas",
+        f"€{subsidy_total:,}",
+        delta=f"Coste neto: €{total_cost - subsidy_total:,}",
+        delta_color="normal"
+    )
+    col3.metric(
+        "Superficie Total",
+        f"{total_area:.0f} m²",
+        delta=f"Estilo: {style.split(' ')[-1]}"
+    )
+    col4.metric(
+        "Ahorro vs Piso Ciudad",
+        f"€{int(total_area * 3500) - (total_cost - subsidy_total):,}",
+        delta="Ahorro real con subvenciones"
+    )
+    
+    st.markdown("---")
+    
+    # ============================================
+    # DOS COLUMNAS: ENERGÍA + PRESUPUESTO
+    # ============================================
+    col_left, col_right = st.columns([1, 1])
+    
+    with col_left:
         
-        # Buscar tipo
-        room_type = None
-        code_lower = code.lower()
+        # EFICIENCIA ENERGÉTICA
+        st.markdown("### Eficiencia Energética")
         
-        if code in room_types:
-            room_type = room_types[code]
-        elif 'salon' in code_lower or 'cocina' in code_lower:
-            room_type = room_types['salon_cocina']
-        elif 'dormitorio' in code_lower and 'principal' in code_lower:
-            room_type = room_types['dormitorio_principal']
-        elif 'dormitorio' in code_lower:
-            room_type = room_types['dormitorio']
-        elif 'bano' in code_lower or 'baño' in code_lower:
-            room_type = room_types['bano']
-        elif 'bodega' in code_lower:
-            room_type = room_types['bodega']
-        elif 'piscina' in code_lower:
-            room_type = room_types['piscina']
-        elif 'paneles' in code_lower:
-            room_type = room_types['paneles_solares']
-        elif 'garaje' in code_lower:
-            room_type = room_types['garaje']
-        elif 'porche' in code_lower:
-            room_type = room_types['porche']
-        elif 'bomba' in code_lower:
-            room_type = room_types['bomba_agua']
-        elif 'accesibilidad' in code_lower:
-            room_type = room_types['accesibilidad']
+        # Calcular calificación
+        energy_score = 0
+        if energy.get('solar'): energy_score += 25
+        if energy.get('aerotermia'): energy_score += 20
+        if energy.get('geotermia'): energy_score += 20
+        if energy.get('insulation'): energy_score += 15
+        if energy.get('rainwater'): energy_score += 10
+        if energy.get('domotic'): energy_score += 10
+        
+        if energy_score >= 60:
+            rating = "A"
+            rating_color = "#2ECC71"
+            rating_text = "Máxima eficiencia energética"
+        elif energy_score >= 40:
+            rating = "B"
+            rating_color = "#27AE60"
+            rating_text = "Alta eficiencia energética"
+        elif energy_score >= 20:
+            rating = "C"
+            rating_color = "#F39C12"
+            rating_text = "Eficiencia media"
         else:
-            room_type = RoomType(code=code, name=code.replace("_", " ").title(), min_m2=5, max_m2=50, base_cost_per_m2=1000)
+            rating = "D"
+            rating_color = "#E74C3C"
+            rating_text = "Eficiencia básica"
         
-        design.rooms.append(RoomInstance(room_type=room_type, area_m2=float(area)))
-    
-    # ============================================
-    # ✏️ EDITOR INTERACTIVO
-    # ============================================
-    
-    try:
-        from .interactive_editor import InteractiveFloorEditor
+        # Badge de calificación
+        st.markdown(f"""
+        <div style='background: {rating_color}; padding: 20px; border-radius: 10px; 
+                    text-align: center; color: white; margin-bottom: 15px;'>
+            <h1 style='margin:0; font-size: 60px;'>{rating}</h1>
+            <p style='margin:0; font-size: 16px;'>{rating_text}</p>
+        </div>
+        """, unsafe_allow_html=True)
         
-        editor = InteractiveFloorEditor(design, ai_validator=None)
-        editor.render()
+        # Detalles energéticos
+        consumo_base = total_area * 120  # kWh/año casa normal
+        ahorro_pct = energy_score * 0.9
+        consumo_real = int(consumo_base * (1 - ahorro_pct/100))
+        ahorro_euros = int((consumo_base - consumo_real) * 0.18)
+        co2_evitado = int((consumo_base - consumo_real) * 0.25 / 1000 * 10) / 10
         
-    except Exception as e:
-        st.error(f"❌ Error en editor: {e}")
-        import traceback
-        st.code(traceback.format_exc())
-    
-    st.markdown("---")
-    
-    # ============================================
-    # 📐 VISUALIZACIÓN DEL PLANO ACTUAL
-    # ============================================
-    st.subheader("📐 Tu Plano Actual")
-    
-    # Mostrar plano 2D si existe
-    if 'current_floor_plan' in st.session_state:
-        st.image(
-            st.session_state['current_floor_plan'],
-            caption="Plano de distribución - Genera de nuevo si hiciste cambios",
-            use_container_width=True
-        )
+        e1, e2 = st.columns(2)
+        e1.metric("Consumo estimado", f"{consumo_real:,} kWh/año",
+                 delta=f"-{ahorro_pct:.0f}% vs media")
+        e2.metric("Ahorro energético", f"€{ahorro_euros:,}/año",
+                 delta="vs casa convencional")
         
-        col1, col2 = st.columns(2)
-        with col1:
-            st.download_button(
-                label="📥 Descargar Plano Actual",
-                data=st.session_state['current_floor_plan'],
-                file_name="plano_distribucion.png",
-                mime="image/png"
+        st.metric("CO₂ evitado", f"{co2_evitado} ton/año",
+                 delta="Contribución al medioambiente")
+        
+        # Sistemas instalados
+        st.markdown("**Sistemas sostenibles incluidos:**")
+        systems = []
+        if energy.get('solar'): systems.append("☀️ Paneles solares fotovoltaicos")
+        if energy.get('aerotermia'): systems.append("🌡️ Aerotermia (calefacción/frío)")
+        if energy.get('geotermia'): systems.append("🌍 Geotermia")
+        if energy.get('insulation'): systems.append("🌿 Aislamiento natural")
+        if energy.get('rainwater'): systems.append("💧 Recuperación agua lluvia")
+        if energy.get('domotic'): systems.append("🏠 Domótica inteligente")
+        if water_systems: systems.append(f"💧 Agua: {' + '.join(water_systems)}")
+        if sewage_systems: systems.append(f"♻️ Saneamiento: {' + '.join(sewage_systems)}")
+        
+        for s in systems:
+            st.markdown(f"- {s}")
+        
+        st.markdown("---")
+        
+        # SUBVENCIONES
+        st.markdown("### Subvenciones Disponibles")
+        
+        subsidy_data = []
+        if energy.get('solar'):
+            subsidy_data.append(("☀️ Paneles solares (IDAE)", "€3,000"))
+        if energy.get('aerotermia'):
+            subsidy_data.append(("🌡️ Aerotermia (NextGen EU)", "€5,000"))
+        if energy.get('geotermia'):
+            subsidy_data.append(("🌍 Geotermia (NextGen EU)", "€8,000"))
+        if energy.get('insulation'):
+            subsidy_data.append(("🌿 Aislamiento (IDAE)", "€2,000"))
+        if energy.get('rainwater'):
+            subsidy_data.append(("💧 Agua lluvia (CC.AA.)", "€1,000"))
+        
+        if subsidy_data:
+            for name, amount in subsidy_data:
+                col_s1, col_s2 = st.columns([3, 1])
+                col_s1.markdown(f"- {name}")
+                col_s2.markdown(f"**{amount}**")
+            
+            st.success(f"Total estimado: **€{subsidy_total:,}** (hasta 40% del coste)")
+            st.caption("Sujeto a convocatorias vigentes. Consulta con nuestro equipo.")
+        else:
+            st.info("Activa sistemas sostenibles en el Paso 1 para acceder a subvenciones")
+    
+    with col_right:
+        
+        # PRESUPUESTO DETALLADO
+        st.markdown("### Presupuesto por Partidas")
+        
+        import pandas as pd
+        
+        partidas = [
+            ("1. Cimentación", f"€{foundation_cost:,}", 
+             f"{int(foundation_cost/total_cost*100)}%",
+             "Zapatas/losa según estudio geotécnico"),
+            ("2. Estructura y cubierta", f"€{int(construction_cost*0.35):,}",
+             "32%", "Estructura + tejado + cerramientos ext."),
+            ("3. Cerramientos y tabiquería", f"€{int(construction_cost*0.20):,}",
+             "18%", "Fachada, ventanas, puertas, tabiques int."),
+            ("4. Instalaciones", f"€{installation_cost:,}",
+             f"{int(installation_cost/total_cost*100)}%",
+             "Elec., fontanería, climatización, domótica"),
+            ("5. Acabados", f"€{int(construction_cost*0.25):,}",
+             "23%", "Pavimentos, pintura, cocina, baños"),
+            ("6. Sistemas sostenibles", f"€{int(construction_cost*0.10):,}",
+             "9%", "Paneles, aerotermia, depósito lluvia"),
+            ("7. Honorarios técnicos", f"€{architecture_cost:,}",
+             "8%", "Arquitecto, aparejador, licencias"),
+        ]
+        
+        df = pd.DataFrame(partidas, 
+                         columns=["Partida", "Coste", "%", "Descripción"])
+        st.dataframe(df, use_container_width=True, hide_index=True)
+        
+        # Total
+        st.markdown(f"""
+        <div style='background: #2C3E50; padding: 15px; border-radius: 8px; 
+                    color: white; text-align: center;'>
+            <h3 style='margin:0;'>TOTAL: €{total_cost:,}</h3>
+            <p style='margin:5px 0 0 0; font-size:14px;'>
+                Neto con subvenciones: €{total_cost - subsidy_total:,}
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown("---")
+        
+        # PLANO ACTUAL
+        st.markdown("### Tu Plano")
+        
+        if 'current_floor_plan' in st.session_state:
+            st.image(
+                st.session_state['current_floor_plan'],
+                caption="Plano de distribución",
+                use_container_width=True
             )
-        with col2:
-            if st.button("🔄 Regenerar Plano con Cambios"):
-                st.info("💡 Vuelve al Paso 2 y pulsa 'Generar Plano 2D' de nuevo")
-    else:
-        st.warning("⚠️ Aún no has generado el plano. Vuelve al Paso 2.")
+        else:
+            st.info("Genera el plano en el Paso 2")
+        
+        st.markdown("---")
+        
+        # DESCARGAS
+        st.markdown("### Descargas")
+        
+        dl1, dl2 = st.columns(2)
+        
+        with dl1:
+            if 'current_floor_plan' in st.session_state:
+                st.download_button(
+                    label="Descargar Plano PNG",
+                    data=st.session_state['current_floor_plan'],
+                    file_name="plano_archirapid.png",
+                    mime="image/png",
+                    use_container_width=True
+                )
+        
+        with dl2:
+            # Excel presupuesto
+            try:
+                import io
+                import openpyxl
+                from openpyxl.styles import Font, PatternFill, Alignment
+                
+                wb = openpyxl.Workbook()
+                ws = wb.active
+                ws.title = "Presupuesto"
+                
+                # Cabecera
+                ws['A1'] = "PRESUPUESTO ARCHIRAPID"
+                ws['A1'].font = Font(bold=True, size=14)
+                ws['A2'] = f"Superficie: {total_area:.0f} m² | Estilo: {style}"
+                
+                # Headers
+                headers = ["Partida", "Coste (€)", "% Total", "Descripción"]
+                for col, h in enumerate(headers, 1):
+                    cell = ws.cell(row=4, column=col, value=h)
+                    cell.font = Font(bold=True, color="FFFFFF")
+                    cell.fill = PatternFill("solid", fgColor="2C3E50")
+                
+                # Datos
+                for row, (partida, coste, pct, desc) in enumerate(partidas, 5):
+                    ws.cell(row=row, column=1, value=partida)
+                    ws.cell(row=row, column=2, value=coste)
+                    ws.cell(row=row, column=3, value=pct)
+                    ws.cell(row=row, column=4, value=desc)
+                
+                # Total
+                ws.cell(row=len(partidas)+6, column=1, value="TOTAL").font = Font(bold=True)
+                ws.cell(row=len(partidas)+6, column=2, value=f"€{total_cost:,}").font = Font(bold=True)
+                ws.cell(row=len(partidas)+7, column=1, value="Con subvenciones").font = Font(bold=True)
+                ws.cell(row=len(partidas)+7, column=2, value=f"€{total_cost-subsidy_total:,}").font = Font(bold=True, color="2ECC71")
+                
+                # Ajustar columnas
+                ws.column_dimensions['A'].width = 30
+                ws.column_dimensions['B'].width = 15
+                ws.column_dimensions['C'].width = 10
+                ws.column_dimensions['D'].width = 45
+                
+                excel_buffer = io.BytesIO()
+                wb.save(excel_buffer)
+                excel_buffer.seek(0)
+                
+                st.download_button(
+                    label="Descargar Excel",
+                    data=excel_buffer.getvalue(),
+                    file_name="presupuesto_archirapid.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True
+                )
+            except Exception as e:
+                st.warning(f"Excel no disponible: {e}")
     
     st.markdown("---")
     
     # ============================================
-    # 📄 DOCUMENTACIÓN
+    # CONSTRUCTORES ASOCIADOS - MONETIZACIÓN
     # ============================================
-    st.subheader("📄 Generar Documentación")
-    st.info("🚧 Próximamente: Memoria técnica PDF, Presupuesto Excel, Planos DWG")
+    st.markdown("### Constructores Asociados")
+    st.caption("Solicita presupuesto real a constructores verificados de tu zona")
+    
+    constructors = [
+        {
+            "name": "Construcciones EcoVerde",
+            "specialty": "Vivienda sostenible y bioconstrucción",
+            "rating": "⭐⭐⭐⭐⭐",
+            "projects": "127 proyectos",
+            "zone": "Andalucía, Extremadura"
+        },
+        {
+            "name": "BuildGreen España",
+            "specialty": "Casas pasivas y certificación energética",
+            "rating": "⭐⭐⭐⭐⭐",
+            "projects": "89 proyectos",
+            "zone": "Nacional"
+        },
+        {
+            "name": "Construye Rural",
+            "specialty": "Vivienda rural, piedra natural y madera",
+            "rating": "⭐⭐⭐⭐",
+            "projects": "203 proyectos",
+            "zone": "Todo el territorio"
+        }
+    ]
+    
+    cols = st.columns(3)
+    for col, constructor in zip(cols, constructors):
+        with col:
+            st.markdown(f"""
+            <div style='border: 1px solid #ddd; border-radius: 10px; 
+                        padding: 15px; height: 200px;'>
+                <h4 style='color: #2C3E50; margin-top:0;'>{constructor["name"]}</h4>
+                <p style='font-size:12px; color:#666;'>{constructor["specialty"]}</p>
+                <p>{constructor["rating"]}</p>
+                <p style='font-size:11px;'>📁 {constructor["projects"]}</p>
+                <p style='font-size:11px;'>📍 {constructor["zone"]}</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            st.button(
+                f"Solicitar Presupuesto",
+                key=f"constructor_{constructor['name']}",
+                use_container_width=True,
+                type="primary"
+            )
+    
+    st.info("ArchiRapid cobra una comisión del 3% al constructor cuando se formaliza el contrato. Sin coste para el cliente.")
     
     st.markdown("---")
     
-    # Botones de navegación
+    # NAVEGACIÓN
     col1, col2 = st.columns(2)
     with col1:
-        if st.button("← Volver al Paso 2"):
+        if st.button("← Volver al Paso 2", use_container_width=True):
             st.session_state["ai_house_step"] = 2
             st.rerun()
     with col2:
-        st.button("🎉 Finalizar Diseño", type="primary", disabled=True)
+        if st.button("Finalizar y Contactar", type="primary", use_container_width=True):
+            st.balloons()
+            st.success("Proyecto completado. Nos pondremos en contacto contigo en 24h.")

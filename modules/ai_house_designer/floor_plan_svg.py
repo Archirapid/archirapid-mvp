@@ -44,8 +44,15 @@ class FloorPlanSVG:
     
     def _calculate_room_dimensions(self, area_m2: float, ratio: float = 1.4) -> Tuple[float, float]:
         """Calcula ancho y alto en metros con ratio dado"""
-        width = math.sqrt(area_m2 * ratio)
-        height = area_m2 / width
+        # Protección contra área 0 o negativa
+        safe_area = max(area_m2, 1.0)
+        width = math.sqrt(safe_area * ratio)
+        # Protección contra width 0
+        if width < 0.1:
+            width = 1.0
+        height = safe_area / width
+        if height < 0.1:
+            height = 1.0
         return round(width, 1), round(height, 1)
     
     def _layout_rooms(self) -> List[Dict]:
