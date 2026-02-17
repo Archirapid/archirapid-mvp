@@ -5,6 +5,7 @@ Distribución real con paredes conectadas, pasillos y medidas
 import math
 from typing import List, Dict, Tuple, Optional
 import io
+from .architect_layout import ArchitectLayout, ZONE_DAY, ZONE_NIGHT, ZONE_WET, ZONE_CIRCULATION, ZONE_SERVICE, ZONE_EXTERIOR, ZONE_GARDEN
 
 class FloorPlanSVG:
     """Genera planos arquitectónicos reales en SVG"""
@@ -56,150 +57,61 @@ class FloorPlanSVG:
         return round(width, 1), round(height, 1)
     
     def _layout_rooms(self) -> List[Dict]:
-        """
-        Distribuye habitaciones en layout tipo plano real.
-        Zona día (salón/cocina) a la izquierda.
-        Zona noche (dormitorios) a la derecha.
-        Servicios (baños, pasillos) en el centro.
-        Extras (garaje, porche) en los extremos.
-        """
-        layout = []
+        """Usa el motor arquitectónico real para layout coherente"""
         
-        # Separar por zonas
-        zona_dia = []      # salón, cocina
-        zona_noche = []    # dormitorios
-        zona_servicio = [] # baños, pasillo, bodega
-        zona_extra = []    # garaje, porche, piscina, paneles, huerto
-        
+        # Preparar datos para el motor
+        rooms_data = []
         for room in self.design.rooms:
-            code = room.room_type.code.lower()
-            if any(x in code for x in ['salon', 'cocina']):
-                zona_dia.append(room)
-            elif any(x in code for x in ['dormitorio']):
-                zona_noche.append(room)
-            elif any(x in code for x in ['bano', 'pasillo', 'bodega', 'instalac']):
-                zona_servicio.append(room)
-            else:
-                zona_extra.append(room)
-        
-        # Ordenar dormitorios (principal primero)
-        zona_noche.sort(key=lambda r: r.area_m2, reverse=True)
-        
-        # LAYOUT GRID:
-        # [EXTRA_IZQ] [DIA] [SERVICIO] [NOCHE] [EXTRA_DER]
-        
-        current_x = 0
-        current_y = 0
-        max_height = 0
-        
-        # Columna 1: Extras izquierda (piscina SIEMPRE va fuera)
-        zona_piscina = [r for r in zona_extra if 'piscina' in r.room_type.code.lower()]
-        extras_izq = [r for r in zona_extra if any(x in r.room_type.code.lower() 
-                      for x in ['garaje', 'porche']) and 'piscina' not in r.room_type.code.lower()]
-        
-        col1_width = 0
-        col1_y = 0
-        for room in extras_izq:
-            w, h = self._calculate_room_dimensions(room.area_m2, 1.2)
-            layout.append({
-                'room': room,
-                'x': current_x,
-                'y': col1_y,
-                'width': w,
-                'height': h
+            rooms_data.append({
+                'code': room.room_type.code,
+                'name': room.room_type.name,
+                'area_m2': max(room.area_m2, 1.0)
             })
-            col1_width = max(col1_width, w)
-            col1_y += h
-            max_height = max(max_height, col1_y)
         
-        current_x += col1_width if col1_width > 0 else 0
+        # Generar layout arquitectónico
+        engine = ArchitectLayout(rooms_data)
+        layout_raw = engine.generate()
         
-        # Columna 2: Zona día (salón-cocina)
-        col2_width = 0
-        col2_y = 0
-        for room in zona_dia:
-            w, h = self._calculate_room_dimensions(room.area_m2, 1.3)
+        # Guardar dimensiones totales
+        all_x = [item['x'] + item['width'] for item in layout_raw]
+        all_z = [item['z'] + item['depth'] for item in layout_raw]
+        self.total_width = max(all_x) if all_x else 10
+        self.total_height = max(all_z) if all_z else 10
+        
+        # Convertir al formato esperado por generate()
+        # Cruzar de vuelta con los room objects originales para tener room_type
+        layout = []
+        for i, item in enumerate(layout_raw):
+            # Buscar el room original por nombre/código
+            original_room = None
+            for room in self.design.rooms:
+                if (room.room_type.code == item['code'] or 
+                    room.room_type.name == item['name']):
+                    original_room = room
+                    break
+            
+            # Si es el pasillo auto-generado, crear room sintético
+            if original_room is None:
+                from .data_model import RoomType, RoomInstance
+                synth_type = RoomType(
+                    code=item['code'],
+                    name=item['name'],
+                    min_m2=1, max_m2=50,
+                    base_cost_per_m2=800
+                )
+                original_room = RoomInstance(
+                    room_type=synth_type,
+                    area_m2=item['area_m2']
+                )
+            
             layout.append({
-                'room': room,
-                'x': current_x,
-                'y': col2_y,
-                'width': w,
-                'height': h
+                'room': original_room,
+                'x': item['x'],
+                'y': item['z'],      # El SVG usa 'y' para la profundidad
+                'width': item['width'],
+                'height': item['depth'],  # El SVG usa 'height' para profundidad
+                'zone': item.get('zone', 'day')
             })
-            col2_width = max(col2_width, w)
-            col2_y += h
-            max_height = max(max_height, col2_y)
-        
-        current_x += col2_width if col2_width > 0 else 0
-        
-        # Columna 3: Servicios (baños, pasillo)
-        col3_width = 0
-        col3_y = 0
-        for room in zona_servicio:
-            w, h = self._calculate_room_dimensions(room.area_m2, 0.8)
-            layout.append({
-                'room': room,
-                'x': current_x,
-                'y': col3_y,
-                'width': w,
-                'height': h
-            })
-            col3_width = max(col3_width, w)
-            col3_y += h
-            max_height = max(max_height, col3_y)
-        
-        current_x += col3_width if col3_width > 0 else 0
-        
-        # Columna 4: Dormitorios
-        col4_width = 0
-        col4_y = 0
-        for room in zona_noche:
-            w, h = self._calculate_room_dimensions(room.area_m2, 1.3)
-            layout.append({
-                'room': room,
-                'x': current_x,
-                'y': col4_y,
-                'width': w,
-                'height': h
-            })
-            col4_width = max(col4_width, w)
-            col4_y += h
-            max_height = max(max_height, col4_y)
-        
-        current_x += col4_width if col4_width > 0 else 0
-        
-        # Columna 5: Extras derecha (paneles, huerto, etc)
-        extras_der = [r for r in zona_extra if r not in extras_izq and r not in zona_piscina]
-        col5_y = 0
-        for room in extras_der:
-            w, h = self._calculate_room_dimensions(room.area_m2, 1.2)
-            layout.append({
-                'room': room,
-                'x': current_x,
-                'y': col5_y,
-                'width': w,
-                'height': h
-            })
-            col5_y += h
-            max_height = max(max_height, col5_y)
-        
-        # Piscina exterior: siempre abajo separada de la casa
-        pool_x = 0
-        pool_y_offset = max_height + 3  # 3 metros de separación
-        for room in zona_piscina:
-            w, h = self._calculate_room_dimensions(room.area_m2, 1.8)  # más ancha que alta
-            layout.append({
-                'room': room,
-                'x': pool_x,
-                'y': pool_y_offset,
-                'width': w,
-                'height': h
-            })
-            pool_x += w + 1
-            max_height = max(max_height, pool_y_offset + h)
-        
-        self.total_width = current_x + (extras_der[0].area_m2 ** 0.5 if extras_der else 0)
-        self.total_height = max_height
         
         return layout
     
@@ -297,7 +209,18 @@ class FloorPlanSVG:
         ax.axis('off')
         fig.patch.set_facecolor('#F2EDE4')
 
-        # Colores profesionales tipo arquitectónico
+        # Colores por zona arquitectónica (preferencia)
+        zone_colors = {
+            ZONE_DAY:         '#F5F0E8',  # Beige cálido - zona día
+            ZONE_NIGHT:       '#EAE8F0',  # Lila suave - dormitorios
+            ZONE_WET:         '#E0EEF0',  # Azul agua - baños
+            ZONE_CIRCULATION: '#F0F0F0',  # Gris claro - pasillo
+            ZONE_SERVICE:     '#E8E8E8',  # Gris - servicios
+            ZONE_EXTERIOR:    '#E8F0E8',  # Verde suave - exterior
+            ZONE_GARDEN:      '#D4EDDA',  # Verde jardín
+        }
+        
+        # También mantener por código como fallback
         colors_map = {
             'salon':    '#F5F0E8',
             'cocina':   '#F5F0E8',
@@ -306,7 +229,7 @@ class FloorPlanSVG:
             'garaje':   '#DCDCDC',
             'porche':   '#E8F0E8',
             'bodega':   '#F0EDE0',
-            'pasillo':  '#EBEBEB',
+            'pasillo':  '#F0F0F0',
             'piscina':  '#B8DFF0',
             'huerto':   '#C8E6C9',
             'caseta':   '#D7CCC8',
@@ -347,12 +270,14 @@ class FloorPlanSVG:
             pw = item['width'] * self.SCALE
             ph = item['height'] * self.SCALE
 
-            # Color de fondo
-            fill = '#F5F5F5'
-            for key, c in colors_map.items():
-                if key in code:
-                    fill = c
-                    break
+            # Color por zona primero, luego por código
+            zone = item.get('zone', '')
+            fill = zone_colors.get(zone, '#F5F5F5')
+            if fill == '#F5F5F5':  # Fallback por código
+                for key, c in colors_map.items():
+                    if key in code:
+                        fill = c
+                        break
 
             # Fondo con sombra sutil
             shadow = plt.Rectangle(
