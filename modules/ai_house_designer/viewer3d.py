@@ -48,83 +48,208 @@ class Viewer3D:
         return round(width, 2), round(depth, 2)
     
     def _layout_rooms(self) -> List[Dict]:
-        """Mismo layout que FloorPlanSVG para coherencia"""
+        """
+        Layout arquitectónico real:
+        - INTERIOR: habitaciones dentro de la casa conectadas
+        - EXTERIOR PRÓXIMO: garaje, porche pegados a la casa
+        - EXTERIOR JARDÍN: piscina, huerto, caseta alejados
+        """
+        layout = []
         
-        zona_dia, zona_noche, zona_servicio, zona_extra = [], [], [], []
+        # CLASIFICAR HABITACIONES
+        interior = []    # Dentro de la casa
+        ext_close = []   # Exterior próximo (garaje, porche)
+        ext_garden = []  # Exterior jardín (piscina, huerto, caseta)
+        
+        INTERIOR_CODES = ['salon', 'cocina', 'dormitorio', 'bano', 
+                         'pasillo', 'bodega', 'despacho', 'instalac']
+        EXT_CLOSE_CODES = ['garaje', 'porche', 'terraza']
+        EXT_GARDEN_CODES = ['piscina', 'pool', 'huerto', 'caseta', 
+                           'aperos', 'paneles', 'bomba']
         
         for room in self.design.rooms:
             code = room.room_type.code.lower()
-            if any(x in code for x in ['salon', 'cocina']):
-                zona_dia.append(room)
-            elif 'dormitorio' in code:
-                zona_noche.append(room)
-            elif any(x in code for x in ['bano', 'pasillo', 'bodega']):
-                zona_servicio.append(room)
+            name = room.room_type.name.lower()
+            combined = code + name
+            
+            if any(x in combined for x in EXT_GARDEN_CODES):
+                ext_garden.append(room)
+            elif any(x in combined for x in EXT_CLOSE_CODES):
+                ext_close.append(room)
             else:
-                zona_extra.append(room)
+                interior.append(room)
         
-        zona_noche.sort(key=lambda r: r.area_m2, reverse=True)
+        # Ordenar interior: salón primero, luego dormitorios, luego baños
+        def room_priority(r):
+            code = r.room_type.code.lower()
+            if 'salon' in code or 'cocina' in code: return 0
+            if 'dormitorio' in code and 'principal' in code: return 1
+            if 'dormitorio' in code: return 2
+            if 'bano' in code: return 3
+            if 'pasillo' in code: return 4
+            return 5
         
-        layout = []
-        current_x = 0
+        interior.sort(key=room_priority)
         
-        # Col 1: Extras izquierda (piscina SIEMPRE va fuera)
-        zona_piscina = [r for r in zona_extra if 'piscina' in r.room_type.code.lower()]
-        extras_izq = [r for r in zona_extra if any(x in r.room_type.code.lower() 
-                      for x in ['garaje', 'porche']) and 'piscina' not in r.room_type.code.lower()]
-        col1_w, col1_y = 0, 0
-        for room in extras_izq:
-            w, d = self._calculate_dimensions(room.area_m2, 1.2)
-            layout.append({'room': room, 'x': current_x, 'z': col1_y, 'width': w, 'depth': d})
-            col1_w = max(col1_w, w)
-            col1_y += d
-        current_x += col1_w if col1_w > 0 else 0
+        # =====================
+        # LAYOUT INTERIOR
+        # =====================
+        # Distribuir habitaciones interiores en grid 2 columnas
+        # Columna izquierda: zona día (salón, cocina)
+        # Columna derecha: zona noche (dormitorios, baños)
         
-        # Col 2: Zona día
-        col2_w, col2_y = 0, 0
+        zona_dia = [r for r in interior if any(x in r.room_type.code.lower() 
+                   for x in ['salon', 'cocina', 'despacho'])]
+        zona_noche = [r for r in interior if any(x in r.room_type.code.lower() 
+                     for x in ['dormitorio'])]
+        zona_servicio = [r for r in interior if any(x in r.room_type.code.lower() 
+                        for x in ['bano', 'pasillo', 'bodega', 'instalac'])]
+        
+        # Calcular ancho de cada zona
+        max_dia_w = 0
+        max_noche_w = 0
+        max_serv_w = 0
+        
+        # Zona día - columna izquierda
+        y_pos = 0
         for room in zona_dia:
-            w, d = self._calculate_dimensions(room.area_m2, 1.3)
-            layout.append({'room': room, 'x': current_x, 'z': col2_y, 'width': w, 'depth': d})
-            col2_w = max(col2_w, w)
-            col2_y += d
-        current_x += col2_w if col2_w > 0 else 0
+            w, d = self._calculate_dimensions(room.area_m2, 1.4)
+            layout.append({'room': room, 'x': 0, 'z': y_pos, 
+                          'width': w, 'depth': d, 'zone': 'interior'})
+            max_dia_w = max(max_dia_w, w)
+            y_pos += d
         
-        # Col 3: Servicios
-        col3_w, col3_y = 0, 0
+        total_interior_depth = max(y_pos, 1)
+        
+        # Zona servicio - columna central
+        x_serv = max_dia_w
+        y_pos = 0
         for room in zona_servicio:
-            w, d = self._calculate_dimensions(room.area_m2, 0.8)
-            layout.append({'room': room, 'x': current_x, 'z': col3_y, 'width': w, 'depth': d})
-            col3_w = max(col3_w, w)
-            col3_y += d
-        current_x += col3_w if col3_w > 0 else 0
+            w, d = self._calculate_dimensions(room.area_m2, 0.75)
+            layout.append({'room': room, 'x': x_serv, 'z': y_pos,
+                          'width': w, 'depth': d, 'zone': 'interior'})
+            max_serv_w = max(max_serv_w, w)
+            y_pos += d
         
-        # Col 4: Dormitorios
-        col4_w, col4_y = 0, 0
+        total_interior_depth = max(total_interior_depth, y_pos)
+        
+        # Zona noche - columna derecha
+        x_noche = max_dia_w + max_serv_w
+        y_pos = 0
         for room in zona_noche:
             w, d = self._calculate_dimensions(room.area_m2, 1.3)
-            layout.append({'room': room, 'x': current_x, 'z': col4_y, 'width': w, 'depth': d})
-            col4_w = max(col4_w, w)
-            col4_y += d
-        current_x += col4_w if col4_w > 0 else 0
+            layout.append({'room': room, 'x': x_noche, 'z': y_pos,
+                          'width': w, 'depth': d, 'zone': 'interior'})
+            max_noche_w = max(max_noche_w, w)
+            y_pos += d
         
-        # Col 5: Extras derecha
-        extras_der = [r for r in zona_extra if r not in extras_izq and r not in zona_piscina]
-        col5_y = 0
-        for room in extras_der:
+        total_interior_depth = max(total_interior_depth, y_pos)
+        
+        # Dimensiones totales del interior
+        house_width = max_dia_w + max_serv_w + max_noche_w
+        house_depth = total_interior_depth
+        
+        # =====================
+        # EXTERIOR PRÓXIMO
+        # =====================
+        # Garaje: a la izquierda de la casa
+        # Porche: delante de la casa (z negativo)
+        
+        garaje_rooms = [r for r in ext_close if 'garaje' in r.room_type.code.lower()]
+        porche_rooms = [r for r in ext_close if any(x in r.room_type.code.lower() 
+                       for x in ['porche', 'terraza'])]
+        
+        # Garaje a la izquierda
+        x_garaje = -8  # 8m a la izquierda
+        y_garaje = 0
+        for room in garaje_rooms:
+            w, d = self._calculate_dimensions(room.area_m2, 1.5)
+            layout.append({'room': room, 'x': x_garaje, 'z': y_garaje,
+                          'width': w, 'depth': d, 'zone': 'ext_close'})
+            y_garaje += d
+        
+        # Porche delante (z negativo = frente de la casa)
+        x_porche = house_width * 0.2
+        z_porche = -5  # 5m delante
+        for room in porche_rooms:
+            w = house_width * 0.6
+            d = room.area_m2 / max(w, 1)
+            layout.append({'room': room, 'x': x_porche, 'z': z_porche,
+                          'width': w, 'depth': d, 'zone': 'ext_close'})
+            z_porche -= d
+        
+        # =====================
+        # EXTERIOR JARDÍN
+        # =====================
+        # Piscina: detrás de la casa
+        # Huerto: a la derecha exterior
+        # Caseta aperos: a la derecha exterior
+        # Paneles solares: encima (tejado, no en suelo)
+        
+        piscina_rooms = [r for r in ext_garden if any(x in r.room_type.code.lower() 
+                        for x in ['piscina', 'pool'])]
+        huerto_rooms = [r for r in ext_garden if 'huerto' in r.room_type.code.lower()]
+        caseta_rooms = [r for r in ext_garden if 'caseta' in r.room_type.code.lower()]
+        paneles_rooms = [r for r in ext_garden if 'panel' in r.room_type.code.lower()]
+        otros_garden = [r for r in ext_garden if r not in piscina_rooms + huerto_rooms 
+                       + caseta_rooms + paneles_rooms]
+        
+        # Piscina detrás de la casa
+        z_pool = house_depth + 5  # 5m detrás
+        for room in piscina_rooms:
+            w, d = self._calculate_dimensions(room.area_m2, 2.0)  # más ancha
+            x_pool = (house_width - w) / 2  # centrada
+            layout.append({'room': room, 'x': x_pool, 'z': z_pool,
+                          'width': w, 'depth': d, 'zone': 'pool'})
+            z_pool += d + 2
+        
+        # Huerto a la derecha exterior
+        x_huerto = house_width + 4
+        z_huerto = 0
+        for room in huerto_rooms:
+            w, d = self._calculate_dimensions(room.area_m2, 1.5)
+            layout.append({'room': room, 'x': x_huerto, 'z': z_huerto,
+                          'width': w, 'depth': d, 'zone': 'garden'})
+            z_huerto += d + 1
+        
+        # Caseta aperos a la derecha (más alejada)
+        x_caseta = house_width + 4
+        z_caseta = z_huerto + 2
+        for room in caseta_rooms:
             w, d = self._calculate_dimensions(room.area_m2, 1.2)
-            layout.append({'room': room, 'x': current_x, 'z': col5_y, 'width': w, 'depth': d})
-            col5_y += d
+            layout.append({'room': room, 'x': x_caseta, 'z': z_caseta,
+                          'width': w, 'depth': d, 'zone': 'ext_close'})
+            z_caseta += d + 1
         
-        # Piscina exterior: siempre abajo separada de la casa
-        pool_x = 0
-        pool_y_offset = max([item['z'] + item['depth'] for item in layout] or [0]) + 3  # 3 metros de separación
-        for room in zona_piscina:
-            w, d = self._calculate_dimensions(room.area_m2, 1.8)  # más ancha que alta
-            layout.append({'room': room, 'x': pool_x, 'z': pool_y_offset, 'width': w, 'depth': d})
-            pool_x += w + 1
+        # Paneles solares: en el tejado (ignorar en layout suelo)
+        for room in paneles_rooms:
+            # Los colocamos en el tejado, arriba de la casa
+            layout.append({'room': room, 
+                          'x': house_width * 0.3, 
+                          'z': house_depth * 0.2,
+                          'width': 4, 'depth': 2, 
+                          'zone': 'roof',
+                          'y_offset': self.WALL_HEIGHT + 0.1})
         
-        self.total_width = current_x + (4 if extras_der else 0)
-        self.total_depth = max([item['z'] + item['depth'] for item in layout] or [10])
+        # Otros extras de jardín
+        x_otros = house_width + 4
+        z_otros = z_caseta + 2
+        for room in otros_garden:
+            w, d = self._calculate_dimensions(room.area_m2, 1.3)
+            layout.append({'room': room, 'x': x_otros, 'z': z_otros,
+                          'width': w, 'depth': d, 'zone': 'garden'})
+            z_otros += d + 1
+        
+        # Calcular dimensiones totales
+        all_x = [item['x'] + item['width'] for item in layout]
+        all_z = [item['z'] + item['depth'] for item in layout]
+        min_x = min([item['x'] for item in layout] or [0])
+        min_z = min([item['z'] for item in layout] or [0])
+        
+        self.total_width = max(all_x or [10]) - min(0, min_x)
+        self.total_depth = max(all_z or [10]) - min(0, min_z)
+        self.house_width = house_width
+        self.house_depth = house_depth
         
         return layout
     
