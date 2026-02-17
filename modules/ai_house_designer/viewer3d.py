@@ -245,6 +245,80 @@ class Viewer3D:
         #room-detail-panel button:hover {{
             background: #2980B9;
         }}
+        #btn-fullscreen {{
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(52,152,219,0.85);
+            color: white;
+            border: none;
+            padding: 7px 18px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+            z-index: 50;
+            transition: all 0.2s;
+        }}
+        #btn-fullscreen:hover {{
+            background: rgba(41,128,185,1);
+            transform: translateX(-50%) scale(1.05);
+        }}
+        
+        /* Modal pantalla completa */
+        #modal-3d {{
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100vw; height: 100vh;
+            background: rgba(0,0,0,0.92);
+            z-index: 9999;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }}
+        #modal-3d.active {{
+            display: flex;
+        }}
+        #modal-canvas-container {{
+            width: 95vw;
+            height: 88vh;
+            position: relative;
+            border-radius: 10px;
+            overflow: hidden;
+            border: 2px solid rgba(52,152,219,0.5);
+        }}
+        #modal-close {{
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            background: rgba(231,76,60,0.9);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            z-index: 10000;
+        }}
+        #modal-title {{
+            color: white;
+            font-size: 14px;
+            margin-bottom: 8px;
+            opacity: 0.8;
+        }}
+        #canvas-container:-webkit-full-screen {{
+            width: 100vw !important;
+            height: 100vh !important;
+        }}
+        #canvas-container:fullscreen {{
+            width: 100vw !important;
+            height: 100vh !important;
+            background: #1a1a2e;
+        }}
     </style>
 </head>
 <body>
@@ -259,6 +333,11 @@ class Viewer3D:
     <button class="btn-view" id="btn-front" onclick="setView('front')">Vista Frontal</button>
     <button class="btn-view" id="btn-iso" onclick="setView('iso')">Vista 3D</button>
     <div id="controls">🖱️ Arrastrar: rotar · Scroll: zoom · Click habitación: info</div>
+    
+    <!-- Botón pantalla completa -->
+    <button id="btn-fullscreen" onclick="openFullscreen()">
+        ⛶ Ver en Pantalla Completa
+    </button>
     
     <!-- Panel orientación solar -->
     <div id="solar-panel">
@@ -787,6 +866,50 @@ console.log('Objetos en escena:', scene.children.length);
 console.log('Total width:', totalW, 'Total depth:', totalD);
 console.log('Center:', centerX, centerZ);
 
+// ============================================
+// PANTALLA COMPLETA
+// ============================================
+let fullscreenRenderer = null;
+let fullscreenAnimating = false;
+
+function openFullscreen() {{
+    // Intentar pantalla completa real del navegador
+    const container = document.getElementById('canvas-container');
+    
+    if (container.requestFullscreen) {{
+        container.requestFullscreen();
+    }} else if (container.webkitRequestFullscreen) {{
+        container.webkitRequestFullscreen();
+    }} else if (container.mozRequestFullScreen) {{
+        container.mozRequestFullScreen();
+    }}
+    
+    // Adaptar renderer al tamaño completo
+    document.addEventListener('fullscreenchange', function onFSChange() {{
+        if (document.fullscreenElement) {{
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+        }} else {{
+            // Volver al tamaño normal
+            const w = container.clientWidth;
+            renderer.setSize(w, 550);
+            camera.aspect = w / 550;
+            camera.updateProjectionMatrix();
+        }}
+        document.removeEventListener('fullscreenchange', onFSChange);
+    }});
+}}
+
+function closeFullscreen() {{
+    if (document.exitFullscreen) {{
+        document.exitFullscreen();
+    }} else if (document.webkitExitFullscreen) {{
+        document.webkitExitFullscreen();
+    }}
+    document.getElementById('modal-3d').classList.remove('active');
+}}
+
 // Animación
 function animate() {{
     requestAnimationFrame(animate);
@@ -802,6 +925,15 @@ window.addEventListener('resize', () => {{
     renderer.setSize(w, 550);
 }});
 </script>
+
+<!-- Modal pantalla completa -->
+<div id="modal-3d">
+    <p id="modal-title">🏠 Vista 3D Completa — Arrastra para rotar · Scroll para zoom · ESC para cerrar</p>
+    <div id="modal-canvas-container">
+        <button id="modal-close" onclick="closeFullscreen()">✕ Cerrar</button>
+    </div>
+</div>
+
 </body>
 </html>
 """
