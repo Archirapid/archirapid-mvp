@@ -274,219 +274,226 @@ class FloorPlanSVG:
         return svg
     
     def generate(self) -> bytes:
-        """Genera el plano SVG completo como bytes PNG"""
-        import subprocess
-        import tempfile
-        import os
-        
-        layout = self._layout_rooms()
-        
-        # Dimensiones del SVG
-        svg_width = int(self.total_width * self.SCALE + self.MARGIN * 3)
-        svg_height = int(self.total_height * self.SCALE + self.MARGIN * 4)
-        
-        total_area = sum(r.area_m2 for r in self.design.rooms)
-        
-        # Cabecera SVG
-        svg_content = f"""<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" 
-     width="{svg_width}" height="{svg_height}"
-     viewBox="0 0 {svg_width} {svg_height}">
-    
-    <!-- Fondo blanco -->
-    <rect width="{svg_width}" height="{svg_height}" fill="white"/>
-    
-    <!-- Definiciones (flechas para cotas) -->
-    <defs>
-        <marker id="arrow" markerWidth="6" markerHeight="6" 
-                refX="3" refY="3" orient="auto">
-            <path d="M0,0 L0,6 L6,3 z" fill="#888"/>
-        </marker>
-    </defs>
-    
-    <!-- Título -->
-    <rect x="10" y="10" width="{svg_width-20}" height="40" 
-          fill="#2C3E50" rx="5"/>
-    <text x="{svg_width/2}" y="35" text-anchor="middle"
-          font-family="Arial, sans-serif" font-size="16" 
-          font-weight="bold" fill="white">
-        PLANO DE DISTRIBUCIÓN — {total_area:.0f} m² TOTALES
-    </text>
-    
-    <!-- Subtítulo -->
-    <text x="{svg_width/2}" y="65" text-anchor="middle"
-          font-family="Arial, sans-serif" font-size="10" fill="#666">
-        Escala aproximada 1:100 · Medidas en metros
-    </text>
-    
-    <!-- Grid de referencia -->
-    <g opacity="0.15">
-"""
-        
-        # Grid sutil
-        grid_step = self.SCALE  # 1 metro por línea
-        for gx in range(self.MARGIN, svg_width, grid_step):
-            svg_content += f'<line x1="{gx}" y1="{self.MARGIN}" x2="{gx}" y2="{svg_height - self.MARGIN}" stroke="#999" stroke-width="0.5" stroke-dasharray="2,4"/>\n'
-        for gy in range(self.MARGIN, svg_height, grid_step):
-            svg_content += f'<line x1="{self.MARGIN}" y1="{gy}" x2="{svg_width - self.MARGIN}" y2="{gy}" stroke="#999" stroke-width="0.5" stroke-dasharray="2,4"/>\n'
-        
-        svg_content += "</g>\n"
-        
-        # Añadir habitaciones
-        for item in layout:
-            svg_content += self._room_to_svg(item, svg_width, svg_height)
-        
-        # Norte
-        svg_content += f"""
-    <!-- Indicador Norte -->
-    <g transform="translate({svg_width - 50}, {svg_height - 60})">
-        <circle cx="20" cy="20" r="18" fill="none" stroke="#2C3E50" stroke-width="2"/>
-        <text x="20" y="14" text-anchor="middle" font-family="Arial" 
-              font-size="12" font-weight="bold" fill="#2C3E50">N</text>
-        <polygon points="20,3 16,20 20,17 24,20" fill="#2C3E50"/>
-    </g>
-    
-    <!-- Leyenda -->
-    <g transform="translate(10, {svg_height - 50})">
-        <text font-family="Arial" font-size="9" fill="#666">
-            Plano generado por ArchiRapid AI · Proyecto en desarrollo
-        </text>
-    </g>
-
-</svg>"""
-        
-        # Convertir SVG a PNG usando matplotlib
+        """Genera plano cenital profesional tipo arquitectónico"""
         import matplotlib.pyplot as plt
         import matplotlib.patches as mpatches
+        from matplotlib.patches import FancyBboxPatch
+        import matplotlib.patheffects as pe
         import numpy as np
-        
-        # Generar PNG directamente con matplotlib (más fiable)
+        import io
+
+        layout = self._layout_rooms()
+
+        # Canvas proporcional
+        svg_width = max(int(self.total_width * self.SCALE + self.MARGIN * 3), 600)
+        svg_height = max(int(self.total_height * self.SCALE + self.MARGIN * 4), 400)
+
         fig_w = svg_width / 100
         fig_h = svg_height / 100
-        fig, ax = plt.subplots(1, 1, figsize=(fig_w, fig_h), facecolor='white')
+        fig, ax = plt.subplots(figsize=(fig_w, fig_h), facecolor='#F2EDE4')
         ax.set_xlim(0, svg_width)
         ax.set_ylim(0, svg_height)
         ax.set_aspect('equal')
         ax.axis('off')
-        
-        # Título
-        ax.add_patch(mpatches.FancyBboxPatch(
-            (10, svg_height-55), svg_width-20, 45,
-            boxstyle="round,pad=2",
-            facecolor='#2C3E50', edgecolor='none'
-        ))
-        ax.text(svg_width/2, svg_height-30, 
-                f'PLANO DE DISTRIBUCIÓN — {total_area:.0f} m² TOTALES',
-                ha='center', va='center',
-                fontsize=14, fontweight='bold', color='white',
-                fontfamily='monospace')
-        
-        # Grid sutil
-        for gx in range(self.MARGIN, int(svg_width), self.SCALE):
-            ax.axvline(x=gx, color='#CCCCCC', linewidth=0.3, linestyle='--', alpha=0.5)
-        for gy in range(self.MARGIN, int(svg_height), self.SCALE):
-            ax.axhline(y=gy, color='#CCCCCC', linewidth=0.3, linestyle='--', alpha=0.5)
-        
-        # Dibujar habitaciones
+        fig.patch.set_facecolor('#F2EDE4')
+
+        # Colores profesionales tipo arquitectónico
         colors_map = {
-            'salon': '#F5F0E8', 'cocina': '#F5F0E8',
-            'dormitorio': '#EEF0F5', 'bano': '#E8F5F0',
-            'garaje': '#F0F0F0', 'porche': '#E8F5E8',
-            'bodega': '#F5F5E8', 'pasillo': '#EBEBEB',
-            'paneles': '#FFF8E8', 'piscina': '#E8F4FF',
-            'default': '#F5F5F5'
+            'salon':    '#F5F0E8',
+            'cocina':   '#F5F0E8',
+            'dormitorio': '#EAE8F0',
+            'bano':     '#E0EEF0',
+            'garaje':   '#DCDCDC',
+            'porche':   '#E8F0E8',
+            'bodega':   '#F0EDE0',
+            'pasillo':  '#EBEBEB',
+            'piscina':  '#B8DFF0',
+            'huerto':   '#C8E6C9',
+            'caseta':   '#D7CCC8',
+            'despacho': '#EDE7F6',
+            'default':  '#F5F5F5'
         }
-        
+
+        wall_color = '#2C2C2C'
+        wall_lw = 3.5
+
+        total_area = sum(r.area_m2 for r in self.design.rooms)
+
+        # Barra de título superior
+        title_h = 45
+        ax.add_patch(plt.Rectangle(
+            (0, svg_height - title_h), svg_width, title_h,
+            facecolor='#2C3E50', zorder=10
+        ))
+        ax.text(svg_width / 2, svg_height - title_h / 2,
+                f'PLANO DE DISTRIBUCIÓN  —  {total_area:.0f} m² TOTALES',
+                ha='center', va='center',
+                fontsize=13, fontweight='bold', color='white',
+                fontfamily='monospace', zorder=11)
+
+        # Subtítulo
+        ax.text(svg_width / 2, svg_height - title_h - 14,
+                'Escala aproximada 1:100  ·  Medidas en metros',
+                ha='center', va='center',
+                fontsize=8, color='#888888', style='italic')
+
         for item in layout:
             room = item['room']
-            
+            code = room.room_type.code.lower()
+            name = room.room_type.name
+
             px = item['x'] * self.SCALE + self.MARGIN
             py = (self.total_height - item['y'] - item['height']) * self.SCALE + self.MARGIN
             pw = item['width'] * self.SCALE
             ph = item['height'] * self.SCALE
-            
-            # Color
-            color = '#F5F5F5'
-            code_lower = room.room_type.code.lower()
+
+            # Color de fondo
+            fill = '#F5F5F5'
             for key, c in colors_map.items():
-                if key in code_lower:
-                    color = c
+                if key in code:
+                    fill = c
                     break
-            
-            # Rectángulo con borde grueso (pared)
-            rect = mpatches.Rectangle(
-                (px, py), pw, ph,
-                linewidth=3,
-                edgecolor='#2C3E50',
-                facecolor=color
+
+            # Fondo con sombra sutil
+            shadow = plt.Rectangle(
+                (px + 2, py - 2), pw, ph,
+                facecolor='#00000015', zorder=1
             )
-            ax.add_patch(rect)
-            
-            # Nombre
-            ax.text(px + pw/2, py + ph/2 + ph*0.1,
-                   room.room_type.name,
-                   ha='center', va='center',
-                   fontsize=max(7, min(11, pw/15)),
-                   fontweight='bold', color='#2C3E50')
-            
+            ax.add_patch(shadow)
+
+            # Habitación principal
+            room_rect = plt.Rectangle(
+                (px, py), pw, ph,
+                facecolor=fill,
+                edgecolor=wall_color,
+                linewidth=wall_lw,
+                zorder=2
+            )
+            ax.add_patch(room_rect)
+
+            # Textura de suelo (líneas diagonales sutiles para zonas húmedas)
+            if any(x in code for x in ['bano', 'cocina']):
+                for offset in range(0, int(pw + ph), 8):
+                    x0 = px + max(0, offset - ph)
+                    x1 = px + min(pw, offset)
+                    y0 = py + max(0, ph - offset)
+                    y1 = py + min(ph, ph + pw - offset)
+                    if x0 < x1:
+                        ax.plot([x0, x1], [y0, y1],
+                                color='#00000008', lw=0.5, zorder=3)
+
+            # Nombre de habitación
+            font_size = max(6.5, min(10, pw / 12))
+            ax.text(px + pw / 2, py + ph * 0.58,
+                    name,
+                    ha='center', va='center',
+                    fontsize=font_size,
+                    fontweight='bold',
+                    color='#2C3E50',
+                    zorder=5)
+
             # Dimensiones
-            ax.text(px + pw/2, py + ph/2 - ph*0.05,
-                   f'{item["width"]:.1f}m × {item["height"]:.1f}m',
-                   ha='center', va='center',
-                   fontsize=max(6, min(9, pw/18)),
-                   color='#555555')
-            
+            ax.text(px + pw / 2, py + ph * 0.38,
+                    f'{item["width"]:.1f}m × {item["height"]:.1f}m',
+                    ha='center', va='center',
+                    fontsize=max(5.5, font_size - 1.5),
+                    color='#666666',
+                    zorder=5)
+
             # Área en azul
-            ax.text(px + pw/2, py + ph/2 - ph*0.22,
-                   f'{room.area_m2:.0f} m²',
-                   ha='center', va='center',
-                   fontsize=max(7, min(10, pw/16)),
-                   fontweight='bold', color='#1565C0')
-            
-            # Cota superior
-            ax.annotate('', 
-                       xy=(px + pw, py - 12),
-                       xytext=(px, py - 12),
-                       arrowprops=dict(arrowstyle='<->', color='#888888', lw=1))
-            ax.text(px + pw/2, py - 18,
-                   f'{item["width"]:.1f} m',
-                   ha='center', va='center',
-                   fontsize=7, color='#666666')
-            
-            # Cota lateral
-            ax.annotate('',
-                       xy=(px - 12, py + ph),
-                       xytext=(px - 12, py),
-                       arrowprops=dict(arrowstyle='<->', color='#888888', lw=1))
-            ax.text(px - 22, py + ph/2,
-                   f'{item["height"]:.1f} m',
-                   ha='center', va='center',
-                   fontsize=7, color='#666666',
-                   rotation=90)
-        
-        # Norte
-        ax.text(svg_width - 35, 35, 'N',
-               ha='center', va='center',
-               fontsize=14, fontweight='bold', color='#2C3E50')
-        circle = plt.Circle((svg_width - 35, 35), 18,
-                           fill=False, edgecolor='#2C3E50', linewidth=2)
-        ax.add_patch(circle)
-        ax.annotate('', 
-                   xy=(svg_width - 35, 20),
-                   xytext=(svg_width - 35, 35),
-                   arrowprops=dict(arrowstyle='->', color='#2C3E50', lw=2))
-        
+            ax.text(px + pw / 2, py + ph * 0.20,
+                    f'{room.area_m2:.0f} m²',
+                    ha='center', va='center',
+                    fontsize=max(6, font_size - 0.5),
+                    fontweight='bold',
+                    color='#1565C0',
+                    zorder=5)
+
+            # Cota ancho (arriba)
+            cota_y = py + ph + 8
+            ax.annotate('', xy=(px + pw, cota_y),
+                        xytext=(px, cota_y),
+                        arrowprops=dict(arrowstyle='<->', color='#999999',
+                                        lw=0.8, mutation_scale=6),
+                        zorder=4)
+            ax.plot([px, px], [py + ph, cota_y], color='#BBBBBB', lw=0.5, zorder=4)
+            ax.plot([px + pw, px + pw], [py + ph, cota_y],
+                    color='#BBBBBB', lw=0.5, zorder=4)
+            ax.text(px + pw / 2, cota_y + 5,
+                    f'{item["width"]:.1f} m',
+                    ha='center', va='bottom',
+                    fontsize=6, color='#888888', zorder=5)
+
+            # Cota alto (lado izquierdo)
+            cota_x = px - 12
+            ax.annotate('', xy=(cota_x, py + ph),
+                        xytext=(cota_x, py),
+                        arrowprops=dict(arrowstyle='<->', color='#999999',
+                                        lw=0.8, mutation_scale=6),
+                        zorder=4)
+            ax.plot([cota_x, px], [py, py], color='#BBBBBB', lw=0.5, zorder=4)
+            ax.plot([cota_x, px], [py + ph, py + ph],
+                    color='#BBBBBB', lw=0.5, zorder=4)
+            ax.text(cota_x - 3, py + ph / 2,
+                    f'{item["height"]:.1f} m',
+                    ha='right', va='center',
+                    fontsize=6, color='#888888',
+                    rotation=90, zorder=5)
+
+            # Símbolo de puerta (arco pequeño en esquina inferior izquierda)
+            if any(x in code for x in ['dormitorio', 'bano', 'despacho', 'bodega']):
+                door_r = min(pw, ph) * 0.18
+                door_r = min(door_r, 18)
+                theta = np.linspace(0, np.pi / 2, 20)
+                door_x = px + door_r * np.cos(theta)
+                door_y = py + door_r * np.sin(theta)
+                ax.plot(door_x, door_y, color=wall_color, lw=1.2,
+                        linestyle='--', zorder=6)
+                ax.plot([px, px], [py, py + door_r],
+                        color=wall_color, lw=1.2, zorder=6)
+
+        # Brújula Norte
+        cx, cy, cr = svg_width - 35, 70, 22
+        circle_n = plt.Circle((cx, cy), cr, fill=False,
+                               edgecolor='#2C3E50', linewidth=1.5, zorder=10)
+        ax.add_patch(circle_n)
+        ax.annotate('', xy=(cx, cy + cr - 4),
+                    xytext=(cx, cy),
+                    arrowprops=dict(arrowstyle='->', color='#E74C3C',
+                                    lw=2, mutation_scale=10),
+                    zorder=11)
+        ax.text(cx, cy + cr + 8, 'N',
+                ha='center', va='bottom',
+                fontsize=10, fontweight='bold', color='#2C3E50', zorder=11)
+
+        # Leyenda colores
+        legend_x = 15
+        legend_y = svg_height - title_h - 35
+        legend_items = [
+            ('Zona Día', '#F5F0E8'),
+            ('Dormitorios', '#EAE8F0'),
+            ('Baños', '#E0EEF0'),
+            ('Exterior', '#E8F0E8'),
+        ]
+        for i, (label, color) in enumerate(legend_items):
+            bx = legend_x + i * 90
+            ax.add_patch(plt.Rectangle((bx, legend_y), 12, 10,
+                                        facecolor=color,
+                                        edgecolor='#999999', lw=0.8, zorder=10))
+            ax.text(bx + 15, legend_y + 5, label,
+                    va='center', fontsize=7, color='#555555', zorder=10)
+
         # Pie de página
-        ax.text(svg_width/2, 15,
-               'ArchiRapid AI · Plano de distribución · Escala aprox. 1:100',
-               ha='center', va='center',
-               fontsize=8, color='#999999', style='italic')
-        
+        ax.text(svg_width / 2, 10,
+                'ArchiRapid AI  ·  Plano de distribución  ·  © 2025',
+                ha='center', va='bottom',
+                fontsize=7, color='#AAAAAA', style='italic')
+
         plt.tight_layout(pad=0)
-        
         buf = io.BytesIO()
-        plt.savefig(buf, format='png', dpi=150, bbox_inches='tight',
-                   facecolor='white', edgecolor='none')
+        plt.savefig(buf, format='png', dpi=150,
+                    bbox_inches='tight',
+                    facecolor='#F2EDE4', edgecolor='none')
         plt.close()
         buf.seek(0)
         return buf.getvalue()
