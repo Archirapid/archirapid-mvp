@@ -574,467 +574,355 @@ Responde SOLO con un JSON válido (sin markdown) con habitaciones y m². Ejemplo
             st.code(traceback.format_exc())
 
 def render_step2():
-    st.header("Paso 2 – Ajusta tu distribución")
+    """Paso 2: Editor visual unificado - Layout 2 columnas profesional"""
     
+    st.header("Paso 2 – Tu Casa en Tiempo Real")
+    st.caption("Ajusta tu diseño. El plano se actualiza automáticamente.")
+    
+    # ============================================
+    # VALIDAR DATOS
+    # ============================================
     req = st.session_state.get("ai_house_requirements", {})
+    proposal = req.get("ai_room_proposal", {})
     
-    # Si no hay propuesta IA, volver al Paso 1
-    if not req.get("ai_room_proposal"):
-        st.warning("⚠️ Primero analiza tus preferencias con IA en Paso 1")
+    if not proposal:
+        st.warning("Primero completa el Paso 1")
         if st.button("← Volver al Paso 1"):
             st.session_state["ai_house_step"] = 1
             st.rerun()
         return
     
-    # Crear plot ficticio
-    plot = Plot(id="design_plot", area_m2=500.0, buildable_ratio=0.33)
+    # Datos de parcela
+    plot_data = st.session_state.get("design_plot_data", {})
+    max_buildable = plot_data.get('buildable_m2', 400.0)
     
-    # Tipos de habitación CON PRECIOS REALES (formato explícito)
+    # ============================================
+    # TIPOS DE HABITACIÓN CON PRECIOS REALES
+    # ============================================
+    from .data_model import HouseDesign, Plot, RoomType, RoomInstance
+    
     room_types = {
-        "salon_cocina": RoomType(
-            code="salon_cocina",
-            name="Salón-Cocina",
-            min_m2=25,
-            max_m2=50,
-            base_cost_per_m2=1200
-        ),
-        "dormitorio_principal": RoomType(
-            code="dormitorio_principal",
-            name="Dormitorio Principal",
-            min_m2=12,
-            max_m2=25,
-            base_cost_per_m2=1400
-        ),
-        "dormitorio": RoomType(
-            code="dormitorio",
-            name="Dormitorio",
-            min_m2=8,
-            max_m2=15,
-            base_cost_per_m2=1100
-        ),
-        "bano": RoomType(
-            code="bano",
-            name="Baño",
-            min_m2=4,
-            max_m2=8,
-            base_cost_per_m2=900
-        ),
-        "bodega": RoomType(
-            code="bodega",
-            name="Bodega",
-            min_m2=6,
-            max_m2=12,
-            base_cost_per_m2=600
-        ),
-        "piscina": RoomType(
-            code="piscina",
-            name="Piscina",
-            min_m2=20,
-            max_m2=40,
-            base_cost_per_m2=2500
-        ),
-        "paneles_solares": RoomType(
-            code="paneles_solares",
-            name="Paneles Solares",
-            min_m2=3,
-            max_m2=10,
-            base_cost_per_m2=3000
-        ),
-        "garaje": RoomType(
-            code="garaje",
-            name="Garaje",
-            min_m2=12,
-            max_m2=25,
-            base_cost_per_m2=900
-        ),
-        "casa_apero": RoomType(
-            code="casa_apero",
-            name="Casa de Aperos",
-            min_m2=15,
-            max_m2=30,
-            base_cost_per_m2=800
-        ),
-        "huerto": RoomType(
-            code="huerto",
-            name="Huerto",
-            min_m2=10,
-            max_m2=50,
-            base_cost_per_m2=150
-        ),
-        "porche": RoomType(
-            code="porche",
-            name="Porche",
-            min_m2=10,
-            max_m2=25,
-            base_cost_per_m2=700
-        ),
-        "bomba_agua": RoomType(
-            code="bomba_agua",
-            name="Bomba de Agua",
-            min_m2=2,
-            max_m2=5,
-            base_cost_per_m2=5000
-        ),
-        "cubierta": RoomType(
-            code="cubierta",
-            name="Cubierta Tejado",
-            min_m2=80,
-            max_m2=150,
-            base_cost_per_m2=400
-        ),
-        "accesibilidad": RoomType(
-            code="accesibilidad",
-            name="Accesibilidad",
-            min_m2=0,
-            max_m2=10,
-            base_cost_per_m2=2000
-        )
+        "salon_cocina": RoomType(code="salon_cocina", name="Salón-Cocina", min_m2=20, max_m2=50, base_cost_per_m2=1200),
+        "dormitorio_principal": RoomType(code="dormitorio_principal", name="Dormitorio Principal", min_m2=12, max_m2=25, base_cost_per_m2=1400),
+        "dormitorio": RoomType(code="dormitorio", name="Dormitorio", min_m2=8, max_m2=15, base_cost_per_m2=1100),
+        "bano": RoomType(code="bano", name="Baño", min_m2=4, max_m2=8, base_cost_per_m2=900),
+        "bodega": RoomType(code="bodega", name="Bodega", min_m2=6, max_m2=20, base_cost_per_m2=600),
+        "piscina": RoomType(code="piscina", name="Piscina", min_m2=20, max_m2=60, base_cost_per_m2=2500),
+        "paneles_solares": RoomType(code="paneles_solares", name="Paneles Solares", min_m2=3, max_m2=15, base_cost_per_m2=3000),
+        "garaje": RoomType(code="garaje", name="Garaje", min_m2=15, max_m2=40, base_cost_per_m2=900),
+        "porche": RoomType(code="porche", name="Porche/Terraza", min_m2=8, max_m2=40, base_cost_per_m2=700),
+        "bomba_agua": RoomType(code="bomba_agua", name="Instalaciones", min_m2=2, max_m2=8, base_cost_per_m2=2000),
+        "accesibilidad": RoomType(code="accesibilidad", name="Zona Accesible", min_m2=0, max_m2=10, base_cost_per_m2=2000),
+        "pasillo": RoomType(code="pasillo", name="Pasillo/Distribuidor", min_m2=5, max_m2=20, base_cost_per_m2=800),
+        "huerto": RoomType(code="huerto", name="Huerto", min_m2=10, max_m2=100, base_cost_per_m2=150),
+        "despacho": RoomType(code="despacho", name="Despacho", min_m2=8, max_m2=20, base_cost_per_m2=1100),
     }
     
-    # Inicializar diseño editable
-    if "house_design" not in st.session_state:
-        rooms = []
-        for room_code, area in req["ai_room_proposal"].items():
-            if not isinstance(area, (int, float)):
-                continue
-            
-            # Buscar tipo coincidente (con similitud)
-            room_type = None
-            
-            # 1. Busca coincidencia exacta
-            if room_code in room_types:
-                room_type = room_types[room_code]
-            
-            # 2. Busca por palabras clave
-            else:
-                code_lower = room_code.lower()
-                
-                # Mapeo de códigos similares
-                if 'salon' in code_lower or 'cocina' in code_lower:
-                    room_type = room_types['salon_cocina']
-                elif 'dormitorio' in code_lower and 'principal' in code_lower:
-                    room_type = room_types['dormitorio_principal']
-                elif 'dormitorio' in code_lower:
-                    room_type = room_types['dormitorio']
-                elif 'bano' in code_lower or 'baño' in code_lower:
-                    room_type = room_types['bano']
-                elif 'bodega' in code_lower:
-                    room_type = room_types['bodega']
-                elif 'piscina' in code_lower:
-                    room_type = room_types['piscina']
-                elif 'paneles' in code_lower:
-                    room_type = room_types['paneles_solares']
-                elif 'garaje' in code_lower:
-                    room_type = room_types['garaje']
-                elif 'porche' in code_lower:
-                    room_type = room_types['porche']
-                elif 'bomba' in code_lower:
-                    room_type = room_types['bomba_agua']
-                elif 'aislamiento' in code_lower:
-                    room_type = RoomType(room_code, room_code.replace("_", " ").title(), 1, 5, 1500)
-                elif 'recuperacion' in code_lower or 'recuperación' in code_lower:
-                    room_type = RoomType(room_code, room_code.replace("_", " ").title(), 1, 5, 1000)
-                elif 'accesibilidad' in code_lower:
-                    room_type = room_types['accesibilidad']
-                elif 'pasillo' in code_lower:
-                    room_type = RoomType(room_code, "Pasillo", 5, 15, 800)
-                elif 'huerto' in code_lower:
-                    room_type = room_types['huerto']
-                elif 'apero' in code_lower or 'aperos' in code_lower:
-                    room_type = room_types['casa_apero']
-                else:
-                    # Tipo genérico
-                    room_type = RoomType(room_code, room_code.replace("_", " ").title(), 5, 50, 1000)
-            
-            # Crear instancia de habitación
-            rooms.append(RoomInstance(room_type=room_type, area_m2=float(area)))
-        
-        st.session_state["house_design"] = HouseDesign(plot=plot, rooms=rooms)
-    
-    design = st.session_state["house_design"]
-    
     # ============================================
-    # 📊 RESUMEN DE DISTRIBUCIÓN (COMPACTO)
+    # CREAR DISEÑO CON MAPEO INTELIGENTE
     # ============================================
-    st.subheader("📊 Tu propuesta actual")
-    
-    # Crear DataFrame para tabla compacta
-    import pandas as pd
-    
-    table_data = []
-    for room in design.rooms:
-        price_per_m2 = float(room.room_type.base_cost_per_m2) if hasattr(room.room_type, 'base_cost_per_m2') else 0
-        cost = room.area_m2 * price_per_m2
-        table_data.append({
-            "Espacio": room.room_type.code.replace("_", " ").title(),
-            "m²": f"{room.area_m2:.0f}",
-            "€/m²": f"€{price_per_m2:,.0f}",
-            "Total": f"€{cost:,.0f}"
-        })
-    
-    df = pd.DataFrame(table_data)
-    st.dataframe(df, use_container_width=True, hide_index=True)
-    
-    # ============================================
-    # 🔧 AJUSTA MEDIDAS (2 COLUMNAS)
-    # ============================================
-    st.markdown("---")
-    st.subheader("🔧 Ajusta medidas")
-    
-    # Dividir en 2 columnas
-    for i in range(0, len(design.rooms), 2):
-        col1, col2 = st.columns(2)
-        
-        # Slider izquierdo
-        with col1:
-            if i < len(design.rooms):
-                room = design.rooms[i]
-                new_area = st.slider(
-                    f"{room.room_type.code.replace('_', ' ').title()}",
-                    min_value=float(room.room_type.min_m2),
-                    max_value=float(room.room_type.max_m2),
-                    value=float(room.area_m2),
-                    step=0.5,
-                    key=f"slider_{i}",
-                    help=f"Rango: {room.room_type.min_m2}-{room.room_type.max_m2} m²"
-                )
-                design.rooms[i].area_m2 = new_area
-        
-        # Slider derecho
-        with col2:
-            if i + 1 < len(design.rooms):
-                room = design.rooms[i + 1]
-                new_area = st.slider(
-                    f"{room.room_type.code.replace('_', ' ').title()}",
-                    min_value=float(room.room_type.min_m2),
-                    max_value=float(room.room_type.max_m2),
-                    value=float(room.area_m2),
-                    step=0.5,
-                    key=f"slider_{i+1}",
-                    help=f"Rango: {room.room_type.min_m2}-{room.room_type.max_m2} m²"
-                )
-                design.rooms[i + 1].area_m2 = new_area
-    
-    # ============================================
-    # 📊 MÉTRICAS EN TIEMPO REAL
-    # ============================================
-    st.markdown("---")
-    
-    # Calcular totales MANUALMENTE
-    total_area = sum([r.area_m2 for r in design.rooms])
-    total_cost = sum([r.area_m2 * r.room_type.base_cost_per_m2 for r in design.rooms])
-    
-    plot_data = st.session_state.get("design_plot_data")
-    
-    max_allowed = plot_data['buildable_m2'] if plot_data else 400.0
-    
-    col1, col2, col3 = st.columns(3)
-    
-    # Máximo edificable
-    col1.metric("Máx. edificable", f"{max_allowed:.0f} m²")
-    
-    # Total diseñado (con color)
-    delta_color = "normal" if total_area <= max_allowed else "inverse"
-    col2.metric(
-        "Total diseñado", 
-        f"{total_area:.0f} m²",
-        delta=f"{total_area - max_allowed:+.0f} m²",
-        delta_color=delta_color
+    plot = Plot(
+        id=plot_data.get('id', 'temp'),
+        area_m2=plot_data.get('total_m2', 400.0),
+        buildable_ratio=0.33
     )
+    design = HouseDesign(plot)
     
-    # Coste total
-    col3.metric("Coste total", f"€{total_cost:,.0f}")
-    
-    # Validación de exceso
-    if total_area > max_allowed:
-        excess = total_area - max_allowed
-        st.error(f"⚠️ **EXCESO:** Te has pasado {excess:.0f} m². Reduce habitaciones o elimina elementos.")
-    elif total_area > max_allowed * 0.95:
-        st.warning(f"⚠️ Estás cerca del límite ({total_area:.0f}/{max_allowed:.0f} m²)")
-    else:
-        st.success(f"✅ Dentro del límite ({total_area:.0f}/{max_allowed:.0f} m²)")
-    
-    st.markdown("---")
-    
-    # ============================================
-    # ✂️ ELIMINAR ELEMENTOS OPCIONALES
-    # ============================================
-    st.subheader("✂️ Elementos opcionales")
-    st.caption("Desmarca para eliminar del diseño y ahorrar presupuesto")
-    
-    # Identificar elementos opcionales (no esenciales)
-    optional_elements = []
-    for i, room in enumerate(design.rooms):
-        code = room.room_type.code.lower()
-        # Solo piscina, garaje, porche, casa aperos, paneles son opcionales
-        if any(x in code for x in ['piscina', 'garaje', 'porche', 'casa', 'apero', 'paneles', 'bomba', 'aislamiento', 'recuperacion']):
-            optional_elements.append((i, room))
-    
-    if optional_elements:
-        # Mostrar en grid 2 columnas
-        cols = st.columns(2)
-        rooms_to_remove = []
+    for code, area in proposal.items():
+        if not isinstance(area, (int, float)):
+            continue
         
-        for idx, (room_idx, room) in enumerate(optional_elements):
-            with cols[idx % 2]:
-                # Nombre formateado
-                room_name = room.room_type.code.replace("_", " ").title()
-                
-                # Icono
-                icon = '📦'
-                if 'piscina' in room.room_type.code.lower():
-                    icon = '🏊'
-                elif 'garaje' in room.room_type.code.lower():
-                    icon = '🚗'
-                elif 'porche' in room.room_type.code.lower():
-                    icon = '🌿'
-                elif 'paneles' in room.room_type.code.lower():
-                    icon = '☀️'
-                elif 'bomba' in room.room_type.code.lower():
-                    icon = '🔥'
-                elif 'aislamiento' in room.room_type.code.lower():
-                    icon = '🌿'
-                elif 'recuperacion' in room.room_type.code.lower():
-                    icon = '💧'
-                
-                # Cálculo del ahorro
-                cost_savings = room.area_m2 * room.room_type.base_cost_per_m2
-                
-                # Checkbox
-                keep = st.checkbox(
-                    f"{icon} **{room_name}** ({room.area_m2:.0f} m² = €{cost_savings:,.0f})",
-                    value=True,
-                    key=f"keep_{room_idx}",
-                    help=f"Desmarcar para eliminar y ahorrar €{cost_savings:,.0f}"
-                )
-                
-                if not keep:
-                    rooms_to_remove.append(room_idx)
+        room_type = None
+        code_lower = code.lower()
         
-        # Eliminar habitaciones desmarcadas
-        if rooms_to_remove:
-            # Eliminar en orden inverso para no desajustar índices
-            for idx in sorted(rooms_to_remove, reverse=True):
-                design.rooms.pop(idx)
-            
-            st.success(f"✅ Eliminados {len(rooms_to_remove)} elemento(s). Presupuesto actualizado.")
+        if code in room_types:
+            room_type = room_types[code]
+        elif 'salon' in code_lower or 'cocina' in code_lower:
+            room_type = room_types['salon_cocina']
+        elif 'dormitorio' in code_lower and 'principal' in code_lower:
+            room_type = room_types['dormitorio_principal']
+        elif 'dormitorio' in code_lower:
+            room_type = room_types['dormitorio']
+        elif 'bano' in code_lower or 'baño' in code_lower:
+            room_type = room_types['bano']
+        elif 'bodega' in code_lower:
+            room_type = room_types['bodega']
+        elif 'piscina' in code_lower:
+            room_type = room_types['piscina']
+        elif 'paneles' in code_lower or 'solar' in code_lower:
+            room_type = room_types['paneles_solares']
+        elif 'garaje' in code_lower or 'garage' in code_lower:
+            room_type = room_types['garaje']
+        elif 'porche' in code_lower or 'terraza' in code_lower:
+            room_type = room_types['porche']
+        elif 'bomba' in code_lower or 'instalac' in code_lower:
+            room_type = room_types['bomba_agua']
+        elif 'accesib' in code_lower:
+            room_type = room_types['accesibilidad']
+        elif 'pasillo' in code_lower or 'distrib' in code_lower:
+            room_type = room_types['pasillo']
+        elif 'huerto' in code_lower:
+            room_type = room_types['huerto']
+        elif 'despacho' in code_lower or 'oficina' in code_lower:
+            room_type = room_types['despacho']
+        else:
+            room_type = RoomType(
+                code=code,
+                name=code.replace("_", " ").title(),
+                min_m2=5, max_m2=50,
+                base_cost_per_m2=1000
+            )
+        
+        design.rooms.append(RoomInstance(
+            room_type=room_type,
+            area_m2=float(area)
+        ))
     
     # ============================================
-    # 📐 VISUALIZACIÓN DEL PLANO 2D
+    # LAYOUT 2 COLUMNAS PRINCIPALES
     # ============================================
-    st.markdown("---")
-    st.subheader("📐 Visualización del Plano")
+    col_left, col_right = st.columns([4, 6])
     
-    if st.button("🎨 Generar Plano 2D", type="primary"):
-        try:
-            from .step2_planner import ProfessionalFloorPlan
-            
-            # Generar plano
-            planner = ProfessionalFloorPlan(design)
-            img_bytes = planner.generate()
-            
-            # Guardar en session state
-            st.session_state['current_floor_plan'] = img_bytes
-            
-            st.success("✅ Plano generado correctamente")
-            st.rerun()
-        
-        except Exception as e:
-            st.error(f"❌ Error generando plano: {e}")
-            import traceback
-            st.code(traceback.format_exc())
-    
-    # Mostrar plano si existe
-    if 'current_floor_plan' in st.session_state:
-        st.image(
-            st.session_state['current_floor_plan'],
-            caption="Plano de distribución profesional",
-            use_container_width=True
-        )
-        
-        # Botón para descargar
-        st.download_button(
-            label="📥 Descargar Plano PNG",
-            data=st.session_state['current_floor_plan'],
-            file_name="plano_distribucion.png",
-            mime="image/png"
-        )
-
     # ============================================
-    # 🤖 SUGERENCIAS INTELIGENTES DE IA
+    # COLUMNA IZQUIERDA: CONTROLES
     # ============================================
-    if 'current_floor_plan' in st.session_state:
+    with col_left:
+        
+        budget = req.get('budget', 150000)
+        
+        # Placeholder para métricas (se calculan después de sliders y checkboxes)
+        metrics_placeholder = st.empty()
+        
         st.markdown("---")
-        st.subheader("🤖 Análisis del Arquitecto IA")
         
-        # Analizar distribución con IA
-        with st.spinner("Analizando distribución..."):
+        # AJUSTAR HABITACIONES
+        st.markdown("#### Ajustar Habitaciones")
+        
+        # Primero identificar qué extras están marcados para eliminar
+        optional_codes = ['piscina', 'garaje', 'porche', 'bodega', 
+                         'huerto', 'paneles', 'bomba', 'accesib']
+        
+        # Pre-calcular qué rooms se van a eliminar
+        preview_remove = []
+        for i, room in enumerate(design.rooms):
+            code = room.room_type.code.lower()
+            if any(x in code for x in optional_codes):
+                keep = st.session_state.get(f"keep_{i}", True)
+                if not keep:
+                    preview_remove.append(i)
+        
+        # Mostrar sliders SOLO para rooms que NO se van a eliminar
+        for i, room in enumerate(design.rooms):
+            if room.area_m2 < 2:
+                continue
+            if i in preview_remove:
+                continue  # No mostrar slider si va a ser eliminado
+                
+            new_area = st.slider(
+                f"{room.room_type.name}",
+                min_value=float(room.room_type.min_m2),
+                max_value=float(room.room_type.max_m2),
+                value=float(room.area_m2),
+                step=0.5,
+                key=f"step2_slider_{i}",
+                help=f"€{room.room_type.base_cost_per_m2:,}/m²"
+            )
+            design.rooms[i].area_m2 = new_area
+        
+        st.markdown("---")
+        
+        # ELIMINAR EXTRAS
+        st.markdown("#### Eliminar Extras (Ahorrar)")
+        
+        optional_codes = ['piscina', 'garaje', 'porche', 'bodega', 
+                         'huerto', 'paneles', 'bomba', 'accesib']
+        
+        rooms_to_remove = []
+        for i, room in enumerate(design.rooms):
+            code = room.room_type.code.lower()
+            if any(x in code for x in optional_codes):
+                cost = room.area_m2 * room.room_type.base_cost_per_m2
+                keep = st.checkbox(
+                    f"{room.room_type.name} · €{cost:,.0f}",
+                    value=True,
+                    key=f"keep_{i}"
+                )
+                if not keep:
+                    rooms_to_remove.append(i)
+        
+        # Eliminar desmarcados
+        for idx in sorted(rooms_to_remove, reverse=True):
+            design.rooms.pop(idx)
+        
+        # RECALCULAR MÉTRICAS FINALES (después de sliders y checkboxes)
+        total_area_final = sum([r.area_m2 for r in design.rooms])
+        total_cost_final = sum([r.area_m2 * r.room_type.base_cost_per_m2 for r in design.rooms])
+        foundation_cost = int(total_area_final * 180)
+        installation_cost = int(total_area_final * 150)
+        total_with_extras = total_cost_final + foundation_cost + installation_cost
+        budget_pct = total_with_extras / budget * 100
+        
+        if budget_pct <= 90:
+            b_icon = "✅"
+            b_color = "normal"
+        elif budget_pct <= 100:
+            b_icon = "⚠️"
+            b_color = "normal"
+        else:
+            b_icon = "❌"
+            b_color = "inverse"
+        
+        # Rellenar placeholder con métricas actualizadas
+        with metrics_placeholder.container():
+            m1, m2 = st.columns(2)
+            m1.metric(
+                "Presupuesto",
+                f"€{total_with_extras:,.0f}",
+                delta=f"{b_icon} {budget_pct:.0f}% de €{budget:,.0f}",
+                delta_color=b_color
+            )
+            m2.metric(
+                "Superficie",
+                f"{total_area_final:.0f} m²",
+                delta=f"Máx: {max_buildable:.0f} m²"
+            )
+            savings = req.get('estimated_savings', 0)
+            if savings > 0:
+                st.success(f"Ahorro energético: €{savings:,}/año")
+        
+        st.markdown("---")
+        
+        if 'current_floor_plan' in st.session_state:
+            st.download_button(
+                label="Descargar Plano PNG",
+                data=st.session_state['current_floor_plan'],
+                file_name="plano_distribucion.png",
+                mime="image/png",
+                use_container_width=True
+            )
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("← Paso 1", use_container_width=True):
+                st.session_state["ai_house_step"] = 1
+                st.rerun()
+        with col2:
+            if st.button("Paso 3 →", type="primary", use_container_width=True):
+                st.session_state["ai_house_step"] = 3
+                st.rerun()
+    
+    # ============================================
+    # COLUMNA DERECHA: PLANO + IA
+    # ============================================
+    with col_right:
+        
+        # TABLA RESUMEN
+        st.markdown("#### Tu Distribución")
+        
+        import pandas as pd
+        table_data = []
+        for room in design.rooms:
+            price = room.room_type.base_cost_per_m2
+            cost = room.area_m2 * price
+            table_data.append({
+                "Espacio": room.room_type.name,
+                "m²": f"{room.area_m2:.0f}",
+                "€/m²": f"€{price:,}",
+                "Total": f"€{cost:,.0f}"
+            })
+        
+        # Añadir cimentación e instalaciones
+        table_data.append({
+            "Espacio": "Cimentación",
+            "m²": f"{total_area_final:.0f}",
+            "€/m²": "€180",
+            "Total": f"€{foundation_cost:,}"
+        })
+        table_data.append({
+            "Espacio": "Instalaciones",
+            "m²": f"{total_area_final:.0f}",
+            "€/m²": "€150",
+            "Total": f"€{installation_cost:,}"
+        })
+        
+        df = pd.DataFrame(table_data)
+        st.dataframe(df, use_container_width=True, hide_index=True)
+        
+        st.markdown("---")
+        
+        # PLANO 2D
+        st.markdown("#### Plano de Distribución")
+        
+        if st.button("Generar Plano 2D", type="primary", use_container_width=True):
             try:
-                from groq import Groq
-                import os
-                from dotenv import load_dotenv
-                from pathlib import Path
-                
-                # Cargar API key
-                project_root = Path(__file__).parent.parent.parent
-                load_dotenv(dotenv_path=project_root / '.env')
-                groq_api_key = os.getenv("GROQ_API_KEY")
-                
-                if not groq_api_key:
-                    st.warning("⚠️ API key de Groq no encontrada")
-                else:
-                    client = Groq(api_key=groq_api_key)
+                from .floor_plan_svg import FloorPlanSVG
+                planner = FloorPlanSVG(design)
+                img_bytes = planner.generate()
+                st.session_state['current_floor_plan'] = img_bytes
+                st.session_state['current_design'] = design
+                st.success("Plano generado correctamente")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Error generando plano: {e}")
+                import traceback
+                st.code(traceback.format_exc())
+        
+        if 'current_floor_plan' in st.session_state:
+            st.image(
+                st.session_state['current_floor_plan'],
+                caption="Plano profesional con medidas reales",
+                use_container_width=True
+            )
+        else:
+            st.info("Pulsa 'Generar Plano 2D' para ver tu distribución")
+        
+        st.markdown("---")
+        
+        # ANÁLISIS IA
+        if 'current_floor_plan' in st.session_state:
+            st.markdown("#### Análisis del Arquitecto IA")
+            
+            with st.spinner("Analizando..."):
+                try:
+                    from groq import Groq
+                    import os
+                    from dotenv import load_dotenv
+                    from pathlib import Path
                     
-                    # Crear resumen de distribución
-                    rooms_summary = []
-                    for room in design.rooms:
-                        rooms_summary.append(f"- {room.room_type.name}: {room.area_m2:.0f} m²")
+                    project_root = Path(__file__).parent.parent.parent
+                    load_dotenv(dotenv_path=project_root / '.env')
+                    client = Groq(api_key=os.getenv("GROQ_API_KEY"))
                     
-                    prompt = f"""Eres un arquitecto experto. Analiza esta distribución de vivienda:
-
-HABITACIONES:
-{chr(10).join(rooms_summary)}
-
-TOTAL: {sum([r.area_m2 for r in design.rooms]):.0f} m²
-
-Proporciona:
-1. Evaluación general (1-2 líneas)
-2. 2-3 sugerencias concretas de mejora
-3. Alertas si algo es problemático (cocina muy pequeña, baño sin ventilación, etc.)
-
-Sé conciso y práctico. Formato:
-
-✅/⚠️/❌ [Aspecto]: [Comentario breve]
-💡 Sugerencia: [Acción específica]
-"""
+                    rooms_summary = "\n".join([
+                        f"- {r.room_type.name}: {r.area_m2:.0f} m² ({r.area_m2:.1f}m × {r.area_m2/max(r.area_m2**0.5,1):.1f}m aprox)"
+                        for r in design.rooms
+                    ])
                     
                     response = client.chat.completions.create(
                         model="llama-3.3-70b-versatile",
-                        messages=[{"role": "user", "content": prompt}],
-                        temperature=0.3
+                        messages=[{"role": "user", "content": f"""Eres arquitecto experto en vivienda sostenible española.
+
+Analiza esta distribución:
+{rooms_summary}
+TOTAL: {total_area_final:.0f} m²
+PRESUPUESTO: €{budget:,}
+ESTILO: {req.get('style', 'No especificado')}
+
+Evalúa brevemente:
+1. ¿Las medidas son correctas para una vivienda real? (mínimos CTE)
+2. ¿Algún espacio demasiado grande o pequeño?
+3. ¿El presupuesto es realista?
+4. Una sugerencia de mejora concreta
+
+Máximo 150 palabras. Usa: ✅ para correcto, ⚠️ para mejorable, ❌ para problema."""}],
+                        temperature=0.3,
+                        max_tokens=300
                     )
                     
-                    analysis = response.choices[0].message.content.strip()
-                    
-                    # Mostrar en expander
-                    with st.expander("📋 Ver análisis detallado", expanded=True):
-                        st.markdown(analysis)
-            
-            except Exception as e:
-                st.error(f"❌ Error en análisis IA: {e}")
-
-    st.markdown("---")
-    
-    # Botones
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("← Volver al Paso 1"):
-            st.session_state["ai_house_step"] = 1
-            st.rerun()
-    with col2:
-        if st.button("Continuar a Paso 3"):
-            st.session_state["ai_house_step"] = 3
-            st.rerun()
+                    st.markdown(response.choices[0].message.content)
+                
+                except Exception as e:
+                    st.warning(f"Análisis IA no disponible: {e}")
 
 def render_step3():
     """Paso 3: Vista 3D y exportación"""
