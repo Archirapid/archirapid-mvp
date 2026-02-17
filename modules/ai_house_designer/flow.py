@@ -850,31 +850,58 @@ def render_step2():
         
         st.markdown("---")
         
-        # PLANO 2D
-        st.markdown("#### Plano de Distribución")
+        # TABS: 2D y 3D
+        tab_2d, tab_3d = st.tabs(["📐 Plano 2D", "🏠 Vista 3D"])
         
-        if st.button("Generar Plano 2D", type="primary", use_container_width=True):
-            try:
-                from .floor_plan_svg import FloorPlanSVG
-                planner = FloorPlanSVG(design)
-                img_bytes = planner.generate()
-                st.session_state['current_floor_plan'] = img_bytes
-                st.session_state['current_design'] = design
-                st.success("Plano generado correctamente")
-                st.rerun()
-            except Exception as e:
-                st.error(f"Error generando plano: {e}")
-                import traceback
-                st.code(traceback.format_exc())
+        with tab_2d:
+            if st.button("Generar Plano 2D", type="primary", use_container_width=True):
+                try:
+                    from .floor_plan_svg import FloorPlanSVG
+                    planner = FloorPlanSVG(design)
+                    img_bytes = planner.generate()
+                    st.session_state['current_floor_plan'] = img_bytes
+                    st.session_state['current_design'] = design
+                    st.success("Plano generado correctamente")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error generando plano: {e}")
+                    import traceback
+                    st.code(traceback.format_exc())
+            
+            if 'current_floor_plan' in st.session_state:
+                st.image(
+                    st.session_state['current_floor_plan'],
+                    caption="Plano profesional con medidas reales",
+                    use_container_width=True
+                )
+            else:
+                st.info("Pulsa 'Generar Plano 2D' para ver tu distribución")
         
-        if 'current_floor_plan' in st.session_state:
-            st.image(
-                st.session_state['current_floor_plan'],
-                caption="Plano profesional con medidas reales",
-                use_container_width=True
-            )
-        else:
-            st.info("Pulsa 'Generar Plano 2D' para ver tu distribución")
+        with tab_3d:
+            if st.button("Generar Vista 3D", type="primary", use_container_width=True):
+                try:
+                    from .viewer3d import Viewer3D
+                    roof_type = req.get('roof_type', 'Dos aguas')
+                    viewer = Viewer3D(design, roof_type=roof_type)
+                    html_3d = viewer.generate_html()
+                    st.session_state['current_3d_html'] = html_3d
+                    st.success("Vista 3D generada")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error generando 3D: {e}")
+                    import traceback
+                    st.code(traceback.format_exc())
+            
+            if 'current_3d_html' in st.session_state:
+                import streamlit.components.v1 as components
+                components.html(
+                    st.session_state['current_3d_html'],
+                    height=570,
+                    scrolling=False
+                )
+                st.caption("Arrastra para rotar · Scroll para zoom · Botones para cambiar vista")
+            else:
+                st.info("Pulsa 'Generar Vista 3D' para ver tu casa en 3D interactivo")
         
         st.markdown("---")
         
