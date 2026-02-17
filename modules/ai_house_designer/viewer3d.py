@@ -182,6 +182,69 @@ class Viewer3D:
         #btn-top {{ top: 50px; right: 10px; }}
         #btn-front {{ top: 85px; right: 10px; }}
         #btn-iso {{ top: 120px; right: 10px; }}
+        #solar-panel {{
+            position: absolute;
+            bottom: 50px;
+            left: 10px;
+            background: rgba(0,0,0,0.75);
+            color: white;
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-size: 11px;
+            border: 1px solid rgba(255,200,0,0.4);
+            min-width: 160px;
+        }}
+        #solar-compass {{
+            width: 70px;
+            height: 70px;
+            margin: 0 auto 8px auto;
+            position: relative;
+        }}
+        #room-detail-panel {{
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(20, 30, 50, 0.95);
+            color: white;
+            padding: 20px 25px;
+            border-radius: 12px;
+            font-size: 13px;
+            border: 2px solid rgba(52,152,219,0.6);
+            min-width: 220px;
+            display: none;
+            z-index: 100;
+            text-align: center;
+        }}
+        #room-detail-panel h3 {{
+            margin: 0 0 10px 0;
+            color: #3498DB;
+            font-size: 16px;
+        }}
+        #room-detail-panel .metric {{
+            margin: 6px 0;
+            font-size: 12px;
+            color: #BDC3C7;
+        }}
+        #room-detail-panel .cost {{
+            font-size: 18px;
+            font-weight: bold;
+            color: #2ECC71;
+            margin: 10px 0;
+        }}
+        #room-detail-panel button {{
+            background: #3498DB;
+            color: white;
+            border: none;
+            padding: 6px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-top: 8px;
+            font-size: 12px;
+        }}
+        #room-detail-panel button:hover {{
+            background: #2980B9;
+        }}
     </style>
 </head>
 <body>
@@ -196,6 +259,44 @@ class Viewer3D:
     <button class="btn-view" id="btn-front" onclick="setView('front')">Vista Frontal</button>
     <button class="btn-view" id="btn-iso" onclick="setView('iso')">Vista 3D</button>
     <div id="controls">🖱️ Arrastrar: rotar · Scroll: zoom · Click habitación: info</div>
+    
+    <!-- Panel orientación solar -->
+    <div id="solar-panel">
+        <div id="solar-compass">
+            <canvas id="compass-canvas" width="70" height="70"></canvas>
+        </div>
+        <div style="text-align:center; color:#FFD700; font-weight:bold; font-size:12px;">
+            ☀️ Orientación Solar
+        </div>
+        <div id="solar-info" style="margin-top:6px; font-size:10px; color:#aaa; text-align:center;">
+            Fachada Sur → Máximo sol
+        </div>
+        <div id="solar-rating" style="margin-top:4px; text-align:center;">
+            <span style="color:#2ECC71; font-weight:bold;">★★★★★ Óptima</span>
+        </div>
+    </div>
+    
+    <!-- Panel detalle habitación (click) -->
+    <div id="room-detail-panel">
+        <button onclick="closeRoomPanel()" 
+                style="position:absolute;top:8px;right:8px;background:rgba(231,76,60,0.8);
+                       padding:2px 8px;border-radius:4px;font-size:11px;">✕</button>
+        <h3 id="detail-name">Habitación</h3>
+        <div class="metric">📐 Dimensiones: <span id="detail-dims">-</span></div>
+        <div class="metric">📏 Superficie: <span id="detail-area">-</span></div>
+        <div class="cost" id="detail-cost">€0</div>
+        <div class="metric">💡 <span id="detail-tip">-</span></div>
+        <div style="margin-top:10px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.2);">
+            <div style="font-size:11px; color:#aaa; margin-bottom:6px;">Ajustar superficie:</div>
+            <input type="range" id="detail-slider" min="5" max="80" value="20"
+                   style="width:100%; accent-color:#3498DB;"
+                   oninput="updateRoomSize(this.value)">
+            <div id="detail-slider-value" style="font-size:11px; color:#3498DB; text-align:center;">
+                20 m²
+            </div>
+        </div>
+        <button onclick="closeRoomPanel()">Cerrar</button>
+    </div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -426,6 +527,162 @@ const roofRight = new THREE.Mesh(roofRightGeo, roofMat);
 roofRight.position.y = {self.WALL_HEIGHT};
 scene.add(roofRight);
 
+// ============================================
+// BRÚJULA SOLAR
+// ============================================
+const compassCanvas = document.getElementById('compass-canvas');
+const compassCtx = compassCanvas.getContext('2d');
+let solarAngle = 180; // Sur por defecto (óptimo para España)
+
+function drawCompass(angle) {{
+    compassCtx.clearRect(0, 0, 70, 70);
+    
+    // Fondo círculo
+    compassCtx.beginPath();
+    compassCtx.arc(35, 35, 32, 0, Math.PI * 2);
+    compassCtx.fillStyle = 'rgba(0,0,0,0.5)';
+    compassCtx.fill();
+    compassCtx.strokeStyle = 'rgba(255,215,0,0.5)';
+    compassCtx.lineWidth = 1.5;
+    compassCtx.stroke();
+    
+    // Letras N, S, E, O
+    compassCtx.fillStyle = '#FFD700';
+    compassCtx.font = 'bold 9px Arial';
+    compassCtx.textAlign = 'center';
+    compassCtx.fillText('N', 35, 12);
+    compassCtx.fillText('S', 35, 62);
+    compassCtx.fillText('E', 62, 38);
+    compassCtx.fillText('O', 10, 38);
+    
+    // Aguja Norte (rojo)
+    const rad = (angle - 90) * Math.PI / 180;
+    compassCtx.beginPath();
+    compassCtx.moveTo(35, 35);
+    compassCtx.lineTo(35 + 22 * Math.cos(rad), 35 + 22 * Math.sin(rad));
+    compassCtx.strokeStyle = '#E74C3C';
+    compassCtx.lineWidth = 2.5;
+    compassCtx.stroke();
+    
+    // Aguja Sur (blanco)
+    compassCtx.beginPath();
+    compassCtx.moveTo(35, 35);
+    compassCtx.lineTo(35 - 16 * Math.cos(rad), 35 - 16 * Math.sin(rad));
+    compassCtx.strokeStyle = 'white';
+    compassCtx.lineWidth = 2;
+    compassCtx.stroke();
+    
+    // Centro
+    compassCtx.beginPath();
+    compassCtx.arc(35, 35, 3, 0, Math.PI * 2);
+    compassCtx.fillStyle = '#FFD700';
+    compassCtx.fill();
+    
+    // Sol en dirección Sur
+    const sunRad = (180 - 90) * Math.PI / 180;
+    const sunX = 35 + 28 * Math.cos(sunRad);
+    const sunY = 35 + 28 * Math.sin(sunRad);
+    compassCtx.fillStyle = '#FFD700';
+    compassCtx.font = '10px Arial';
+    compassCtx.fillText('☀', sunX, sunY);
+}}
+
+drawCompass(solarAngle);
+
+// Calcular rating solar
+function getSolarRating(angle) {{
+    const southDiff = Math.abs(((angle - 180 + 360) % 360));
+    if (southDiff < 30) return {{ stars: '★★★★★', text: 'Óptima al Sur', color: '#2ECC71' }};
+    if (southDiff < 60) return {{ stars: '★★★★☆', text: 'Muy buena', color: '#27AE60' }};
+    if (southDiff < 90) return {{ stars: '★★★☆☆', text: 'Buena', color: '#F39C12' }};
+    if (southDiff < 135) return {{ stars: '★★☆☆☆', text: 'Regular', color: '#E67E22' }};
+    return {{ stars: '★☆☆☆☆', text: 'Mejorable al Norte', color: '#E74C3C' }};
+}}
+
+// Rotar orientación de la casa
+document.addEventListener('keydown', (e) => {{
+    if (e.key === 'ArrowLeft') {{ solarAngle = (solarAngle - 15 + 360) % 360; }}
+    if (e.key === 'ArrowRight') {{ solarAngle = (solarAngle + 15) % 360; }}
+    drawCompass(solarAngle);
+    const rating = getSolarRating(solarAngle);
+    document.getElementById('solar-rating').innerHTML = 
+        '<span style="color:' + rating.color + '; font-weight:bold;">' + 
+        rating.stars + ' ' + rating.text + '</span>';
+}});
+
+// ============================================
+// PANEL DETALLE HABITACIÓN (CLICK)
+// ============================================
+const ROOM_COSTS = {{
+    'salon': 1200, 'cocina': 1200, 'dormitorio': 1100,
+    'bano': 900, 'garaje': 900, 'porche': 700,
+    'bodega': 600, 'pasillo': 800, 'paneles': 3000,
+    'piscina': 2500, 'huerto': 150, 'despacho': 1100,
+    'default': 1000
+}};
+
+const ROOM_TIPS = {{
+    'salon': 'Orientar al Sur para luz natural todo el día',
+    'cocina': 'Mínimo 12m² recomendado por CTE',
+    'dormitorio': 'Mínimo 9m² según normativa española',
+    'bano': 'Mínimo 4m². Ventilación obligatoria',
+    'garaje': 'Mínimo 15m² para 1 vehículo normal',
+    'porche': 'Orientar al Sur para máximo aprovechamiento solar',
+    'piscina': 'Requiere vallado de seguridad (normativa)',
+    'bodega': 'Temperatura ideal 12-16°C, semisótano recomendado',
+    'default': 'Espacio bien dimensionado para su uso'
+}};
+
+let selectedRoom = null;
+
+function getCostPerM2(name) {{
+    const nameLower = name.toLowerCase();
+    for (const [key, cost] of Object.entries(ROOM_COSTS)) {{
+        if (nameLower.includes(key)) return cost;
+    }}
+    return ROOM_COSTS.default;
+}}
+
+function getTip(name) {{
+    const nameLower = name.toLowerCase();
+    for (const [key, tip] of Object.entries(ROOM_TIPS)) {{
+        if (nameLower.includes(key)) return tip;
+    }}
+    return ROOM_TIPS.default;
+}}
+
+function openRoomPanel(room) {{
+    selectedRoom = room;
+    const costPerM2 = getCostPerM2(room.name);
+    const totalCost = room.area * costPerM2;
+    
+    document.getElementById('detail-name').textContent = room.name;
+    document.getElementById('detail-dims').textContent = 
+        room.width.toFixed(1) + 'm × ' + room.depth.toFixed(1) + 'm';
+    document.getElementById('detail-area').textContent = room.area.toFixed(0) + ' m²';
+    document.getElementById('detail-cost').textContent = 
+        '€' + totalCost.toLocaleString('es-ES');
+    document.getElementById('detail-tip').textContent = getTip(room.name);
+    document.getElementById('detail-slider').min = Math.max(4, room.area * 0.5);
+    document.getElementById('detail-slider').max = room.area * 2;
+    document.getElementById('detail-slider').value = room.area;
+    document.getElementById('detail-slider-value').textContent = room.area.toFixed(0) + ' m²';
+    document.getElementById('room-detail-panel').style.display = 'block';
+}}
+
+function closeRoomPanel() {{
+    document.getElementById('room-detail-panel').style.display = 'none';
+    selectedRoom = null;
+}}
+
+function updateRoomSize(value) {{
+    const v = parseFloat(value);
+    const costPerM2 = selectedRoom ? getCostPerM2(selectedRoom.name) : 1000;
+    document.getElementById('detail-slider-value').textContent = v.toFixed(0) + ' m²';
+    document.getElementById('detail-cost').textContent = 
+        '€' + (v * costPerM2).toLocaleString('es-ES');
+}}
+
 // Controles de órbita (manual)
 let isDragging = false;
 let previousMousePosition = {{ x: 0, y: 0 }};
@@ -443,6 +700,17 @@ function updateCamera() {{
 renderer.domElement.addEventListener('mousedown', (e) => {{
     isDragging = true;
     previousMousePosition = {{ x: e.clientX, y: e.clientY }};
+}});
+
+renderer.domElement.addEventListener('click', (e) => {{
+    const rect = renderer.domElement.getBoundingClientRect();
+    mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+    raycaster.setFromCamera(mouse, camera);
+    const intersects = raycaster.intersectObjects(roomMeshes);
+    if (intersects.length > 0 && intersects[0].object.userData.room) {{
+        openRoomPanel(intersects[0].object.userData.room);
+    }}
 }});
 
 renderer.domElement.addEventListener('mousemove', (e) => {{
