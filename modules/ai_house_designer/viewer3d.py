@@ -341,6 +341,10 @@ class Viewer3D:
     <button class="btn-view" id="btn-top" onclick="setView('top')">Vista Superior</button>
     <button class="btn-view" id="btn-front" onclick="setView('front')">Vista Frontal</button>
     <button class="btn-view" id="btn-iso" onclick="setView('iso')">Vista 3D</button>
+    <button class="btn-view" id="btn-roof" onclick="toggleRoof()" 
+            style="top:155px; right:10px; background:rgba(149,165,166,0.8);">
+        Tejado: OFF
+    </button>
     <div id="controls">🖱️ Arrastrar: rotar · Scroll: zoom · Click habitación: info</div>
     
     <!-- Botón abrir en nueva pestaña -->
@@ -428,14 +432,36 @@ scene.add(dirLight);
 const hemiLight = new THREE.HemisphereLight(0x87CEEB, 0x8B7355, 0.4);
 scene.add(hemiLight);
 
-// Suelo
-const groundGeo = new THREE.PlaneGeometry(totalW + 10, totalD + 10);
-const groundMat = new THREE.MeshLambertMaterial({{ color: 0x8B9467, side: THREE.DoubleSide }});
+// Parcela completa con zona verde exterior
+const groundGeo = new THREE.PlaneGeometry(totalW + 25, totalD + 25);
+const groundMat = new THREE.MeshLambertMaterial({{ 
+    color: 0x7CB87C,  // Verde hierba
+    side: THREE.DoubleSide 
+}});
 const ground = new THREE.Mesh(groundGeo, groundMat);
 ground.rotation.x = -Math.PI / 2;
 ground.position.set(centerX, -0.05, centerZ);
 ground.receiveShadow = true;
 scene.add(ground);
+
+// Zona pavimentada bajo la casa
+const houseFloorGeo = new THREE.PlaneGeometry(totalW + 1, totalD + 1);
+const houseFloorMat = new THREE.MeshLambertMaterial({{ 
+    color: 0xE8E0D0,  // Beige pavimento
+    side: THREE.DoubleSide 
+}});
+const houseFloor = new THREE.Mesh(houseFloorGeo, houseFloorMat);
+houseFloor.rotation.x = -Math.PI / 2;
+houseFloor.position.set(centerX, -0.02, centerZ);
+scene.add(houseFloor);
+
+// Zona piscina exterior (verde agua)
+const poolZoneGeo = new THREE.PlaneGeometry(10, 8);
+const poolZoneMat = new THREE.MeshLambertMaterial({{ color: 0x4FC3F7 }});
+const poolZone = new THREE.Mesh(poolZoneGeo, poolZoneMat);
+poolZone.rotation.x = -Math.PI / 2;
+poolZone.position.set(centerX - totalW/2 - 5, -0.03, centerZ + totalD/2);
+scene.add(poolZone);
 
 // Grid
 const gridHelper = new THREE.GridHelper(Math.max(totalW, totalD) + 10, 
@@ -551,69 +577,59 @@ rooms.forEach((room, index) => {{
     scene.add(sprite);
 }});
 
-// Tejado simple (dos aguas)
-const roofW = totalW + 2;
-const roofD = totalD + 2;
-const roofHeight = 2.0;
-const roofPoints = [
-    new THREE.Vector3(-1, 0, -1),
-    new THREE.Vector3(totalW + 1, 0, -1),
-    new THREE.Vector3(totalW/2, roofHeight, totalD/2),
-];
+// Tejado OPCIONAL - Por defecto oculto para ver planta
+let roofVisible = false;
+const roofGroup = new THREE.Group();
+
 const roofMat = new THREE.MeshLambertMaterial({{ color: 0xB55A30, side: THREE.DoubleSide }});
 
 // Tejado frente
-const roofFrontGeo = new THREE.BufferGeometry().setFromPoints([
-    new THREE.Vector3(-1, 0, -1),
-    new THREE.Vector3(totalW + 1, 0, -1),
-    new THREE.Vector3(totalW/2, roofHeight, (totalD)/2),
+const roofFrontGeo = new THREE.BufferGeometry();
+const rfv = new Float32Array([
+    -1, 0, -1,  totalW+1, 0, -1,  totalW/2, 2.0, totalD/2,
+    -1, 0, -1,  totalW/2, 2.0, totalD/2,  -1, 0, -1
 ]);
+roofFrontGeo.setAttribute('position', new THREE.BufferAttribute(rfv, 3));
+roofFrontGeo.computeVertexNormals();
 const roofFront = new THREE.Mesh(roofFrontGeo, roofMat);
 roofFront.position.y = {self.WALL_HEIGHT};
-scene.add(roofFront);
+roofGroup.add(roofFront);
 
 // Tejado atrás
-const roofBackGeo = new THREE.BufferGeometry().setFromPoints([
-    new THREE.Vector3(-1, 0, totalD + 1),
-    new THREE.Vector3(totalW + 1, 0, totalD + 1),
-    new THREE.Vector3(totalW/2, roofHeight, (totalD)/2),
+const roofBackGeo = new THREE.BufferGeometry();
+const rbv = new Float32Array([
+    -1, 0, totalD+1,  totalW+1, 0, totalD+1,  totalW/2, 2.0, totalD/2,
+    -1, 0, totalD+1,  totalW/2, 2.0, totalD/2,  -1, 0, totalD+1
 ]);
+roofBackGeo.setAttribute('position', new THREE.BufferAttribute(rbv, 3));
+roofBackGeo.computeVertexNormals();
 const roofBack = new THREE.Mesh(roofBackGeo, roofMat);
 roofBack.position.y = {self.WALL_HEIGHT};
-scene.add(roofBack);
+roofGroup.add(roofBack);
 
-// Planos inclinados del tejado
-const roofLeftGeo = new THREE.BufferGeometry();
-const roofLeftVerts = new Float32Array([
-    -1, 0, -1,
-    -1, 0, totalD + 1,
-    totalW/2, roofHeight, totalD/2,
-    -1, 0, -1,
-    totalW/2, roofHeight, totalD/2,
-    -1, 0, -1,
+// Planos laterales
+const roofLGeo = new THREE.BufferGeometry();
+const rlv = new Float32Array([
+    -1,0,-1,  -1,0,totalD+1,  totalW/2,2.0,totalD/2,
 ]);
-roofLeftGeo.setAttribute('position', new THREE.BufferAttribute(roofLeftVerts, 3));
-roofLeftGeo.computeVertexNormals();
-
-const roofRightGeo = new THREE.BufferGeometry();
-const roofRightVerts = new Float32Array([
-    totalW+1, 0, -1,
-    totalW+1, 0, totalD+1,
-    totalW/2, roofHeight, totalD/2,
-    totalW+1, 0, -1,
-    totalW/2, roofHeight, totalD/2,
-    totalW+1, 0, -1,
-]);
-roofRightGeo.setAttribute('position', new THREE.BufferAttribute(roofRightVerts, 3));
-roofRightGeo.computeVertexNormals();
-
-const roofLeft = new THREE.Mesh(roofLeftGeo, roofMat);
+roofLGeo.setAttribute('position', new THREE.BufferAttribute(rlv, 3));
+roofLGeo.computeVertexNormals();
+const roofLeft = new THREE.Mesh(roofLGeo, roofMat);
 roofLeft.position.y = {self.WALL_HEIGHT};
-scene.add(roofLeft);
+roofGroup.add(roofLeft);
 
-const roofRight = new THREE.Mesh(roofRightGeo, roofMat);
+const roofRGeo = new THREE.BufferGeometry();
+const rrv = new Float32Array([
+    totalW+1,0,-1,  totalW+1,0,totalD+1,  totalW/2,2.0,totalD/2,
+]);
+roofRGeo.setAttribute('position', new THREE.BufferAttribute(rrv, 3));
+roofRGeo.computeVertexNormals();
+const roofRight = new THREE.Mesh(roofRGeo, roofMat);
 roofRight.position.y = {self.WALL_HEIGHT};
-scene.add(roofRight);
+roofGroup.add(roofRight);
+
+roofGroup.visible = false;  // Oculto por defecto
+scene.add(roofGroup);
 
 // ============================================
 // BRÚJULA SOLAR
@@ -808,7 +824,7 @@ function updateRoomSize(value) {{
 // Controles de órbita (manual)
 let isDragging = false;
 let previousMousePosition = {{ x: 0, y: 0 }};
-let spherical = {{ radius: 30, phi: Math.PI/3.5, theta: Math.PI/5 }};
+let spherical = {{ radius: 35, phi: 0.15, theta: Math.PI/4 }};
 
 function updateCamera() {{
     const x = centerX + spherical.radius * Math.sin(spherical.phi) * Math.sin(spherical.theta);
@@ -872,13 +888,22 @@ renderer.domElement.addEventListener('wheel', (e) => {{
 // Vistas predefinidas
 function setView(type) {{
     if (type === 'top') {{
-        spherical = {{ radius: 30, phi: 0.05, theta: Math.PI/4 }};
+        spherical = {{ radius: 40, phi: 0.05, theta: Math.PI/4 }};
     }} else if (type === 'front') {{
-        spherical = {{ radius: 25, phi: Math.PI/3, theta: 0 }};
+        spherical = {{ radius: 30, phi: Math.PI/2.5, theta: 0 }};
     }} else {{
-        spherical = {{ radius: 25, phi: Math.PI/4, theta: Math.PI/4 }};
+        spherical = {{ radius: 35, phi: Math.PI/3.5, theta: Math.PI/5 }};
     }}
     updateCamera();
+}}
+
+function toggleRoof() {{
+    roofVisible = !roofVisible;
+    roofGroup.visible = roofVisible;
+    document.getElementById('btn-roof').textContent = 
+        roofVisible ? 'Tejado: ON' : 'Tejado: OFF';
+    document.getElementById('btn-roof').style.background = 
+        roofVisible ? 'rgba(230,126,34,0.8)' : 'rgba(149,165,166,0.8)';
 }}
 
 // Touch support
