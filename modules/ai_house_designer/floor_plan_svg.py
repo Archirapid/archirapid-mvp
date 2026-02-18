@@ -69,7 +69,8 @@ class FloorPlanSVG:
             })
         
         # Generar layout arquitectónico
-        engine = ArchitectLayout(rooms_data)
+        house_shape = getattr(self.design, 'request', {}).get('house_shape', 'Rectangular (más común)')
+        engine = ArchitectLayout(rooms_data, house_shape)
         layout_raw = engine.generate()
         
         # Guardar dimensiones totales

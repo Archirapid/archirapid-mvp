@@ -255,6 +255,13 @@ def render_step1():
             help="El tejado afecta al coste, aislamiento y recogida de agua"
         )
     
+    # Guardar selecciones
+    if 'request' not in st.session_state:
+        st.session_state['request'] = {}
+    
+    st.session_state['request']['house_shape'] = house_shape
+    st.session_state['request']['roof_type'] = roof_type
+    
     st.markdown("---")
     
     # ============================================

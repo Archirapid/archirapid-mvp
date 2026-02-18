@@ -70,8 +70,9 @@ class ArchitectLayout:
 
     PASILLO_H = 1.2  # Altura (profundidad) del pasillo horizontal
 
-    def __init__(self, rooms_data):
+    def __init__(self, rooms_data, house_shape: str = "Rectangular"):
         self.raw = rooms_data
+        self.house_shape = house_shape  # Nuevo parámetro
 
     def _rooms_by_zone(self, rooms, *zones):
         return [r for r in rooms if r.zone in zones]
@@ -324,8 +325,10 @@ class ArchitectLayout:
         }
 
 
-def generate_layout(rooms_data):
-    return ArchitectLayout(rooms_data).generate()
+def generate_layout(rooms_data, house_shape: str = "Rectangular"):
+    # Extraer solo el nombre de la forma (sin paréntesis)
+    shape_clean = house_shape.split('(')[0].strip()
+    return ArchitectLayout(rooms_data, shape_clean).generate()
 
 
 if __name__ == '__main__':
