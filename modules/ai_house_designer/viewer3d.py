@@ -503,16 +503,13 @@ class Viewer3D:
         <div class="metric">📏 Superficie: <span id="detail-area">-</span></div>
         <div class="cost" id="detail-cost">€0</div>
         <div class="metric">💡 <span id="detail-tip">-</span></div>
-        <div style="margin-top:10px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.2);">
-            <div style="font-size:11px; color:#aaa; margin-bottom:6px;">Ajustar superficie:</div>
-            <input type="range" id="detail-slider" min="5" max="80" value="20"
-                   style="width:100%; accent-color:#3498DB;"
-                   oninput="updateRoomSize(this.value)">
-            <div id="detail-slider-value" style="font-size:11px; color:#3498DB; text-align:center;">
-                20 m²
+        <div style="margin-top:15px; padding-top:15px; border-top:1px solid rgba(255,255,255,0.2); text-align:center;">
+            <div style="font-size:12px; color:#95A5A6; line-height:1.6;">
+                💡 Para cambiar dimensiones:<br>
+                <span style="color:#3498DB;">Usa los sliders en la columna izquierda</span>
             </div>
         </div>
-        <button onclick="closeRoomPanel()">Cerrar</button>
+        <button onclick="closeRoomPanel()" style="margin-top:15px;">Cerrar</button>
     </div>
 </div>
 
@@ -892,58 +889,12 @@ function openRoomPanel(room) {{
     document.getElementById('detail-cost').textContent = 
         '€' + totalCost.toLocaleString('es-ES');
     document.getElementById('detail-tip').textContent = getTip(room.name);
-    document.getElementById('detail-slider').min = Math.max(4, room.area * 0.5);
-    document.getElementById('detail-slider').max = room.area * 2;
-    document.getElementById('detail-slider').value = room.area;
-    document.getElementById('detail-slider-value').textContent = room.area.toFixed(0) + ' m²';
     document.getElementById('room-detail-panel').style.display = 'block';
 }}
 
 function closeRoomPanel() {{
     document.getElementById('room-detail-panel').style.display = 'none';
     selectedRoom = null;
-}}
-
-function updateRoomSize(value) {{
-    const v = parseFloat(value);
-    const costPerM2 = selectedRoom ? getCostPerM2(selectedRoom.name) : 1000;
-    const newCost = v * costPerM2;
-    
-    document.getElementById('detail-slider-value').textContent = v.toFixed(0) + ' m²';
-    document.getElementById('detail-cost').textContent = 
-        '€' + newCost.toLocaleString('es-ES');
-    
-    // Actualizar área del room seleccionado
-    if (selectedRoom) {{
-        const oldArea = selectedRoom.area;
-        selectedRoom.area = v;
-        
-        // Calcular diferencia y mostrar mensaje
-        const diff = v - oldArea;
-        const costDiff = diff * costPerM2;
-        
-        // Recalcular presupuesto total
-        let totalCost = 0;
-        rooms.forEach(r => {{
-            totalCost += r.area * getCostPerM2(r.name);
-        }});
-        
-        // Mostrar en panel info
-        const infoPanel = document.getElementById('info-panel');
-        const budgetChange = costDiff >= 0 ? 
-            '+€' + Math.abs(costDiff).toLocaleString('es-ES') : 
-            '-€' + Math.abs(costDiff).toLocaleString('es-ES');
-        
-        infoPanel.innerHTML = `
-            <strong>🏠 Vista 3D Interactiva</strong><br>
-            Superficie: ${{rooms.reduce((s,r) => s+r.area, 0).toFixed(0)}} m²<br>
-            Habitaciones: ${{rooms.length}}<br>
-            <span style="color:#F39C12">💰 Presupuesto: €${{totalCost.toLocaleString('es-ES')}}</span><br>
-            <span style="color:${{costDiff >= 0 ? '#E74C3C' : '#2ECC71'}}">
-                ${{budgetChange}} vs anterior
-            </span>
-        `;
-    }}
 }}
 
 // Controles de órbita (manual)
