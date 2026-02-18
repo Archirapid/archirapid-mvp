@@ -935,7 +935,7 @@ def render_step2():
             if st.button("Generar Vista 3D", type="primary", use_container_width=True):
                 try:
                     from .viewer3d import Viewer3D
-                    roof_type = req.get('roof_type', 'Dos aguas')
+                    roof_type = st.session_state.get('request', {}).get('roof_type', 'Dos aguas (clásico, eficiente)')
                     viewer = Viewer3D(design, roof_type=roof_type)
                     html_3d = viewer.generate_html()
                     st.session_state['current_3d_html'] = html_3d

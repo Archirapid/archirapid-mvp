@@ -28,9 +28,9 @@ class Viewer3D:
         'default': 0xF5F5F5
     }
     
-    def __init__(self, design, roof_type: str = "Dos aguas"):
+    def __init__(self, design, roof_type=None):
         self.design = design
-        self.roof_type = roof_type
+        self.roof_type = roof_type or getattr(design, 'request', {}).get('roof_type', 'Dos aguas (clásico, eficiente)')
     
     def _get_color_hex(self, code: str) -> str:
         code_lower = code.lower()
@@ -558,57 +558,214 @@ rooms.forEach((room, index) => {{
     scene.add(sprite);
 }});
 
-// Tejado OPCIONAL - Por defecto oculto para ver planta
+// ================================================
+// TEJADO ADAPTATIVO según tipo seleccionado
+// ================================================
 let roofVisible = false;
 const roofGroup = new THREE.Group();
-
 const roofMat = new THREE.MeshLambertMaterial({{ color: 0xB55A30, side: THREE.DoubleSide }});
 
-// Tejado frente
-const roofFrontGeo = new THREE.BufferGeometry();
-const rfv = new Float32Array([
-    -1, 0, -1,  totalW+1, 0, -1,  totalW/2, 2.0, totalD/2,
-    -1, 0, -1,  totalW/2, 2.0, totalD/2,  -1, 0, -1
-]);
-roofFrontGeo.setAttribute('position', new THREE.BufferAttribute(rfv, 3));
-roofFrontGeo.computeVertexNormals();
-const roofFront = new THREE.Mesh(roofFrontGeo, roofMat);
-roofFront.position.y = {self.WALL_HEIGHT};
-roofGroup.add(roofFront);
+// Obtener tipo de tejado (pasado desde Python)
+const roofType = "{{roof_type}}";  // Será reemplazado por Python
 
-// Tejado atrás
-const roofBackGeo = new THREE.BufferGeometry();
-const rbv = new Float32Array([
-    -1, 0, totalD+1,  totalW+1, 0, totalD+1,  totalW/2, 2.0, totalD/2,
-    -1, 0, totalD+1,  totalW/2, 2.0, totalD/2,  -1, 0, totalD+1
-]);
-roofBackGeo.setAttribute('position', new THREE.BufferAttribute(rbv, 3));
-roofBackGeo.computeVertexNormals();
-const roofBack = new THREE.Mesh(roofBackGeo, roofMat);
-roofBack.position.y = {self.WALL_HEIGHT};
-roofGroup.add(roofBack);
+// Función para crear tejado según tipo
+function createRoof(type) {{
+    const group = new THREE.Group();
+    
+    if (type.includes("Dos aguas")) {{
+        // Tejado DOS AGUAS clásico (cumbrera en el centro, largo de la casa)
+        const ridgeHeight = 2.5;  // Altura de la cumbrera
+        
+        // Plano izquierdo (pendiente hacia la izquierda)
+        const leftGeo = new THREE.BufferGeometry();
+        const lv = new Float32Array([
+            -1, 0, -1,              // Esquina frontal izquierda
+            -1, 0, totalD+1,         // Esquina trasera izquierda
+            totalW/2, ridgeHeight, totalD+1,  // Cumbrera trasera
+            
+            -1, 0, -1,
+            totalW/2, ridgeHeight, totalD+1,
+            totalW/2, ridgeHeight, -1   // Cumbrera frontal
+        ]);
+        leftGeo.setAttribute('position', new THREE.BufferAttribute(lv, 3));
+        leftGeo.computeVertexNormals();
+        group.add(new THREE.Mesh(leftGeo, roofMat));
+        
+        // Plano derecho (pendiente hacia la derecha)
+        const rightGeo = new THREE.BufferGeometry();
+        const rv = new Float32Array([
+            totalW+1, 0, -1,
+            totalW+1, 0, totalD+1,
+            totalW/2, ridgeHeight, totalD+1,
+            
+            totalW+1, 0, -1,
+            totalW/2, ridgeHeight, totalD+1,
+            totalW/2, ridgeHeight, -1
+        ]);
+        rightGeo.setAttribute('position', new THREE.BufferAttribute(rv, 3));
+        rightGeo.computeVertexNormals();
+        group.add(new THREE.Mesh(rightGeo, roofMat));
+        
+        // Tapas triangulares (hastiales)
+        const frontGeo = new THREE.BufferGeometry();
+        const fv = new Float32Array([
+            -1, 0, -1,
+            totalW+1, 0, -1,
+            totalW/2, ridgeHeight, -1
+        ]);
+        frontGeo.setAttribute('position', new THREE.BufferAttribute(fv, 3));
+        frontGeo.computeVertexNormals();
+        group.add(new THREE.Mesh(frontGeo, roofMat));
+        
+        const backGeo = new THREE.BufferGeometry();
+        const bv = new Float32Array([
+            -1, 0, totalD+1,
+            totalW+1, 0, totalD+1,
+            totalW/2, ridgeHeight, totalD+1
+        ]);
+        backGeo.setAttribute('position', new THREE.BufferAttribute(bv, 3));
+        backGeo.computeVertexNormals();
+        group.add(new THREE.Mesh(backGeo, roofMat));
+    }}
+    else if (type.includes("Plana")) {{
+        // Tejado PLANO (solo una losa horizontal)
+        const flatGeo = new THREE.BoxGeometry(totalW+2, 0.3, totalD+2);
+        const flatMat = new THREE.MeshLambertMaterial({{ color: 0x95A5A6 }});  // Gris hormigón
+        const flatRoof = new THREE.Mesh(flatGeo, flatMat);
+        flatRoof.position.set(totalW/2, 0.15, totalD/2);
+        group.add(flatRoof);
+    }}
+    else if (type.includes("Cuatro aguas")) {{
+        // Tejado CUATRO AGUAS (piramidal, 4 pendientes)
+        const peakHeight = 2.0;
+        
+        // Plano frontal
+        const fGeo = new THREE.BufferGeometry();
+        const fv = new Float32Array([
+            -1, 0, -1,
+            totalW+1, 0, -1,
+            totalW/2, peakHeight, totalD/2
+        ]);
+        fGeo.setAttribute('position', new THREE.BufferAttribute(fv, 3));
+        fGeo.computeVertexNormals();
+        group.add(new THREE.Mesh(fGeo, roofMat));
+        
+        // Plano trasero
+        const bGeo = new THREE.BufferGeometry();
+        const bv = new Float32Array([
+            -1, 0, totalD+1,
+            totalW+1, 0, totalD+1,
+            totalW/2, peakHeight, totalD/2
+        ]);
+        bGeo.setAttribute('position', new THREE.BufferAttribute(bv, 3));
+        bGeo.computeVertexNormals();
+        group.add(new THREE.Mesh(bGeo, roofMat));
+        
+        // Plano izquierdo
+        const lGeo = new THREE.BufferGeometry();
+        const lv = new Float32Array([
+            -1, 0, -1,
+            -1, 0, totalD+1,
+            totalW/2, peakHeight, totalD/2
+        ]);
+        lGeo.setAttribute('position', new THREE.BufferAttribute(lv, 3));
+        lGeo.computeVertexNormals();
+        group.add(new THREE.Mesh(lGeo, roofMat));
+        
+        // Plano derecho
+        const rGeo = new THREE.BufferGeometry();
+        const rv = new Float32Array([
+            totalW+1, 0, -1,
+            totalW+1, 0, totalD+1,
+            totalW/2, peakHeight, totalD/2
+        ]);
+        rGeo.setAttribute('position', new THREE.BufferAttribute(rv, 3));
+        rGeo.computeVertexNormals();
+        group.add(new THREE.Mesh(rGeo, roofMat));
+    }}
+    else if (type.includes("un agua")) {{
+        // Tejado A UN AGUA (pendiente única hacia atrás)
+        const slopeHeight = 2.0;
+        
+        const monoGeo = new THREE.BufferGeometry();
+        const mv = new Float32Array([
+            -1, slopeHeight, -1,        // Frontal alto izquierda
+            totalW+1, slopeHeight, -1,   // Frontal alto derecha
+            totalW+1, 0, totalD+1,       // Trasero bajo derecha
+            
+            -1, slopeHeight, -1,
+            totalW+1, 0, totalD+1,
+            -1, 0, totalD+1              // Trasero bajo izquierda
+        ]);
+        monoGeo.setAttribute('position', new THREE.BufferAttribute(mv, 3));
+        monoGeo.computeVertexNormals();
+        group.add(new THREE.Mesh(monoGeo, roofMat));
+        
+        // Tapas laterales
+        const leftCapGeo = new THREE.BufferGeometry();
+        const lcv = new Float32Array([
+            -1, slopeHeight, -1,
+            -1, 0, totalD+1,
+            -1, slopeHeight, -1
+        ]);
+        leftCapGeo.setAttribute('position', new THREE.BufferAttribute(lcv, 3));
+        leftCapGeo.computeVertexNormals();
+        group.add(new THREE.Mesh(leftCapGeo, roofMat));
+        
+        const rightCapGeo = new THREE.BufferGeometry();
+        const rcv = new Float32Array([
+            totalW+1, slopeHeight, -1,
+            totalW+1, 0, totalD+1,
+            totalW+1, slopeHeight, -1
+        ]);
+        rightCapGeo.setAttribute('position', new THREE.BufferAttribute(rcv, 3));
+        rightCapGeo.computeVertexNormals();
+        group.add(new THREE.Mesh(rightCapGeo, roofMat));
+    }}
+    else {{
+        // Por defecto: Invertida (igual que Cuatro aguas pero color diferente)
+        const peakHeight = 1.8;
+        const invertMat = new THREE.MeshLambertMaterial({{ color: 0x7F8C8D, side: THREE.DoubleSide }});
+        
+        const fGeo = new THREE.BufferGeometry();
+        const fv = new Float32Array([
+            -1, 0, -1, totalW+1, 0, -1, totalW/2, peakHeight, totalD/2
+        ]);
+        fGeo.setAttribute('position', new THREE.BufferAttribute(fv, 3));
+        fGeo.computeVertexNormals();
+        group.add(new THREE.Mesh(fGeo, invertMat));
+        
+        const bGeo = new THREE.BufferGeometry();
+        const bv = new Float32Array([
+            -1, 0, totalD+1, totalW+1, 0, totalD+1, totalW/2, peakHeight, totalD/2
+        ]);
+        bGeo.setAttribute('position', new THREE.BufferAttribute(bv, 3));
+        bGeo.computeVertexNormals();
+        group.add(new THREE.Mesh(bGeo, invertMat));
+        
+        const lGeo = new THREE.BufferGeometry();
+        const lv = new Float32Array([
+            -1, 0, -1, -1, 0, totalD+1, totalW/2, peakHeight, totalD/2
+        ]);
+        lGeo.setAttribute('position', new THREE.BufferAttribute(lv, 3));
+        lGeo.computeVertexNormals();
+        group.add(new THREE.Mesh(lGeo, invertMat));
+        
+        const rGeo = new THREE.BufferGeometry();
+        const rv = new Float32Array([
+            totalW+1, 0, -1, totalW+1, 0, totalD+1, totalW/2, peakHeight, totalD/2
+        ]);
+        rGeo.setAttribute('position', new THREE.BufferAttribute(rv, 3));
+        rGeo.computeVertexNormals();
+        group.add(new THREE.Mesh(rGeo, invertMat));
+    }}
+    
+    group.position.y = {self.WALL_HEIGHT};
+    return group;
+}}
 
-// Planos laterales
-const roofLGeo = new THREE.BufferGeometry();
-const rlv = new Float32Array([
-    -1,0,-1,  -1,0,totalD+1,  totalW/2,2.0,totalD/2,
-]);
-roofLGeo.setAttribute('position', new THREE.BufferAttribute(rlv, 3));
-roofLGeo.computeVertexNormals();
-const roofLeft = new THREE.Mesh(roofLGeo, roofMat);
-roofLeft.position.y = {self.WALL_HEIGHT};
-roofGroup.add(roofLeft);
-
-const roofRGeo = new THREE.BufferGeometry();
-const rrv = new Float32Array([
-    totalW+1,0,-1,  totalW+1,0,totalD+1,  totalW/2,2.0,totalD/2,
-]);
-roofRGeo.setAttribute('position', new THREE.BufferAttribute(rrv, 3));
-roofRGeo.computeVertexNormals();
-const roofRight = new THREE.Mesh(roofRGeo, roofMat);
-roofRight.position.y = {self.WALL_HEIGHT};
-roofGroup.add(roofRight);
-
+// Crear tejado del tipo seleccionado
+roofGroup.add(createRoof(roofType));
 roofGroup.visible = false;  // Oculto por defecto
 scene.add(roofGroup);
 
@@ -918,4 +1075,6 @@ window.addEventListener('resize', () => {{
 </body>
 </html>
 """
+        # Reemplazar el tipo de tejado
+        html = html.replace('{{roof_type}}', self.roof_type)
         return html
