@@ -52,6 +52,8 @@ def generate_babylon_html(rooms_data, total_width, total_depth):
         <button class="tool-btn" id="btn-select" onclick="setMode('select')">🖱️ Seleccionar</button>
         <button class="tool-btn" id="btn-move" onclick="setMode('move')">↔️ Mover</button>
         <button class="tool-btn" id="btn-wall" onclick="setMode('wall')">🧱 Añadir Tabique</button>
+        <hr style="margin: 10px 0; border-color: rgba(255,255,255,0.2);">
+        <button class="tool-btn" id="btn-save" onclick="saveChanges()" style="background: rgba(46,204,113,0.3); border-color: #2ECC71;">💾 Guardar Cambios</button>
     </div>
 
     <script>
@@ -298,6 +300,55 @@ def generate_babylon_html(rooms_data, total_width, total_depth):
                 console.log('Modo: Añadir Tabique');
                 alert('Función "Añadir Tabique" en desarrollo');
             }}
+        }}
+        
+        // ================================================
+        // GUARDAR CAMBIOS
+        // ================================================
+        function saveChanges() {{
+            // Recopilar coordenadas actuales de todas las paredes
+            const currentLayout = [];
+            
+            roomsData.forEach((room, i) => {{
+                // Buscar paredes de esta habitación
+                const backWall = scene.getMeshByName(`wall_back_${{i}}`);
+                const frontWall = scene.getMeshByName(`wall_front_${{i}}`);
+                const leftWall = scene.getMeshByName(`wall_left_${{i}}`);
+                const rightWall = scene.getMeshByName(`wall_right_${{i}}`);
+                const floor = scene.getMeshByName(`floor_${{i}}`);
+                
+                if (floor) {{
+                    currentLayout.push({{
+                        index: i,
+                        name: room.name,
+                        original_area: room.area_m2,
+                        // Posición actual del suelo
+                        x: floor.position.x - floor.scaling.x/2,
+                        z: floor.position.z - floor.scaling.z/2,
+                        width: floor.scaling.x,
+                        depth: floor.scaling.z,
+                        // Calcular nueva área
+                        new_area: (floor.scaling.x * floor.scaling.z).toFixed(2)
+                    }});
+                }}
+            }});
+            
+            // Mostrar JSON en consola
+            console.log('=== LAYOUT MODIFICADO ===');
+            console.log(JSON.stringify(currentLayout, null, 2));
+            console.log('========================');
+            
+            // Descargar como archivo
+            const dataStr = JSON.stringify(currentLayout, null, 2);
+            const dataBlob = new Blob([dataStr], {{type: 'application/json'}});
+            const url = URL.createObjectURL(dataBlob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'archirapid_layout_modificado.json';
+            link.click();
+            
+            // Mostrar warning
+            alert('⚠️ CAMBIOS GUARDADOS\\n\\n📄 Archivo JSON descargado\\n\\n⚠️ IMPORTANTE: Este diseño requiere validación por un arquitecto antes de construcción.\\n\\nLos cambios NO garantizan cumplimiento de normativa CTE.');
         }}
         
         // Activar modo seleccionar por defecto
