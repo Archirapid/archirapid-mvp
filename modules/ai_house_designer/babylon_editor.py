@@ -42,15 +42,16 @@ def generate_babylon_html(rooms_data, total_width, total_depth):
     </style>
     <script src="https://cdn.babylonjs.com/babylon.js"></script>
     <script src="https://cdn.babylonjs.com/gui/babylon.gui.min.js"></script>
+    <script src="https://cdn.babylonjs.com/materialsLibrary/babylonjs.materials.min.js"></script>
 </head>
 <body>
     <canvas id="renderCanvas"></canvas>
     
     <div id="toolbar">
         <h3>🛠️ Herramientas</h3>
-        <button class="tool-btn">🖱️ Seleccionar</button>
-        <button class="tool-btn">↔️ Mover</button>
-        <button class="tool-btn">🧱 Añadir Tabique</button>
+        <button class="tool-btn" id="btn-select" onclick="setMode('select')">🖱️ Seleccionar</button>
+        <button class="tool-btn" id="btn-move" onclick="setMode('move')">↔️ Mover</button>
+        <button class="tool-btn" id="btn-wall" onclick="setMode('wall')">🧱 Añadir Tabique</button>
     </div>
 
     <script>
@@ -86,6 +87,31 @@ def generate_babylon_html(rooms_data, total_width, total_depth):
         const groundMat = new BABYLON.StandardMaterial("groundMat", scene);
         groundMat.diffuseColor = new BABYLON.Color3(0.48, 0.72, 0.48);
         ground.material = groundMat;
+        
+        // ================================================
+        // GRID VISIBLE (cuadrícula blanca 1m x 1m)
+        // ================================================
+        const gridSize = Math.max(totalWidth, totalDepth) + 15;
+        const gridDivisions = gridSize; // 1 división = 1 metro
+        
+        // Grid principal (líneas cada 1m)
+        const gridHelper = new BABYLON.GridMaterial("gridMaterial", scene);
+        gridHelper.majorUnitFrequency = 5;  // Línea gruesa cada 5m
+        gridHelper.minorUnitVisibility = 0.5;  // Visibilidad líneas finas
+        gridHelper.gridRatio = 1;  // Espaciado 1 metro
+        gridHelper.mainColor = new BABYLON.Color3(1, 1, 1);  // Blanco
+        gridHelper.lineColor = new BABYLON.Color3(0.3, 0.5, 0.7);  // Azul claro
+        gridHelper.opacity = 0.6;
+        gridHelper.backFaceCulling = false;
+        
+        const gridPlane = BABYLON.MeshBuilder.CreateGround("gridPlane", {{
+            width: gridSize, height: gridSize
+        }}, scene);
+        gridPlane.material = gridHelper;
+        gridPlane.position.y = 0.01;  // Ligeramente sobre el suelo
+        gridPlane.isPickable = false;
+        
+        console.log('Grid creado:', gridSize, 'm x', gridSize, 'm con divisiones cada 1m');
         
         // Cargar habitaciones
         roomsData.forEach((room, i) => {{
@@ -166,28 +192,116 @@ def generate_babylon_html(rooms_data, total_width, total_depth):
             
             console.log(`Puerta creada en habitación ${{i}}: x=${{doorMarker.position.x}}, z=${{doorMarker.position.z}}`);
             
-            // Etiqueta 3D flotante
+            // Etiqueta 3D flotante MÁS GRANDE
             const label = BABYLON.MeshBuilder.CreatePlane(`label_${{i}}`, {{
-                width: 4, height: 2
+                width: 3.5,
+                height: 1.8
             }}, scene);
-            label.position.set(room.x + room.width/2, wallHeight + 1, room.z + room.depth/2);
+            label.position.set(room.x + room.width/2, wallHeight + 1.5, room.z + room.depth/2);
             label.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
             
             // Textura etiqueta con GUI
             const advancedTexture = BABYLON.GUI.AdvancedDynamicTexture.CreateForMesh(label);
+            
+            // Fondo semi-transparente oscuro
+            const bgRect = new BABYLON.GUI.Rectangle();
+            bgRect.width = 1;
+            bgRect.height = 1;
+            bgRect.background = "rgba(44, 62, 80, 0.85)";  // Fondo oscuro
+            bgRect.cornerRadius = 20;
+            advancedTexture.addControl(bgRect);
+            
             const textBlock = new BABYLON.GUI.TextBlock();
             textBlock.text = `${{room.name}}\\n${{room.area_m2.toFixed(0)}} m²`;
             textBlock.color = "white";
-            textBlock.fontSize = 48;
+            textBlock.fontSize = 52;
             textBlock.fontWeight = "bold";
-            advancedTexture.addControl(textBlock);
+            textBlock.outlineWidth = 4;
+            textBlock.outlineColor = "black";
+            bgRect.addControl(textBlock);
         }});
+        
+        // ================================================
+        // SISTEMA DE SELECCIÓN Y GIZMO
+        // ================================================
+        let selectedMesh = null;
+        let gizmoManager = null;
+        let currentMode = 'select';
+        
+        // Crear Gizmo Manager (para mover objetos)
+        gizmoManager = new BABYLON.GizmoManager(scene);
+        gizmoManager.positionGizmoEnabled = false;  // Desactivado por defecto
+        gizmoManager.rotationGizmoEnabled = false;
+        gizmoManager.scaleGizmoEnabled = false;
+        gizmoManager.boundingBoxGizmoEnabled = false;
+        
+        // Click para seleccionar objetos
+        scene.onPointerDown = function(evt, pickResult) {{
+            if (pickResult.hit && currentMode === 'select') {{
+                const mesh = pickResult.pickedMesh;
+                
+                // Solo seleccionar paredes y suelos
+                if (mesh && (mesh.name.startsWith('floor_') || 
+                            mesh.name.startsWith('wall_'))) {{
+                    selectedMesh = mesh;
+                    console.log('Seleccionado:', mesh.name);
+                    
+                    // Highlight del objeto seleccionado
+                    if (window.highlightLayer) {{
+                        window.highlightLayer.removeAllMeshes();
+                        window.highlightLayer.addMesh(mesh, BABYLON.Color3.Yellow());
+                    }}
+                }}
+            }}
+        }};
+        
+        // Crear highlight layer para objetos seleccionados
+        window.highlightLayer = new BABYLON.HighlightLayer("highlight", scene);
         
         // Render loop
         engine.runRenderLoop(() => scene.render());
         window.addEventListener('resize', () => engine.resize());
         
         console.log('Babylon.js cargado:', roomsData.length, 'habitaciones');
+        
+        // ================================================
+        // FUNCIONES DE LOS BOTONES
+        // ================================================
+        function setMode(mode) {{
+            currentMode = mode;
+            
+            // Actualizar botones visualmente
+            document.querySelectorAll('.tool-btn').forEach(btn => {{
+                btn.style.background = 'rgba(52,152,219,0.2)';
+            }});
+            
+            if (mode === 'select') {{
+                document.getElementById('btn-select').style.background = 'rgba(52,152,219,0.6)';
+                gizmoManager.positionGizmoEnabled = false;
+                console.log('Modo: Seleccionar');
+            }}
+            else if (mode === 'move') {{
+                document.getElementById('btn-move').style.background = 'rgba(52,152,219,0.6)';
+                
+                if (selectedMesh) {{
+                    gizmoManager.attachToMesh(selectedMesh);
+                    gizmoManager.positionGizmoEnabled = true;
+                    console.log('Modo: Mover (gizmo activado)');
+                }} else {{
+                    alert('Primero selecciona un objeto con modo Seleccionar');
+                    setMode('select');
+                }}
+            }}
+            else if (mode === 'wall') {{
+                document.getElementById('btn-wall').style.background = 'rgba(52,152,219,0.6)';
+                gizmoManager.positionGizmoEnabled = false;
+                console.log('Modo: Añadir Tabique');
+                alert('Función "Añadir Tabique" en desarrollo');
+            }}
+        }}
+        
+        // Activar modo seleccionar por defecto
+        setMode('select');
     </script>
 </body>
 </html>
