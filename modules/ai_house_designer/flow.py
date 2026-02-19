@@ -87,7 +87,7 @@ def main():
     st.title("🏠 Diseñador de Vivienda con IA (MVP) v2.1 🔧")
     
     # Mostrar paso actual
-    st.subheader(f"Paso {ai_house_step} de 3")
+    st.subheader(f"Paso {ai_house_step} de 4")
     
     # Llamar a la función correspondiente según el paso
     if ai_house_step == 1:
@@ -95,7 +95,9 @@ def main():
     elif ai_house_step == 2:
         render_step2()
     elif ai_house_step == 3:
-        render_step3()
+        render_step3_editor()
+    elif ai_house_step == 4:
+        render_step3()  # Documentación ahora es paso 4
 
 def render_step1():
     """Paso 1: Configurador de vivienda - Estilo Mercedes Benz"""
@@ -594,6 +596,19 @@ def render_step2():
     st.header("Paso 2 – Tu Casa en Tiempo Real")
     st.caption("Ajusta tu diseño. El plano se actualiza automáticamente.")
     
+    # Botones navegación
+    col1, col2 = st.columns([1, 1])
+    with col1:
+        if st.button("← Paso 1", key="back_to_1", use_container_width=True):
+            st.session_state["ai_house_step"] = 1
+            st.rerun()
+    with col2:
+        if st.button("Paso 3: Editor 3D →", key="go_to_3", type="primary", use_container_width=True):
+            st.session_state["ai_house_step"] = 3
+            st.rerun()
+    
+    st.markdown("---")
+    
     # ============================================
     # VALIDAR DATOS
     # ============================================
@@ -1018,6 +1033,99 @@ Máximo 150 palabras. Usa: ✅ para correcto, ⚠️ para mejorable, ❌ para pr
                 
                 except Exception as e:
                     st.warning(f"Análisis IA no disponible: {e}")
+
+def render_step3_editor():
+    """Paso 3: Editor 3D con Babylon.js"""
+    
+    st.header("Paso 3 – Editor 3D Avanzado")
+    st.caption("Diseña tu casa con herramientas profesionales")
+    
+    # Validar datos
+    req = st.session_state.get("ai_house_requirements", {})
+    if not req or not req.get("ai_room_proposal"):
+        st.warning("⚠️ Completa primero el Paso 1 y 2")
+        if st.button("← Volver al Paso 2"):
+            st.session_state["ai_house_step"] = 2
+            st.rerun()
+        return
+    
+    # Botones navegación
+    col1, col2 = st.columns([1, 1])
+    with col1:
+        if st.button("← Paso 2", key="back_to_2_from_editor", use_container_width=True):
+            st.session_state["ai_house_step"] = 2
+            st.rerun()
+    with col2:
+        if st.button("Paso 4: Documentación →", key="go_to_4", type="primary", use_container_width=True):
+            st.session_state["ai_house_step"] = 4
+            st.rerun()
+    
+    st.markdown("---")
+    
+    # Info editor
+    st.info("""
+    🎯 **Editor 3D Profesional con Babylon.js**
+    
+    **Herramientas:**
+    - 🖱️ Seleccionar y mover elementos
+    - 🧱 Añadir/eliminar tabiques
+    - 🚪 Colocar puertas y ventanas
+    - 📐 Snap to grid automático
+    
+    **El editor se abrirá en una nueva pestaña de tu navegador.**
+    """)
+    
+    # Botón abrir editor
+    if st.button("🏗️ Abrir Editor Babylon.js", type="primary", use_container_width=True, key="open_babylon"):
+        
+        # Obtener layout
+        from .architect_layout import generate_layout
+        
+        rooms_data = []
+        for room_data in req.get("ai_room_proposal", {}).items():
+            rooms_data.append({
+                'code': room_data[0],
+                'name': room_data[0],
+                'area_m2': room_data[1]
+            })
+        
+        house_shape = req.get('house_shape', 'Rectangular (más común)')
+        layout_result = generate_layout(rooms_data, house_shape)
+        
+        # Calcular dimensiones
+        if layout_result:
+            all_x = [item['x'] + item['width'] for item in layout_result]
+            all_z = [item['z'] + item['depth'] for item in layout_result]
+            total_width = max(all_x)
+            total_depth = max(all_z)
+        else:
+            total_width = 10
+            total_depth = 10
+        
+        # Generar HTML
+        from .babylon_editor import generate_babylon_html
+        html_editor = generate_babylon_html(layout_result, total_width, total_depth)
+        
+        # Guardar y abrir
+        import tempfile
+        import os
+        import webbrowser
+        
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.html', delete=False, encoding='utf-8') as f:
+            f.write(html_editor)
+            temp_path = f.name
+        
+        try:
+            chrome_path = 'C:/Program Files/Google/Chrome/Application/chrome.exe %s'
+            webbrowser.get(chrome_path).open('file://' + os.path.abspath(temp_path))
+        except:
+            try:
+                firefox_path = 'C:/Program Files/Mozilla Firefox/firefox.exe %s'
+                webbrowser.get(firefox_path).open('file://' + os.path.abspath(temp_path))
+            except:
+                webbrowser.open('file://' + os.path.abspath(temp_path), new=2)
+        
+        st.success("✅ Editor abierto en nueva pestaña")
 
 def render_step3():
     """Paso 3: Documentación completa y monetización"""
