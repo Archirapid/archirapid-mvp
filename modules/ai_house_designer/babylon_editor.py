@@ -192,49 +192,6 @@ def generate_babylon_html(rooms_data, total_width, total_depth):
             
             console.log(`Puerta creada en habitación ${{i}}: x=${{doorMarker.position.x}}, z=${{doorMarker.position.z}}`);
             
-            // ================================================
-            // VENTANAS: Rectángulos azul claro en paredes laterales
-            // ================================================
-            const windowWidth = 1.2;  // 120cm ancho
-            const windowHeight = 1.4; // 140cm alto
-            const windowMat = new BABYLON.StandardMaterial(`windowMat_${{i}}`, scene);
-            windowMat.diffuseColor = new BABYLON.Color3(0.5, 0.8, 1.0); // Azul claro
-            windowMat.emissiveColor = new BABYLON.Color3(0.1, 0.2, 0.3); // Brillo sutil
-            
-            // Ventana en pared izquierda (si habitación > 8m²)
-            if (room.area_m2 > 8) {{
-                const leftWindow = BABYLON.MeshBuilder.CreateBox(`window_left_${{i}}`, {{
-                    width: 0.12,
-                    height: windowHeight,
-                    depth: windowWidth
-                }}, scene);
-                leftWindow.position.set(
-                    room.x - 0.06,
-                    1.2,  // A 1.2m del suelo
-                    room.z + room.depth/2
-                );
-                leftWindow.material = windowMat;
-                leftWindow.isPickable = false;
-            }}
-            
-            // Ventana en pared derecha (si habitación > 8m²)
-            if (room.area_m2 > 8) {{
-                const rightWindow = BABYLON.MeshBuilder.CreateBox(`window_right_${{i}}`, {{
-                    width: 0.12,
-                    height: windowHeight,
-                    depth: windowWidth
-                }}, scene);
-                rightWindow.position.set(
-                    room.x + room.width + 0.06,
-                    1.2,
-                    room.z + room.depth/2
-                );
-                rightWindow.material = windowMat;
-                rightWindow.isPickable = false;
-            }}
-            
-            console.log(`Ventanas creadas en habitación ${{i}} (${{room.name}}): ${{room.area_m2 > 8 ? '2 ventanas' : 'sin ventanas'}}`);
-            
             // Etiqueta 3D flotante MÁS GRANDE
             const label = BABYLON.MeshBuilder.CreatePlane(`label_${{i}}`, {{
                 width: 3.5,
