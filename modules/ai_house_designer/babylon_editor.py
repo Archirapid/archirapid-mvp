@@ -41,6 +41,7 @@ def generate_babylon_html(rooms_data, total_width, total_depth):
         }}
     </style>
     <script src="https://cdn.babylonjs.com/babylon.js"></script>
+    <script src="https://cdn.babylonjs.com/gui/babylon.gui.min.js"></script>
 </head>
 <body>
     <canvas id="renderCanvas"></canvas>
@@ -82,14 +83,70 @@ def generate_babylon_html(rooms_data, total_width, total_depth):
         
         // Cargar habitaciones
         roomsData.forEach((room, i) => {{
+            // Suelo habitación
             const floor = BABYLON.MeshBuilder.CreateBox(`floor_${{i}}`, {{
                 width: room.width - 0.1, height: 0.05, depth: room.depth - 0.1
             }}, scene);
             floor.position.set(room.x + room.width/2, 0.025, room.z + room.depth/2);
             
-            const mat = new BABYLON.StandardMaterial(`mat_${{i}}`, scene);
-            mat.diffuseColor = new BABYLON.Color3(0.9, 0.9, 0.85);
-            floor.material = mat;
+            const floorMat = new BABYLON.StandardMaterial(`floorMat_${{i}}`, scene);
+            floorMat.diffuseColor = new BABYLON.Color3(0.95, 0.94, 0.92); // Beige claro
+            floor.material = floorMat;
+            
+            // PAREDES (4 por habitación)
+            const wallHeight = 2.7;
+            const wallThickness = 0.15;
+            
+            // Material paredes oscuras
+            const wallMat = new BABYLON.StandardMaterial(`wallMat_${{i}}`, scene);
+            wallMat.diffuseColor = new BABYLON.Color3(0.17, 0.24, 0.31); // Gris oscuro
+            
+            // Pared trasera
+            const backWall = BABYLON.MeshBuilder.CreateBox(`wall_back_${{i}}`, {{
+                width: room.width, height: wallHeight, depth: wallThickness
+            }}, scene);
+            backWall.position.set(room.x + room.width/2, wallHeight/2, room.z);
+            backWall.material = wallMat;
+            
+            // Pared frontal (semi-transparente para ver interior)
+            const frontWall = BABYLON.MeshBuilder.CreateBox(`wall_front_${{i}}`, {{
+                width: room.width, height: wallHeight, depth: wallThickness
+            }}, scene);
+            frontWall.position.set(room.x + room.width/2, wallHeight/2, room.z + room.depth);
+            const frontMat = new BABYLON.StandardMaterial(`frontMat_${{i}}`, scene);
+            frontMat.diffuseColor = new BABYLON.Color3(0.17, 0.24, 0.31);
+            frontMat.alpha = 0.3; // Transparente
+            frontWall.material = frontMat;
+            
+            // Pared izquierda
+            const leftWall = BABYLON.MeshBuilder.CreateBox(`wall_left_${{i}}`, {{
+                width: wallThickness, height: wallHeight, depth: room.depth
+            }}, scene);
+            leftWall.position.set(room.x, wallHeight/2, room.z + room.depth/2);
+            leftWall.material = wallMat;
+            
+            // Pared derecha
+            const rightWall = BABYLON.MeshBuilder.CreateBox(`wall_right_${{i}}`, {{
+                width: wallThickness, height: wallHeight, depth: room.depth
+            }}, scene);
+            rightWall.position.set(room.x + room.width, wallHeight/2, room.z + room.depth/2);
+            rightWall.material = wallMat;
+            
+            // Etiqueta 3D flotante
+            const label = BABYLON.MeshBuilder.CreatePlane(`label_${{i}}`, {{
+                width: 4, height: 2
+            }}, scene);
+            label.position.set(room.x + room.width/2, wallHeight + 1, room.z + room.depth/2);
+            label.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
+            
+            // Textura etiqueta con GUI
+            const advancedTexture = BABYLON.GUI.AdvancedDynamicTexture.CreateForMesh(label);
+            const textBlock = new BABYLON.GUI.TextBlock();
+            textBlock.text = `${{room.name}}\\n${{room.area_m2.toFixed(0)}} m²`;
+            textBlock.color = "white";
+            textBlock.fontSize = 48;
+            textBlock.fontWeight = "bold";
+            advancedTexture.addControl(textBlock);
         }});
         
         // Render loop
