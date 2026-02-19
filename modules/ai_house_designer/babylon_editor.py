@@ -138,6 +138,34 @@ def generate_babylon_html(rooms_data, total_width, total_depth):
             rightWall.position.set(room.x + room.width, wallHeight/2, room.z + room.depth/2);
             rightWall.material = wallMat;
             
+            // ================================================
+            // PUERTA: Rectángulo amarillo brillante (MÁS VISIBLE)
+            // ================================================
+            const doorWidth = 0.9;
+            const doorHeight = 2.0;
+            
+            // Material puerta amarillo neón (imposible no verlo)
+            const doorMat = new BABYLON.StandardMaterial(`doorMat_${{i}}`, scene);
+            doorMat.diffuseColor = new BABYLON.Color3(1, 0.9, 0); // Amarillo
+            doorMat.emissiveColor = new BABYLON.Color3(0.5, 0.45, 0); // Brillo
+            
+            // Puerta como BOX GRANDE y visible
+            const doorMarker = BABYLON.MeshBuilder.CreateBox(`door_${{i}}`, {{
+                width: doorWidth,
+                height: doorHeight,
+                depth: 0.3  // MÁS GRUESA para verse mejor
+            }}, scene);
+            
+            // Posición: FUERA de la pared (hacia adelante)
+            doorMarker.position.set(
+                room.x + room.width/2,
+                doorHeight/2,
+                room.z - 0.3  // MÁS hacia adelante
+            );
+            doorMarker.material = doorMat;
+            
+            console.log(`Puerta creada en habitación ${{i}}: x=${{doorMarker.position.x}}, z=${{doorMarker.position.z}}`);
+            
             // Etiqueta 3D flotante
             const label = BABYLON.MeshBuilder.CreatePlane(`label_${{i}}`, {{
                 width: 4, height: 2
