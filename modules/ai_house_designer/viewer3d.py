@@ -260,48 +260,60 @@ class Viewer3D:
             transform: translateX(-50%) scale(1.05);
         }}
         
-        /* Modal pantalla completa */
+        /* Modal pantalla completa - Todo visible sin scroll */
         #modal-3d {{
             display: none;
             position: fixed;
             top: 0; left: 0;
-            width: 100vw; height: 100vh;
-            background: rgba(0,0,0,0.92);
+            width: 100vw; 
+            height: 100vh;
+            background: rgba(0,0,0,0.95);
             z-index: 9999;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
+            padding: 0;
+            margin: 0;
         }}
         #modal-3d.active {{
             display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;  /* Centrado vertical */
+        }}
+        #modal-title {{
+            color: white;
+            font-size: 14px;
+            margin: 0 0 10px 0;
+            opacity: 0.8;
+            position: absolute;
+            top: 50px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10001;
         }}
         #modal-canvas-container {{
-            width: 95vw;
-            height: 88vh;
+            width: 90vw;  /* Reducido de 95vw */
+            height: 80vh;  /* Reducido de 85vh */
             position: relative;
             border-radius: 10px;
             overflow: hidden;
             border: 2px solid rgba(52,152,219,0.5);
         }}
         #modal-close {{
-            position: absolute;
+            position: fixed;
             top: 15px;
             right: 20px;
             background: rgba(231,76,60,0.9);
             color: white;
             border: none;
-            padding: 8px 16px;
+            padding: 10px 20px;
             border-radius: 8px;
             cursor: pointer;
-            font-size: 14px;
+            font-size: 15px;
             font-weight: bold;
-            z-index: 10000;
+            z-index: 10002;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
         }}
-        #modal-title {{
-            color: white;
-            font-size: 14px;
-            margin-bottom: 8px;
-            opacity: 0.8;
+        #modal-close:hover {{
+            background: rgba(231,76,60,1);
         }}
         #canvas-container:-webkit-full-screen {{
             width: 100vw !important;
@@ -470,16 +482,14 @@ rooms.forEach((room, index) => {{
     floor.receiveShadow = true;
     scene.add(floor);
     
-    // Paredes (4 paredes por habitación)
+    // Paredes (4 paredes por habitación) - Opacas y visibles
     const wallMat = new THREE.MeshLambertMaterial({{ 
-        color: color,
-        transparent: true,
-        opacity: 0.85
+        color: 0x2C3E50,  // Gris oscuro casi negro
+        side: THREE.DoubleSide
     }});
     const wallMatDark = new THREE.MeshLambertMaterial({{ 
-        color: color,
-        transparent: true,
-        opacity: 0.75
+        color: 0x1A252F,  // Gris muy oscuro
+        side: THREE.DoubleSide
     }});
     
     const wallThickness = 0.15;
@@ -515,6 +525,31 @@ rooms.forEach((room, index) => {{
     rightWall.position.set(room.x + room.width, room.height/2, room.z + room.depth/2);
     rightWall.castShadow = true;
     scene.add(rightWall);
+    
+    // ================================================
+    // PUERTA: Línea azul gruesa en la pared frontal
+    // ================================================
+    const doorMat = new THREE.LineBasicMaterial({{ 
+        color: 0x3498DB, 
+        linewidth: 4 
+    }});
+    
+    // Crear línea vertical de puerta (90cm de ancho, centrada)
+    const doorWidth = 0.9;
+    const doorHeight = 2.0;
+    const doorX = room.x + room.width / 2;  // Centro de la habitación
+    const doorZ = room.z;  // Pared frontal
+    
+    const doorPoints = [
+        new THREE.Vector3(doorX - doorWidth/2, 0, doorZ),
+        new THREE.Vector3(doorX - doorWidth/2, doorHeight, doorZ),
+        new THREE.Vector3(doorX + doorWidth/2, doorHeight, doorZ),
+        new THREE.Vector3(doorX + doorWidth/2, 0, doorZ)
+    ];
+    
+    const doorGeo = new THREE.BufferGeometry().setFromPoints(doorPoints);
+    const doorLine = new THREE.Line(doorGeo, doorMat);
+    scene.add(doorLine);
     
     // Techo
     const ceilGeo = new THREE.BoxGeometry(room.width, 0.08, room.depth);
@@ -1076,5 +1111,5 @@ window.addEventListener('resize', () => {{
 </html>
 """
         # Reemplazar el tipo de tejado
-        html = html.replace('{{roof_type}}', self.roof_type)
+        html = html.replace('{roof_type}', self.roof_type)
         return html

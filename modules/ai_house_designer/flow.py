@@ -935,27 +935,41 @@ def render_step2():
             if st.button("Generar Vista 3D", type="primary", use_container_width=True):
                 try:
                     from .viewer3d import Viewer3D
+                    import tempfile
+                    import os
+                    import webbrowser
+                    
                     roof_type = st.session_state.get('request', {}).get('roof_type', 'Dos aguas (clásico, eficiente)')
                     viewer = Viewer3D(design, roof_type=roof_type)
                     html_3d = viewer.generate_html()
-                    st.session_state['current_3d_html'] = html_3d
-                    st.success("Vista 3D generada")
-                    st.rerun()
+                    
+                    # Guardar HTML en archivo temporal
+                    with tempfile.NamedTemporaryFile(mode='w', suffix='.html', delete=False, encoding='utf-8') as f:
+                        f.write(html_3d)
+                        temp_path = f.name
+                    
+                    # FORZAR apertura en navegador (Chrome, Firefox, o el predeterminado)
+                    try:
+                        # Intentar con Chrome primero
+                        chrome_path = 'C:/Program Files/Google/Chrome/Application/chrome.exe %s'
+                        webbrowser.get(chrome_path).open('file://' + os.path.abspath(temp_path))
+                    except:
+                        try:
+                            # Intentar con Firefox
+                            firefox_path = 'C:/Program Files/Mozilla Firefox/firefox.exe %s'
+                            webbrowser.get(firefox_path).open('file://' + os.path.abspath(temp_path))
+                        except:
+                            # Último recurso: navegador predeterminado con new=2 (nueva pestaña)
+                            webbrowser.open('file://' + os.path.abspath(temp_path), new=2)
+                    
+                    st.success("✅ Vista 3D abierta en nueva pestaña del navegador")
+                    st.info("💡 Si no se abrió automáticamente, ve a la barra de direcciones y busca la pestaña nueva")
                 except Exception as e:
                     st.error(f"Error generando 3D: {e}")
                     import traceback
                     st.code(traceback.format_exc())
-            
-            if 'current_3d_html' in st.session_state:
-                import streamlit.components.v1 as components
-                components.html(
-                    st.session_state['current_3d_html'],
-                    height=570,
-                    scrolling=False
-                )
-                st.caption("Arrastra para rotar · Scroll para zoom · Botones para cambiar vista")
             else:
-                st.info("Pulsa 'Generar Vista 3D' para ver tu casa en 3D interactivo")
+                st.info("Pulsa 'Generar Vista 3D' para ver tu casa en 3D interactivo en una nueva pestaña del navegador")
         
         st.markdown("---")
         
