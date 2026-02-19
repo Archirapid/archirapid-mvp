@@ -318,17 +318,23 @@ def generate_babylon_html(rooms_data, total_width, total_depth):
                 const floor = scene.getMeshByName(`floor_${{i}}`);
                 
                 if (floor) {{
+                    // Calcular dimensiones reales desde bounds
+                    const bounds = floor.getBoundingInfo().boundingBox;
+                    const actualWidth = bounds.maximumWorld.x - bounds.minimumWorld.x;
+                    const actualDepth = bounds.maximumWorld.z - bounds.minimumWorld.z;
+                    
                     currentLayout.push({{
                         index: i,
                         name: room.name,
                         original_area: room.area_m2,
-                        // Posición actual del suelo
-                        x: floor.position.x - floor.scaling.x/2,
-                        z: floor.position.z - floor.scaling.z/2,
-                        width: floor.scaling.x,
-                        depth: floor.scaling.z,
-                        // Calcular nueva área
-                        new_area: (floor.scaling.x * floor.scaling.z).toFixed(2)
+                        // Coordenadas esquina inferior izquierda
+                        x: bounds.minimumWorld.x,
+                        z: bounds.minimumWorld.z,
+                        // Dimensiones REALES
+                        width: parseFloat(actualWidth.toFixed(2)),
+                        depth: parseFloat(actualDepth.toFixed(2)),
+                        // Nueva área real
+                        new_area: parseFloat((actualWidth * actualDepth).toFixed(2))
                     }});
                 }}
             }});
