@@ -57,6 +57,12 @@ def generate_babylon_html(rooms_data, total_width, total_depth):
         const roomsData = {rooms_js};
         const totalWidth = {total_width};
         const totalDepth = {total_depth};
+        console.log('=== DEBUG BABYLON ===');
+        console.log('Rooms data:', roomsData);
+        console.log('Total rooms:', roomsData ? roomsData.length : 0);
+        console.log('Total width:', totalWidth);
+        console.log('Total depth:', totalDepth);
+        console.log('====================');
         
         const canvas = document.getElementById('renderCanvas');
         const engine = new BABYLON.Engine(canvas, true);
