@@ -1052,10 +1052,16 @@ def render_step3_editor():
             st.rerun()
         return
     
-    # Botón navegación
-    if st.button("← Volver al Paso 2", key="back_to_2_from_editor", use_container_width=True):
-        st.session_state["ai_house_step"] = 2
-        st.rerun()
+    # Botones navegación
+    col1, col2 = st.columns([1, 1])
+    with col1:
+        if st.button("← Paso 2", key="back_to_2_from_editor", use_container_width=True):
+            st.session_state["ai_house_step"] = 2
+            st.rerun()
+    with col2:
+        if st.button("Paso 4: Documentación →", key="go_to_4", type="primary", use_container_width=True):
+            st.session_state["ai_house_step"] = 4
+            st.rerun()
     
     st.markdown("---")
     
