@@ -71,6 +71,7 @@ def generate_babylon_html(rooms_data, total_width, total_depth):
         <h3>🛠️ Herramientas</h3>
         <button class="tool-btn" id="btn-select" onclick="setMode('select')">🖱️ Seleccionar</button>
         <button class="tool-btn" id="btn-move" onclick="setMode('move')">↔️ Mover</button>
+        <button class="tool-btn" id="btn-scale" onclick="setMode('scale')">⤢ Escalar</button>
         <button class="tool-btn" id="btn-wall" onclick="setMode('wall')">🧱 Añadir Tabique</button>
         <hr style="margin: 10px 0; border-color: rgba(255,255,255,0.2);">
         <button class="tool-btn" id="btn-save" onclick="saveChanges()" style="background: rgba(46,204,113,0.3); border-color: #2ECC71;">💾 Guardar Cambios</button>
@@ -263,7 +264,7 @@ def generate_babylon_html(rooms_data, total_width, total_depth):
         gizmoManager = new BABYLON.GizmoManager(scene);
         gizmoManager.positionGizmoEnabled = false;  // Desactivado por defecto
         gizmoManager.rotationGizmoEnabled = false;
-        gizmoManager.scaleGizmoEnabled = false;
+        gizmoManager.scaleGizmoEnabled = false;  // Se activa en modo escalar
         gizmoManager.boundingBoxGizmoEnabled = false;
         
         // Click para seleccionar objetos
@@ -326,6 +327,33 @@ def generate_babylon_html(rooms_data, total_width, total_depth):
                     console.log('Modo: Mover (gizmo activado)');
                 }} else {{
                     alert('Primero selecciona un objeto con modo Seleccionar');
+                    setMode('select');
+                }}
+            }}
+            else if (mode === 'scale') {{
+                document.getElementById('btn-scale').style.background = 'rgba(52,152,219,0.6)';
+                
+                if (selectedMesh) {{
+                    gizmoManager.attachToMesh(selectedMesh);
+                    gizmoManager.positionGizmoEnabled = false;
+                    gizmoManager.scaleGizmoEnabled = true;
+                    
+                    // Solo permitir escalar en X y Z (no en Y/altura)
+                    gizmoManager.gizmos.scaleGizmo.xGizmo.isEnabled = true;
+                    gizmoManager.gizmos.scaleGizmo.yGizmo.isEnabled = false;  // Sin escalar altura
+                    gizmoManager.gizmos.scaleGizmo.zGizmo.isEnabled = true;
+                    
+                    console.log('Modo: Escalar (arrastra cubos en esquinas)');
+                    
+                    // Actualizar info al escalar
+                    if (selectedMesh.name.startsWith('floor_')) {{
+                        const roomIndex = parseInt(selectedMesh.name.split('_')[1]);
+                        selectedMesh.onAfterWorldMatrixUpdateObservable.add(() => {{
+                            updateRoomInfo(selectedMesh, roomIndex);
+                        }});
+                    }}
+                }} else {{
+                    alert('Primero selecciona una habitación con modo Seleccionar');
                     setMode('select');
                 }}
             }}
