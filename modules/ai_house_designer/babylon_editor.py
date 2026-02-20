@@ -74,6 +74,7 @@ def generate_babylon_html(rooms_data, total_width, total_depth):
         <button class="tool-btn" id="btn-scale" onclick="setMode('scale')">⤢ Escalar</button>
         <button class="tool-btn" id="btn-wall" onclick="setMode('wall')">🧱 Añadir Tabique</button>
         <hr style="margin: 10px 0; border-color: rgba(255,255,255,0.2);">
+        <button class="tool-btn" onclick="setTopView()">🔝 Vista Planta</button>
         <button class="tool-btn" id="btn-save" onclick="saveChanges()" style="background: rgba(46,204,113,0.3); border-color: #2ECC71;">💾 Guardar Cambios</button>
     </div>
 
@@ -444,6 +445,21 @@ def generate_babylon_html(rooms_data, total_width, total_depth):
                     <p style="color: #888;">Original: ${{room.area_m2}}m²</p>
                 `;
             }}
+        }}
+        
+        // ================================================
+        // VISTA PLANTA (CENITAL)
+        // ================================================
+        function setTopView() {{
+            // Posición: Justo encima del centro de la casa
+            const centerX = totalWidth / 2;
+            const centerZ = totalDepth / 2;
+            
+            // Animar cámara a posición cenital
+            camera.setPosition(new BABYLON.Vector3(centerX, totalWidth * 1.5, centerZ));
+            camera.setTarget(new BABYLON.Vector3(centerX, 0, centerZ));
+            
+            console.log('Vista planta activada');
         }}
         
         // Activar modo seleccionar por defecto
