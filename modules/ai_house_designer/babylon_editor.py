@@ -53,6 +53,22 @@ def generate_babylon_html(rooms_data, total_width, total_depth):
             margin: 5px 0;
             font-size: 13px;
         }}
+        #warning-panel {{
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(230, 126, 34, 0.15);
+            padding: 12px;
+            border-radius: 8px;
+            color: white;
+            width: 250px;
+            border: 2px solid #E67E22;
+        }}
+        #warning-panel h3 {{
+            margin: 0 0 8px 0;
+            color: #E67E22;
+            font-size: 15px;
+        }}
         .tool-btn {{
             display: block; width: 100%; padding: 8px;
             margin: 5px 0; background: rgba(52,152,219,0.2);
@@ -83,6 +99,16 @@ def generate_babylon_html(rooms_data, total_width, total_depth):
         <div id="room-info">
             <p style="color: #888;">Selecciona una habitación</p>
         </div>
+    </div>
+
+    <div id="warning-panel">
+        <h3>⚠️ Importante</h3>
+        <p style="font-size: 12px; line-height: 1.5;">
+            Los cambios realizados en este editor requieren <strong>validación por un arquitecto</strong> antes de construcción.
+        </p>
+        <p style="font-size: 11px; color: #E67E22; margin-top: 8px;">
+            ⚠️ No garantizan cumplimiento normativa CTE
+        </p>
     </div>
 
     <script>
