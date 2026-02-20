@@ -33,6 +33,26 @@ def generate_babylon_html(rooms_data, total_width, total_depth):
             background: rgba(0,0,0,0.85); padding: 15px;
             border-radius: 12px; color: white; min-width: 200px;
         }}
+        #info-panel {{
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0,0,0,0.85);
+            padding: 15px;
+            border-radius: 12px;
+            color: white;
+            width: 250px;
+            border: 1px solid rgba(52,152,219,0.3);
+        }}
+        #info-panel h3 {{
+            margin: 0 0 10px 0;
+            color: #3498DB;
+            font-size: 16px;
+        }}
+        #room-info p {{
+            margin: 5px 0;
+            font-size: 13px;
+        }}
         .tool-btn {{
             display: block; width: 100%; padding: 8px;
             margin: 5px 0; background: rgba(52,152,219,0.2);
@@ -54,6 +74,13 @@ def generate_babylon_html(rooms_data, total_width, total_depth):
         <button class="tool-btn" id="btn-wall" onclick="setMode('wall')">🧱 Añadir Tabique</button>
         <hr style="margin: 10px 0; border-color: rgba(255,255,255,0.2);">
         <button class="tool-btn" id="btn-save" onclick="saveChanges()" style="background: rgba(46,204,113,0.3); border-color: #2ECC71;">💾 Guardar Cambios</button>
+    </div>
+
+    <div id="info-panel">
+        <h3>📊 Info Habitación</h3>
+        <div id="room-info">
+            <p style="color: #888;">Selecciona una habitación</p>
+        </div>
     </div>
 
     <script>
@@ -250,11 +277,17 @@ def generate_babylon_html(rooms_data, total_width, total_depth):
                     selectedMesh = mesh;
                     console.log('Seleccionado:', mesh.name);
                     
+                    // Extraer índice de habitación del nombre del mesh
+                    const roomIndex = parseInt(mesh.name.split('_').pop());
+                    
                     // Highlight del objeto seleccionado
                     if (window.highlightLayer) {{
                         window.highlightLayer.removeAllMeshes();
                         window.highlightLayer.addMesh(mesh, BABYLON.Color3.Yellow());
                     }}
+                    
+                    // Actualizar panel info
+                    updateRoomInfo(mesh, roomIndex);
                 }}
             }}
         }};
@@ -357,6 +390,32 @@ def generate_babylon_html(rooms_data, total_width, total_depth):
             
             // Mostrar warning
             alert('⚠️ CAMBIOS GUARDADOS\\n\\n📄 Archivo JSON descargado\\n\\n⚠️ IMPORTANTE: Este diseño requiere validación por un arquitecto antes de construcción.\\n\\nLos cambios NO garantizan cumplimiento de normativa CTE.');
+        }}
+        
+        // ================================================
+        // ACTUALIZAR PANEL INFO
+        // ================================================
+        function updateRoomInfo(mesh, roomIndex) {{
+            const room = roomsData[roomIndex];
+            if (!room) return;
+            
+            // Calcular dimensiones actuales desde mesh
+            const floor = scene.getMeshByName(`floor_${{roomIndex}}`);
+            if (floor) {{
+                const bounds = floor.getBoundingInfo().boundingBox;
+                const actualWidth = bounds.maximumWorld.x - bounds.minimumWorld.x;
+                const actualDepth = bounds.maximumWorld.z - bounds.minimumWorld.z;
+                const actualArea = actualWidth * actualDepth;
+                
+                const infoDiv = document.getElementById('room-info');
+                infoDiv.innerHTML = `
+                    <p><strong>${{room.name}}</strong></p>
+                    <p>📐 Ancho: <strong>${{actualWidth.toFixed(2)}}m</strong></p>
+                    <p>📐 Fondo: <strong>${{actualDepth.toFixed(2)}}m</strong></p>
+                    <p>📦 Área: <strong>${{actualArea.toFixed(1)}}m²</strong></p>
+                    <p style="color: #888;">Original: ${{room.area_m2}}m²</p>
+                `;
+            }}
         }}
         
         // Activar modo seleccionar por defecto
