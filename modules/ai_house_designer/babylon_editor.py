@@ -196,8 +196,8 @@ def generate_babylon_html(rooms_data, total_width, total_depth):
             
             // Etiqueta 3D flotante MÁS GRANDE
             const label = BABYLON.MeshBuilder.CreatePlane(`label_${{i}}`, {{
-                width: 3.5,
-                height: 1.8
+                width: 2.2,  // Reducido de 3.5
+                height: 1.2  // Reducido de 1.8
             }}, scene);
             label.position.set(room.x + room.width/2, wallHeight + 1.5, room.z + room.depth/2);
             label.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
@@ -214,12 +214,14 @@ def generate_babylon_html(rooms_data, total_width, total_depth):
             advancedTexture.addControl(bgRect);
             
             const textBlock = new BABYLON.GUI.TextBlock();
-            textBlock.text = `${{room.name}}\\n${{room.area_m2.toFixed(0)}} m²`;
-            textBlock.color = "white";
-            textBlock.fontSize = 52;
-            textBlock.fontWeight = "bold";
-            textBlock.outlineWidth = 4;
-            textBlock.outlineColor = "black";
+            // Nombre más pequeño + medidas más grandes
+            textBlock.text = `${{room.name}}\\n\\n${{room.width.toFixed(1)}}m × ${{room.depth.toFixed(1)}}m\\n${{room.area_m2.toFixed(0)}} m²`;
+            textBlock.color = "#FFFFFF";  // Blanco puro
+            textBlock.fontSize = 48;  // Un poco más pequeño
+            textBlock.fontWeight = "600";  // Menos bold
+            textBlock.outlineWidth = 3;
+            textBlock.outlineColor = "#000000";
+            textBlock.lineSpacing = "8px";  // Espacio entre líneas
             bgRect.addControl(textBlock);
         }});
         
