@@ -1123,12 +1123,28 @@ def render_step3_editor():
                 webbrowser.open('file://' + os.path.abspath(temp_path), new=2)
         
         st.success("✅ Editor abierto en nueva pestaña")
+        
+        # Marcar que se usó el editor 3D
+        st.session_state["babylon_editor_used"] = True
 
 def render_step3():
     """Paso 3: Documentación completa y monetización"""
     
     st.header("Paso 3 – Tu Proyecto Completo")
     st.caption("Documentación técnica, eficiencia energética y siguiente paso.")
+    
+    # Verificar si se usó el editor 3D
+    if st.session_state.get("babylon_editor_used", False):
+        st.warning("""
+        ⚠️ **DISEÑO MODIFICADO MANUALMENTE**
+        
+        Este proyecto ha sido editado con el editor 3D. Los cambios realizados:
+        - Requieren validación por arquitecto colegiado
+        - NO garantizan cumplimiento de normativa CTE
+        - Pueden afectar presupuesto y plazos
+        
+        Nuestro equipo revisará el diseño antes de visar si contrata este servicio con nosotros.
+        """)
     
     # Validar datos
     req = st.session_state.get("ai_house_requirements", {})
