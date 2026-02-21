@@ -53,6 +53,26 @@ def generate_babylon_html(rooms_data, total_width, total_depth):
             margin: 5px 0;
             font-size: 13px;
         }}
+        #budget-panel {{
+            position: absolute;
+            top: 350px;
+            right: 20px;
+            background: rgba(46, 204, 113, 0.15);
+            padding: 12px;
+            border-radius: 8px;
+            color: white;
+            width: 250px;
+            border: 2px solid #2ECC71;
+        }}
+        #budget-panel h3 {{
+            margin: 0 0 8px 0;
+            color: #2ECC71;
+            font-size: 15px;
+        }}
+        #budget-info p {{
+            margin: 3px 0;
+            font-size: 12px;
+        }}
         #warning-panel {{
             position: absolute;
             bottom: 20px;
@@ -98,6 +118,15 @@ def generate_babylon_html(rooms_data, total_width, total_depth):
         <h3>📊 Info Habitación</h3>
         <div id="room-info">
             <p style="color: #888;">Selecciona una habitación</p>
+        </div>
+    </div>
+
+    <div id="budget-panel">
+        <h3>💰 Presupuesto</h3>
+        <div id="budget-info">
+            <p><strong>Superficie:</strong> <span id="total-area">0</span> m²</p>
+            <p><strong>Coste:</strong> <span id="total-cost">€0</span></p>
+            <p style="font-size: 11px; color: #888; margin-top: 5px;" id="budget-diff"></p>
         </div>
     </div>
 
@@ -470,6 +499,9 @@ def generate_babylon_html(rooms_data, total_width, total_depth):
                     <p>📦 Área: <strong>${{actualArea.toFixed(1)}}m²</strong></p>
                     <p style="color: #888;">Original: ${{room.area_m2}}m²</p>
                 `;
+                
+                // Recalcular presupuesto total
+                updateBudget();
             }}
         }}
         
@@ -487,6 +519,53 @@ def generate_babylon_html(rooms_data, total_width, total_depth):
             
             console.log('Vista planta activada');
         }}
+        
+        // ================================================
+        // ACTUALIZAR PRESUPUESTO TOTAL
+        // ================================================
+        const COST_PER_M2 = 1500;  // €/m² promedio construcción
+        let originalTotalArea = 0;
+        
+        // Calcular área original al inicio
+        roomsData.forEach(room => {{
+            originalTotalArea += room.area_m2 || 0;
+        }});
+        
+        function updateBudget() {{
+            let totalArea = 0;
+            
+            // Calcular área actual de todos los suelos
+            roomsData.forEach((room, i) => {{
+                const floor = scene.getMeshByName(`floor_${{i}}`);
+                if (floor) {{
+                    const bounds = floor.getBoundingInfo().boundingBox;
+                    const actualWidth = bounds.maximumWorld.x - bounds.minimumWorld.x;
+                    const actualDepth = bounds.maximumWorld.z - bounds.minimumWorld.z;
+                    totalArea += (actualWidth * actualDepth);
+                }}
+            }});
+            
+            const totalCost = totalArea * COST_PER_M2;
+            const originalCost = originalTotalArea * COST_PER_M2;
+            const diff = totalCost - originalCost;
+            
+            // Actualizar panel
+            document.getElementById('total-area').textContent = totalArea.toFixed(1);
+            document.getElementById('total-cost').textContent = '€' + totalCost.toLocaleString('es-ES', {{maximumFractionDigits: 0}});
+            
+            const diffElem = document.getElementById('budget-diff');
+            if (Math.abs(diff) > 100) {{
+                const sign = diff > 0 ? '+' : '';
+                diffElem.textContent = `${{sign}}€${{diff.toLocaleString('es-ES', {{maximumFractionDigits: 0}})}} vs original`;
+                diffElem.style.color = diff > 0 ? '#E67E22' : '#2ECC71';
+            }} else {{
+                diffElem.textContent = 'Sin cambios significativos';
+                diffElem.style.color = '#888';
+            }}
+        }}
+        
+        // Calcular presupuesto inicial
+        updateBudget();
         
         // Activar modo seleccionar por defecto
         setMode('select');

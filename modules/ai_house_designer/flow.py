@@ -1052,34 +1052,37 @@ def render_step3_editor():
             st.rerun()
         return
     
-    # Botones navegación
-    col1, col2 = st.columns([1, 1])
-    with col1:
-        if st.button("← Paso 2", key="back_to_2_from_editor", use_container_width=True):
-            st.session_state["ai_house_step"] = 2
-            st.rerun()
-    with col2:
-        if st.button("Paso 4: Documentación →", key="go_to_4", type="primary", use_container_width=True):
-            st.session_state["ai_house_step"] = 4
-            st.rerun()
+    # Botón volver arriba
+    if st.button("← Volver al Paso 2", key="back_to_2_top", use_container_width=True):
+        st.session_state["ai_house_step"] = 2
+        st.rerun()
     
     st.markdown("---")
     
-    # Info editor
+    # Información del editor
     st.info("""
     🎯 **Editor 3D Profesional con Babylon.js**
     
-    **Herramientas:**
+    **Herramientas disponibles:**
     - 🖱️ Seleccionar y mover elementos
-    - 🧱 Añadir/eliminar tabiques
-    - 🚪 Colocar puertas y ventanas
-    - 📐 Snap to grid automático
+    - ⤢ Escalar habitaciones (ancho/fondo)
+    - 🔝 Vista cenital (planta)
+    - 💾 Guardar cambios (exportar JSON)
     
-    **El editor se abrirá en una nueva pestaña de tu navegador.**
+    **El asistente IA te ayudará a:**
+    - ✅ Validar que tu diseño cumple normativa
+    - ⚠️ Alertar sobre problemas técnicos
     """)
     
-    # Botón abrir editor
+    # Botón abrir editor - DESTACADO
+    st.markdown("### 🏗️ Diseña tu casa")
+    
     if st.button("🏗️ Abrir Editor Babylon.js", type="primary", use_container_width=True, key="open_babylon"):
+        
+        # Obtener forma de casa
+        house_shape = st.session_state.get('request', {}).get('house_shape', 'Rectangular (más común)')
+        
+        from .babylon_editor import generate_babylon_html
         
         # Obtener layout
         from .architect_layout import generate_layout
@@ -1092,7 +1095,6 @@ def render_step3_editor():
                 'area_m2': room_data[1]
             })
         
-        house_shape = req.get('house_shape', 'Rectangular (más común)')
         layout_result = generate_layout(rooms_data, house_shape)
         
         # Calcular dimensiones
@@ -1105,11 +1107,9 @@ def render_step3_editor():
             total_width = 10
             total_depth = 10
         
-        # Generar HTML
-        from .babylon_editor import generate_babylon_html
         html_editor = generate_babylon_html(layout_result, total_width, total_depth)
         
-        # Guardar y abrir
+        # Guardar y abrir en nueva pestaña
         import tempfile
         import os
         import webbrowser
@@ -1118,6 +1118,7 @@ def render_step3_editor():
             f.write(html_editor)
             temp_path = f.name
         
+        # Abrir en navegador
         try:
             chrome_path = 'C:/Program Files/Google/Chrome/Application/chrome.exe %s'
             webbrowser.get(chrome_path).open('file://' + os.path.abspath(temp_path))
@@ -1132,6 +1133,17 @@ def render_step3_editor():
         
         # Marcar que se usó el editor 3D
         st.session_state["babylon_editor_used"] = True
+    
+    st.markdown("---")
+    
+    # Botón continuar DESPUÉS del editor
+    st.markdown("### ✅ Ya terminé de diseñar")
+    
+    col1, col2 = st.columns([1, 2])
+    with col2:
+        if st.button("Continuar a Documentación (Paso 4) →", type="primary", use_container_width=True, key="go_to_4_bottom"):
+            st.session_state["ai_house_step"] = 4
+            st.rerun()
 
 def render_step3():
     """Paso 3: Documentación completa y monetización"""
