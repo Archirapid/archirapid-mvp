@@ -1502,18 +1502,70 @@ def render_step3():
         
         st.markdown("---")
         
-        # PLANO ACTUAL
+        # PLANO FINAL (siempre desde get_final_design)
         st.markdown("### Tu Plano")
-        
-        if 'current_floor_plan' in st.session_state:
+
+        final_rooms_for_plan = get_final_design()
+        plan_source = final_rooms_for_plan.get('source', 'ai_original')
+        plan_label = {
+            'babylon': '🏗️ Plano desde Editor 3D',
+            'step2_sliders': '📊 Plano con ajustes del Paso 2',
+            'ai_original': '🤖 Plano propuesta IA'
+        }.get(plan_source, 'Plano de distribución')
+
+        if st.button("🗺️ Generar Plano Final", type="primary", use_container_width=True, key="gen_plan_paso4"):
+            try:
+                from .architect_layout import generate_layout
+                from .floor_plan_svg import FloorPlanSVG
+                from .data_model import HouseDesign, Plot, RoomType, RoomInstance
+
+                house_shape = st.session_state.get('request', {}).get('house_shape', 'Rectangular')
+                rooms_for_layout = []
+                for r in final_rooms_for_plan['rooms']:
+                    rooms_for_layout.append({
+                        'code': r.get('code', r.get('name', 'espacio')),
+                        'name': r.get('name', 'Espacio'),
+                        'area_m2': float(r.get('area_m2', 10))
+                    })
+
+                layout = generate_layout(rooms_for_layout, house_shape)
+
+                plot = Plot(id='final', area_m2=500, buildable_ratio=0.33)
+                design_for_plan = HouseDesign(plot)
+                for r in final_rooms_for_plan['rooms']:
+                    rt = RoomType(
+                        code=r.get('code', 'espacio'),
+                        name=r.get('name', 'Espacio'),
+                        min_m2=2, max_m2=200,
+                        base_cost_per_m2=1000
+                    )
+                    design_for_plan.rooms.append(RoomInstance(room_type=rt, area_m2=float(r.get('area_m2', 10))))
+
+                planner = FloorPlanSVG(design_for_plan)
+                img_bytes = planner.generate()
+                st.session_state['final_floor_plan'] = img_bytes
+                st.success(f"✅ Plano generado desde: {plan_label}")
+
+            except Exception as e:
+                st.error(f"❌ Error generando plano: {e}")
+                import traceback
+                st.code(traceback.format_exc())
+
+        if 'final_floor_plan' in st.session_state:
+            st.image(
+                st.session_state['final_floor_plan'],
+                caption=plan_label,
+                use_container_width=True
+            )
+        elif 'current_floor_plan' in st.session_state:
             st.image(
                 st.session_state['current_floor_plan'],
-                caption="Plano de distribución",
+                caption="Plano del Paso 2 (genera el plano final arriba)",
                 use_container_width=True
             )
         else:
-            st.info("Genera el plano en el Paso 2")
-        
+            st.info("Pulsa 'Generar Plano Final' para ver el plano correcto")
+
         st.markdown("---")
         
         # DESCARGAS
@@ -1522,11 +1574,12 @@ def render_step3():
         dl1, dl2 = st.columns(2)
         
         with dl1:
-            if 'current_floor_plan' in st.session_state:
+            plan_to_download = st.session_state.get('final_floor_plan') or st.session_state.get('current_floor_plan')
+            if plan_to_download:
                 st.download_button(
                     label="Descargar Plano PNG",
-                    data=st.session_state['current_floor_plan'],
-                    file_name="plano_archirapid.png",
+                    data=plan_to_download,
+                    file_name="plano_archirapid_final.png",
                     mime="image/png",
                     use_container_width=True
                 )
