@@ -768,38 +768,45 @@ def render_step2():
                 continue  # No mostrar slider si va a ser eliminado
             
             cost_per_m2 = get_cost_per_m2(room.room_type.code)
-            current_cost = room.area_m2 * cost_per_m2
             
-            # Mostrar nombre y precio actual
+            # Leer valor previo desde session_state si existe
+            slider_key = f"step2_slider_{i}"
+            saved_area = st.session_state.get(slider_key, float(room.area_m2))
+            saved_area = max(float(room.room_type.min_m2), 
+                       min(float(room.room_type.max_m2), saved_area))
+
+            new_area = st.slider(
+                f"{saved_area:.1f} m²",
+                min_value=float(room.room_type.min_m2),
+                max_value=float(room.room_type.max_m2),
+                value=saved_area,
+                step=0.5,
+                key=slider_key,
+                label_visibility="collapsed"
+            )
+
+            # Calcular coste con valor ACTUAL del slider
+            new_cost = new_area * cost_per_m2
+            old_cost = float(room.area_m2) * cost_per_m2
+            diff = new_cost - old_cost
+
+            if abs(diff) > 10:
+                if diff > 0:
+                    st.caption(f"💰 +€{diff:,.0f}")
+                else:
+                    st.caption(f"💰 {diff:,.0f}")
+
+            design.rooms[i].area_m2 = new_area
+
+            # AHORA calcular y mostrar precio
+            current_cost = new_area * cost_per_m2
+
             col1, col2 = st.columns([3, 1])
             with col1:
                 st.markdown(f"**{room.room_type.name}**")
             with col2:
                 st.markdown(f"<span style='color:#2ECC71; font-weight:bold;'>€{current_cost:,.0f}</span>", 
                            unsafe_allow_html=True)
-            
-            new_area = st.slider(
-                f"{room.area_m2:.1f} m²",
-                min_value=float(room.room_type.min_m2),
-                max_value=float(room.room_type.max_m2),
-                value=float(room.area_m2),
-                step=0.5,
-                key=f"step2_slider_{i}",
-                label_visibility="collapsed"
-            )
-            
-            # Actualizar área y mostrar cambio si hubo
-            if abs(new_area - room.area_m2) > 0.1:
-                old_cost = room.area_m2 * cost_per_m2
-                new_cost = new_area * cost_per_m2
-                diff = new_cost - old_cost
-                
-                if diff > 0:
-                    st.caption(f"💰 +€{diff:,.0f}")
-                elif diff < 0:
-                    st.caption(f"💰 {diff:,.0f}")
-            
-            design.rooms[i].area_m2 = new_area
         
         st.markdown("---")
         
