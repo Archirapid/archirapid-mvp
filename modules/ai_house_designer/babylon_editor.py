@@ -18,6 +18,7 @@ def generate_babylon_html(rooms_data, total_width, total_depth):
     import json
     rooms_js = json.dumps(rooms_data, ensure_ascii=False)
 
+
     js_scale_observer = """
                     // Solo permitir escalar en X y Z (no en Y/altura)
                     gizmoManager.gizmos.scaleGizmo.xGizmo.isEnabled = true;
@@ -44,6 +45,36 @@ def generate_babylon_html(rooms_data, total_width, total_depth):
                         alert('Primero selecciona una habitación con modo Seleccionar');
                         setMode('select');
                     }
+"""
+
+
+    js_move_observer = """
+                    gizmoManager.attachToMesh(selectedMesh);
+                    gizmoManager.positionGizmoEnabled = true;
+
+                    // Bloquear eje Y para que NO floten
+                    gizmoManager.gizmos.positionGizmo.xGizmo.isEnabled = true;
+                    gizmoManager.gizmos.positionGizmo.yGizmo.isEnabled = false;
+                    gizmoManager.gizmos.positionGizmo.zGizmo.isEnabled = true;
+
+                    console.log('Modo: Mover (gizmo activado, eje Y bloqueado)');
+
+                    gizmoManager.gizmos.positionGizmo.onDragEndObservable.clear();
+
+                    const roomIndexMove = selectedMesh.name.startsWith('floor_')
+                        ? parseInt(selectedMesh.name.split('_')[1])
+                        : parseInt(selectedMesh.name.split('_').pop());
+
+                    gizmoManager.gizmos.positionGizmo.onDragEndObservable.add(() => {
+                        scene.registerAfterRender(function waitFrameMove() {
+                            scene.unregisterAfterRender(waitFrameMove);
+                            updateRoomInfo(selectedMesh, roomIndexMove);
+                            updateBudget();
+                            console.log('Paneles actualizados tras mover roomIndex=' + roomIndexMove);
+                            console.log('DEBUG: Llamando updateRoomInfo...');
+                            console.log('DEBUG: Llamando updateBudget...');
+                        });
+                    });
 """
 
     html = f"""
@@ -406,9 +437,7 @@ def generate_babylon_html(rooms_data, total_width, total_depth):
                 document.getElementById('btn-move').style.background = 'rgba(52,152,219,0.6)';
                 
                 if (selectedMesh) {{
-                    gizmoManager.attachToMesh(selectedMesh);
-                    gizmoManager.positionGizmoEnabled = true;
-                    console.log('Modo: Mover (gizmo activado)');
+                    {js_move_observer}
                 }} else {{
                     alert('Primero selecciona un objeto con modo Seleccionar');
                     setMode('select');
@@ -495,6 +524,7 @@ def generate_babylon_html(rooms_data, total_width, total_depth):
         // ACTUALIZAR PANEL INFO
         // ================================================
         function updateRoomInfo(mesh, roomIndex) {{
+            console.log('updateRoomInfo llamado para roomIndex:', roomIndex);
             const room = roomsData[roomIndex];
             if (!room) return;
             
@@ -547,6 +577,7 @@ def generate_babylon_html(rooms_data, total_width, total_depth):
         }});
         
         function updateBudget() {{
+            console.log('updateBudget llamado');
             let totalArea = 0;
             
             // Calcular área actual de todos los suelos
