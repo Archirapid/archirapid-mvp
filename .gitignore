@@ -69,3 +69,7 @@ desktop.ini
 *.bak
 *.swp
 backups/
+*.tar.gz
+backup_*
+*.tar.gz
+backup_*
