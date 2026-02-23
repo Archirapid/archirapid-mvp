@@ -102,6 +102,101 @@ def main():
     # CRÍTICO: Salir para no ejecutar código del marketplace
     return
 
+
+def get_final_design():
+    """
+    Retorna el diseño FINAL del usuario.
+    ORDEN DE PRIORIDAD:
+    1. babylon_modified_layout (si modificó en 3D)
+    2. Sliders Paso 2 (desde session_state)
+    3. ai_room_proposal original
+    
+    Returns:
+        dict: {
+            'rooms': [{'name': str, 'area_m2': float, ...}],
+            'total_area': float,
+            'total_cost': float,
+            'source': 'babylon' | 'step2_sliders' | 'ai_original'
+        }
+    """
+    import streamlit as st
+    
+    COST_PER_M2 = 1500
+    
+    # PRIORIDAD 1: Babylon (diseño modificado en 3D)
+    babylon_data = st.session_state.get("babylon_modified_layout")
+    if babylon_data:
+        rooms = []
+        total_area = 0
+        for room in babylon_data:
+            try:
+                area = float(room.get('new_area', room.get('original_area', 10)))
+                total_area += area
+                rooms.append({
+                    'name': room.get('name', 'Espacio'),
+                    'code': room.get('name', 'generic'),
+                    'area_m2': area,
+                    'index': room.get('index', 0)
+                })
+            except (ValueError, TypeError):
+                continue
+        
+        return {
+            'rooms': rooms,
+            'total_area': round(total_area, 1),
+            'total_cost': int(total_area * COST_PER_M2),
+            'source': 'babylon'
+        }
+    
+    # PRIORIDAD 2: Sliders Paso 2 (valores ajustados por usuario)
+    req = st.session_state.get("ai_house_requirements", {})
+    proposal = req.get("ai_room_proposal", {})
+    
+    if proposal:
+        rooms = []
+        total_area = 0
+        
+        for i, (code, original_area) in enumerate(proposal.items()):
+            # Leer del slider si existe
+            slider_key = f"step2_slider_{i}"
+            area = st.session_state.get(slider_key)
+            
+            if area is None:
+                # Si no hay slider, usar área original
+                try:
+                    area = float(original_area)
+                except (ValueError, TypeError):
+                    area = 10
+            
+            total_area += area
+            rooms.append({
+                'name': code,
+                'code': code,
+                'area_m2': area,
+                'index': i
+            })
+        
+        # Determinar si es modificado o original
+        source = 'step2_sliders' if any(
+            st.session_state.get(f"step2_slider_{i}") is not None 
+            for i in range(len(proposal))
+        ) else 'ai_original'
+        
+        return {
+            'rooms': rooms,
+            'total_area': round(total_area, 1),
+            'total_cost': int(total_area * COST_PER_M2),
+            'source': source
+        }
+    
+    # FALLBACK: Vacío
+    return {
+        'rooms': [],
+        'total_area': 0,
+        'total_cost': 0,
+        'source': 'none'
+    }
+
 def render_step1():
     """Paso 1: Configurador de vivienda - Estilo Mercedes Benz"""
     
@@ -624,7 +719,13 @@ def render_step2():
             st.session_state["ai_house_step"] = 1
             st.rerun()
         return
-    
+
+
+
+    # Indicador visual si hay diseño de Babylon activo
+    if st.session_state.get("babylon_modified_layout"):
+        st.info("🏗️ **Diseño activo desde Editor 3D** — Los sliders reflejan las medidas del editor")
+
     # Datos de parcela
     plot_data = st.session_state.get("design_plot_data", {})
     max_buildable = plot_data.get('buildable_m2', 400.0)
@@ -1159,6 +1260,12 @@ def render_step3():
     st.caption("Documentación técnica, eficiencia energética y siguiente paso.")
     
     # Verificar si se usó el editor 3D
+
+
+
+    st.markdown("---")
+
+    # Verificar si se usó el editor 3D
     if st.session_state.get("babylon_editor_used", False):
         st.warning("""
         ⚠️ **DISEÑO MODIFICADO MANUALMENTE**
@@ -1170,7 +1277,31 @@ def render_step3():
         
         Nuestro equipo revisará el diseño antes de visar si contrata este servicio con nosotros.
         """)
-    
+
+    # Sincronización Babylon → Paso 4
+    st.markdown("---")
+    babylon_json = st.file_uploader(
+        "📐 Si modificaste el diseño en Editor 3D, sube el JSON aquí:",
+        type=['json'],
+        key="babylon_sync_step4",
+        help="El JSON se descarga al hacer 'Guardar Cambios' en Babylon"
+    )
+
+    if babylon_json:
+        import json as _json
+        try:
+            babylon_data = _json.load(babylon_json)
+            st.session_state["babylon_modified_layout"] = babylon_data
+
+            # Calcular totales
+            total_area = sum(float(r.get('new_area', 0)) for r in babylon_data)
+            total_cost = int(total_area * 1500)
+
+            st.success(f"✅ Diseño cargado: {len(babylon_data)} habitaciones | {total_area:.1f}m² | €{total_cost:,}")
+            # NO hacer st.rerun() aquí
+        except Exception as e:
+            st.error(f"❌ Error: {e}")
+
     # Validar datos
     req = st.session_state.get("ai_house_requirements", {})
     proposal = req.get("ai_room_proposal", {})
@@ -1189,8 +1320,21 @@ def render_step3():
     water_systems = req.get('water_systems', [])
     sewage_systems = req.get('sewage_systems', [])
     
-    total_area = sum(v for v in proposal.values() if isinstance(v, (int, float)))
-    
+    # Usar diseño FINAL (Babylon si modificó, sino sliders)
+    final_design = get_final_design()
+    total_area = final_design['total_area']
+    total_cost = final_design['total_cost']
+    rooms = final_design['rooms']
+    source = final_design['source']
+
+    # Indicador visual de origen
+    if source == 'babylon':
+        st.success("🏗️ **Diseño desde Editor 3D** - Versión personalizada")
+    elif source == 'step2_sliders':
+        st.info("📊 **Diseño ajustado en Paso 2** - Con modificaciones en sliders")
+    else:
+        st.info("🤖 **Diseño generado por IA** - Propuesta original")
+
     # Costes por partidas
     construction_cost = int(total_area * 1100)
     foundation_cost = int(total_area * 180)
