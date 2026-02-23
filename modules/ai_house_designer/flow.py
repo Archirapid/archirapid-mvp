@@ -861,6 +861,18 @@ def render_step2():
                     return cost
             return 1000  # coste por defecto
         
+        # Aviso antes de los sliders
+        st.warning("""
+        ⚠️ **DISEÑO PRELIMINAR**
+
+        Los sliders te permiten ajustar áreas para estimar presupuesto.
+
+        El diseño arquitectónico FINAL se crea en el **Editor 3D (Paso 3)**.
+
+        Las medidas aquí son aproximadas y pueden variar en el editor 3D 
+        debido a las dimensiones reales de construcción.
+        """)
+        
         # Mostrar sliders SOLO para rooms que NO se van a eliminar
         for i, room in enumerate(design.rooms):
             if room.area_m2 < 2:
@@ -1030,72 +1042,31 @@ def render_step2():
         
         st.markdown("---")
         
-        # TABS: 2D y 3D
-        tab_2d, tab_3d = st.tabs(["📐 Plano 2D", "🏠 Vista 3D"])
-        
-        with tab_2d:
-            if st.button("Generar Plano 2D", type="primary", use_container_width=True):
-                try:
-                    from .floor_plan_svg import FloorPlanSVG
-                    planner = FloorPlanSVG(design)
-                    img_bytes = planner.generate()
-                    st.session_state['current_floor_plan'] = img_bytes
-                    st.session_state['current_design'] = design
-                    st.success("Plano generado correctamente")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Error generando plano: {e}")
-                    import traceback
-                    st.code(traceback.format_exc())
-            
-            if 'current_floor_plan' in st.session_state:
-                st.image(
-                    st.session_state['current_floor_plan'],
-                    caption="Plano profesional con medidas reales",
-                    use_container_width=True
-                )
-            else:
-                st.info("Pulsa 'Generar Plano 2D' para ver tu distribución")
-        
-        with tab_3d:
-            if st.button("Generar Vista 3D", type="primary", use_container_width=True):
-                try:
-                    from .viewer3d import Viewer3D
-                    import tempfile
-                    import os
-                    import webbrowser
-                    
-                    roof_type = st.session_state.get('request', {}).get('roof_type', 'Dos aguas (clásico, eficiente)')
-                    viewer = Viewer3D(design, roof_type=roof_type)
-                    html_3d = viewer.generate_html()
-                    
-                    # Guardar HTML en archivo temporal
-                    with tempfile.NamedTemporaryFile(mode='w', suffix='.html', delete=False, encoding='utf-8') as f:
-                        f.write(html_3d)
-                        temp_path = f.name
-                    
-                    # FORZAR apertura en navegador (Chrome, Firefox, o el predeterminado)
-                    try:
-                        # Intentar con Chrome primero
-                        chrome_path = 'C:/Program Files/Google/Chrome/Application/chrome.exe %s'
-                        webbrowser.get(chrome_path).open('file://' + os.path.abspath(temp_path))
-                    except:
-                        try:
-                            # Intentar con Firefox
-                            firefox_path = 'C:/Program Files/Mozilla Firefox/firefox.exe %s'
-                            webbrowser.get(firefox_path).open('file://' + os.path.abspath(temp_path))
-                        except:
-                            # Último recurso: navegador predeterminado con new=2 (nueva pestaña)
-                            webbrowser.open('file://' + os.path.abspath(temp_path), new=2)
-                    
-                    st.success("✅ Vista 3D abierta en nueva pestaña del navegador")
-                    st.info("💡 Si no se abrió automáticamente, ve a la barra de direcciones y busca la pestaña nueva")
-                except Exception as e:
-                    st.error(f"Error generando 3D: {e}")
-                    import traceback
-                    st.code(traceback.format_exc())
-            else:
-                st.info("Pulsa 'Generar Vista 3D' para ver tu casa en 3D interactivo en una nueva pestaña del navegador")
+        # Plano 2D preliminar (sin pestañas)
+        st.subheader("📐 Plano 2D Preliminar")
+
+        if st.button("Generar Plano 2D", type="primary", use_container_width=True):
+            try:
+                from .floor_plan_svg import FloorPlanSVG
+                planner = FloorPlanSVG(design)
+                img_bytes = planner.generate()
+                st.session_state['current_floor_plan'] = img_bytes
+                st.session_state['current_design'] = design
+                st.success("Plano generado correctamente")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Error generando plano: {e}")
+                import traceback
+                st.code(traceback.format_exc())
+
+        if 'current_floor_plan' in st.session_state:
+            st.image(
+                st.session_state['current_floor_plan'],
+                caption="Plano profesional con medidas reales",
+                use_container_width=True
+            )
+        else:
+            st.info("Pulsa 'Generar Plano 2D' para ver tu distribución")
         
         st.markdown("---")
         
