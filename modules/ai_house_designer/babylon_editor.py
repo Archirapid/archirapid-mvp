@@ -257,7 +257,7 @@ def generate_babylon_html(rooms_data, total_width, total_depth):
         <button class="tool-btn" id="btn-select" onclick="setMode('select')">🖱️ Seleccionar</button>
         <button class="tool-btn" id="btn-move" onclick="setMode('move')">↔️ Mover</button>
         <button class="tool-btn" id="btn-scale" onclick="setMode('scale')">⤢ Escalar</button>
-        <button class="tool-btn" id="btn-wall" onclick="setMode('wall')">🧱 Añadir Tabique</button>
+        <button class="tool-btn" id="btn-wall" onclick="setMode('wall')">🏗️ Cerramiento Finca</button>
         <hr style="margin: 10px 0; border-color: rgba(255,255,255,0.2);">
         <button class="tool-btn" onclick="setTopView()">🔝 Vista Planta</button>
         <button class="tool-btn" id="btn-save" onclick="saveChanges()" style="background: rgba(46,204,113,0.3); border-color: #2ECC71;">💾 Guardar Cambios</button>
