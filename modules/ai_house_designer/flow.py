@@ -1252,30 +1252,22 @@ def render_step3_editor():
         
         html_editor = generate_babylon_html(layout_result, total_width, total_depth)
         
-        # Guardar y abrir en nueva pestaña
-        import tempfile
-        import os
-        import webbrowser
-        
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.html', delete=False, encoding='utf-8') as f:
-            f.write(html_editor)
-            temp_path = f.name
-        
-        # Abrir en navegador
-        try:
-            chrome_path = 'C:/Program Files/Google/Chrome/Application/chrome.exe %s'
-            webbrowser.get(chrome_path).open('file://' + os.path.abspath(temp_path))
-        except:
-            try:
-                firefox_path = 'C:/Program Files/Mozilla Firefox/firefox.exe %s'
-                webbrowser.get(firefox_path).open('file://' + os.path.abspath(temp_path))
-            except:
-                webbrowser.open('file://' + os.path.abspath(temp_path), new=2)
-        
-        st.success("✅ Editor abierto en nueva pestaña")
-        
-        # Marcar que se usó el editor 3D
+        # Guardar HTML en session_state para renderizar embebido
+        st.session_state["babylon_html"] = html_editor
         st.session_state["babylon_editor_used"] = True
+        st.rerun()
+
+    # Renderizar editor embebido si existe
+    if st.session_state.get("babylon_html"):
+        import streamlit.components.v1 as components
+
+        st.info("💡 Usa las herramientas del editor 3D. Cuando termines, pulsa **💾 Guardar Cambios** dentro del editor para descargar el JSON.")
+
+        components.html(
+            st.session_state["babylon_html"],
+            height=700,
+            scrolling=False
+        )
     
     st.markdown("---")
     
