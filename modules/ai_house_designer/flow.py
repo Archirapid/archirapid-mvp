@@ -103,6 +103,70 @@ def main():
     return
 
 
+def recalculate_layout(modified_rooms: list, house_shape: str = "Rectangular") -> dict:
+    """
+    Recibe habitaciones con áreas modificadas desde Babylon.
+    Redistribuye el layout completo usando generate_layout().
+    
+    Args:
+        modified_rooms: [{'code': str, 'name': str, 'area_m2': float}, ...]
+        house_shape: Forma de la planta
+    
+    Returns:
+        dict: {
+            'success': bool,
+            'layout': [{'x', 'z', 'width', 'depth', 'name', 'code', 'area_m2'}, ...],
+            'total_width': float,
+            'total_depth': float,
+            'error': str (solo si success=False)
+        }
+    """
+    try:
+        from .architect_layout import generate_layout
+        
+        # Validar y limpiar datos de entrada
+        rooms_clean = []
+        for r in modified_rooms:
+            try:
+                area = float(r.get('area_m2', r.get('new_area', 10)))
+                area = max(2.0, area)  # mínimo 2m²
+                rooms_clean.append({
+                    'code': str(r.get('code', r.get('name', 'espacio'))),
+                    'name': str(r.get('name', 'Espacio')),
+                    'area_m2': area
+                })
+            except (ValueError, TypeError):
+                continue
+        
+        if not rooms_clean:
+            return {'success': False, 'error': 'No hay habitaciones válidas'}
+        
+        # Redistribuir layout completo
+        layout = generate_layout(rooms_clean, house_shape)
+        
+        if not layout:
+            return {'success': False, 'error': 'generate_layout devolvió vacío'}
+        
+        # Calcular dimensiones totales
+        total_width = max(item['x'] + item['width'] for item in layout)
+        total_depth = max(item['z'] + item['depth'] for item in layout)
+        
+        return {
+            'success': True,
+            'layout': layout,
+            'total_width': round(total_width, 2),
+            'total_depth': round(total_depth, 2)
+        }
+    
+    except Exception as e:
+        import traceback
+        return {
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        }
+
+
 def get_final_design():
     """
     Retorna el diseño FINAL del usuario.

@@ -92,6 +92,8 @@ def generate_babylon_html(rooms_data, total_width, total_depth):
         const infoDiv = document.getElementById('room-info');
         infoDiv.innerHTML = '<p style="color:#E67E22;"><strong>🧱 Modo Tabique</strong></p><p>Click 1: Punto inicio</p><p>Click 2: Punto fin → crea tabique</p>';
 
+        // Guardar handler original
+        const originalPointerDown = scene.onPointerDown;
         // Reemplazar onPointerDown para modo wall
         scene.onPointerDown = function(evt, pickResult) {
             if (currentMode !== 'wall') return;
@@ -165,6 +167,15 @@ def generate_babylon_html(rooms_data, total_width, total_depth):
         };
 
         window.customWalls = customWalls;
+
+        // Restaurar handler original al cambiar modo
+        const originalSetMode = window.setMode;
+        window.setMode = function(mode) {
+            if (mode !== 'wall' && originalPointerDown) {
+                scene.onPointerDown = originalPointerDown;
+            }
+            originalSetMode(mode);
+        };
 """
 
     html = f"""
