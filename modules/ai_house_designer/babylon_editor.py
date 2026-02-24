@@ -77,6 +77,96 @@ def generate_babylon_html(rooms_data, total_width, total_depth):
                     });
 """
 
+    js_wall_mode = """
+        // Variables para modo tabique
+        let wallPoint1 = null;
+        let wallMarker1 = null;
+        let customWalls = [];
+
+        document.getElementById('btn-wall').style.background = 'rgba(52,152,219,0.6)';
+        gizmoManager.positionGizmoEnabled = false;
+        gizmoManager.scaleGizmoEnabled = false;
+        gizmoManager.attachToMesh(null);
+
+        // Instrucción visual
+        const infoDiv = document.getElementById('room-info');
+        infoDiv.innerHTML = '<p style="color:#E67E22;"><strong>🧱 Modo Tabique</strong></p><p>Click 1: Punto inicio</p><p>Click 2: Punto fin → crea tabique</p>';
+
+        // Reemplazar onPointerDown para modo wall
+        scene.onPointerDown = function(evt, pickResult) {
+            if (currentMode !== 'wall') return;
+
+            const ray = scene.createPickingRay(scene.pointerX, scene.pointerY, BABYLON.Matrix.Identity(), camera);
+            const groundPick = scene.pickWithRay(ray, (mesh) => mesh.name === 'ground' || mesh.name === 'gridPlane');
+
+            let hitPoint = null;
+            if (groundPick && groundPick.hit) {
+                hitPoint = groundPick.pickedPoint;
+            } else if (pickResult.hit && pickResult.pickedPoint) {
+                hitPoint = pickResult.pickedPoint;
+            }
+
+            if (!hitPoint) return;
+
+            if (!wallPoint1) {
+                wallPoint1 = hitPoint.clone();
+
+                if (wallMarker1) wallMarker1.dispose();
+                wallMarker1 = BABYLON.MeshBuilder.CreateSphere('wallMarker1', { diameter: 0.3 }, scene);
+                wallMarker1.position = wallPoint1.clone();
+                wallMarker1.position.y = 0.15;
+                const markerMat = new BABYLON.StandardMaterial('markerMat', scene);
+                markerMat.diffuseColor = new BABYLON.Color3(1, 0.2, 0.2);
+                markerMat.emissiveColor = new BABYLON.Color3(0.5, 0.1, 0.1);
+                wallMarker1.material = markerMat;
+
+                infoDiv.innerHTML = '<p style="color:#E67E22;"><strong>🧱 Punto 1 marcado</strong></p><p>Ahora click en punto final del tabique</p>';
+
+            } else {
+                const wallPoint2 = hitPoint.clone();
+
+                const dx = wallPoint2.x - wallPoint1.x;
+                const dz = wallPoint2.z - wallPoint1.z;
+                const length = Math.sqrt(dx*dx + dz*dz);
+                const angle = Math.atan2(dx, dz);
+                const wallHeight = 2.7;
+                const wallThickness = 0.15;
+
+                if (length > 0.3) {
+                    const wallId = 'custom_wall_' + customWalls.length;
+                    const newWall = BABYLON.MeshBuilder.CreateBox(wallId, {
+                        width: length,
+                        height: wallHeight,
+                        depth: wallThickness
+                    }, scene);
+
+                    newWall.position.x = (wallPoint1.x + wallPoint2.x) / 2;
+                    newWall.position.y = wallHeight / 2;
+                    newWall.position.z = (wallPoint1.z + wallPoint2.z) / 2;
+                    newWall.rotation.y = angle;
+
+                    const customWallMat = new BABYLON.StandardMaterial(wallId + '_mat', scene);
+                    customWallMat.diffuseColor = new BABYLON.Color3(0.6, 0.4, 0.2);
+                    newWall.material = customWallMat;
+
+                    customWalls.push({
+                        id: wallId,
+                        x1: wallPoint1.x, z1: wallPoint1.z,
+                        x2: wallPoint2.x, z2: wallPoint2.z,
+                        length: parseFloat(length.toFixed(2))
+                    });
+
+                    infoDiv.innerHTML = '<p style="color:#2ECC71;"><strong>✅ Tabique creado</strong></p><p>Longitud: ' + length.toFixed(1) + 'm</p><p>Click para nuevo tabique</p>';
+                }
+
+                if (wallMarker1) { wallMarker1.dispose(); wallMarker1 = null; }
+                wallPoint1 = null;
+            }
+        };
+
+        window.customWalls = customWalls;
+"""
+
     html = f"""
 <!DOCTYPE html>
 <html>
@@ -458,10 +548,7 @@ def generate_babylon_html(rooms_data, total_width, total_depth):
                 }}
             }}
             else if (mode === 'wall') {{
-                document.getElementById('btn-wall').style.background = 'rgba(52,152,219,0.6)';
-                gizmoManager.positionGizmoEnabled = false;
-                console.log('Modo: Añadir Tabique');
-                alert('Función "Añadir Tabique" en desarrollo');
+                {js_wall_mode}
             }}
         }}
         
@@ -502,6 +589,17 @@ def generate_babylon_html(rooms_data, total_width, total_depth):
                 }}
             }});
             
+            // Añadir tabiques personalizados al JSON
+            if (window.customWalls && window.customWalls.length > 0) {{
+                currentLayout.push({{
+                    index: 'custom_walls',
+                    name: 'Tabiques personalizados',
+                    custom_walls: window.customWalls,
+                    original_area: 0,
+                    new_area: 0
+                }});
+            }}
+
             // Mostrar JSON en consola
             console.log('=== LAYOUT MODIFICADO ===');
             console.log(JSON.stringify(currentLayout, null, 2));
