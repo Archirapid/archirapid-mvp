@@ -911,7 +911,7 @@ def render_step2():
         
         # Diccionario de costes por m² según tipo
         ROOM_COSTS = {
-            'salon': 1200, 'cocina': 1200, 'dormitorio': 1100,
+            'salon': 1200, 'cocina': 1200, 'dormitorio': 1400,
             'bano': 900, 'garaje': 900, 'porche': 700,
             'bodega': 600, 'pasillo': 800, 'paneles': 3000,
             'piscina': 2500, 'huerto': 150, 'despacho': 1100,
@@ -952,6 +952,15 @@ def render_step2():
             saved_area = max(float(room.room_type.min_m2), 
                        min(float(room.room_type.max_m2), saved_area))
 
+            # Mostrar PRIMERO: nombre y precio
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                st.markdown(f"**{room.room_type.name}**")
+            with col2:
+                current_cost = saved_area * cost_per_m2
+                st.markdown(f"<span style='color:#2ECC71; font-weight:bold;'>€{current_cost:,.0f}</span>", unsafe_allow_html=True)
+
+            # Luego el slider
             new_area = st.slider(
                 f"{saved_area:.1f} m²",
                 min_value=float(room.room_type.min_m2),
@@ -974,16 +983,6 @@ def render_step2():
                     st.caption(f"💰 {diff:,.0f}")
 
             design.rooms[i].area_m2 = new_area
-
-            # AHORA calcular y mostrar precio
-            current_cost = new_area * cost_per_m2
-
-            col1, col2 = st.columns([3, 1])
-            with col1:
-                st.markdown(f"**{room.room_type.name}**")
-            with col2:
-                st.markdown(f"<span style='color:#2ECC71; font-weight:bold;'>€{current_cost:,.0f}</span>", 
-                           unsafe_allow_html=True)
         
         st.markdown("---")
         
