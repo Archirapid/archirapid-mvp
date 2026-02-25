@@ -335,34 +335,89 @@ def render_step1():
     st.markdown("---")
     
     # ============================================
-    # PASO B: ESTILO DE VIVIENDA
+    # PASO B: ESTILO DE VIVIENDA - CARDS CON FOTOS
     # ============================================
     st.subheader("🎨 ¿Qué estilo te gusta?")
-    
-    col1, col2, col3 = st.columns(3)
-    
-    styles = {
-        "🌿 Ecológico": "Materiales naturales, mínimo impacto ambiental",
-        "🏡 Rural": "Piedra, madera, integrado en el paisaje",
-        "🏠 Moderno": "Líneas limpias, grandes ventanales, minimalista",
-        "⛰️ Montaña": "Refugio alpino, tejados inclinados, madera y piedra",
-        "🌊 Playa": "Abierto, ventilado, colores claros, terrazas",
-        "🏛️ Clásico": "Elegante, simétrico, materiales nobles",
-        "💃 Andaluz": "Patio central, cerámica, cal, frescor natural",
-        "🌆 Contemporáneo": "Vanguardista, tecnológico, sostenible"
+
+    styles_data = {
+        "Ecológico": {
+            "desc": "Materiales naturales, mínimo impacto ambiental",
+            "img": "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&h=250&fit=crop"
+        },
+        "Rural": {
+            "desc": "Piedra, madera, integrado en el paisaje",
+            "img": "https://images.unsplash.com/photo-1570129477492-45c003edd2be?w=400&h=250&fit=crop"
+        },
+        "Moderno": {
+            "desc": "Líneas limpias, grandes ventanales, minimalista",
+            "img": "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=400&h=250&fit=crop"
+        },
+        "Montaña": {
+            "desc": "Refugio alpino, tejados inclinados, madera y piedra",
+            "img": "https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?w=400&h=250&fit=crop"
+        },
+        "Playa": {
+            "desc": "Abierto, ventilado, colores claros, terrazas",
+            "img": "https://images.unsplash.com/photo-1499793983690-e29da59ef1c2?w=400&h=250&fit=crop"
+        },
+        "Clásico": {
+            "desc": "Elegante, simétrico, materiales nobles",
+            "img": "https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=400&h=250&fit=crop"
+        },
+        "Andaluz": {
+            "desc": "Patio central, cerámica, cal, frescor natural",
+            "img": "https://images.unsplash.com/photo-1534430480872-3498386e7856?w=400&h=250&fit=crop"
+        },
+        "Contemporáneo": {
+            "desc": "Vanguardista, tecnológico, sostenible",
+            "img": "https://images.unsplash.com/photo-1613490493576-7fde63acd811?w=400&h=250&fit=crop"
+        },
     }
-    
-    style_options = list(styles.keys())
-    selected_style = st.radio(
-        "Elige el estilo de tu vivienda",
-        style_options,
-        horizontal=True,
-        label_visibility="collapsed"
-    )
-    
-    # Mostrar descripción del estilo
-    st.caption(f"✨ {styles[selected_style]}")
-    
+
+    # Inicializar selección
+    if 'selected_style_key' not in st.session_state:
+        st.session_state['selected_style_key'] = 'Moderno'
+
+    # Render cards en filas de 4
+    style_keys = list(styles_data.keys())
+    for row_start in range(0, len(style_keys), 4):
+        cols = st.columns(4)
+        for col, style_key in zip(cols, style_keys[row_start:row_start+4]):
+            data = styles_data[style_key]
+            is_selected = st.session_state['selected_style_key'] == style_key
+            border_color = "#3498DB" if is_selected else "rgba(255,255,255,0.1)"
+            bg_color = "rgba(52,152,219,0.15)" if is_selected else "rgba(255,255,255,0.03)"
+            check = "✅ " if is_selected else ""
+
+            with col:
+                st.markdown(f"""
+                <div style='\
+                    border: 2px solid {border_color};\
+                    border-radius: 12px;\
+                    overflow: hidden;\
+                    background: rgba(20,30,48,0.95);\
+                    margin-bottom: 8px;\
+                    cursor: pointer;\
+                '>
+                    <img src='{data["img"]}' style='width:100%; height:130px; object-fit:cover;'>
+                    <div style='padding: 8px 10px;'>
+                        <p style='margin:0; font-weight:700; font-size:0.9em; color:white; text-shadow: 1px 1px 3px rgba(0,0,0,0.9);'>{check}{style_key}</p>
+                        <p style='margin:2px 0 0 0; font-size:0.75em; color:rgba(255,255,255,0.85); text-shadow: 1px 1px 2px rgba(0,0,0,0.9);'>{data["desc"]}</p>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+                if st.button(
+                    "✓ Seleccionar" if is_selected else "Elegir",
+                    key=f"style_btn_{style_key}",
+                    use_container_width=True,
+                    type="primary" if is_selected else "secondary"
+                ):
+                    st.session_state['selected_style_key'] = style_key
+                    st.rerun()
+
+    selected_style = st.session_state['selected_style_key']
+    st.caption(f"✨ Seleccionado: **{selected_style}** — {styles_data[selected_style]['desc']}")
     st.markdown("---")
     
     # ============================================
@@ -457,28 +512,75 @@ def render_step1():
     st.markdown("---")
     
     # ============================================
-    # PASO D: EXTRAS
+    # PASO D: EXTRAS - CARDS VISUALES
     # ============================================
     st.subheader("🌟 Extras")
-    
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        has_garage = st.checkbox("🚗 Garaje", value=True)
-        has_pool = st.checkbox("🏊 Piscina")
-    
-    with col2:
-        has_porch = st.checkbox("🌿 Porche/Terraza", value=True)
-        has_bodega = st.checkbox("🍷 Bodega")
-    
-    with col3:
-        has_huerto = st.checkbox("🌱 Huerto")
-        has_caseta = st.checkbox("🔧 Casa de Aperos")
-    
-    with col4:
-        has_accessible = st.checkbox("♿ Accesible")
-        has_office = st.checkbox("💼 Despacho")
-    
+    st.caption("Selecciona los elementos adicionales que quieres incluir")
+
+    extras_data = [
+        {"key": "garage",     "label": "Garaje",         "desc": "2 plazas cubiertas",     "color": "#1a3a5c", "accent": "#3498DB", "default": True},
+        {"key": "pool",       "label": "Piscina",        "desc": "8×4m con depuradora",    "color": "#0d3d56", "accent": "#00BCD4", "default": False},
+        {"key": "porch",      "label": "Porche/Terraza", "desc": "Cubierto, suelo ext.",   "color": "#1a3d2b", "accent": "#2ECC71", "default": True},
+        {"key": "bodega",     "label": "Bodega",         "desc": "9m² climatizada",         "color": "#3d1a2b", "accent": "#9B59B6", "default": False},
+        {"key": "huerto",     "label": "Huerto",         "desc": "30m² con riego",          "color": "#1e3d1a", "accent": "#27AE60", "default": False},
+        {"key": "caseta",     "label": "Casa de Aperos", "desc": "15m² exterior",           "color": "#3d2e1a", "accent": "#E67E22", "default": False},
+        {"key": "accessible", "label": "Accesible",      "desc": "Rampas y baño adaptado", "color": "#1a2d3d", "accent": "#5DADE2", "default": False},
+        {"key": "office",     "label": "Despacho",       "desc": "10m² insonorizado",       "color": "#2d1a3d", "accent": "#8E44AD", "default": False},
+    ]
+
+    # Inicializar estado
+    for extra in extras_data:
+        if f"extra_{extra['key']}" not in st.session_state:
+            st.session_state[f"extra_{extra['key']}"] = extra['default']
+
+    # Render en 2 filas de 4
+    for row_start in range(0, len(extras_data), 4):
+        cols = st.columns(4)
+        for col, extra in zip(cols, extras_data[row_start:row_start+4]):
+            key = f"extra_{extra['key']}"
+            is_on = st.session_state[key]
+            bg = extra['color'] if not is_on else extra['color']
+            border = extra['accent'] if is_on else "rgba(255,255,255,0.1)"
+            opacity = "1" if is_on else "0.55"
+            indicator = f"<span style='color:{extra['accent']}; font-weight:900;'>●</span>" if is_on else "<span style='color:rgba(255,255,255,0.3); font-weight:900;'>○</span>"
+
+            with col:
+                st.markdown(f"""
+                <div style='\
+                    border: 2px solid {border};\
+                    border-radius: 10px;\
+                    padding: 10px 12px;\
+                    background: {bg};\
+                    margin-bottom: 6px;\
+                    opacity: {opacity};\
+                '>
+                    <div style='display:flex; justify-content:space-between; align-items:center;'>
+                        <p style='margin:0; font-weight:700; font-size:0.88em; color:white;'>{extra['label']}</p>
+                        {indicator}
+                    </div>
+                    <p style='margin:3px 0 0 0; font-size:0.72em; color:rgba(255,255,255,0.75);'>{extra['desc']}</p>
+                </div>
+                """, unsafe_allow_html=True)
+
+                if st.button(
+                    "✓ Incluido" if is_on else "Añadir",
+                    key=f"btn_extra_{extra['key']}",
+                    use_container_width=True,
+                    type="primary" if is_on else "secondary"
+                ):
+                    st.session_state[key] = not is_on
+                    st.rerun()
+
+    # Extraer valores para uso posterior
+    has_garage     = st.session_state["extra_garage"]
+    has_pool       = st.session_state["extra_pool"]
+    has_porch      = st.session_state["extra_porch"]
+    has_bodega     = st.session_state["extra_bodega"]
+    has_huerto     = st.session_state["extra_huerto"]
+    has_caseta     = st.session_state["extra_caseta"]
+    has_accessible = st.session_state["extra_accessible"]
+    has_office     = st.session_state["extra_office"]
+
     st.markdown("---")
     
     # ============================================
