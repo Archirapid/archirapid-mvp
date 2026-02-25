@@ -82,7 +82,13 @@ class ArchitectLayout:
         all_rooms = []
         for rd in self.raw:
             zone = classify(rd['code'], rd['name'])
-            r = R(rd['code'], rd['name'], max(rd['area_m2'], 2.0), zone)
+            # asegurar que el área sea un número para evitar comparaciones str/float
+            try:
+                area_val = float(rd.get('area_m2', 0))
+            except (TypeError, ValueError):
+                area_val = 0.0
+            area_val = max(area_val, 2.0)
+            r = R(rd['code'], rd['name'], area_val, zone)
             all_rooms.append(r)
 
         day   = self._rooms_by_zone(all_rooms, ZONE_DAY)

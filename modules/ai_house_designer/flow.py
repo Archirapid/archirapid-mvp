@@ -264,16 +264,44 @@ def get_final_design():
 def render_step1():
     """Paso 1: Configurador de vivienda - Estilo Mercedes Benz"""
     
-    st.header("🏡 Diseña Tu Vivienda Sostenible")
-    st.caption("Configura tu casa ideal. La IA diseñará la distribución perfecta para ti.")
-    
     # Obtener datos de la finca
     plot_data = st.session_state.get("design_plot_data", {})
     max_buildable = plot_data.get('buildable_m2', 0)
-    
+
     # ============================================
-    # BANNER FINCA
+    # HERO BANNER PROFESIONAL
     # ============================================
+    st.markdown("""
+    <div style='
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+        padding: 40px 30px;
+        border-radius: 16px;
+        text-align: center;
+        margin-bottom: 24px;
+        border: 1px solid rgba(52,152,219,0.3);
+    '>
+        <h1 style='
+            color: white;
+            font-size: 2.4em;
+            margin: 0 0 10px 0;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        '>🏡 Diseña Tu Vivienda Sostenible</h1>
+        <p style='
+            color: rgba(255,255,255,0.75);
+            font-size: 1.1em;
+            margin: 0 0 20px 0;
+        '>Inteligencia Artificial + Editor 3D + Normativa CTE · Todo en un solo flujo</p>
+        <div style='display: flex; justify-content: center; gap: 30px; flex-wrap: wrap;'>
+            <div style='color: #2ECC71; font-size: 0.95em;'>✅ Distribución automática</div>
+            <div style='color: #3498DB; font-size: 0.95em;'>🏗️ Editor 3D profesional</div>
+            <div style='color: #E67E22; font-size: 0.95em;'>📐 Planos constructivos</div>
+            <div style='color: #9B59B6; font-size: 0.95em;'>💰 Presupuesto en tiempo real</div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # BANNER FINCA (si existe)
     if plot_data:
         col1, col2, col3 = st.columns(3)
         col1.metric("📍 Tu Finca", plot_data.get('title', 'Tu parcela'))
