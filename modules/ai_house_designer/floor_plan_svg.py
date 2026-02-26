@@ -318,9 +318,14 @@ class FloorPlanSVG:
                     color='#2C3E50',
                     zorder=5)
 
-            # Dimensiones
+            # Dimensiones calculadas desde área original del slider
+            _geo_ratio = item["width"] / item["height"] if item["height"] > 0 else 1.4
+            _area_src = item.get("area_original", room.area_m2)
+            _safe_area = max(_area_src, 1.0)
+            _disp_w = round(math.sqrt(_safe_area * _geo_ratio), 1)
+            _disp_h = round(_safe_area / _disp_w, 1) if _disp_w > 0 else 1.0
             ax.text(px + pw / 2, py + ph * 0.38,
-                    f'{item["width"]:.1f}m × {item["height"]:.1f}m',
+                    f'{_disp_w:.1f}m × {_disp_h:.1f}m',
                     ha='center', va='center',
                     fontsize=max(5.5, font_size - 1.5),
                     color='#666666',

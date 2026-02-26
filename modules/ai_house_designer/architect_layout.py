@@ -328,6 +328,7 @@ class ArchitectLayout:
             'width': r.w, 'depth': r.d,
             'name': r.name, 'code': r.code,
             'zone': r.zone, 'area_m2': r.area,
+            'area_original': r.area,
         }
 
 

@@ -1113,6 +1113,12 @@ def render_step2():
                     st.caption(f"💰 {diff:,.0f}")
 
             design.rooms[i].area_m2 = new_area
+            
+            # CABLE SLIDER → SESSION_STATE: persistir valor del slider
+            req = st.session_state.get("ai_house_requirements", {})
+            if "ai_room_proposal" in req:
+                req["ai_room_proposal"][room.room_type.code] = new_area
+                st.session_state["ai_house_requirements"] = req
         
         st.markdown("---")
         
