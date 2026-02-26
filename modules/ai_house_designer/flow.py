@@ -985,12 +985,21 @@ def render_step2():
             st.session_state["ai_house_step"] = 1
             st.rerun()
         return
-
-
-
-    # Indicador visual si hay diseño de Babylon activo
-    if st.session_state.get("babylon_modified_layout"):
-        st.info("🏗️ **Diseño activo desde Editor 3D** — Los sliders reflejan las medidas del editor")
+    
+    # ================================================
+    # USAR DATOS CENTRALIZADOS (referencia)
+    # ================================================
+    design_data = get_current_design_data()
+    base_total_cost = design_data['total_cost']
+    
+    # Si hay diseño de Babylon, usar esas áreas en los sliders
+    # El cable #076 ya sincronizó ai_room_proposal con new_area de Babylon
+    if design_data['modified']:
+        st.info(f"📐 **Diseño editado en Babylon activo**: {design_data['total_area']}m² · "
+                f"€{base_total_cost:,} · Los sliders reflejan tu diseño 3D")
+    
+    # proposal ya tiene los valores de Babylon gracias al cable #076
+    # No necesitamos sobreescribir nada más aquí
 
     # Datos de parcela
     plot_data = st.session_state.get("design_plot_data", {})
