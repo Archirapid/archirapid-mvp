@@ -6,6 +6,87 @@ from groq import Groq
 
 from .data_model import create_example_design, HouseDesign, Plot, RoomType, RoomInstance
 
+# ============================================================
+# FUENTE ÚNICA DE VERDAD - ARQUITECTURA CENTRALIZADA
+# ============================================================
+
+def get_current_design_data():
+    """
+    Retorna los datos del diseño actual desde la fuente correcta.
+    ORDEN DE PRIORIDAD:
+    1. babylon_modified_layout (si existe) - diseño editado en 3D
+    2. ai_room_proposal - diseño inicial de la IA
+    """
+    COST_PER_M2 = 1500
+    
+    # 1. Intentar cargar desde Babylon (prioridad)
+    babylon_data = st.session_state.get("babylon_modified_layout")
+    
+    if babylon_data:
+        rooms = []
+        total_area = 0
+        for room in babylon_data:
+            try:
+                area = float(room.get('new_area', room.get('original_area', 10)))
+                total_area += area
+                rooms.append({
+                    'name': room.get('name', 'Espacio'),
+                    'code': room.get('code', room.get('name', 'generic')),
+                    'area_m2': area,
+                    'x': room.get('x', 0),
+                    'z': room.get('z', 0),
+                    'width': room.get('width', 0),
+                    'depth': room.get('depth', 0)
+                })
+            except (ValueError, TypeError):
+                continue
+        return {
+            'rooms': rooms,
+            'total_area': round(total_area, 1),
+            'total_cost': int(total_area * COST_PER_M2),
+            'cost_per_m2': COST_PER_M2,
+            'source': 'babylon',
+            'modified': True
+        }
+    
+    # 2. Si no hay Babylon, usar propuesta IA
+    req = st.session_state.get("ai_house_requirements", {})
+    proposal = req.get("ai_room_proposal", {})
+    
+    if proposal:
+        rooms = []
+        total_area = 0
+        for code, area in proposal.items():
+            try:
+                area_float = float(area) if isinstance(area, (str, int, float)) else 10
+                total_area += area_float
+                rooms.append({
+                    'name': code,
+                    'code': code,
+                    'area_m2': area_float
+                })
+            except (ValueError, TypeError):
+                continue
+        return {
+            'rooms': rooms,
+            'total_area': round(total_area, 1),
+            'total_cost': int(total_area * COST_PER_M2),
+            'cost_per_m2': COST_PER_M2,
+            'source': 'ai_proposal',
+            'modified': False
+        }
+    
+    # 3. Fallback
+    return {
+        'rooms': [],
+        'total_area': 0,
+        'total_cost': 0,
+        'cost_per_m2': COST_PER_M2,
+        'source': 'none',
+        'modified': False
+    }
+
+
 def main():
     # ============================================
     # 🔗 CONEXIÓN CON DATOS DE LA FINCA COMPRADA
