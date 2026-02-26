@@ -740,55 +740,38 @@ def render_step1():
         f"⚡ Ahorro energético estimado: <b>€{ahorro_anual:,}/año</b></div>"
     ) if ahorro_anual > 0 else ""
 
-    st.markdown(f"""
-    <div style='background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
-                padding: 24px; border-radius: 16px; color: white;
-                border: 1px solid rgba(255,255,255,0.1);
-                box-shadow: 0 8px 32px rgba(0,0,0,0.3);'>
+    resumen_html = (
+        "<div style='background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);"
+        "padding: 24px; border-radius: 16px; color: white;"
+        "border: 1px solid rgba(255,255,255,0.1);"
+        "box-shadow: 0 8px 32px rgba(0,0,0,0.3);'>"
+        "<p style='margin:0 0 16px 0; font-size:13px; opacity:0.6;"
+        "letter-spacing:2px; text-transform:uppercase;'>Resumen de tu proyecto</p>"
+        "<div style='display:grid; grid-template-columns: repeat(4,1fr); gap:12px; margin-bottom:16px;'>"
+        "<div style='background:rgba(255,255,255,0.07); padding:14px; border-radius:10px;"
+        "text-align:center; border:1px solid rgba(255,255,255,0.1);'>"
+        "<div style='font-size:11px; opacity:0.6; margin-bottom:4px;'>PRESUPUESTO</div>"
+        f"<div style='font-size:20px; font-weight:700; color:#2ECC71;'>€{budget:,}</div></div>"
+        "<div style='background:rgba(255,255,255,0.07); padding:14px; border-radius:10px;"
+        "text-align:center; border:1px solid rgba(255,255,255,0.1);'>"
+        "<div style='font-size:11px; opacity:0.6; margin-bottom:4px;'>SUPERFICIE</div>"
+        f"<div style='font-size:20px; font-weight:700; color:#3498DB;'>{recommended_m2} m²</div></div>"
+        "<div style='background:rgba(255,255,255,0.07); padding:14px; border-radius:10px;"
+        "text-align:center; border:1px solid rgba(255,255,255,0.1);'>"
+        "<div style='font-size:11px; opacity:0.6; margin-bottom:4px;'>HABITACIONES</div>"
+        f"<div style='font-size:20px; font-weight:700; color:#E67E22;'>{bedrooms} dorm · {bathrooms} baños</div></div>"
+        "<div style='background:rgba(255,255,255,0.07); padding:14px; border-radius:10px;"
+        "text-align:center; border:1px solid rgba(255,255,255,0.1);'>"
+        "<div style='font-size:11px; opacity:0.6; margin-bottom:4px;'>ESTILO</div>"
+        f"<div style='font-size:14px; font-weight:700; color:#9B59B6;'>{selected_style.split(' ')[-1]}</div>"
+        "</div></div>"
+        "<div style='margin-bottom:8px; font-size:12px; opacity:0.6;'>EXTRAS INCLUIDOS</div>"
+        f"<div style='margin-bottom:4px;'>{extras_html}</div>"
+        f"{ahorro_html}"
+        "</div>"
+    )
 
-        <p style='margin:0 0 16px 0; font-size:13px; opacity:0.6; 
-                  letter-spacing:2px; text-transform:uppercase;'>
-            Resumen de tu proyecto
-        </p>
-
-        <div style='display:grid; grid-template-columns: repeat(4,1fr); gap:12px; margin-bottom:16px;'>
-
-            <div style='background:rgba(255,255,255,0.07); padding:14px;
-                        border-radius:10px; text-align:center;
-                        border:1px solid rgba(255,255,255,0.1);'>
-                <div style='font-size:11px; opacity:0.6; margin-bottom:4px;'>PRESUPUESTO</div>
-                <div style='font-size:20px; font-weight:700; color:#2ECC71;'>€{budget:,}</div>
-            </div>
-
-            <div style='background:rgba(255,255,255,0.07); padding:14px;
-                        border-radius:10px; text-align:center;
-                        border:1px solid rgba(255,255,255,0.1);'>
-                <div style='font-size:11px; opacity:0.6; margin-bottom:4px;'>SUPERFICIE</div>
-                <div style='font-size:20px; font-weight:700; color:#3498DB;'>{recommended_m2} m²</div>
-            </div>
-
-            <div style='background:rgba(255,255,255,0.07); padding:14px;
-                        border-radius:10px; text-align:center;
-                        border:1px solid rgba(255,255,255,0.1);'>
-                <div style='font-size:11px; opacity:0.6; margin-bottom:4px;'>HABITACIONES</div>
-                <div style='font-size:20px; font-weight:700; color:#E67E22;'>{bedrooms} dorm · {bathrooms} baños</div>
-            </div>
-
-            <div style='background:rgba(255,255,255,0.07); padding:14px;
-                        border-radius:10px; text-align:center;
-                        border:1px solid rgba(255,255,255,0.1);'>
-                <div style='font-size:11px; opacity:0.6; margin-bottom:4px;'>ESTILO</div>
-                <div style='font-size:14px; font-weight:700; color:#9B59B6;'>{selected_style.split(" ")[-1]}</div>
-            </div>
-
-        </div>
-
-        <div style='margin-bottom:8px; font-size:12px; opacity:0.6;'>EXTRAS INCLUIDOS</div>
-        <div style='margin-bottom:4px;'>{extras_html}</div>
-        {ahorro_html}
-
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown(resumen_html, unsafe_allow_html=True)
     
     st.markdown("<br>", unsafe_allow_html=True)
     
