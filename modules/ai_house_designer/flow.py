@@ -1531,11 +1531,27 @@ def render_step3():
         import json as _json
         try:
             babylon_data = _json.load(babylon_json)
+            # Guardar en session_state
             st.session_state["babylon_modified_layout"] = babylon_data
-
-            # Calcular totales
-            total_area = sum(float(r.get('new_area', 0)) for r in babylon_data)
-            total_cost = int(total_area * 1500)
+            
+            # CABLE BABYLON → ai_room_proposal
+            # Actualizar propuesta con new_area de Babylon
+            # para que los sliders del Paso 2 reflejen el diseño editado
+            _req_sync = st.session_state.get("ai_house_requirements", {})
+            if "ai_room_proposal" in _req_sync:
+                for _room in babylon_data:
+                    try:
+                        _name = _room.get('name', '')
+                        _new_area = float(_room.get('new_area', _room.get('original_area', 0)))
+                        if _name and _new_area > 0:
+                            _req_sync["ai_room_proposal"][ _name ] = round(_new_area, 1)
+                    except (ValueError, TypeError):
+                        continue
+                st.session_state["ai_house_requirements"] = _req_sync
+            
+            # Recalcular con conversión segura
+            total_area = 0
+            original_area = 0
 
             st.success(f"✅ Diseño cargado: {len(babylon_data)} habitaciones | {total_area:.1f}m² | €{total_cost:,}")
             # NO hacer st.rerun() aquí
