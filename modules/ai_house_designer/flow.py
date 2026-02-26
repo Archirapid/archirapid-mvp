@@ -838,7 +838,8 @@ NUNCA ignorar las peticiones especiales del cliente.
 
 Responde SOLO con un JSON válido (sin markdown) con habitaciones y m². Ejemplo:
 {{
-  "salon_cocina": 35,
+  "salon": 22,
+  "cocina": 14,
   "dormitorio_principal": 16,
   "dormitorio": 11,
   "bano": 6,
@@ -931,6 +932,8 @@ def render_step2():
     
     room_types = {
         "salon_cocina": RoomType(code="salon_cocina", name="Salón-Cocina", min_m2=20, max_m2=50, base_cost_per_m2=1200),
+        "salon": RoomType(code="salon", name="Salón", min_m2=15, max_m2=40, base_cost_per_m2=1100),
+        "cocina": RoomType(code="cocina", name="Cocina", min_m2=8, max_m2=20, base_cost_per_m2=1300),
         "dormitorio_principal": RoomType(code="dormitorio_principal", name="Dormitorio Principal", min_m2=12, max_m2=25, base_cost_per_m2=1400),
         "dormitorio": RoomType(code="dormitorio", name="Dormitorio", min_m2=8, max_m2=15, base_cost_per_m2=1100),
         "bano": RoomType(code="bano", name="Baño", min_m2=4, max_m2=8, base_cost_per_m2=900),
@@ -965,7 +968,11 @@ def render_step2():
         
         if code in room_types:
             room_type = room_types[code]
-        elif 'salon' in code_lower or 'cocina' in code_lower:
+        elif 'salon' in code_lower and 'cocina' not in code_lower:
+            room_type = room_types['salon']
+        elif 'cocina' in code_lower and 'salon' not in code_lower:
+            room_type = room_types['cocina']
+        elif 'salon' in code_lower and 'cocina' in code_lower:
             room_type = room_types['salon_cocina']
         elif 'dormitorio' in code_lower and 'principal' in code_lower:
             room_type = room_types['dormitorio_principal']
