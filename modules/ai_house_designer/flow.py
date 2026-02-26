@@ -928,8 +928,37 @@ Responde SOLO con un JSON válido (sin markdown) con habitaciones y m². Ejemplo
 def render_step2():
     """Paso 2: Editor visual unificado - Layout 2 columnas profesional"""
     
-    st.header("Paso 2 – Tu Casa en Tiempo Real")
-    st.caption("Ajusta tu diseño. El plano se actualiza automáticamente.")
+    # Leer datos del proyecto para el banner (lectura segura, sin modificar)
+    _req_header = st.session_state.get("ai_house_requirements", {})
+    _budget_h = _req_header.get("budget", 0)
+    _style_h = _req_header.get("style", "")
+    _style_h_short = _style_h.split(" ")[-1] if _style_h else "—"
+    _area_h = _req_header.get("target_area_m2", 0)
+    _beds_h = _req_header.get("bedrooms", 0)
+    _baths_h = _req_header.get("bathrooms", 0)
+
+    _banner_html = (
+        "<div style='background: linear-gradient(135deg, #1a1a2e 0%, #0f3460 100%);"
+        "padding: 16px 24px; border-radius: 12px; color: white; margin-bottom: 16px;"
+        "border: 1px solid rgba(255,255,255,0.1);'>"
+        "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;'>"
+        "<div>"
+        "<div style='font-size:11px; opacity:0.5; letter-spacing:2px; text-transform:uppercase;'>Tu proyecto</div>"
+        "<div style='font-size:20px; font-weight:700; margin-top:2px;'>Ajusta tu diseño</div>"
+        "<div style='font-size:12px; opacity:0.6; margin-top:2px;'>El plano se actualiza automáticamente</div>"
+        "</div>"
+        "<div style='display:flex; gap:16px; flex-wrap:wrap;'>"
+        f"<div style='text-align:center;'><div style='font-size:10px; opacity:0.5;'>PRESUPUESTO</div>"
+        f"<div style='font-size:16px; font-weight:700; color:#2ECC71;'>€{_budget_h:,}</div></div>"
+        f"<div style='text-align:center;'><div style='font-size:10px; opacity:0.5;'>SUPERFICIE</div>"
+        f"<div style='font-size:16px; font-weight:700; color:#3498DB;'>{_area_h} m²</div></div>"
+        f"<div style='text-align:center;'><div style='font-size:10px; opacity:0.5;'>HABITACIONES</div>"
+        f"<div style='font-size:16px; font-weight:700; color:#E67E22;'>{_beds_h}d · {_baths_h}b</div></div>"
+        f"<div style='text-align:center;'><div style='font-size:10px; opacity:0.5;'>ESTILO</div>"
+        f"<div style='font-size:16px; font-weight:700; color:#9B59B6;'>{_style_h_short}</div></div>"
+        "</div></div></div>"
+    )
+    st.markdown(_banner_html, unsafe_allow_html=True)
     
     # Botones navegación
     col1, col2 = st.columns([1, 1])
