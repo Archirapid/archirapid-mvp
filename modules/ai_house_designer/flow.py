@@ -717,17 +717,76 @@ def render_step1():
     
     st.info(f"💰 Presupuesto estimado de cimentación: **€{foundation_cost:,}** ({int(foundation_cost/budget*100)}% del presupuesto total) · Incluido en el presupuesto global")
     
-    # Resumen antes del botón
+    # Resumen antes del botón - diseño profesional
+    extras_activos = []
+    if has_garage: extras_activos.append("Garaje")
+    if has_pool: extras_activos.append("Piscina")
+    if has_porch: extras_activos.append("Porche")
+    if has_bodega: extras_activos.append("Bodega")
+    if has_huerto: extras_activos.append("Huerto")
+    if has_caseta: extras_activos.append("Casa Aperos")
+    if has_office: extras_activos.append("Despacho")
+
+    extras_html = "".join([
+        f"<span style='background:rgba(255,255,255,0.15); padding:3px 10px; "
+        f"border-radius:20px; margin:3px; display:inline-block; font-size:12px;'>"
+        f"{e}</span>"
+        for e in extras_activos
+    ]) if extras_activos else "<span style='opacity:0.6; font-size:12px;'>Sin extras seleccionados</span>"
+
+    ahorro_html = (
+        f"<div style='margin-top:12px; padding:8px 16px; background:rgba(46,204,113,0.2); "
+        f"border-radius:8px; border:1px solid rgba(46,204,113,0.4); font-size:13px;'>"
+        f"⚡ Ahorro energético estimado: <b>€{ahorro_anual:,}/año</b></div>"
+    ) if ahorro_anual > 0 else ""
+
     st.markdown(f"""
-    <div style='background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
-                padding: 20px; border-radius: 15px; color: white; text-align: center;'>
-        <h3>📋 Tu configuración</h3>
-        <p>💰 Presupuesto: <b>€{budget:,}</b> · 
-           🎨 Estilo: <b>{selected_style}</b> · 
-           🛏️ Dormitorios: <b>{bedrooms}</b> · 
-           🚿 Baños: <b>{bathrooms}</b></p>
-        <p>📐 Superficie recomendada: <b>{recommended_m2} m²</b> 
-           (dentro de tu presupuesto y parcela)</p>
+    <div style='background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+                padding: 24px; border-radius: 16px; color: white;
+                border: 1px solid rgba(255,255,255,0.1);
+                box-shadow: 0 8px 32px rgba(0,0,0,0.3);'>
+
+        <p style='margin:0 0 16px 0; font-size:13px; opacity:0.6; 
+                  letter-spacing:2px; text-transform:uppercase;'>
+            Resumen de tu proyecto
+        </p>
+
+        <div style='display:grid; grid-template-columns: repeat(4,1fr); gap:12px; margin-bottom:16px;'>
+
+            <div style='background:rgba(255,255,255,0.07); padding:14px;
+                        border-radius:10px; text-align:center;
+                        border:1px solid rgba(255,255,255,0.1);'>
+                <div style='font-size:11px; opacity:0.6; margin-bottom:4px;'>PRESUPUESTO</div>
+                <div style='font-size:20px; font-weight:700; color:#2ECC71;'>€{budget:,}</div>
+            </div>
+
+            <div style='background:rgba(255,255,255,0.07); padding:14px;
+                        border-radius:10px; text-align:center;
+                        border:1px solid rgba(255,255,255,0.1);'>
+                <div style='font-size:11px; opacity:0.6; margin-bottom:4px;'>SUPERFICIE</div>
+                <div style='font-size:20px; font-weight:700; color:#3498DB;'>{recommended_m2} m²</div>
+            </div>
+
+            <div style='background:rgba(255,255,255,0.07); padding:14px;
+                        border-radius:10px; text-align:center;
+                        border:1px solid rgba(255,255,255,0.1);'>
+                <div style='font-size:11px; opacity:0.6; margin-bottom:4px;'>HABITACIONES</div>
+                <div style='font-size:20px; font-weight:700; color:#E67E22;'>{bedrooms} dorm · {bathrooms} baños</div>
+            </div>
+
+            <div style='background:rgba(255,255,255,0.07); padding:14px;
+                        border-radius:10px; text-align:center;
+                        border:1px solid rgba(255,255,255,0.1);'>
+                <div style='font-size:11px; opacity:0.6; margin-bottom:4px;'>ESTILO</div>
+                <div style='font-size:14px; font-weight:700; color:#9B59B6;'>{selected_style.split(" ")[-1]}</div>
+            </div>
+
+        </div>
+
+        <div style='margin-bottom:8px; font-size:12px; opacity:0.6;'>EXTRAS INCLUIDOS</div>
+        <div style='margin-bottom:4px;'>{extras_html}</div>
+        {ahorro_html}
+
     </div>
     """, unsafe_allow_html=True)
     
