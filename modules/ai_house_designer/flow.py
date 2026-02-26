@@ -1654,7 +1654,8 @@ def render_step3():
             total_area = 0
             original_area = 0
 
-            st.success(f"✅ Diseño cargado: {len(babylon_data)} habitaciones | {total_area:.1f}m² | €{total_cost:,}")
+            _area_loaded = sum(float(r.get('new_area', r.get('original_area', 0))) for r in babylon_data)
+            st.success(f"✅ Diseño cargado: {len(babylon_data)} habitaciones | {_area_loaded:.1f}m²")
             # NO hacer st.rerun() aquí
         except Exception as e:
             st.error(f"❌ Error: {e}")
@@ -1677,21 +1678,15 @@ def render_step3():
     water_systems = req.get('water_systems', [])
     sewage_systems = req.get('sewage_systems', [])
     
-    # Usar diseño FINAL (Babylon si modificó, sino sliders)
-    final_design = get_final_design()
-    total_area = final_design['total_area']
-    total_cost = final_design['total_cost']
-    rooms = final_design['rooms']
-    source = final_design['source']
-
+    # Usar diseño FINAL via get_current_design_data (fuente única de verdad)
+    design_data = get_current_design_data()
+    total_area = design_data['total_area']
+    rooms = design_data['rooms']
     # Indicador visual de origen
-    if source == 'babylon':
+    if design_data['modified']:
         st.success("🏗️ **Diseño desde Editor 3D** - Versión personalizada")
-    elif source == 'step2_sliders':
-        st.info("📊 **Diseño ajustado en Paso 2** - Con modificaciones en sliders")
     else:
         st.info("🤖 **Diseño generado por IA** - Propuesta original")
-
     # Costes por partidas
     construction_cost = int(total_area * 1100)
     foundation_cost = int(total_area * 180)
