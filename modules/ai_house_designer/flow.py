@@ -77,6 +77,17 @@ def main():
     
     # ============================================
     
+    # Si hay una finca nueva seleccionada, resetear el diseñador desde cero
+    # Esto evita que quede atrapado en un paso anterior de otra sesión
+    if design_plot_id and st.session_state.get("_last_design_plot_id") != design_plot_id:
+        st.session_state["ai_house_step"] = 1
+        st.session_state["_last_design_plot_id"] = design_plot_id
+        # Limpiar diseño anterior para que no contamine el nuevo
+        st.session_state.pop("ai_room_proposal", None)
+        st.session_state.pop("babylon_modified_layout", None)
+        st.session_state.pop("current_floor_plan", None)
+        st.session_state.pop("babylon_editor_used", None)
+    
     # Inicializar el paso si no existe
     if "ai_house_step" not in st.session_state:
         st.session_state["ai_house_step"] = 1
