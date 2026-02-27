@@ -30,10 +30,14 @@ def render_architects_panel(ctx: dict):
     subscription_active = ctx['subscription_active']
     db = ctx['db']
     
-    # Validar que architect_id y architect_email existen y no están vacíos
-    if not architect_id or not architect_email:
-        st.error("Error: architect_id y architect_email son requeridos y no pueden estar vacíos.")
+    # Validar que architect_id existe y no está vacío
+    if not architect_id:
+        st.error("Error: architect_id es requerido y no puede estar vacío.")
         return
+    # architect_email se usa para contexto, pero puede venir vacío si el formulario
+    # no lo envió; en ese caso lo aceptamos para no bloquear el acceso.
+    if not architect_email:
+        st.warning("Aviso: email del arquitecto no proporcionado, se usará valor vacío.")
     
     # Configurar el estado de sesión para el arquitecto
     st.session_state['architect_id'] = architect_id
