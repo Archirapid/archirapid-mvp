@@ -1602,26 +1602,35 @@ elif st.session_state.get('selected_page') == "Diseñador de Vivienda":
 
 elif st.session_state.get('selected_page') == "Arquitectos (Marketplace)":
     with st.container():
-        # Punto de entrada blindado para arquitectos
+        # Primero, si no hay ningún arquitecto logueado, mostramos
+        # el formulario de login/registro que ya existe en marketplace_upload.
+        if 'arquitecto_id' not in st.session_state:
+            from modules.marketplace import marketplace_upload
+            marketplace_upload.main()
+            # Salimos para que no intente continuar con el panel blindado
+            return
+
+        # Ahora sí tenemos un arquitecto en sesión, construimos el ctx
+        # usando los valores que guarda el flujo de login anterior.
         from src import db
         from modules.marketplace.architects import check_subscription
-        
-        architect_id = st.session_state.get('architect_id')
-        architect_email = st.session_state.get('architect_email')
-        
+
+        architect_id = st.session_state.get('arquitecto_id')
+        architect_email = st.session_state.get('architecto_email')
+
         # Verificar suscripción si hay architect_id
         subscription_active = False
         if architect_id:
             sub_info = check_subscription(architect_id)
             subscription_active = sub_info.get('active', False)
-        
+
         ctx = {
             'architect_id': architect_id,
             'architect_email': architect_email,
             'subscription_active': subscription_active,
             'db': db
         }
-        
+
         from modules.marketplace.architects_entry import render_architects_panel
         render_architects_panel(ctx)
 
