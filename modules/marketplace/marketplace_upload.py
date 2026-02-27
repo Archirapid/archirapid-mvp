@@ -442,6 +442,12 @@ def main():
     """
     st.title("👷 Arquitectos - Marketplace")
     
+    # si acabamos de marcar registro, saltar directamente a formulario de auth
+    if st.session_state.pop('architect_redirect_registration', False):
+        from modules.marketplace import auth
+        auth.show_registration()
+        return
+
     # Límites de planes
     PLAN_LIMITS = {
         'student': 1,  # Plan gratuito para estudiantes: 1 proyecto
@@ -475,14 +481,14 @@ def main():
                         st.session_state.setdefault('arquitecto_plan', None)
                         st.rerun()
                     else:
-                        # Nuevo arquitecto: enviar al formulario rico de registro
+                        # Nuevo arquitecto: marcar para redirigir al formulario rico
                         st.session_state['login_role'] = 'architect'
                         # prefills para el formulario completo
                         st.session_state['auth_prefill_name'] = name
                         st.session_state['auth_prefill_email'] = email
                         st.session_state['auth_prefill_phone'] = telefono
-                        from modules.marketplace import auth
-                        auth.show_registration()
+                        st.session_state['architect_redirect_registration'] = True
+                        st.experimental_rerun()
                         return
                 except Exception as e:
                     st.error(f"Error: {e}")
