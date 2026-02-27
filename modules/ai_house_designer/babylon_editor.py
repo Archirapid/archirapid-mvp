@@ -268,15 +268,14 @@ def generate_babylon_html(rooms_data, total_width, total_depth):
             if (zone === 'day')        fMat.diffuseColor = new BABYLON.Color3(0.96, 0.94, 0.88);
             else if (zone === 'night') fMat.diffuseColor = new BABYLON.Color3(0.88, 0.93, 0.98);
             else if (zone === 'wet')   fMat.diffuseColor = new BABYLON.Color3(0.85, 0.95, 0.98);
-            else if (zone === 'exterior' || zone === 'garden')
-                                        fMat.diffuseColor = new BABYLON.Color3(0.75, 0.90, 0.70);
-            else                        fMat.diffuseColor = new BABYLON.Color3(0.94, 0.93, 0.90);
+            else if (zone === 'exterior') fMat.diffuseColor = new BABYLON.Color3(0.75, 0.90, 0.70);
+            else if (zone === 'garden')   fMat.diffuseColor = new BABYLON.Color3(0.20, 0.60, 0.90);
+            else                          fMat.diffuseColor = new BABYLON.Color3(0.94, 0.93, 0.90);
 
             floor.material = fMat;
 
-            // Paredes (no en jardín/exterior)
-            const zoneR = (room.zone || '').toLowerCase();
-            if (zoneR !== 'garden' && zoneR !== 'exterior') {{
+            // Paredes (no en jardín ni exterior)
+            if (zone !== 'garden' && zone !== 'exterior') {{
                 _buildWalls(i, rx, rz, rw, rd);
             }}
 
