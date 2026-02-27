@@ -1620,7 +1620,7 @@ elif st.session_state.get('selected_page') == "👤 Panel de Cliente":
     if st.session_state.get('role') == 'owner':
         from modules.marketplace import owners
         owners.main()
-        return
+        st.stop()
     route_main_panel()
 
 elif st.session_state.get('selected_page') == "👤 Panel de Proveedor":
