@@ -488,7 +488,7 @@ def main():
                         st.session_state['auth_prefill_email'] = email
                         st.session_state['auth_prefill_phone'] = telefono
                         st.session_state['architect_redirect_registration'] = True
-                        st.experimental_rerun()
+                        st.rerun()
                         return
                 except Exception as e:
                     st.error(f"Error: {e}")

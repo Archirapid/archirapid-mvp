@@ -49,7 +49,7 @@ with st.expander("Acceso Existente - Arquitectos"):
                     st.session_state['architect_id'] = datos['id']
                     st.session_state['architect_name'] = datos['nombre']
                     st.success(f"¡Bienvenido de nuevo, {datos['nombre']}! Ahora puedes subir proyectos.")
-                    st.experimental_rerun()
+                    st.rerun()
                 else:
                     st.error("No se encontró ningún arquitecto con ese email. Por favor regístrate.")
 
