@@ -1616,7 +1616,7 @@ elif st.session_state.get('selected_page') == "Arquitectos (Marketplace)":
         from modules.marketplace.architects import check_subscription
 
         architect_id = st.session_state.get('arquitecto_id')
-        architect_email = st.session_state.get('architecto_email')
+        architect_email = st.session_state.get('arquitecto_email')
 
         # Verificar suscripción si hay architect_id
         subscription_active = False

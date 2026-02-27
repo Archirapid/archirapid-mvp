@@ -466,6 +466,9 @@ def main():
             
             if submitted:
                 try:
+                    # guardar email siempre para contexto posterior
+                    st.session_state['arquitecto_email'] = email.strip()
+
                     if architect_id and architect_id.strip().isdigit():
                         # Login con ID existente
                         aid = int(architect_id.strip())
