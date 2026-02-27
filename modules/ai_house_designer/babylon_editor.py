@@ -330,15 +330,15 @@ def generate_babylon_html(rooms_data, total_width, total_depth):
             if (oldLabel) oldLabel.dispose();
 
             const label = BABYLON.MeshBuilder.CreatePlane(`label_${{i}}`,
-                {{width: 2.0, height: 1.1}}, scene);
-            label.position.set(rx+rw/2, WALL_H + 1.4, rz+rd/2);
+                {{width: 3.5, height: 1.6}}, scene);
+            label.position.set(rx+rw/2, WALL_H + 0.8, rz+rd/2);
             label.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
             label.isPickable = false;
 
             const adv = BABYLON.GUI.AdvancedDynamicTexture.CreateForMesh(label);
             const bg  = new BABYLON.GUI.Rectangle();
             bg.width = 1; bg.height = 1;
-            bg.background = "rgba(20,30,45,0.82)";
+            bg.background = "rgba(10,20,35,0.92)";
             bg.cornerRadius = 18;
             adv.addControl(bg);
 
@@ -347,7 +347,7 @@ def generate_babylon_html(rooms_data, total_width, total_depth):
             const area = (rw * rd).toFixed(1);
             txt.text = `${{room.name}}\\n${{rw.toFixed(1)}}m × ${{rd.toFixed(1)}}m\\n${{area}} m²`;
             txt.color = "#FFFFFF";
-            txt.fontSize = 44;
+            txt.fontSize = 56;
             txt.fontWeight = "600";
             txt.lineSpacing = "6px";
             bg.addControl(txt);
