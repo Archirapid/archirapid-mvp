@@ -599,12 +599,7 @@ def generate_babylon_html(rooms_data, total_width, total_depth):
                 }}
             }});
             // Reconstruir todos
-            roomsData.forEach((_,i) => {{
-                const r = roomsData[i];
-                _buildFloor(i, r.x, r.z, r.width, r.depth, r.zone);
-                _buildWalls(i, r.x, r.z, r.width, r.depth);
-                _buildLabel(i, r.x, r.z, r.width, r.depth);
-            }});
+            roomsData.forEach((_,i) => buildRoom(i));
             selectedMesh = null;
             selectedIndex = null;
             updateBudget();
