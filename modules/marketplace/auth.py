@@ -129,11 +129,18 @@ def show_registration():
         password_confirm = st.text_input("Confirmar contraseña *", type="password", placeholder="Repite tu contraseña")
 
         st.subheader("👤 Tipo de Usuario")
+        # si venimos del formulario de arquitectos forzamos ese perfil
         if st.session_state.get('login_role') == 'owner':
             st.info("Registrándote como Propietario")
             tipo_usuario = "Propietario (Subo fincas)"
             empresa = ""
             especialidad = ""
+        elif st.session_state.get('login_role') == 'architect':
+            # ocultar selector, ya sabemos que es arquitecto
+            tipo_usuario = "Arquitecto (Vendo proyectos)"
+            st.info("Registrándote como Arquitecto")
+            empresa = st.text_input("Empresa/Estudio", placeholder="Nombre de tu empresa")
+            especialidad = st.selectbox("Especialidad", ["Arquitectura Residencial", "Arquitectura Comercial", "Urbanismo", "Interiorismo", "Otros"])
         else:
             role_to_index = {'client': 0, 'architect': 1, 'owner': 2}
             tipo_usuario = st.selectbox(
