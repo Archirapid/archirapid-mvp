@@ -326,34 +326,7 @@ def generate_babylon_html(rooms_data, total_width, total_depth):
         }}
 
         function _buildLabel(i, rx, rz, rw, rd) {{
-            // Eliminar etiqueta anterior si existe
             const oldLabel = scene.getMeshByName(`label_${{i}}`);
-            if (oldLabel) {{ oldLabel.dispose(); }}
-
-            // Crear plano en el suelo de la habitación
-            const label = BABYLON.MeshBuilder.CreatePlane(`label_${{i}}`, {{
-                width: rw - 0.2,
-                height: rd - 0.2
-            }}, scene);
-            label.position.set(rx + rw/2, 0.08, rz + rd/2);
-            label.rotation.x = Math.PI / 2;  // Tumbado en el suelo
-            label.isPickable = false;
-
-            const adv = BABYLON.GUI.AdvancedDynamicTexture.CreateForMesh(label);
-            const room = roomsData[i];
-            const area = (rw * rd).toFixed(1);
-
-            const txt = new BABYLON.GUI.TextBlock();
-            txt.text = `${{room.name}}
-${{rw.toFixed(1)}}m × ${{rd.toFixed(1)}}m  ${{area}}m²`;
-            txt.color = "rgba(0,0,0,0.75)";
-            txt.fontSize = 72;
-            txt.fontWeight = "700";
-            txt.textHorizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_CENTER;
-            txt.textVerticalAlignment = BABYLON.GUI.Control.VERTICAL_ALIGNMENT_CENTER;
-            txt.lineSpacing = "8px";
-            adv.addControl(txt);
-        }}`);
             if (oldLabel) oldLabel.dispose();
 
             const label = BABYLON.MeshBuilder.CreatePlane(`label_${{i}}`,
