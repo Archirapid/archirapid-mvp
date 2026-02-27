@@ -631,52 +631,13 @@ def generate_babylon_html(rooms_data, total_width, total_depth):
                 showToast('Dimensiones no válidas (mínimo 0.5m)');
                 return;
             }}
-
-            const i    = selectedIndex;
-            const room = roomsData[i];
-            const rx   = room.x;
-            const rz   = room.z;
-
-            // Actualizar datos
-            roomsData[i].width   = newW;
-            roomsData[i].depth   = newD;
-            roomsData[i].area_m2 = parseFloat((newW * newD).toFixed(2));
-
-            // Reconstruir suelo
-            const oldFloor = scene.getMeshByName(`floor_${{i}}`);
-            if (oldFloor) {{
-                hlLayer.removeAllMeshes();
-                oldFloor.dispose();
-            }}
-            const newFloor = BABYLON.MeshBuilder.CreateBox(`floor_${{i}}`, {{
-                width: newW - 0.05, height: 0.06, depth: newD - 0.05
-            }}, scene);
-            newFloor.position.set(rx + newW/2, 0.03, rz + newD/2);
-
-            // Reutilizar material por zona
-            const fMat = new BABYLON.StandardMaterial(`fMat_${{i}}`, scene);
-            const zone = (room.zone || '').toLowerCase();
-            if (zone === 'day')         fMat.diffuseColor = new BABYLON.Color3(0.96, 0.94, 0.88);
-            else if (zone === 'night')  fMat.diffuseColor = new BABYLON.Color3(0.88, 0.93, 0.98);
-            else if (zone === 'wet')    fMat.diffuseColor = new BABYLON.Color3(0.85, 0.95, 0.98);
-            else if (zone === 'exterior' || zone === 'garden')
-                                         fMat.diffuseColor = new BABYLON.Color3(0.75, 0.90, 0.70);
-            else                         fMat.diffuseColor = new BABYLON.Color3(0.94, 0.93, 0.90);
-            newFloor.material = fMat;
-
-            // Seleccionar nuevo mesh
-            selectedMesh = newFloor;
-            hlLayer.addMesh(newFloor, BABYLON.Color3.Yellow());
-
-            // Reconstruir paredes y etiqueta
-            _disposeWalls(i);
-            _buildWalls(i, rx, rz, newW, newD);
-            _buildLabel(i, rx, rz, newW, newD);
-
-            // Actualizar panels
-            updateRoomInfo(i);
-            updateBudget();
-            checkCTE(i, newW, newD);
+            // Actualizar área de la habitación seleccionada
+            roomsData[selectedIndex].area_m2 = parseFloat((newW * newD).toFixed(2));
+            // Regenerar layout completo y reconstruir escena
+            const newLayout = generateLayoutJS(roomsData);
+            rebuildScene(newLayout);
+            // Validar CTE de la habitación que se editó
+            checkCTE(selectedIndex, newW, newD);
         }}
 
         // ================================================
