@@ -1367,11 +1367,15 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
                             conn = db_conn()
                             c = conn.cursor()
                             
+                            # determinar rol en función de login_role
+                            new_role = 'client'
+                            if st.session_state.get('login_role') == 'owner':
+                                new_role = 'owner'
                             c.execute("""
                                 INSERT INTO users (email, full_name, role, is_professional, password_hash, created_at)
                                 VALUES (?, ?, ?, ?, ?, datetime('now'))
                             """, (
-                                email, name, 'client',
+                                email, name, new_role,
                                 0,  # is_professional
                                 hashed_password
                             ))
@@ -1385,13 +1389,13 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
                             # Login automático
                             st.session_state['user_id'] = user_id
                             st.session_state['user_email'] = email
-                            st.session_state['role'] = 'client'
+                            st.session_state['role'] = new_role
                             st.session_state['user_name'] = name
                             st.session_state['logged_in'] = True
                             st.session_state['viewing_login'] = False
                             st.session_state['show_role_selector'] = False
                             
-                            # Redirigir según el rol
+                            # Redirigir según el rol (owner va al portal de propietarios)
                             if st.session_state['role'] == 'client':
                                 st.session_state['selected_page'] = "👤 Panel de Cliente"
                             elif st.session_state['role'] == 'architect':
@@ -1400,6 +1404,8 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
                                 st.session_state['selected_page'] = "👤 Panel de Proveedor"
                             elif st.session_state['role'] == 'admin':
                                 st.session_state['selected_page'] = "Intranet"
+                            elif st.session_state['role'] == 'owner':
+                                st.session_state['selected_page'] = "🏠 Propietarios"
                             
                             st.success(f"¡Bienvenido {name}!")
                             st.rerun()
