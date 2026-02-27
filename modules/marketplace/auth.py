@@ -107,16 +107,21 @@ def show_registration():
         return
     st.title("📝 Registro de Usuario")
 
+    # precargar valores si vienen de un formulario anterior
+    pre_nombre = st.session_state.pop('auth_prefill_name', '')
+    pre_email = st.session_state.pop('auth_prefill_email', '')
+    pre_telefono = st.session_state.pop('auth_prefill_phone', '')
+
     with st.form("registro_form"):
         st.subheader("📋 Información Personal")
 
         col1, col2 = st.columns(2)
         with col1:
-            nombre = st.text_input("Nombre completo *", placeholder="Tu nombre completo")
+            nombre = st.text_input("Nombre completo *", placeholder="Tu nombre completo", value=pre_nombre)
         with col2:
-            email = st.text_input("Email *", placeholder="tu@email.com")
+            email = st.text_input("Email *", placeholder="tu@email.com", value=pre_email)
 
-        telefono = st.text_input("Teléfono", placeholder="+34 600 000 000")
+        telefono = st.text_input("Teléfono", placeholder="+34 600 000 000", value=pre_telefono)
         direccion = st.text_input("Dirección", placeholder="Calle, Ciudad, Provincia")
 
         st.subheader("🔐 Credenciales de Acceso")

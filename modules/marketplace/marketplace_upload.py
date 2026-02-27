@@ -475,14 +475,15 @@ def main():
                         st.session_state.setdefault('arquitecto_plan', None)
                         st.rerun()
                     else:
-                        # Registro nuevo
-                        import time
-                        new_id = int(time.time())  # ID temporal
-                        st.session_state['arquitecto_id'] = new_id
-                        st.session_state.setdefault('arquitecto_plan', None)
-                        # phone is collected but not stored in stub
-                        st.success(f"Cuenta creada para {name or email} (ID: {new_id})")
-                        st.rerun()
+                        # Nuevo arquitecto: enviar al formulario rico de registro
+                        st.session_state['login_role'] = 'architect'
+                        # prefills para el formulario completo
+                        st.session_state['auth_prefill_name'] = name
+                        st.session_state['auth_prefill_email'] = email
+                        st.session_state['auth_prefill_phone'] = telefono
+                        from modules.marketplace import auth
+                        auth.show_registration()
+                        return
                 except Exception as e:
                     st.error(f"Error: {e}")
         return
