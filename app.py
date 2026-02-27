@@ -1607,8 +1607,8 @@ elif st.session_state.get('selected_page') == "Arquitectos (Marketplace)":
         if 'arquitecto_id' not in st.session_state:
             from modules.marketplace import marketplace_upload
             marketplace_upload.main()
-            # Salimos para que no intente continuar con el panel blindado
-            return
+            # detengo ejecución de Streamlit para no seguir con el panel blindado
+            st.stop()
 
         # Ahora sí tenemos un arquitecto en sesión, construimos el ctx
         # usando los valores que guarda el flujo de login anterior.
