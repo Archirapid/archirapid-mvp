@@ -116,6 +116,9 @@ def panel_cliente_v2():
 
 def route_main_panel():
     selected_page = st.session_state.get("selected_page")
+    # Bloque de Seguridad: Si el rol es owner, la página DEBE ser Propietarios
+    if st.session_state.get('role') == 'owner':
+        st.session_state['selected_page'] = "🏠 Propietarios"
     user_role = st.session_state.get("user_role", "buyer")
     
     if selected_page == "🏠 Propietarios":
@@ -1613,6 +1616,11 @@ elif st.session_state.get('selected_page') == "Intranet":
         intranet.main()
 
 elif st.session_state.get('selected_page') == "👤 Panel de Cliente":
+    # escape owners que intenten ir al panel de cliente
+    if st.session_state.get('role') == 'owner':
+        from modules.marketplace import owners
+        owners.main()
+        return
     route_main_panel()
 
 elif st.session_state.get('selected_page') == "👤 Panel de Proveedor":

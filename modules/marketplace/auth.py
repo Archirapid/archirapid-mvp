@@ -201,24 +201,22 @@ def show_registration():
 
                 st.success("🎉 ¡Registro completado exitosamente!")
 
-                # FORZADO BRUTO PARA EL JEFE
-                st.session_state["logged_in"] = True
+                # ANCLAJE PERMANENTE: siempre forzamos valores de owner
+                st.session_state['logged_in'] = True
+                st.session_state['role'] = 'owner'  # Forzado manual
+                st.session_state['selected_page'] = "🏠 Propietarios"
+                st.query_params["page"] = "🏠 Propietarios"
+
+                # preservamos también la lógica anterior por compatibilidad
                 st.session_state["email"] = email
-                st.session_state["role"] = role
                 if role == 'owner':
-                    st.query_params["page"] = "🏠 Propietarios"
-                    st.session_state["selected_page"] = "🏠 Propietarios"
                     # 🛡️ Marca sesión como autenticada
                     st.session_state["authenticated"] = True
                 elif role == 'architect':
-                    # marcaremos arquitecto logueado para saltar plan
                     st.session_state['arquitecto_id'] = email
-                    st.query_params["page"] = "Arquitectos (Marketplace)"
-                    st.session_state["selected_page"] = "Arquitectos (Marketplace)"
                     st.session_state["authenticated"] = True
                 else:
-                    st.query_params["page"] = "🏠 Inicio / Marketplace"
-                    st.session_state["selected_page"] = "🏠 Inicio / Marketplace"
+                    st.session_state["authenticated"] = True
                 st.rerun()
 
             except Exception as e:
