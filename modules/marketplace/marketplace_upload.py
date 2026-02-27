@@ -28,6 +28,7 @@ import streamlit as st
 import json
 import os
 import re
+import time
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime
 from .data_access import save_proyecto, get_usuario
@@ -440,9 +441,6 @@ def main():
     """
     Página principal del marketplace para arquitectos
     """
-    # DEBUG: mostrar estado de sesión al entrar
-    st.write("--- DEBUG session_state:", {k: v for k,v in st.session_state.items()})
-
     # si acabamos de registrarnos y no tenemos arquitecto_id, forzamos el login
     frm_key = "FormSubmitter:registro_form-🚀 Registrarme y Acceder"
     if st.session_state.get('login_role') == 'architect' and st.session_state.get(frm_key) and not st.session_state.get('arquitecto_id'):
@@ -453,7 +451,6 @@ def main():
         st.session_state['authenticated'] = True
         # eliminar flag para no repetir
         st.session_state.pop(frm_key, None)
-        st.write("(DEBUG) set arquitecto_id via registration fallback", sid)
 
     st.title("👷 Arquitectos - Marketplace")
     
