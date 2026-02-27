@@ -203,6 +203,12 @@ def show_registration():
                     st.session_state["selected_page"] = "🏠 Propietarios"
                     # 🛡️ Marca sesión como autenticada
                     st.session_state["authenticated"] = True
+                elif role == 'architect':
+                    # marcaremos arquitecto logueado para saltar plan
+                    st.session_state['arquitecto_id'] = email
+                    st.query_params["page"] = "Arquitectos (Marketplace)"
+                    st.session_state["selected_page"] = "Arquitectos (Marketplace)"
+                    st.session_state["authenticated"] = True
                 else:
                     st.query_params["page"] = "🏠 Inicio / Marketplace"
                     st.session_state["selected_page"] = "🏠 Inicio / Marketplace"
