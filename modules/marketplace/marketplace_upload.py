@@ -440,6 +440,21 @@ def main():
     """
     Página principal del marketplace para arquitectos
     """
+    # DEBUG: mostrar estado de sesión al entrar
+    st.write("--- DEBUG session_state:", {k: v for k,v in st.session_state.items()})
+
+    # si acabamos de registrarnos y no tenemos arquitecto_id, forzamos el login
+    frm_key = "FormSubmitter:registro_form-🚀 Registrarme y Acceder"
+    if st.session_state.get('login_role') == 'architect' and st.session_state.get(frm_key) and not st.session_state.get('arquitecto_id'):
+        # asignar ID basado en email si existe, sino generar temporal
+        sid = st.session_state.get('auth_prefill_email') or f"temp_{int(time.time())}"
+        st.session_state['arquitecto_id'] = sid
+        st.session_state.setdefault('arquitecto_plan', None)
+        st.session_state['authenticated'] = True
+        # eliminar flag para no repetir
+        st.session_state.pop(frm_key, None)
+        st.write("(DEBUG) set arquitecto_id via registration fallback", sid)
+
     st.title("👷 Arquitectos - Marketplace")
     
     # si acabamos de marcar registro, saltar directamente a formulario de auth
