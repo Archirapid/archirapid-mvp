@@ -565,7 +565,7 @@ def generate_babylon_html(rooms_data, total_width, total_depth):
             // Porche
             ext.forEach(r => {{ const d=Math.max(Math.round(r.area/houseW*10)/10,2); layout.push({{x:0,z:zBot,width:houseW,depth:d,name:r.name,code:r.code,zone:r.zone,area_m2:r.area}}); }});
             // Piscina
-            piscinas.forEach(r => {{ const pw=Math.max(Math.round(Math.sqrt(r.area*2)*10)/10,5); const pd=Math.round(r.area/pw*10)/10; layout.push({{x:(houseW-pw)/2,z:-pd-3,width:pw,depth:pd,name:r.name,code:r.code,zone:r.zone,area_m2:r.area}}); }});
+            piscinas.forEach(r => {{ const pw=Math.max(Math.round(Math.sqrt(r.area*2)*10)/10,5); const pd=Math.round(r.area/pw*10)/10; layout.push({{x:(houseW-pw)/2,z:zBot+3,width:pw,depth:pd,name:r.name,code:r.code,zone:r.zone,area_m2:r.area}}); }});
             // Laterales
             let xl=houseW+3, zl=0;
             laterales.forEach(r => {{ const lw=Math.round(Math.sqrt(r.area*1.3)*10)/10; const ld=Math.round(r.area/lw*10)/10; layout.push({{x:xl,z:zl,width:lw,depth:ld,name:r.name,code:r.code,zone:r.zone,area_m2:r.area}}); zl+=ld+1; }});
