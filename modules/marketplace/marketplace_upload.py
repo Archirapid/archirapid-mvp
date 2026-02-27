@@ -465,28 +465,32 @@ def main():
             submitted = st.form_submit_button("Entrar / Registrarse")
             
             if submitted:
-                try:
-                    # guardar email siempre para contexto posterior
-                    st.session_state['arquitecto_email'] = email.strip()
+                # mínima validación: debe haber ID o email
+                if not (architect_id and architect_id.strip().isdigit()) and not email.strip():
+                    st.error("Introduce tu ID o un email válido para registrarte.")
+                else:
+                    try:
+                        # guardar email siempre para contexto posterior (puede ser cadena vacía si login)
+                        st.session_state['arquitecto_email'] = email.strip()
 
-                    if architect_id and architect_id.strip().isdigit():
-                        # Login con ID existente
-                        aid = int(architect_id.strip())
-                        architect_data = get_usuario(aid)
-                        st.success(f"Bienvenido {architect_data.get('nombre', 'Arquitecto')}!")
-                        st.session_state['arquitecto_id'] = aid
-                        st.session_state.setdefault('arquitecto_plan', None)
-                        st.rerun()
-                    else:
-                        # Registro nuevo
-                        import time
-                        new_id = int(time.time())  # ID temporal
-                        st.session_state['arquitecto_id'] = new_id
-                        st.session_state.setdefault('arquitecto_plan', None)
-                        st.success(f"Cuenta creada para {name or email} (ID: {new_id})")
-                        st.rerun()
-                except Exception as e:
-                    st.error(f"Error: {e}")
+                        if architect_id and architect_id.strip().isdigit():
+                            # Login con ID existente
+                            aid = int(architect_id.strip())
+                            architect_data = get_usuario(aid)
+                            st.success(f"Bienvenido {architect_data.get('nombre', 'Arquitecto')}!")
+                            st.session_state['arquitecto_id'] = aid
+                            st.session_state.setdefault('arquitecto_plan', None)
+                            st.rerun()
+                        else:
+                            # Registro nuevo
+                            import time
+                            new_id = int(time.time())  # ID temporal
+                            st.session_state['arquitecto_id'] = new_id
+                            st.session_state.setdefault('arquitecto_plan', None)
+                            st.success(f"Cuenta creada para {name or email} (ID: {new_id})")
+                            st.rerun()
+                    except Exception as e:
+                        st.error(f"Error: {e}")
         return
     
     # Usuario logueado
