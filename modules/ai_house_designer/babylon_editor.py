@@ -496,6 +496,122 @@ def generate_babylon_html(rooms_data, total_width, total_depth):
         }}
 
         // ================================================
+        // MOTOR LAYOUT JS — puerto de architec_layout.py
+        // Redistribuye toda la planta sin colisiones
+        // ================================================
+        function classifyZone(code, name) {{
+            const c = (code + name).toLowerCase();
+            if (['piscin','pool','huerto','caseta','apero','panel','solar','bomba'].some(x => c.includes(x))) return 'garden';
+            if (['porche','terraza'].some(x => c.includes(x))) return 'exterior';
+            if (['garaje','garage','bodega'].some(x => c.includes(x))) return 'service';
+            if (['pasillo','distribuidor','hall','recibidor'].some(x => c.includes(x))) return 'circ';
+            if (['bano','baño','aseo','wc'].some(x => c.includes(x))) return 'wet';
+            if (['dormitorio','habitacion','suite'].some(x => c.includes(x))) return 'night';
+            return 'day';
+        }}
+
+        function generateLayoutJS(rooms) {{
+            const FILA1_D = 4.5, FILA3_D = 3.5, PASILLO_H = 1.2;
+            const rs = rooms.map(r => ({{
+                ...r,
+                area: Math.max(r.area_m2 || 2, 2),
+                zone: r.zone || classifyZone(r.code||'', r.name||'')
+            }}));
+            const day   = rs.filter(r => r.zone === 'day');
+            const night = rs.filter(r => r.zone === 'night').sort((a,b) => b.area - a.area);
+            const wet   = rs.filter(r => r.zone === 'wet');
+            const svc   = rs.filter(r => r.zone === 'service');
+            const ext   = rs.filter(r => r.zone === 'exterior');
+            const gdn   = rs.filter(r => r.zone === 'garden');
+            const garajes   = svc.filter(r => (r.code||'').toLowerCase().includes('garaje') || (r.code||'').toLowerCase().includes('garage'));
+            const otrosSvc  = svc.filter(r => !garajes.includes(r));
+            const piscinas  = gdn.filter(r => (r.code||'').toLowerCase().includes('piscin') || (r.code||'').toLowerCase().includes('pool'));
+            const laterales = gdn.filter(r => !piscinas.includes(r));
+            const layout = [];
+            // Ancho casa desde fila noche
+            const nightW = night.map(r => Math.max(Math.round(r.area/FILA3_D*10)/10, 2.8));
+            const banoW  = wet.map(r => Math.min(Math.max(Math.round(r.area/FILA3_D*10)/10, 1.5), 2.5));
+            const fila3 = [];
+            let bi = 0;
+            for (let i=0; i<night.length; i++) {{
+                if (bi < wet.length) {{ fila3.push({{r:wet[bi], w:banoW[bi], d:FILA3_D}}); bi++; }}
+                fila3.push({{r:night[i], w:nightW[i], d:FILA3_D}});
+            }}
+            while (bi < wet.length) {{ fila3.push({{r:wet[bi], w:banoW[bi], d:FILA3_D}}); bi++; }}
+            let houseW = Math.min(Math.max(fila3.reduce((s,i)=>s+i.w,0), 8), 18);
+            // Fila 1: día + garaje
+            let garajeW = 0;
+            const garajeItems = garajes.map(r => {{ const gw=Math.max(Math.round(r.area/FILA1_D*10)/10,3.5); garajeW+=gw; return {{r,w:gw}}; }});
+            const dayAvail = Math.max(houseW - garajeW, 5);
+            const dayTotal = day.reduce((s,r)=>s+r.area,0) || 1;
+            let xd = 0;
+            day.forEach((r,idx) => {{
+                let w = idx===day.length-1 ? Math.max(dayAvail-xd,3) : Math.max(Math.round(dayAvail*(r.area/dayTotal)*10)/10,3);
+                layout.push({{x:xd, z:0, width:w, depth:FILA1_D, name:r.name, code:r.code, zone:r.zone, area_m2:r.area}});
+                xd += w;
+            }});
+            let xo = xd;
+            otrosSvc.forEach(r => {{ const w=Math.max(Math.round(r.area/FILA1_D*10)/10,2); layout.push({{x:xo,z:0,width:w,depth:FILA1_D,name:r.name,code:r.code,zone:r.zone,area_m2:r.area}}); xo+=w; }});
+            let xg = houseW - garajeW;
+            garajeItems.forEach(item => {{ layout.push({{x:xg,z:0,width:item.w,depth:FILA1_D,name:item.r.name,code:item.r.code,zone:item.r.zone,area_m2:item.r.area}}); xg+=item.w; }});
+            // Pasillo
+            const pasilloR = rs.find(r=>r.zone==='circ');
+            layout.push({{x:0, z:FILA1_D, width:houseW, depth:PASILLO_H, name:pasilloR?pasilloR.name:'Distribuidor', code:pasilloR?pasilloR.code:'pasillo', zone:'circ', area_m2:houseW*PASILLO_H}});
+            // Fila 3: noche
+            const zF3 = FILA1_D + PASILLO_H;
+            let xc = 0;
+            fila3.forEach(item => {{ layout.push({{x:xc,z:zF3,width:item.w,depth:item.d,name:item.r.name,code:item.r.code,zone:item.r.zone,area_m2:item.r.area}}); xc+=item.w; }});
+            const zBot = zF3 + FILA3_D;
+            // Porche
+            ext.forEach(r => {{ const d=Math.max(Math.round(r.area/houseW*10)/10,2); layout.push({{x:0,z:zBot,width:houseW,depth:d,name:r.name,code:r.code,zone:r.zone,area_m2:r.area}}); }});
+            // Piscina
+            piscinas.forEach(r => {{ const pw=Math.max(Math.round(Math.sqrt(r.area*2)*10)/10,5); const pd=Math.round(r.area/pw*10)/10; layout.push({{x:(houseW-pw)/2,z:-pd-3,width:pw,depth:pd,name:r.name,code:r.code,zone:r.zone,area_m2:r.area}}); }});
+            // Laterales
+            let xl=houseW+3, zl=0;
+            laterales.forEach(r => {{ const lw=Math.round(Math.sqrt(r.area*1.3)*10)/10; const ld=Math.round(r.area/lw*10)/10; layout.push({{x:xl,z:zl,width:lw,depth:ld,name:r.name,code:r.code,zone:r.zone,area_m2:r.area}}); zl+=ld+1; }});
+            // Normalizar
+            if (layout.length > 0) {{
+                const minX = Math.min(...layout.map(i=>i.x));
+                const minZ = Math.min(...layout.map(i=>i.z));
+                const ox = Math.max(0,-minX)+2, oz = Math.max(0,-minZ)+2;
+                layout.forEach(i => {{ i.x+=ox; i.z+=oz; }});
+            }}
+            return layout;
+        }}
+
+        function rebuildScene(newLayout) {{
+            // Eliminar todos los meshes de habitaciones
+            roomsData.forEach((_,i) => {{
+                ['floor','wall_back','wall_front','wall_left','wall_right','door','label'].forEach(prefix => {{
+                    const m = scene.getMeshByName(`${{prefix}}_${{i}}`);
+                    if (m) m.dispose();
+                }});
+            }});
+            hlLayer.removeAllMeshes();
+            // Actualizar roomsData con nueva geometría
+            newLayout.forEach((item, i) => {{
+                if (roomsData[i]) {{
+                    roomsData[i].x = item.x;
+                    roomsData[i].z = item.z;
+                    roomsData[i].width = item.width;
+                    roomsData[i].depth = item.depth;
+                    roomsData[i].area_m2 = item.area_m2;
+                }}
+            }});
+            // Reconstruir todos
+            roomsData.forEach((_,i) => {{
+                const r = roomsData[i];
+                _buildFloor(i, r.x, r.z, r.width, r.depth, r.zone);
+                _buildWalls(i, r.x, r.z, r.width, r.depth);
+                _buildLabel(i, r.x, r.z, r.width, r.depth);
+            }});
+            selectedMesh = null;
+            selectedIndex = null;
+            updateBudget();
+            showToast('✅ Planta redistribuida sin colisiones');
+        }}
+
+        // ================================================
         // PANEL NUMÉRICO — EDITAR DIMENSIONES
         // ================================================
         function showEditPanel(i) {{
