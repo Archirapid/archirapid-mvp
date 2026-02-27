@@ -1,6 +1,11 @@
 import sqlite3
 
-conn = sqlite3.connect('D:/ARCHIRAPID_PROYECT25/data.db')
+import os
+
+base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
+# usar siempre la instalación actual sobre C: (o la carpeta donde esté clonado)
+db_path = os.path.join(base_dir, 'data.db')
+conn = sqlite3.connect(db_path)
 cursor = conn.cursor()
 
 # List tables
