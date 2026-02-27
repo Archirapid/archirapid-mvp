@@ -274,8 +274,11 @@ def generate_babylon_html(rooms_data, total_width, total_depth):
 
             floor.material = fMat;
 
-            // Paredes
-            _buildWalls(i, rx, rz, rw, rd);
+            // Paredes (no en jardín/exterior)
+            const zoneR = (room.zone || '').toLowerCase();
+            if (zoneR !== 'garden' && zoneR !== 'exterior') {{
+                _buildWalls(i, rx, rz, rw, rd);
+            }}
 
             // Etiqueta
             _buildLabel(i, rx, rz, rw, rd);
