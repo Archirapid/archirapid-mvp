@@ -460,7 +460,7 @@ def main():
                 email = st.text_input("Email")
             with col2:
                 name = st.text_input("Nombre completo")
-                company = st.text_input("Empresa (opcional)")
+                telefono = st.text_input("Teléfono", placeholder="+34 600 000 000")
             
             submitted = st.form_submit_button("Entrar / Registrarse")
             
@@ -480,6 +480,7 @@ def main():
                         new_id = int(time.time())  # ID temporal
                         st.session_state['arquitecto_id'] = new_id
                         st.session_state.setdefault('arquitecto_plan', None)
+                        # phone is collected but not stored in stub
                         st.success(f"Cuenta creada para {name or email} (ID: {new_id})")
                         st.rerun()
                 except Exception as e:

@@ -1602,28 +1602,9 @@ elif st.session_state.get('selected_page') == "Diseñador de Vivienda":
 
 elif st.session_state.get('selected_page') == "Arquitectos (Marketplace)":
     with st.container():
-        # Punto de entrada blindado para arquitectos
-        from src import db
-        from modules.marketplace.architects import check_subscription
-        
-        architect_id = st.session_state.get('architect_id')
-        architect_email = st.session_state.get('architect_email')
-        
-        # Verificar suscripción si hay architect_id
-        subscription_active = False
-        if architect_id:
-            sub_info = check_subscription(architect_id)
-            subscription_active = sub_info.get('active', False)
-        
-        ctx = {
-            'architect_id': architect_id,
-            'architect_email': architect_email,
-            'subscription_active': subscription_active,
-            'db': db
-        }
-        
-        from modules.marketplace.architects_entry import render_architects_panel
-        render_architects_panel(ctx)
+        # Simple acceso al marketplace de arquitectos (formulario de login/registro)
+        from modules.marketplace import marketplace_upload
+        marketplace_upload.main()
 
 elif st.session_state.get('selected_page') == "Intranet":
     st.write("Cargando Panel de Control...")
