@@ -269,6 +269,8 @@ def generate_babylon_html(rooms_data, total_width, total_depth):
             else if (zone === 'night') fMat.diffuseColor = new BABYLON.Color3(0.88, 0.93, 0.98);
             else if (zone === 'wet')   fMat.diffuseColor = new BABYLON.Color3(0.85, 0.95, 0.98);
             else if (zone === 'exterior') fMat.diffuseColor = new BABYLON.Color3(0.75, 0.90, 0.70);
+            else if (zone === 'garden' && (room.code||'').toLowerCase().includes('panel'))
+                                          fMat.diffuseColor = new BABYLON.Color3(0.95, 0.85, 0.20);
             else if (zone === 'garden')   fMat.diffuseColor = new BABYLON.Color3(0.20, 0.55, 0.85);
             else                          fMat.diffuseColor = new BABYLON.Color3(0.94, 0.93, 0.90);
 
