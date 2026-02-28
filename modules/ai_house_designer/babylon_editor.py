@@ -134,6 +134,8 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
         <button class="tool-btn" onclick="setTopView()">🔝 Vista Planta</button>
         <button class="tool-btn" onclick="setIsoView()">🏠 Vista 3D</button>
         <hr class="divider">
+        <button class="tool-btn" id="btn-roof" onclick="toggleRoof()">🏠 Tejado OFF</button>
+        <hr class="divider">
         <button class="tool-btn green" onclick="saveChanges()">💾 Guardar JSON</button>
         <button class="tool-btn green" id="btn-glb" onclick="exportGLB()">📦 Exportar 3D (.glb)</button>
 
@@ -899,6 +901,131 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             window._toastTimer = setTimeout(() => t.style.opacity = '0', 3000);
         }}
 
+        // ================================================
+        // TEJADO 3D
+        // ================================================
+        let roofMesh = null;
+        let roofActive = false;
+
+        function buildRoof() {{
+            if (roofMesh) {{ roofMesh.dispose(); roofMesh = null; }}
+
+            // Calcular bounding box de TODA la casa (solo habitaciones interiores)
+            const interiorZones = ['day','night','wet','circ','service'];
+            const houseRooms = roomsData.filter(r => interiorZones.includes((r.zone||'').toLowerCase()));
+            if (houseRooms.length === 0) return;
+
+            const minX = Math.min(...houseRooms.map(r => r.x));
+            const minZ = Math.min(...houseRooms.map(r => r.z));
+            const maxX = Math.max(...houseRooms.map(r => r.x + r.width));
+            const maxZ = Math.max(...houseRooms.map(r => r.z + r.depth));
+            const hW = maxX - minX;  // ancho total casa
+            const hD = maxZ - minZ;  // fondo total casa
+            const hCX = minX + hW / 2;  // centro X
+            const hCZ = minZ + hD / 2;  // centro Z
+            const wallH = 2.7;           // altura paredes
+            const roofH = hW * 0.28;     // altura cumbrera (28% del ancho)
+            const overhang = 0.6;        // voladizo perimetral
+
+            // Material tejado - teja árabe por defecto
+            const rMat = new BABYLON.StandardMaterial('roofMat', scene);
+            if (roofType.includes('Plana') || roofType.includes('Invertida')) {{
+                rMat.diffuseColor = new BABYLON.Color3(0.55, 0.55, 0.58); // hormigón gris
+            }} else {{
+                rMat.diffuseColor = new BABYLON.Color3(0.72, 0.36, 0.18); // teja árabe terracota
+            }}
+            rMat.specularColor = new BABYLON.Color3(0.1, 0.1, 0.1);
+
+            const rType = roofType.toLowerCase();
+
+            if (rType.includes('plana') || rType.includes('invertida')) {{
+                // TEJADO PLANO — losa horizontal con parapeto
+                roofMesh = BABYLON.MeshBuilder.CreateBox('roof', {{
+                    width: hW + overhang * 2,
+                    height: 0.25,
+                    depth: hD + overhang * 2
+                }}, scene);
+                roofMesh.position.set(hCX, wallH + 0.12, hCZ);
+
+            }} else if (rType.includes('un agua')) {{
+                // TEJADO A UN AGUA — plano inclinado de norte a sur
+                const path1 = [
+                    new BABYLON.Vector3(minX - overhang, wallH, minZ - overhang),
+                    new BABYLON.Vector3(maxX + overhang, wallH, minZ - overhang)
+                ];
+                const path2 = [
+                    new BABYLON.Vector3(minX - overhang, wallH + roofH, maxZ + overhang),
+                    new BABYLON.Vector3(maxX + overhang, wallH + roofH, maxZ + overhang)
+                ];
+                roofMesh = BABYLON.MeshBuilder.CreateRibbon('roof', {{
+                    pathArray: [path1, path2], sideOrientation: BABYLON.Mesh.DOUBLESIDE
+                }}, scene);
+
+            }} else if (rType.includes('cuatro')) {{
+                // TEJADO A CUATRO AGUAS — 4 faldones que convergen en cumbrera central
+                const apex = new BABYLON.Vector3(hCX, wallH + roofH, hCZ);
+                const corners = [
+                    [new BABYLON.Vector3(minX - overhang, wallH, minZ - overhang),
+                     new BABYLON.Vector3(maxX + overhang, wallH, minZ - overhang), apex],
+                    [new BABYLON.Vector3(maxX + overhang, wallH, minZ - overhang),
+                     new BABYLON.Vector3(maxX + overhang, wallH, maxZ + overhang), apex],
+                    [new BABYLON.Vector3(maxX + overhang, wallH, maxZ + overhang),
+                     new BABYLON.Vector3(minX - overhang, wallH, maxZ + overhang), apex],
+                    [new BABYLON.Vector3(minX - overhang, wallH, maxZ + overhang),
+                     new BABYLON.Vector3(minX - overhang, wallH, minZ - overhang), apex],
+                ];
+                const parts = [];
+                corners.forEach((tri, i) => {{
+                    const t = BABYLON.MeshBuilder.CreateRibbon(`roof_${{i}}`, {{
+                        pathArray: [[tri[0], tri[2]], [tri[1], tri[2]]],
+                        sideOrientation: BABYLON.Mesh.DOUBLESIDE
+                    }}, scene);
+                    t.material = rMat;
+                    parts.push(t);
+                }});
+                roofMesh = BABYLON.Mesh.MergeMeshes(parts, true, true);
+                if (roofMesh) roofMesh.name = 'roof';
+
+            }} else {{
+                // DOS AGUAS — por defecto (más común en España)
+                // Cumbrera a lo largo del eje X (de este a oeste)
+                const path1 = [
+                    new BABYLON.Vector3(minX - overhang, wallH, minZ - overhang),
+                    new BABYLON.Vector3(minX - overhang, wallH + roofH, hCZ),
+                    new BABYLON.Vector3(minX - overhang, wallH, maxZ + overhang)
+                ];
+                const path2 = [
+                    new BABYLON.Vector3(maxX + overhang, wallH, minZ - overhang),
+                    new BABYLON.Vector3(maxX + overhang, wallH + roofH, hCZ),
+                    new BABYLON.Vector3(maxX + overhang, wallH, maxZ + overhang)
+                ];
+                roofMesh = BABYLON.MeshBuilder.CreateRibbon('roof', {{
+                    pathArray: [path1, path2], sideOrientation: BABYLON.Mesh.DOUBLESIDE
+                }}, scene);
+            }}
+
+            if (roofMesh) {{
+                roofMesh.material = rMat;
+                roofMesh.isPickable = false;
+            }}
+        }}
+
+        function toggleRoof() {{
+            const btn = document.getElementById('btn-roof');
+            if (roofActive) {{
+                if (roofMesh) {{ roofMesh.dispose(); roofMesh = null; }}
+                roofActive = false;
+                btn.textContent = '🏠 Tejado OFF';
+                btn.classList.remove('active');
+                showToast('Tejado ocultado');
+            }} else {{
+                buildRoof();
+                roofActive = true;
+                btn.textContent = '🏠 Tejado ON';
+                btn.classList.add('active');
+                showToast('Tejado: ' + roofType.split('(')[0].trim());
+            }}
+        }}                                                                                                                             
         // ================================================
         // RENDER LOOP
         // ================================================
