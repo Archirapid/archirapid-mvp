@@ -1363,12 +1363,14 @@ def render_step2():
                          'huerto', 'paneles', 'bomba', 'accesib']
         
         rooms_to_remove = []
-        for i, room in enumerate(design.rooms):
-            code = room.room_type.code.lower()
-            if any(x in code for x in optional_codes):
-                cost = room.area_m2 * room.room_type.base_cost_per_m2
+        optional_rooms = [(i, room) for i, room in enumerate(design.rooms)
+                          if any(x in room.room_type.code.lower() for x in optional_codes)]
+        cols = st.columns(3)
+        for col_idx, (i, room) in enumerate(optional_rooms):
+            cost = room.area_m2 * room.room_type.base_cost_per_m2
+            with cols[col_idx % 3]:
                 keep = st.checkbox(
-                    f"{room.room_type.name} · €{cost:,.0f}",
+                    f"{room.room_type.name}\n€{cost:,.0f}",
                     value=True,
                     key=f"keep_{i}"
                 )
