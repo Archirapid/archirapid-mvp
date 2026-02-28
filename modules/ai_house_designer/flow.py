@@ -6,6 +6,13 @@ from groq import Groq
 
 from .data_model import create_example_design, HouseDesign, Plot, RoomType, RoomInstance
 
+# ---------------------------------------------------------------------------
+# CONSTANTES REUTILIZABLES
+# ---------------------------------------------------------------------------
+PANEL_MIN_M2 = 3  # superficie mínima de los paneles solares dentro del presupuesto
+
+
+
 # ============================================================
 # FUENTE ÚNICA DE VERDAD - ARQUITECTURA CENTRALIZADA
 # ============================================================
@@ -929,6 +936,40 @@ def render_step1():
         # Llamar a IA
         _generate_ai_proposal(req)
 
+def _normalize_ai_proposal(proposal: dict, energy_list: list) -> dict:
+    """Normaliza los nombres y entradas del JSON generado por la IA.
+
+    - Agrega o agrupa cualquier clave que mencione paneles o solar en una sola
+      entrada con código **paneles_solares**.
+    - Si el cliente pidió energía solar y no aparece ningún panel, inserta una
+      entrada mínima con {PANEL_MIN_M2} m² para garantizar su visualización.
+    - Devuelve el diccionario modificado (la operación se realiza in‑place).
+    """
+    panel_area = 0.0
+    keys_to_remove = []
+
+    for k, v in list(proposal.items()):
+        if 'panel' in k.lower() or 'solar' in k.lower():
+            try:
+                panel_area += float(v)
+            except Exception:
+                # valores no numéricos se ignoran
+                pass
+            keys_to_remove.append(k)
+
+    # eliminar las claves antiguas
+    for k in keys_to_remove:
+        proposal.pop(k, None)
+
+    if panel_area > 0:
+        proposal['paneles_solares'] = panel_area
+    elif 'solar' in energy_list:
+        # el usuario quería paneles pero la IA no generó ninguno
+        proposal['paneles_solares'] = PANEL_MIN_M2
+
+    return proposal
+
+
 def _generate_ai_proposal(req):
     """Genera propuesta de distribución con IA"""
     with st.spinner("🤖 La IA está diseñando tu casa..."):
@@ -1004,10 +1045,9 @@ Responde SOLO con un JSON válido (sin markdown) con habitaciones y m². Ejemplo
                 response_text = response_text[start:end].strip()
             
             ai_proposal = json.loads(response_text)
-            # si el input solicitó paneles solares (key 'solar') y la IA no lo devolvió, lo añadimos
-            if 'solar' in energy_list and 'paneles_solares' not in ai_proposal:
-                # usar el m2 mínimo definido en room_types
-                ai_proposal['paneles_solares'] = room_types['paneles_solares'].min_m2
+
+            # Normalizar resultados y asegurar paneles solares
+            ai_proposal = _normalize_ai_proposal(ai_proposal, energy_list)
             
             # Guardar propuesta
             req["ai_room_proposal"] = ai_proposal
