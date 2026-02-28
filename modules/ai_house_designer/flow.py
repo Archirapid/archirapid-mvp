@@ -1000,7 +1000,7 @@ def _generate_ai_proposal(req):
 - {req['bathrooms']} baños
 - Extras: {', '.join(extras_list) if extras_list else 'ninguno'}
 - Energía/Sostenibilidad: {', '.join(energy_list) if energy_list else 'ninguno'}
-- REGLA ESTRICTA: Si en la lista aparece "solar" (paneles solares), incluye EXACTAMENTE UNO con code "paneles_solares" en el JSON. NUNCA dos entradas de paneles.
+- REGLA ESTRICTA: Si en la lista aparece "solar" (paneles solares), incluye EXACTAMENTE UNO con code "paneles_solares" en el JSON. El nombre debe coincidir *exactamente* (sin tilde ni espacios) y no puede haber otro registro similar. NUNCA dos entradas de paneles.
 
 PETICIONES ESPECIALES DEL CLIENTE (OBLIGATORIO INCLUIR):
 {req.get('special_notes', 'ninguna')}
