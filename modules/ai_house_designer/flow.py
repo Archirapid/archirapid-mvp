@@ -949,6 +949,7 @@ def _normalize_ai_proposal(proposal: dict, energy_list: list) -> dict:
     keys_to_remove = []
 
     for k, v in list(proposal.items()):
+        # recoger cualquier mención a paneles/solar para sumar y eliminar
         if 'panel' in k.lower() or 'solar' in k.lower():
             try:
                 panel_area += float(v)
@@ -957,7 +958,15 @@ def _normalize_ai_proposal(proposal: dict, energy_list: list) -> dict:
                 pass
             keys_to_remove.append(k)
 
-    # eliminar las claves antiguas
+    # quitar también claves de sistemas energéticos no espaciales
+    for en in energy_list:
+        if en != 'solar':
+            # eliminar claves que contengan el término
+            for k in list(proposal.keys()):
+                if en.lower() in k.lower():
+                    proposal.pop(k, None)
+
+    # eliminar las claves antiguas asociadas a paneles
     for k in keys_to_remove:
         proposal.pop(k, None)
 
@@ -1000,6 +1009,7 @@ def _generate_ai_proposal(req):
 - {req['bathrooms']} baños
 - Extras: {', '.join(extras_list) if extras_list else 'ninguno'}
 - Energía/Sostenibilidad: {', '.join(energy_list) if energy_list else 'ninguno'}
+- **IMPORTANTE**: No transformes ninguna energía/sostenibilidad salvo los paneles en habitaciones. Es decir, no crees espacios llamados "aerotermia", "geotermia", "domótica", "rainwater", "insulation" ni similares. Esas tecnologías sólo deben aparecer en el análisis escrito, nunca en el plano ni como habitaciones.
 - REGLA ESTRICTA: Si en la lista aparece "solar" (paneles solares), incluye EXACTAMENTE UNO con code "paneles_solares" en el JSON. El nombre debe coincidir *exactamente* (sin tilde ni espacios) y no puede haber otro registro similar. NUNCA dos entradas de paneles.
 
 PETICIONES ESPECIALES DEL CLIENTE (OBLIGATORIO INCLUIR):
@@ -1519,13 +1529,19 @@ def render_step2():
                         f"- {r.room_type.name}: {r.area_m2:.0f} m² ({r.area_m2:.1f}m × {r.area_m2/max(r.area_m2**0.5,1):.1f}m aprox)"
                         for r in design.rooms
                     ])
+                    # anotar extras energéticos para que la IA comente
+                    energy_notes = []
+                    for en, val in req.get('energy', {}).items():
+                        if val:
+                            energy_notes.append(en)
+                    energy_text = ("\nSistemas elegidos: " + ", ".join(energy_notes)) if energy_notes else ""
                     
                     response = client.chat.completions.create(
                         model="llama-3.3-70b-versatile",
                         messages=[{"role": "user", "content": f"""Eres arquitecto experto en vivienda sostenible española.
 
 Analiza esta distribución:
-{rooms_summary}
+{rooms_summary}{energy_text}
 TOTAL: {total_area_final:.0f} m²
 PRESUPUESTO: €{budget:,}
 ESTILO: {req.get('style', 'No especificado')}

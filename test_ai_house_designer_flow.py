@@ -36,3 +36,14 @@ def test_normalize_non_numeric_values():
     # since value not numeric and we asked for solar, should get minimal
     assert normalized['paneles_solares'] == PANEL_MIN_M2
     assert 'salon' in normalized
+
+
+def test_strip_other_energy_keys():
+    # if the proposal includes aerotermia etc these should be removed
+    prop = {'aerotermia': 1, 'geotermia': 2, 'salon': 20}
+    normalized = _normalize_ai_proposal(prop, energy_list=['aerotermia','geotermia','solar'])
+    assert 'aerotermia' not in normalized
+    assert 'geotermia' not in normalized
+    # solar was in energy_list but there is no solar key so panel minimum added
+    assert normalized['paneles_solares'] == PANEL_MIN_M2
+    assert normalized['salon'] == 20
