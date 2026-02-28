@@ -959,6 +959,7 @@ def _generate_ai_proposal(req):
 - {req['bathrooms']} baños
 - Extras: {', '.join(extras_list) if extras_list else 'ninguno'}
 - Energía/Sostenibilidad: {', '.join(energy_list) if energy_list else 'ninguno'}
+- REGLA ESTRICTA: Si incluyes paneles_solares, incluye EXACTAMENTE UNO con code "paneles_solares". NUNCA dos entradas de paneles.
 
 PETICIONES ESPECIALES DEL CLIENTE (OBLIGATORIO INCLUIR):
 {req.get('special_notes', 'ninguna')}
