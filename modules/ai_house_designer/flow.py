@@ -1375,6 +1375,30 @@ def render_step2():
                 if not keep:
                     rooms_to_remove.append(i)
         
+        # SISTEMAS ENERGÉTICOS — costes fijos opcionales
+        ENERGY_COSTS = {
+            'aerotermia':  ('🌡️ Aerotermia',             8000),
+            'geotermia':   ('🌍 Geotermia',              12000),
+            'rainwater':   ('💧 Recuperación Agua Lluvia', 3500),
+            'insulation':  ('🌿 Aislamiento Natural',     2000),
+            'domotic':     ('🏠 Domótica',                5000),
+        }
+        energy_selected = req.get('energy', {})
+        energy_cost_total = 0
+        energy_keep = {}
+        for key, (label, cost) in ENERGY_COSTS.items():
+            if energy_selected.get(key):
+                keep_e = st.checkbox(
+                    f"{label} · €{cost:,}",
+                    value=True,
+                    key=f"keep_energy_{key}"
+                )
+                energy_keep[key] = keep_e
+                if keep_e:
+                    energy_cost_total += cost
+        st.session_state['energy_cost_total'] = energy_cost_total
+        st.session_state['energy_keep'] = energy_keep
+
         # Eliminar desmarcados
         for idx in sorted(rooms_to_remove, reverse=True):
             design.rooms.pop(idx)
