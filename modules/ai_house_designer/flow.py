@@ -957,7 +957,16 @@ def _normalize_ai_proposal(proposal: dict, energy_list: list) -> dict:
                 pass
             keys_to_remove.append(k)
 
-    # eliminar las claves antiguas
+    # quitar también claves de sistemas energéticos no espaciales
+    # si el usuario marcó cualquier energía distinta de solar, eliminamos
+    # posibles entradas generadas por la IA que mencionen el término.
+    for en in energy_list:
+        if en != 'solar':
+            for k in list(proposal.keys()):
+                if en.lower() in k.lower():
+                    proposal.pop(k, None)
+
+    # eliminar las claves antiguas asociadas a paneles
     for k in keys_to_remove:
         proposal.pop(k, None)
 
@@ -1000,6 +1009,7 @@ def _generate_ai_proposal(req):
 - {req['bathrooms']} baños
 - Extras: {', '.join(extras_list) if extras_list else 'ninguno'}
 - Energía/Sostenibilidad: {', '.join(energy_list) if energy_list else 'ninguno'}
+- **IMPORTANTE**: No transformes ninguna energía/sostenibilidad salvo los paneles en habitaciones. Es decir, no crees espacios llamados "aerotermia", "geotermia", "domótica", "rainwater", "insulation" ni similares. Esas tecnologías sólo deben aparecer en el análisis escrito, nunca en el plano ni como habitaciones.
 - REGLA ESTRICTA: Si en la lista aparece "solar" (paneles solares), incluye EXACTAMENTE UNO con code "paneles_solares" en el JSON. NUNCA dos entradas de paneles.
 
 PETICIONES ESPECIALES DEL CLIENTE (OBLIGATORIO INCLUIR):
