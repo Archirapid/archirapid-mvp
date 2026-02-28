@@ -3,7 +3,7 @@ Editor 3D avanzado usando Babylon.js
 v3.0 - Panel numérico + paredes sincronizadas + CTE + GLB
 """
 
-def generate_babylon_html(rooms_data, total_width, total_depth):
+def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos aguas (clásico, eficiente)"):
     """
     Genera HTML con Babylon.js editor
 
@@ -182,6 +182,7 @@ def generate_babylon_html(rooms_data, total_width, total_depth):
         const roomsData = {rooms_js};
         const totalWidth = {total_width};
         const totalDepth = {total_depth};
+        const roofType = "{roof_type}";
         const WALL_H = 2.7;
         const WALL_T = 0.15;
         const COST_PER_M2 = 1500;

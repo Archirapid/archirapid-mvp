@@ -1668,7 +1668,8 @@ def render_step3_editor():
             total_width = 10
             total_depth = 10
         
-        html_editor = generate_babylon_html(layout_result, total_width, total_depth)
+        roof_type = st.session_state.get('request', {}).get('roof_type', 'Dos aguas (clásico, eficiente)')
+        html_editor = generate_babylon_html(layout_result, total_width, total_depth, roof_type)
         
         # Guardar HTML en session_state para renderizar embebido
         st.session_state["babylon_html"] = html_editor
