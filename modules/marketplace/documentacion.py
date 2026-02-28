@@ -34,6 +34,15 @@ def generar_memoria_constructiva(plan_json, superficie_finca):
 
     estancias_texto = "\n".join(estancias)
 
+    # extraer datos energéticos si se proveen
+    energy_sys = plan_json.get("energy_systems", [])
+    energy_cost = plan_json.get("energy_extras_cost", 0)
+    if energy_sys:
+        energy_section = "\n".join([f"- {s.capitalize()}" for s in energy_sys])
+        ener_text = f"\n\n7. SISTEMAS ENERGÉTICOS SELECCIONADOS\n{energy_section}\nCosto asociado: €{energy_cost:,}\n"
+    else:
+        ener_text = ""
+
     memoria = f"""
 MEMORIA CONSTRUCTIVA (MVP - ARCHIRAPID)
 
@@ -43,7 +52,7 @@ MEMORIA CONSTRUCTIVA (MVP - ARCHIRAPID)
 - Superficie total proyectada: {total:.1f} m²
 
 2. DISTRIBUCIÓN DE ESTANCIAS
-{estancias_texto}
+{estancias_texto}{ener_text}
 
 3. CONSIDERACIONES TÉCNICAS
 - Cimentación: Losa de hormigón armado o zapatas corridas (a definir según estudio geotécnico)
@@ -100,9 +109,14 @@ def generar_presupuesto_estimado(plan_json, coste_m2=900.0):
     honorarios_profesionales = subtotal_obra * 0.12  # 12% aproximado
     impuestos = (subtotal_obra + honorarios_profesionales) * 0.10  # 10% IVA aproximado
     imprevistos = subtotal_obra * 0.05  # 5% imprevistos
+    # añadir coste energético si viene
+    energy_cost = plan_json.get("energy_extras_cost", 0)
+    if energy_cost:
+        subtotal_obra += energy_cost
+
     total_estimado = subtotal_obra + honorarios_profesionales + impuestos + imprevistos
 
-    return {
+    result = {
         "coste_m2": coste_m2,
         "superficie_total": total,
         "subtotal_obra": subtotal_obra,
@@ -112,6 +126,10 @@ def generar_presupuesto_estimado(plan_json, coste_m2=900.0):
         "total_estimado": total_estimado,
         "nota": "Presupuesto orientativo para MVP. No incluye terrenos, licencias ni costes reales de materiales."
     }
+    if energy_cost:
+        result["energy_extras_cost"] = energy_cost
+        result["energy_systems"] = plan_json.get("energy_systems", [])
+    return result
 
 
 def generar_plano_cad(plan_json):
