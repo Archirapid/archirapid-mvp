@@ -268,14 +268,16 @@ def generate_babylon_html(rooms_data, total_width, total_depth):
             if (zone === 'day')        fMat.diffuseColor = new BABYLON.Color3(0.96, 0.94, 0.88);
             else if (zone === 'night') fMat.diffuseColor = new BABYLON.Color3(0.88, 0.93, 0.98);
             else if (zone === 'wet')   fMat.diffuseColor = new BABYLON.Color3(0.85, 0.95, 0.98);
-            else if (zone === 'exterior' || zone === 'garden')
-                                        fMat.diffuseColor = new BABYLON.Color3(0.75, 0.90, 0.70);
-            else                        fMat.diffuseColor = new BABYLON.Color3(0.94, 0.93, 0.90);
+            else if (zone === 'exterior') fMat.diffuseColor = new BABYLON.Color3(0.75, 0.90, 0.70);
+            else if (zone === 'garden')   fMat.diffuseColor = new BABYLON.Color3(0.20, 0.55, 0.85);
+            else                          fMat.diffuseColor = new BABYLON.Color3(0.94, 0.93, 0.90);
 
             floor.material = fMat;
 
-            // Paredes
-            _buildWalls(i, rx, rz, rw, rd);
+            // Paredes solo en zonas habitables
+            if (zone !== 'garden' && zone !== 'exterior') {{
+                _buildWalls(i, rx, rz, rw, rd);
+            }}
 
             // Etiqueta
             _buildLabel(i, rx, rz, rw, rd);
@@ -491,7 +493,10 @@ def generate_babylon_html(rooms_data, total_width, total_depth):
             roomsData[i].depth = rd;
 
             _disposeWalls(i);
-            _buildWalls(i, rx, rz, rw, rd);
+            const zoneS = (roomsData[i].zone || '').toLowerCase();
+            if (zoneS !== 'garden' && zoneS !== 'exterior') {{
+                _buildWalls(i, rx, rz, rw, rd);
+            }}
             _buildLabel(i, rx, rz, rw, rd);
         }}
 
