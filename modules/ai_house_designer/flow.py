@@ -133,6 +133,8 @@ def get_current_design_data():
 
 
 def main():
+    # asegurar que el selector de páginas del app principal se mantiene
+    st.session_state['selected_page'] = "Diseñador de Vivienda"
     # ============================================
     # 🔗 CONEXIÓN CON DATOS DE LA FINCA COMPRADA
     # ============================================
@@ -217,6 +219,16 @@ def main():
     # Inicializar el paso si no existe
     if "ai_house_step" not in st.session_state:
         st.session_state["ai_house_step"] = 1
+    # sanitizar valores extraños (ej. 0) que puedan haberse quedado en la sesión
+    else:
+        val = st.session_state.get("ai_house_step")
+        try:
+            if not isinstance(val, int) or val < 1 or val > 4:
+                st.session_state["ai_house_step"] = 1
+                st.warning("⚠️ Valor de paso inválido detectado, reiniciando al Paso 1")
+        except Exception:
+            st.session_state["ai_house_step"] = 1
+            st.warning("⚠️ Error leyendo el paso; reiniciando al Paso 1")
     
     ai_house_step = st.session_state["ai_house_step"]
     
@@ -970,8 +982,10 @@ def render_step1():
         }
         
         st.session_state["ai_house_requirements"] = req
+        # asegurar que avanzamos al paso 2 incluso si la IA falla
+        st.session_state["ai_house_step"] = 2
         
-        # Llamar a IA
+        # Llamar a IA (puede continuar ajustando la propuesta en segundo plano)
         _generate_ai_proposal(req)
 
 def _normalize_ai_proposal(proposal: dict, energy_list: list) -> dict:
@@ -1980,24 +1994,43 @@ def render_step3():
         
         import pandas as pd
         
+        # construir partidas iniciales sin contar extras energéticos
         partidas = [
-            ("1. Cimentación", f"€{foundation_cost:,}", 
-             f"{int(foundation_cost/total_cost*100)}%",
+            ("Cimentación", f"€{foundation_cost:,}", 
+             f"{int(foundation_cost/total_with_extras*100)}%",
              "Zapatas/losa según estudio geotécnico"),
-            ("2. Estructura y cubierta", f"€{int(construction_cost*0.35):,}",
-             "32%", "Estructura + tejado + cerramientos ext."),
-            ("3. Cerramientos y tabiquería", f"€{int(construction_cost*0.20):,}",
-             "18%", "Fachada, ventanas, puertas, tabiques int."),
-            ("4. Instalaciones", f"€{installation_cost:,}",
-             f"{int(installation_cost/total_cost*100)}%",
+            ("Estructura y cubierta", f"€{int(construction_cost*0.35):,}",
+             f"{int((construction_cost*0.35)/total_with_extras*100)}%",
+             "Estructura + tejado + cerramientos ext."),
+            ("Cerramientos y tabiquería", f"€{int(construction_cost*0.20):,}",
+             f"{int((construction_cost*0.20)/total_with_extras*100)}%",
+             "Fachada, ventanas, puertas, tabiques int."),
+            ("Instalaciones", f"€{installation_cost:,}",
+             f"{int(installation_cost/total_with_extras*100)}%",
              "Elec., fontanería, climatización, domótica"),
-            ("5. Acabados", f"€{int(construction_cost*0.25):,}",
-             "23%", "Pavimentos, pintura, cocina, baños"),
-            ("6. Sistemas sostenibles", f"€{int(construction_cost*0.10):,}",
-             "9%", "Paneles, aerotermia, depósito lluvia"),
-            ("7. Honorarios técnicos", f"€{architecture_cost:,}",
-             "8%", "Arquitecto, aparejador, licencias"),
+            ("Acabados", f"€{int(construction_cost*0.25):,}",
+             f"{int((construction_cost*0.25)/total_with_extras*100)}%",
+             "Pavimentos, pintura, cocina, baños"),
         ]
+        # añadir cada sistema energético seleccionado
+        energy_extra_cost = 0
+        if 'keep_energy_flags' in locals():
+            for en, keep in keep_energy_flags.items():
+                if keep and en in ENERGY_COSTS:
+                    cost = ENERGY_COSTS[en]
+                    energy_extra_cost += cost
+                    partidas.append((
+                        en.capitalize(),
+                        f"€{cost:,}",
+                        f"{int(cost/total_with_extras*100)}%",
+                        f"Sistema energético: {en}"
+                    ))
+        # honorarios técnicos finales
+        partidas.append(
+            ("Honorarios técnicos", f"€{architecture_cost:,}",
+             f"{int(architecture_cost/total_with_extras*100)}%",
+             "Arquitecto, aparejador, licencias")
+        )
         
         df = pd.DataFrame(partidas, 
                          columns=["Partida", "Coste", "%", "Descripción"])
