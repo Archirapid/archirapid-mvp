@@ -11,6 +11,44 @@ from .data_model import create_example_design, HouseDesign, Plot, RoomType, Room
 # ---------------------------------------------------------------------------
 PANEL_MIN_M2 = 3  # superficie mínima de los paneles solares dentro del presupuesto
 
+# costes orientativos de los sistemas energéticos (simulados)
+ENERGY_COSTS = {
+    'aerotermia': 15000,
+    'geotermia': 20000,
+    'rainwater': 3000,
+    'insulation': 4000,
+    'domotic': 6000
+}
+
+
+def calculate_total_with_extras(design, energy_flags: dict, keep_energy: dict = None) -> float:
+    """Calcula el coste total tras sliders y eliminación de extras.
+
+    - `design` es un HouseDesign cuyo atributo .rooms ya refleja los cambios
+      de sliders y los items borrados.
+    - `energy_flags` contiene las opciones seleccionadas por el usuario (True/False).
+    - `keep_energy` es un diccionario opcional con banderas que indican si se
+      mantiene cada sistema energético; si falta una entrada se asume True.
+
+    Devuelve la cifra total (obra + cimientos + instalaciones + costes
+    energéticos opcionales).
+    """
+    total_area_final = sum([r.area_m2 for r in design.rooms])
+    total_cost_final = sum([r.area_m2 * r.room_type.base_cost_per_m2 for r in design.rooms])
+
+    # coste de sistemas energéticos que se mantienen
+    energy_extra_cost = 0
+    keep_energy = keep_energy or {}
+    for en, cost in ENERGY_COSTS.items():
+        if energy_flags.get(en) and keep_energy.get(en, True):
+            energy_extra_cost += cost
+
+    foundation_cost = int(total_area_final * 180)
+    installation_cost = int(total_area_final * 150)
+
+    return total_cost_final + energy_extra_cost + foundation_cost + installation_cost
+
+
 
 
 # ============================================================
@@ -1365,33 +1403,60 @@ def render_step2():
         
         # ELIMINAR EXTRAS
         st.markdown("#### Eliminar Extras (Ahorrar)")
-        
-        optional_codes = ['piscina', 'garaje', 'porche', 'bodega', 
-                         'huerto', 'paneles', 'bomba', 'accesib']
-        
+
+        # recopilamos primero las habitaciones opcionales y las energéticas
+        optional_codes = ['piscina', 'garaje', 'porche', 'bodega',
+                          'huerto', 'paneles', 'bomba', 'accesib']
+
+        extras_items = []  # (tipo, identificador, objeto_o_nombre, coste)
         rooms_to_remove = []
+
+        # extras de habitaciones
         for i, room in enumerate(design.rooms):
             code = room.room_type.code.lower()
             if any(x in code for x in optional_codes):
                 cost = room.area_m2 * room.room_type.base_cost_per_m2
-                keep = st.checkbox(
+                extras_items.append(('room', i, room, cost))
+
+        # extras energéticos (no espaciales)
+        for en, cost in ENERGY_COSTS.items():
+            if req.get('energy', {}).get(en):
+                extras_items.append(('energy', en, None, cost))
+
+        # dibujar en cuadrícula de 4 columnas
+        cols = st.columns(4)
+        keep_energy_flags = {}
+
+        for idx, item in enumerate(extras_items):
+            col = cols[idx % 4]
+            if item[0] == 'room':
+                _, i_room, room, cost = item
+                keep = col.checkbox(
                     f"{room.room_type.name} · €{cost:,.0f}",
                     value=True,
-                    key=f"keep_{i}"
+                    key=f"keep_{i_room}"
                 )
                 if not keep:
-                    rooms_to_remove.append(i)
-        
-        # Eliminar desmarcados
+                    rooms_to_remove.append(i_room)
+            else:
+                _, en_name, _, cost = item
+                key = f"keep_energy_{en_name}"
+                keep = col.checkbox(
+                    f"{en_name.capitalize()} · €{cost:,.0f}",
+                    value=True,
+                    key=key
+                )
+                keep_energy_flags[en_name] = keep
+
+        # Eliminar habitaciones desmarcadas
         for idx in sorted(rooms_to_remove, reverse=True):
             design.rooms.pop(idx)
-        
+
         # RECALCULAR MÉTRICAS FINALES (después de sliders y checkboxes)
+        total_with_extras = calculate_total_with_extras(design,
+                                                        req.get('energy', {}),
+                                                        keep_energy_flags)
         total_area_final = sum([r.area_m2 for r in design.rooms])
-        total_cost_final = sum([r.area_m2 * r.room_type.base_cost_per_m2 for r in design.rooms])
-        foundation_cost = int(total_area_final * 180)
-        installation_cost = int(total_area_final * 150)
-        total_with_extras = total_cost_final + foundation_cost + installation_cost
         budget_pct = total_with_extras / budget * 100
         
         if budget_pct <= 90:
