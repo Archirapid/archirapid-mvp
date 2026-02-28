@@ -1004,6 +1004,10 @@ Responde SOLO con un JSON válido (sin markdown) con habitaciones y m². Ejemplo
                 response_text = response_text[start:end].strip()
             
             ai_proposal = json.loads(response_text)
+            # si el input solicito paneles_solares y la IA no lo devolvió, lo añadimos
+            if 'paneles_solares' in energy_list and 'paneles_solares' not in ai_proposal:
+                # usar el m2 mínimo definido en room_types
+                ai_proposal['paneles_solares'] = room_types['paneles_solares'].min_m2
             
             # Guardar propuesta
             req["ai_room_proposal"] = ai_proposal
