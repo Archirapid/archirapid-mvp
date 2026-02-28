@@ -1116,6 +1116,13 @@ def render_step2():
     req = st.session_state.get("ai_house_requirements", {})
     proposal = req.get("ai_room_proposal", {})
     
+    # doble chequeo: si el cliente pidió energía solar y por algún motivo la
+    # propuesta llegó vacía o con claves erroneas, normalizamos/regeneramos aquí
+    if req.get('energy', {}).get('solar'):
+        proposal = _normalize_ai_proposal(proposal, ['solar'])
+        req["ai_room_proposal"] = proposal
+        st.session_state["ai_house_requirements"] = req
+
     if not proposal:
         st.warning("Primero completa el Paso 1")
         if st.button("← Volver al Paso 1"):
