@@ -1363,41 +1363,44 @@ def render_step2():
                          'huerto', 'paneles', 'bomba', 'accesib']
         
         rooms_to_remove = []
+        # Construir lista unificada: habitaciones opcionales + sistemas energéticos
+        ENERGY_COSTS = {
+            'aerotermia': ('🌡️ Aerotermia · €8,000',    8000),
+            'geotermia':  ('🌍 Geotermia · €12,000',    12000),
+            'rainwater':  ('💧 Agua Lluvia · €3,500',    3500),
+            'insulation': ('🌿 Aislamiento · €2,000',    2000),
+            'domotic':    ('🏠 Domótica · €5,000',       5000),
+        }
+        energy_selected = req.get('energy', {})
+        energy_cost_total = 0
+        energy_keep = {}
+
+        # Grid 3 columnas — todos los extras juntos
         optional_rooms = [(i, room) for i, room in enumerate(design.rooms)
                           if any(x in room.room_type.code.lower() for x in optional_codes)]
+        energy_items = [(k, label, cost) for k, (label, cost) in ENERGY_COSTS.items()
+                        if energy_selected.get(k)]
+        total_items = len(optional_rooms) + len(energy_items)
         cols = st.columns(3)
-        for col_idx, (i, room) in enumerate(optional_rooms):
+        col_idx = 0
+        for i, room in optional_rooms:
             cost = room.area_m2 * room.room_type.base_cost_per_m2
             with cols[col_idx % 3]:
                 keep = st.checkbox(
-                    f"{room.room_type.name}\n€{cost:,.0f}",
+                    f"{room.room_type.name} · €{cost:,.0f}",
                     value=True,
                     key=f"keep_{i}"
                 )
                 if not keep:
                     rooms_to_remove.append(i)
-        
-        # SISTEMAS ENERGÉTICOS — costes fijos opcionales
-        ENERGY_COSTS = {
-            'aerotermia':  ('🌡️ Aerotermia',             8000),
-            'geotermia':   ('🌍 Geotermia',              12000),
-            'rainwater':   ('💧 Recuperación Agua Lluvia', 3500),
-            'insulation':  ('🌿 Aislamiento Natural',     2000),
-            'domotic':     ('🏠 Domótica',                5000),
-        }
-        energy_selected = req.get('energy', {})
-        energy_cost_total = 0
-        energy_keep = {}
-        for key, (label, cost) in ENERGY_COSTS.items():
-            if energy_selected.get(key):
-                keep_e = st.checkbox(
-                    f"{label} · €{cost:,}",
-                    value=True,
-                    key=f"keep_energy_{key}"
-                )
+            col_idx += 1
+        for key, label, cost in energy_items:
+            with cols[col_idx % 3]:
+                keep_e = st.checkbox(label, value=True, key=f"keep_energy_{key}")
                 energy_keep[key] = keep_e
                 if keep_e:
                     energy_cost_total += cost
+            col_idx += 1
         st.session_state['energy_cost_total'] = energy_cost_total
         st.session_state['energy_keep'] = energy_keep
 
