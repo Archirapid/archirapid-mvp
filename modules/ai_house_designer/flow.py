@@ -1551,6 +1551,16 @@ def render_step2():
                         f"- {r.room_type.name}: {r.area_m2:.0f} m² ({r.area_m2:.1f}m × {r.area_m2/max(r.area_m2**0.5,1):.1f}m aprox)"
                         for r in design.rooms
                     ])
+                    ENERGY_LABELS = {
+                        'aerotermia': 'Aerotermia', 'geotermia': 'Geotermia',
+                        'rainwater': 'Recuperación agua lluvia',
+                        'insulation': 'Aislamiento natural', 'domotic': 'Domótica',
+                        'solar': 'Paneles solares',
+                    }
+                    energy_sel = req.get('energy', {})
+                    systems_summary = ", ".join([
+                        ENERGY_LABELS[k] for k in ENERGY_LABELS if energy_sel.get(k)
+                    ]) or "ninguno"
                     
                     response = client.chat.completions.create(
                         model="llama-3.3-70b-versatile",
@@ -1561,14 +1571,16 @@ Analiza esta distribución:
 TOTAL: {total_area_final:.0f} m²
 PRESUPUESTO: €{budget:,}
 ESTILO: {req.get('style', 'No especificado')}
+SISTEMAS SOSTENIBLES SELECCIONADOS: {systems_summary}
 
 Evalúa brevemente:
 1. ¿Las medidas son correctas para una vivienda real? (mínimos CTE)
 2. ¿Algún espacio demasiado grande o pequeño?
 3. ¿El presupuesto es realista?
 4. Una sugerencia de mejora concreta
+5. En 1 frase por sistema: comenta profesionalmente cada sistema sostenible seleccionado indicando que se instalará en obra (no en el plano)
 
-Máximo 150 palabras. Usa: ✅ para correcto, ⚠️ para mejorable, ❌ para problema."""}],
+Máximo 200 palabras. Usa: ✅ para correcto, ⚠️ para mejorable, ❌ para problema."""}],
                         temperature=0.3,
                         max_tokens=300
                     )
