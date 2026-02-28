@@ -1413,7 +1413,8 @@ def render_step2():
         total_cost_final = sum([r.area_m2 * r.room_type.base_cost_per_m2 for r in design.rooms])
         foundation_cost = int(total_area_final * 180)
         installation_cost = int(total_area_final * 150)
-        total_with_extras = total_cost_final + foundation_cost + installation_cost
+        energy_cost_total = st.session_state.get('energy_cost_total', 0)
+        total_with_extras = total_cost_final + foundation_cost + installation_cost + energy_cost_total
         budget_pct = total_with_extras / budget * 100
         
         if budget_pct <= 90:
@@ -1498,6 +1499,13 @@ def render_step2():
             "€/m²": "€150",
             "Total": f"€{installation_cost:,}"
         })
+        if energy_cost_total > 0:
+            table_data.append({
+                "Espacio": "Sistemas sostenibles",
+                "m²": "-",
+                "€/m²": "-",
+                "Total": f"€{energy_cost_total:,}"
+            })
         
         df = pd.DataFrame(table_data)
         st.dataframe(df, use_container_width=True, hide_index=True)
@@ -1956,8 +1964,9 @@ def render_step3():
              "Elec., fontanería, climatización, domótica"),
             ("5. Acabados", f"€{int(construction_cost*0.25):,}",
              "23%", "Pavimentos, pintura, cocina, baños"),
-            ("6. Sistemas sostenibles", f"€{int(construction_cost*0.10):,}",
-             "9%", "Paneles, aerotermia, depósito lluvia"),
+            ("6. Sistemas sostenibles", f"€{st.session_state.get('energy_cost_total', int(construction_cost*0.10)):,}",
+             f"{int(st.session_state.get('energy_cost_total', construction_cost*0.10)/max(total_cost,1)*100)}%",
+             "Paneles, aerotermia, geotermia, domótica, agua lluvia"),
             ("7. Honorarios técnicos", f"€{architecture_cost:,}",
              "8%", "Arquitecto, aparejador, licencias"),
         ]
