@@ -11,44 +11,6 @@ from .data_model import create_example_design, HouseDesign, Plot, RoomType, Room
 # ---------------------------------------------------------------------------
 PANEL_MIN_M2 = 3  # superficie mínima de los paneles solares dentro del presupuesto
 
-# costes orientativos de los sistemas energéticos (simulados)
-ENERGY_COSTS = {
-    'aerotermia': 15000,
-    'geotermia': 20000,
-    'rainwater': 3000,
-    'insulation': 4000,
-    'domotic': 6000
-}
-
-
-def calculate_total_with_extras(design, energy_flags: dict, keep_energy: dict = None) -> float:
-    """Calcula el coste total tras sliders y eliminación de extras.
-
-    - `design` es un HouseDesign cuyo atributo .rooms ya refleja los cambios
-      de sliders y los items borrados.
-    - `energy_flags` contiene las opciones seleccionadas por el usuario (True/False).
-    - `keep_energy` es un diccionario opcional con banderas que indican si se
-      mantiene cada sistema energético; si falta una entrada se asume True.
-
-    Devuelve la cifra total (obra + cimientos + instalaciones + costes
-    energéticos opcionales).
-    """
-    total_area_final = sum([r.area_m2 for r in design.rooms])
-    total_cost_final = sum([r.area_m2 * r.room_type.base_cost_per_m2 for r in design.rooms])
-
-    # coste de sistemas energéticos que se mantienen
-    energy_extra_cost = 0
-    keep_energy = keep_energy or {}
-    for en, cost in ENERGY_COSTS.items():
-        if energy_flags.get(en) and keep_energy.get(en, True):
-            energy_extra_cost += cost
-
-    foundation_cost = int(total_area_final * 180)
-    installation_cost = int(total_area_final * 150)
-
-    return total_cost_final + energy_extra_cost + foundation_cost + installation_cost
-
-
 
 
 # ============================================================
@@ -133,8 +95,6 @@ def get_current_design_data():
 
 
 def main():
-    # asegurar que el selector de páginas del app principal se mantiene
-    st.session_state['selected_page'] = "Diseñador de Vivienda"
     # ============================================
     # 🔗 CONEXIÓN CON DATOS DE LA FINCA COMPRADA
     # ============================================
@@ -219,16 +179,6 @@ def main():
     # Inicializar el paso si no existe
     if "ai_house_step" not in st.session_state:
         st.session_state["ai_house_step"] = 1
-    # sanitizar valores extraños (ej. 0) que puedan haberse quedado en la sesión
-    else:
-        val = st.session_state.get("ai_house_step")
-        try:
-            if not isinstance(val, int) or val < 1 or val > 4:
-                st.session_state["ai_house_step"] = 1
-                st.warning("⚠️ Valor de paso inválido detectado, reiniciando al Paso 1")
-        except Exception:
-            st.session_state["ai_house_step"] = 1
-            st.warning("⚠️ Error leyendo el paso; reiniciando al Paso 1")
     
     ai_house_step = st.session_state["ai_house_step"]
     
@@ -982,10 +932,8 @@ def render_step1():
         }
         
         st.session_state["ai_house_requirements"] = req
-        # asegurar que avanzamos al paso 2 incluso si la IA falla
-        st.session_state["ai_house_step"] = 2
         
-        # Llamar a IA (puede continuar ajustando la propuesta en segundo plano)
+        # Llamar a IA
         _generate_ai_proposal(req)
 
 def _normalize_ai_proposal(proposal: dict, energy_list: list) -> dict:
@@ -1001,7 +949,6 @@ def _normalize_ai_proposal(proposal: dict, energy_list: list) -> dict:
     keys_to_remove = []
 
     for k, v in list(proposal.items()):
-        # recoger cualquier mención a paneles/solar para sumar y eliminar
         if 'panel' in k.lower() or 'solar' in k.lower():
             try:
                 panel_area += float(v)
@@ -1010,15 +957,7 @@ def _normalize_ai_proposal(proposal: dict, energy_list: list) -> dict:
                 pass
             keys_to_remove.append(k)
 
-    # quitar también claves de sistemas energéticos no espaciales
-    for en in energy_list:
-        if en != 'solar':
-            # eliminar claves que contengan el término
-            for k in list(proposal.keys()):
-                if en.lower() in k.lower():
-                    proposal.pop(k, None)
-
-    # eliminar las claves antiguas asociadas a paneles
+    # eliminar las claves antiguas
     for k in keys_to_remove:
         proposal.pop(k, None)
 
@@ -1061,8 +1000,7 @@ def _generate_ai_proposal(req):
 - {req['bathrooms']} baños
 - Extras: {', '.join(extras_list) if extras_list else 'ninguno'}
 - Energía/Sostenibilidad: {', '.join(energy_list) if energy_list else 'ninguno'}
-- **IMPORTANTE**: No transformes ninguna energía/sostenibilidad salvo los paneles en habitaciones. Es decir, no crees espacios llamados "aerotermia", "geotermia", "domótica", "rainwater", "insulation" ni similares. Esas tecnologías sólo deben aparecer en el análisis escrito, nunca en el plano ni como habitaciones.
-- REGLA ESTRICTA: Si en la lista aparece "solar" (paneles solares), incluye EXACTAMENTE UNO con code "paneles_solares" en el JSON. El nombre debe coincidir *exactamente* (sin tilde ni espacios) y no puede haber otro registro similar. NUNCA dos entradas de paneles.
+- REGLA ESTRICTA: Si en la lista aparece "solar" (paneles solares), incluye EXACTAMENTE UNO con code "paneles_solares" en el JSON. NUNCA dos entradas de paneles.
 
 PETICIONES ESPECIALES DEL CLIENTE (OBLIGATORIO INCLUIR):
 {req.get('special_notes', 'ninguna')}
@@ -1178,13 +1116,6 @@ def render_step2():
     req = st.session_state.get("ai_house_requirements", {})
     proposal = req.get("ai_room_proposal", {})
     
-    # doble chequeo: si el cliente pidió energía solar y por algún motivo la
-    # propuesta llegó vacía o con claves erroneas, normalizamos/regeneramos aquí
-    if req.get('energy', {}).get('solar'):
-        proposal = _normalize_ai_proposal(proposal, ['solar'])
-        req["ai_room_proposal"] = proposal
-        st.session_state["ai_house_requirements"] = req
-
     if not proposal:
         st.warning("Primero completa el Paso 1")
         if st.button("← Volver al Paso 1"):
@@ -1417,60 +1348,33 @@ def render_step2():
         
         # ELIMINAR EXTRAS
         st.markdown("#### Eliminar Extras (Ahorrar)")
-
-        # recopilamos primero las habitaciones opcionales y las energéticas
-        optional_codes = ['piscina', 'garaje', 'porche', 'bodega',
-                          'huerto', 'paneles', 'bomba', 'accesib']
-
-        extras_items = []  # (tipo, identificador, objeto_o_nombre, coste)
+        
+        optional_codes = ['piscina', 'garaje', 'porche', 'bodega', 
+                         'huerto', 'paneles', 'bomba', 'accesib']
+        
         rooms_to_remove = []
-
-        # extras de habitaciones
         for i, room in enumerate(design.rooms):
             code = room.room_type.code.lower()
             if any(x in code for x in optional_codes):
                 cost = room.area_m2 * room.room_type.base_cost_per_m2
-                extras_items.append(('room', i, room, cost))
-
-        # extras energéticos (no espaciales)
-        for en, cost in ENERGY_COSTS.items():
-            if req.get('energy', {}).get(en):
-                extras_items.append(('energy', en, None, cost))
-
-        # dibujar en cuadrícula de 4 columnas
-        cols = st.columns(4)
-        keep_energy_flags = {}
-
-        for idx, item in enumerate(extras_items):
-            col = cols[idx % 4]
-            if item[0] == 'room':
-                _, i_room, room, cost = item
-                keep = col.checkbox(
+                keep = st.checkbox(
                     f"{room.room_type.name} · €{cost:,.0f}",
                     value=True,
-                    key=f"keep_{i_room}"
+                    key=f"keep_{i}"
                 )
                 if not keep:
-                    rooms_to_remove.append(i_room)
-            else:
-                _, en_name, _, cost = item
-                key = f"keep_energy_{en_name}"
-                keep = col.checkbox(
-                    f"{en_name.capitalize()} · €{cost:,.0f}",
-                    value=True,
-                    key=key
-                )
-                keep_energy_flags[en_name] = keep
-
-        # Eliminar habitaciones desmarcadas
+                    rooms_to_remove.append(i)
+        
+        # Eliminar desmarcados
         for idx in sorted(rooms_to_remove, reverse=True):
             design.rooms.pop(idx)
-
+        
         # RECALCULAR MÉTRICAS FINALES (después de sliders y checkboxes)
-        total_with_extras = calculate_total_with_extras(design,
-                                                        req.get('energy', {}),
-                                                        keep_energy_flags)
         total_area_final = sum([r.area_m2 for r in design.rooms])
+        total_cost_final = sum([r.area_m2 * r.room_type.base_cost_per_m2 for r in design.rooms])
+        foundation_cost = int(total_area_final * 180)
+        installation_cost = int(total_area_final * 150)
+        total_with_extras = total_cost_final + foundation_cost + installation_cost
         budget_pct = total_with_extras / budget * 100
         
         if budget_pct <= 90:
@@ -1608,19 +1512,13 @@ def render_step2():
                         f"- {r.room_type.name}: {r.area_m2:.0f} m² ({r.area_m2:.1f}m × {r.area_m2/max(r.area_m2**0.5,1):.1f}m aprox)"
                         for r in design.rooms
                     ])
-                    # anotar extras energéticos para que la IA comente
-                    energy_notes = []
-                    for en, val in req.get('energy', {}).items():
-                        if val:
-                            energy_notes.append(en)
-                    energy_text = ("\nSistemas elegidos: " + ", ".join(energy_notes)) if energy_notes else ""
                     
                     response = client.chat.completions.create(
                         model="llama-3.3-70b-versatile",
                         messages=[{"role": "user", "content": f"""Eres arquitecto experto en vivienda sostenible española.
 
 Analiza esta distribución:
-{rooms_summary}{energy_text}
+{rooms_summary}
 TOTAL: {total_area_final:.0f} m²
 PRESUPUESTO: €{budget:,}
 ESTILO: {req.get('style', 'No especificado')}
@@ -1994,43 +1892,24 @@ def render_step3():
         
         import pandas as pd
         
-        # construir partidas iniciales sin contar extras energéticos
         partidas = [
-            ("Cimentación", f"€{foundation_cost:,}", 
-             f"{int(foundation_cost/total_with_extras*100)}%",
+            ("1. Cimentación", f"€{foundation_cost:,}", 
+             f"{int(foundation_cost/total_cost*100)}%",
              "Zapatas/losa según estudio geotécnico"),
-            ("Estructura y cubierta", f"€{int(construction_cost*0.35):,}",
-             f"{int((construction_cost*0.35)/total_with_extras*100)}%",
-             "Estructura + tejado + cerramientos ext."),
-            ("Cerramientos y tabiquería", f"€{int(construction_cost*0.20):,}",
-             f"{int((construction_cost*0.20)/total_with_extras*100)}%",
-             "Fachada, ventanas, puertas, tabiques int."),
-            ("Instalaciones", f"€{installation_cost:,}",
-             f"{int(installation_cost/total_with_extras*100)}%",
+            ("2. Estructura y cubierta", f"€{int(construction_cost*0.35):,}",
+             "32%", "Estructura + tejado + cerramientos ext."),
+            ("3. Cerramientos y tabiquería", f"€{int(construction_cost*0.20):,}",
+             "18%", "Fachada, ventanas, puertas, tabiques int."),
+            ("4. Instalaciones", f"€{installation_cost:,}",
+             f"{int(installation_cost/total_cost*100)}%",
              "Elec., fontanería, climatización, domótica"),
-            ("Acabados", f"€{int(construction_cost*0.25):,}",
-             f"{int((construction_cost*0.25)/total_with_extras*100)}%",
-             "Pavimentos, pintura, cocina, baños"),
+            ("5. Acabados", f"€{int(construction_cost*0.25):,}",
+             "23%", "Pavimentos, pintura, cocina, baños"),
+            ("6. Sistemas sostenibles", f"€{int(construction_cost*0.10):,}",
+             "9%", "Paneles, aerotermia, depósito lluvia"),
+            ("7. Honorarios técnicos", f"€{architecture_cost:,}",
+             "8%", "Arquitecto, aparejador, licencias"),
         ]
-        # añadir cada sistema energético seleccionado
-        energy_extra_cost = 0
-        if 'keep_energy_flags' in locals():
-            for en, keep in keep_energy_flags.items():
-                if keep and en in ENERGY_COSTS:
-                    cost = ENERGY_COSTS[en]
-                    energy_extra_cost += cost
-                    partidas.append((
-                        en.capitalize(),
-                        f"€{cost:,}",
-                        f"{int(cost/total_with_extras*100)}%",
-                        f"Sistema energético: {en}"
-                    ))
-        # honorarios técnicos finales
-        partidas.append(
-            ("Honorarios técnicos", f"€{architecture_cost:,}",
-             f"{int(architecture_cost/total_with_extras*100)}%",
-             "Arquitecto, aparejador, licencias")
-        )
         
         df = pd.DataFrame(partidas, 
                          columns=["Partida", "Coste", "%", "Descripción"])

@@ -807,11 +807,6 @@ def main():
                                         ["Madera", "Ladrillo", "Hormigón", "Bloque"], key="mat_gemelo")
             sistema_clima = st.checkbox("Sistema climatización", key="clima_gemelo")
             paneles_solares = st.checkbox("Paneles solares", key="solar_gemelo")
-            aerotermia = st.checkbox("Aerotermia", key="aero_gemelo")
-            geotermia = st.checkbox("Geotermia", key="geo_gemelo")
-            lluvia = st.checkbox("Recuperación agua lluvia", key="rain_gemelo")
-            aislamiento = st.checkbox("Aislamiento natural", key="ins_gemelo")
-            domotica = st.checkbox("Domótica", key="domo_gemelo")
 
         # Botón de análisis IA
         if st.button("🚀 Analizar Gemelo Digital con IA", type="primary", key="analizar_gemelo"):
@@ -837,27 +832,6 @@ def main():
                         if hab["tipo"] != "garage"
                     ]
                 }
-                # añadir garage
-                # (se añade más abajo)
-                
-                # incluir datos energéticos seleccionados
-                energy_list = []
-                if paneles_solares: energy_list.append("solar")
-                if 'aerotermia' in locals() and aerotermia: energy_list.append("aerotermia")
-                if 'geotermia' in locals() and geotermia: energy_list.append("geotermia")
-                if 'lluvia' in locals() and lluvia: energy_list.append("rainwater")
-                if 'aislamiento' in locals() and aislamiento: energy_list.append("insulation")
-                if 'domotica' in locals() and domotica: energy_list.append("domotic")
-                if energy_list:
-                    plan_json["energy_systems"] = energy_list
-                    # calcular coste usando misma dict si disponible
-                    try:
-                        from modules.ai_house_designer.flow import ENERGY_COSTS
-                        cost = sum(ENERGY_COSTS.get(e,0) for e in energy_list if e != 'solar')
-                        # panel solar no lo añadimos aquí; coste ya en plan_vivienda?
-                        plan_json["energy_extras_cost"] = cost
-                    except Exception:
-                        pass
 
                 # Añadir garage si existe
                 garage_hab = next((h for h in plan_actual["distribucion"] if h["tipo"] == "garage"), None)
