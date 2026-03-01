@@ -1054,10 +1054,6 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
         }});
 
         // ================================================
-        // TOAST (mensajes flotantes)
-        // ================================================
-        function showToast(msg) {
-        // ================================================
         function showToast(msg) {{
             let t = document.getElementById('toast');
             if (!t) {{
