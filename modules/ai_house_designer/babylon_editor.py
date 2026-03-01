@@ -170,6 +170,27 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
         </div>
     </div>
 
+    <!-- PANEL TEJADO -->
+    <div id="roof-panel" style="display:none; position:absolute; top:20px; right:290px;
+         background:rgba(0,0,0,0.88); padding:14px; border-radius:12px; color:white;
+         width:200px; border:1px solid rgba(255,165,0,0.4);">
+        <h3 style="margin:0 0 10px 0; font-size:13px; color:#F39C12;">🏠 Tejado</h3>
+        <p style="font-size:11px; opacity:0.7; margin-bottom:6px;">Material:</p>
+        <select id="roof-material" onchange="changeRoofMaterial(this.value)"
+                style="width:100%; background:#222; color:white; border:1px solid #F39C12;
+                       border-radius:4px; padding:5px; font-size:12px; margin-bottom:8px;">
+            <option value="teja">🟤 Teja árabe</option>
+            <option value="pizarra">⚫ Pizarra</option>
+            <option value="zinc">🔵 Zinc</option>
+            <option value="sandwich">⬜ Panel sándwich</option>
+            <option value="vegetal">🟢 Cubierta vegetal</option>
+        </select>
+        <p style="font-size:11px; opacity:0.7; margin-bottom:4px;">Voladizo: <span id="overhang-val">0.6m</span></p>
+        <input type="range" id="overhang-slider" min="0" max="15" value="6"
+               oninput="changeOverhang(this.value)"
+               style="width:100%; accent-color:#F39C12;">
+    </div>
+
     <!-- PANEL AVISO -->
     <div id="warning-panel">
         <h3>⚠️ Importante</h3>
@@ -1010,6 +1031,32 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             }}
         }}
 
+        // Colores por material
+        const ROOF_COLORS = {{
+            'teja':      new BABYLON.Color3(0.72, 0.36, 0.18),
+            'pizarra':   new BABYLON.Color3(0.25, 0.25, 0.30),
+            'zinc':      new BABYLON.Color3(0.55, 0.60, 0.65),
+            'sandwich':  new BABYLON.Color3(0.75, 0.75, 0.78),
+            'vegetal':   new BABYLON.Color3(0.30, 0.55, 0.25),
+        }};
+        let currentRoofMaterial = 'teja';
+        let currentOverhang = 0.6;
+
+        function changeRoofMaterial(mat) {{
+            currentRoofMaterial = mat;
+            if (roofMesh && roofMesh.material) {{
+                roofMesh.material.diffuseColor = ROOF_COLORS[mat] || ROOF_COLORS['teja'];
+                showToast('Material: ' + document.getElementById('roof-material').options[
+                    document.getElementById('roof-material').selectedIndex].text);
+            }}
+        }}
+
+        function changeOverhang(val) {{
+            currentOverhang = parseFloat(val) / 10;
+            document.getElementById('overhang-val').textContent = currentOverhang.toFixed(1) + 'm';
+            if (roofActive) {{ buildRoof(); }}
+        }}
+
         function toggleRoof() {{
             const btn = document.getElementById('btn-roof');
             if (roofActive) {{
@@ -1017,12 +1064,14 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                 roofActive = false;
                 btn.textContent = '🏠 Tejado OFF';
                 btn.classList.remove('active');
+                document.getElementById('roof-panel').style.display = 'none';
                 showToast('Tejado ocultado');
             }} else {{
                 buildRoof();
                 roofActive = true;
                 btn.textContent = '🏠 Tejado ON';
                 btn.classList.add('active');
+                document.getElementById('roof-panel').style.display = 'block';
                 showToast('Tejado: ' + roofType.split('(')[0].trim());
             }}
         }}                                                                                                                             
