@@ -105,6 +105,15 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
         #budget-panel h3 {{ margin: 0 0 6px 0; color: #2ECC71; font-size: 14px; }}
         #budget-info p {{ margin: 3px 0; font-size: 12px; }}
 
+        /* BRÚJULA */
+        #compass-wrap {{
+            position: absolute; bottom: 80px; right: 20px;
+            background: rgba(0,0,0,0.75); border-radius: 50%;
+            width: 74px; height: 74px;
+            border: 1px solid rgba(255,215,0,0.4);
+            display: flex; align-items: center; justify-content: center;
+        }}
+
         /* PANEL AVISO */
         #warning-panel {{
             position: absolute; bottom: 20px; right: 20px;
@@ -135,6 +144,10 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
         <button class="tool-btn" onclick="setIsoView()">🏠 Vista 3D</button>
         <hr class="divider">
         <button class="tool-btn" id="btn-roof" onclick="toggleRoof()">🏠 Tejado OFF</button>
+        <hr class="divider">
+        <button class="tool-btn" onclick="resetLayout()">↩️ Reset Layout</button>
+        <button class="tool-btn" onclick="undoLastAction()">⬅️ Deshacer</button>
+        <button class="tool-btn" id="btn-delete" onclick="deleteSelected()" style="background:rgba(231,76,60,0.25);border-color:#E74C3C;">🗑️ Borrar seleccionado</button>
         <hr class="divider">
         <button class="tool-btn green" onclick="saveChanges()">💾 Guardar JSON</button>
         <button class="tool-btn green" id="btn-glb" onclick="exportGLB()">📦 Exportar 3D (.glb)</button>
@@ -192,6 +205,10 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
     </div>
 
     <!-- PANEL AVISO -->
+    <div id="compass-wrap">
+        <canvas id="compass-canvas" width="70" height="70"></canvas>
+    </div>
+
     <div id="warning-panel">
         <h3>⚠️ Importante</h3>
         <p>Los cambios requieren <strong>validación por arquitecto</strong> antes de construcción.</p>
@@ -338,47 +355,79 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                 {{width: WALL_T, height: WALL_H, depth: rd}}, scene);
             rw_.position.set(rx+rw, WALL_H/2, rz+rd/2);
             rw_.material = wMat;
+
+            // Marcador de puerta — caja delgada sobre la pared correcta según zona
+            const zone = (roomsData[i].zone || '').toLowerCase();
+            const code = (roomsData[i].code || '').toLowerCase();
+            const DOOR_W = 0.95, DOOR_H = 2.05, DOOR_D = 0.12;
+            const doorMat = new BABYLON.StandardMaterial(`doorMat_${{i}}`, scene);
+            doorMat.diffuseColor = new BABYLON.Color3(0.85, 0.70, 0.40);
+            doorMat.emissiveColor = new BABYLON.Color3(0.3, 0.22, 0.08);
+
+            if (zone === 'exterior') {{
+                // Porche: puerta centrada en pared norte (z-) hacia salón
+                const d = BABYLON.MeshBuilder.CreateBox(`door_${{i}}`,
+                    {{width: DOOR_W, height: DOOR_H, depth: DOOR_D}}, scene);
+                d.position.set(rx + rw/2, DOOR_H/2, rz);
+                d.material = doorMat;
+            }} else if (zone === 'day') {{
+                // Salón/cocina: puerta en z- (hacia porche)
+                const d1 = BABYLON.MeshBuilder.CreateBox(`door_${{i}}_a`,
+                    {{width: DOOR_W, height: DOOR_H, depth: DOOR_D}}, scene);
+                d1.position.set(rx + rw*0.25, DOOR_H/2, rz);
+                d1.material = doorMat;
+                // Segunda puerta en z+ (hacia pasillo)
+                const d2 = BABYLON.MeshBuilder.CreateBox(`door_${{i}}_b`,
+                    {{width: DOOR_W, height: DOOR_H, depth: DOOR_D}}, scene);
+                d2.position.set(rx + rw*0.25, DOOR_H/2, rz+rd);
+                d2.material = doorMat;
+            }} else if (zone === 'service') {{
+                // Garaje: portón en z- (fachada) + puerta peatonal en x- (hacia salón)
+                const portMat = new BABYLON.StandardMaterial(`portMat_${{i}}`, scene);
+                portMat.diffuseColor = new BABYLON.Color3(0.8, 0.5, 0.1);
+                const port = BABYLON.MeshBuilder.CreateBox(`door_${{i}}_port`,
+                    {{width: DOOR_W*2.5, height: DOOR_H, depth: DOOR_D}}, scene);
+                port.position.set(rx + rw/2, DOOR_H/2, rz);
+                port.material = portMat;
+                const dp = BABYLON.MeshBuilder.CreateBox(`door_${{i}}_ped`,
+                    {{width: DOOR_D, height: DOOR_H, depth: DOOR_W}}, scene);
+                dp.position.set(rx, DOOR_H/2, rz + rd/2);
+                dp.material = doorMat;
+            }} else if (zone === 'night' || zone === 'wet') {{
+                // Dormitorios/baños: puerta en z- (hacia pasillo)
+                const d = BABYLON.MeshBuilder.CreateBox(`door_${{i}}`,
+                    {{width: DOOR_W, height: DOOR_H, depth: DOOR_D}}, scene);
+                d.position.set(rx + rw*0.25, DOOR_H/2, rz);
+                d.material = doorMat;
+            }}
         }}
 
         function _disposeWalls(i) {{
-            // Eliminar paredes
-            ['wall_back_','wall_front_','wall_left_','wall_right_'].forEach(prefix => {{
-                const m = scene.getMeshByName(prefix + i);
-                if (m) {{ m.material && m.material.dispose(); m.dispose(); }}
+            // Paredes
+            ['wall_back_','wall_front_','wall_left_','wall_right_'].forEach(pre => {{
+                ['', '_L', '_R', '_B', '_T'].forEach(suf => {{
+                    const m = scene.getMeshByName(pre + i + suf);
+                    if (m) {{ m.material && m.material.dispose(); m.dispose(); }}
+                }});
             }});
-            // Eliminar materiales huérfanos de esta habitación
-            ['wMat_','fwMat_'].forEach(prefix => {{
-                const mat = scene.getMaterialByName(prefix + i);
+            // Marcadores de puerta
+            ['door_'].forEach(pre => {{
+                ['', '_a', '_b', '_port', '_ped'].forEach(suf => {{
+                    const m = scene.getMeshByName(pre + i + suf);
+                    if (m) {{ m.material && m.material.dispose(); m.dispose(); }}
+                }});
+            }});
+            // Materiales
+            ['wMat_','fwMat_','doorMat_','portMat_'].forEach(pre => {{
+                const mat = scene.getMaterialByName(pre + i);
                 if (mat) mat.dispose();
             }});
         }}
 
         function _buildLabel(i, rx, rz, rw, rd) {{
+            // Etiquetas flotantes eliminadas — info disponible en panel derecho al seleccionar
             const oldLabel = scene.getMeshByName(`label_${{i}}`);
             if (oldLabel) oldLabel.dispose();
-
-            const label = BABYLON.MeshBuilder.CreatePlane(`label_${{i}}`,
-                {{width: 3.5, height: 1.6}}, scene);
-            label.position.set(rx+rw/2, WALL_H + 0.8, rz+rd/2);
-            label.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
-            label.isPickable = false;
-
-            const adv = BABYLON.GUI.AdvancedDynamicTexture.CreateForMesh(label);
-            const bg  = new BABYLON.GUI.Rectangle();
-            bg.width = 1; bg.height = 1;
-            bg.background = "rgba(10,20,35,0.92)";
-            bg.cornerRadius = 18;
-            adv.addControl(bg);
-
-            const txt = new BABYLON.GUI.TextBlock();
-            const room = roomsData[i];
-            const area = (rw * rd).toFixed(1);
-            txt.text = `${{room.name}}\\n${{rw.toFixed(1)}}m × ${{rd.toFixed(1)}}m\\n${{area}} m²`;
-            txt.color = "#FFFFFF";
-            txt.fontSize = 56;
-            txt.fontWeight = "600";
-            txt.lineSpacing = "6px";
-            bg.addControl(txt);
         }}
 
         // Construir todas las habitaciones
@@ -473,11 +522,12 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                     gizmoManager.gizmos.positionGizmo.xGizmo.isEnabled = true;
                     gizmoManager.gizmos.positionGizmo.yGizmo.isEnabled = false;
                     gizmoManager.gizmos.positionGizmo.zGizmo.isEnabled = true;
-                    // Al soltar, actualizar paredes y label
+                    // Al soltar: redistribuir planta completa sin colisiones
                     gizmoManager.gizmos.positionGizmo.onDragEndObservable.clear();
                     gizmoManager.gizmos.positionGizmo.onDragEndObservable.add(() => {{
-                        syncWallsToFloor(selectedIndex);
-                        updateRoomInfo(selectedIndex);
+                        saveSnapshot();
+                        const newLayout = generateLayoutJS(roomsData);
+                        rebuildScene(newLayout);
                         updateBudget();
                     }});
                 }} else {{
@@ -613,10 +663,13 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
         function rebuildScene(newLayout) {{
             // Eliminar todos los meshes de habitaciones
             roomsData.forEach((_,i) => {{
-                ['floor','wall_back','wall_front','wall_left','wall_right','door','label'].forEach(prefix => {{
+                // Suelo y label
+                ['floor','label'].forEach(prefix => {{
                     const m = scene.getMeshByName(`${{prefix}}_${{i}}`);
                     if (m) m.dispose();
                 }});
+                // Paredes y puertas — usar _disposeWalls que conoce todos los sufijos
+                _disposeWalls(i);
             }});
             hlLayer.removeAllMeshes();
             // Actualizar roomsData con nueva geometría
@@ -835,6 +888,17 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
         // MODO CERRAMIENTO FINCA (tabiques libres)
         // ================================================
         window.customWalls = [];
+        // Snapshot inicial para Reset Layout
+        const initialRoomsData = JSON.parse(JSON.stringify(roomsData));
+        // Historial de acciones para Undo (máx 20)
+        const actionHistory = [];
+        function saveSnapshot() {{
+            actionHistory.push({{
+                rooms: JSON.parse(JSON.stringify(roomsData)),
+                walls: JSON.parse(JSON.stringify(window.customWalls))
+            }});
+            if (actionHistory.length > 20) actionHistory.shift();
+        }}
 
         function startWallMode() {{
             let wallPoint1 = null;
@@ -903,7 +967,96 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
         }}
 
         // ================================================
+        // RESET LAYOUT — volver al estado inicial
+        // ================================================
+        function resetLayout() {{
+            saveSnapshot();
+            // Limpiar cerramientos personalizados
+            window.customWalls.forEach(cw => {{
+                const m = scene.getMeshByName(cw.id);
+                if (m) {{ m.material && m.material.dispose(); m.dispose(); }}
+            }});
+            window.customWalls = [];
+            // Restaurar roomsData original
+            roomsData.length = 0;
+            initialRoomsData.forEach(r => roomsData.push(JSON.parse(JSON.stringify(r))));
+            // Reconstruir escena
+            const newLayout = generateLayoutJS(roomsData);
+            rebuildScene(newLayout);
+            showToast('↩️ Layout restaurado al original');
+        }}
+
+        // ================================================
+        // UNDO — deshacer última acción
+        // ================================================
+        function undoLastAction() {{
+            if (actionHistory.length === 0) {{
+                showToast('⚠️ No hay acciones para deshacer');
+                return;
+            }}
+            const prev = actionHistory.pop();
+            // Restaurar cerramientos
+            window.customWalls.forEach(cw => {{
+                const m = scene.getMeshByName(cw.id);
+                if (m) {{ m.material && m.material.dispose(); m.dispose(); }}
+            }});
+            window.customWalls = prev.walls;
+            // Reconstruir cerramientos guardados
+            prev.walls.forEach(cw => {{
+                const dx = cw.x2 - cw.x1, dz = cw.z2 - cw.z1;
+                const len = Math.sqrt(dx*dx + dz*dz);
+                const ang = Math.atan2(dx, dz);
+                const m = BABYLON.MeshBuilder.CreateBox(cw.id,
+                    {{width:len, height:WALL_H, depth:WALL_T}}, scene);
+                m.position.set((cw.x1+cw.x2)/2, WALL_H/2, (cw.z1+cw.z2)/2);
+                m.rotation.y = ang;
+                const mat = new BABYLON.StandardMaterial(cw.id+'m', scene);
+                mat.diffuseColor = new BABYLON.Color3(0.65,0.45,0.25);
+                m.material = mat;
+            }});
+            // Restaurar roomsData
+            roomsData.length = 0;
+            prev.rooms.forEach(r => roomsData.push(r));
+            const newLayout = generateLayoutJS(roomsData);
+            rebuildScene(newLayout);
+            showToast('⬅️ Acción deshecha');
+        }}
+
+        // ================================================
+        // DELETE — borrar elemento seleccionado
+        // ================================================
+        function deleteSelected() {{
+            if (selectedIndex !== null) {{
+                // Es una habitación — no se puede borrar (solo elementos externos)
+                showToast('⚠️ Las habitaciones no se borran aquí. Usa el Paso 2.');
+                return;
+            }}
+            // Buscar cerramiento seleccionado
+            if (selectedMesh && selectedMesh.name.startsWith('cwall_')) {{
+                saveSnapshot();
+                const idx = window.customWalls.findIndex(cw => cw.id === selectedMesh.name);
+                if (idx !== -1) window.customWalls.splice(idx, 1);
+                selectedMesh.material && selectedMesh.material.dispose();
+                selectedMesh.dispose();
+                selectedMesh = null;
+                hlLayer.removeAllMeshes();
+                document.getElementById('room-info').innerHTML =
+                    '<p style="color:#888;">Selecciona una habitación</p>';
+                showToast('🗑️ Cerramiento eliminado');
+                return;
+            }}
+            showToast('⚠️ Selecciona primero un cerramiento para borrar');
+        }}
+
+        // Tecla Supr/Delete para borrar rápido
+        window.addEventListener('keydown', (e) => {{
+            if (e.key === 'Delete' || e.key === 'Backspace') deleteSelected();
+        }});
+
+        // ================================================
         // TOAST (mensajes flotantes)
+        // ================================================
+        function showToast(msg) {
         // ================================================
         function showToast(msg) {{
             let t = document.getElementById('toast');
@@ -1080,6 +1233,51 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
         // ================================================
         engine.runRenderLoop(() => scene.render());
         window.addEventListener('resize', () => engine.resize());
+
+        // ================================================
+        // BRÚJULA — N siempre arriba, fija
+        // ================================================
+        (function() {{
+            const canvas = document.getElementById('compass-canvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            // Fondo círculo
+            ctx.beginPath();
+            ctx.arc(35, 35, 32, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(0,0,0,0.5)';
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(255,215,0,0.5)';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+            // Letras N S E O
+            ctx.fillStyle = '#FFD700';
+            ctx.font = 'bold 9px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('N', 35, 12);
+            ctx.fillText('S', 35, 62);
+            ctx.fillText('E', 62, 38);
+            ctx.fillText('O', 10, 38);
+            // Aguja Norte (rojo) apunta arriba
+            const rad = (180 - 90) * Math.PI / 180;
+            ctx.beginPath();
+            ctx.moveTo(35, 35);
+            ctx.lineTo(35 + 22 * Math.cos(rad), 35 + 22 * Math.sin(rad));
+            ctx.strokeStyle = '#E74C3C';
+            ctx.lineWidth = 2.5;
+            ctx.stroke();
+            // Aguja Sur (blanco)
+            ctx.beginPath();
+            ctx.moveTo(35, 35);
+            ctx.lineTo(35 - 16 * Math.cos(rad), 35 - 16 * Math.sin(rad));
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            // Centro
+            ctx.beginPath();
+            ctx.arc(35, 35, 3, 0, Math.PI * 2);
+            ctx.fillStyle = '#FFD700';
+            ctx.fill();
+        }})();
 
         setMode('select');
         console.log('ArchiRapid Editor 3D v3.0 —', roomsData.length, 'habitaciones cargadas');
