@@ -3,7 +3,7 @@ Editor 3D avanzado usando Babylon.js
 v3.0 - Panel numérico + paredes sincronizadas + CTE + GLB
 """
 
-def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos aguas (clásico, eficiente)"):
+def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos aguas (clásico, eficiente)", plot_area_m2=0, foundation_type="Losa de hormigón (suelos blandos)", house_style="Moderno"):
     """
     Genera HTML con Babylon.js editor
 
@@ -33,9 +33,33 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
         #toolbar {{
             position: absolute; top: 20px; left: 20px;
             background: rgba(0,0,0,0.88); padding: 14px;
-            border-radius: 12px; color: white; min-width: 210px;
+            border-radius: 12px; color: white; width: 210px;
             border: 1px solid rgba(255,255,255,0.1);
+            max-height: calc(100vh - 40px);
+            overflow-y: auto;
+            overflow-x: hidden;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(52,152,219,0.5) transparent;
+            transition: width 0.25s ease, padding 0.25s ease;
         }}
+        #toolbar::-webkit-scrollbar {{ width: 4px; }}
+        #toolbar::-webkit-scrollbar-track {{ background: transparent; }}
+        #toolbar::-webkit-scrollbar-thumb {{ background: rgba(52,152,219,0.5); border-radius: 2px; }}
+        #toolbar.collapsed {{
+            width: 42px; padding: 10px 8px; overflow: hidden;
+        }}
+        #toolbar.collapsed .tool-btn,
+        #toolbar.collapsed hr.divider,
+        #toolbar.collapsed #edit-panel,
+        #toolbar.collapsed #fence-options,
+        #toolbar.collapsed h3 span {{ display: none; }}
+        #toolbar.collapsed h3 {{ margin: 0; font-size: 18px; text-align: center; }}
+        #toggle-toolbar {{
+            float: right; background: none; border: none;
+            color: rgba(255,255,255,0.6); cursor: pointer;
+            font-size: 14px; padding: 0; line-height: 1;
+        }}
+        #toggle-toolbar:hover {{ color: white; }}
         #toolbar h3 {{ margin: 0 0 10px 0; font-size: 14px; opacity: 0.8; }}
         .tool-btn {{
             display: block; width: 100%; padding: 8px 10px;
@@ -134,16 +158,43 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
 
     <!-- TOOLBAR IZQUIERDO -->
     <div id="toolbar">
-        <h3>🛠️ Herramientas</h3>
+        <h3>🛠️ <span>Herramientas</span>
+            <button id="toggle-toolbar" onclick="toggleToolbar()" title="Colapsar/Expandir">◀</button>
+        </h3>
         <button class="tool-btn active" id="btn-select" onclick="setMode('select')">🖱️ Seleccionar</button>
         <button class="tool-btn" id="btn-move"   onclick="setMode('move')">↔️ Mover habitación</button>
         <button class="tool-btn" id="btn-scale"  onclick="setMode('scale')">📐 Editar dimensiones</button>
-        <button class="tool-btn" id="btn-wall"   onclick="setMode('wall')">🏗️ Cerramiento Finca</button>
+        <button class="tool-btn" id="btn-fence" onclick="toggleFence()">🧱 Cerramiento OFF</button>
+        <div id="fence-options" style="display:none; margin-top:6px;">
+            <select id="fence-style" style="width:100%;padding:4px;background:#1a1a2e;color:white;border:1px solid #3498DB;border-radius:4px;font-size:12px;">
+                <option value="verja">⛓️ Verja metálica (1.8m)</option>
+                <option value="muro">🧱 Muro de cemento (2.0m)</option>
+            </select>
+            <div id="fence-info" style="margin-top:8px; padding:8px; background:rgba(52,152,219,0.1);
+                 border:1px solid rgba(52,152,219,0.3); border-radius:6px; font-size:11px; display:none;">
+                <p style="margin:2px 0;">📏 <strong id="fence-dim-w">—</strong> × <strong id="fence-dim-d">—</strong> m</p>
+                <p style="margin:2px 0;">📐 Superficie: <strong id="fence-area">—</strong> m²</p>
+                <p style="margin:2px 0;">📏 Perímetro: <strong id="fence-perim">—</strong> m lineales</p>
+                <p style="margin:2px 0; color:#2ECC71;">🏗️ Máx. construible: <strong id="fence-build">—</strong> m²</p>
+            </div>
+        </div>
         <hr class="divider">
         <button class="tool-btn" onclick="setTopView()">🔝 Vista Planta</button>
         <button class="tool-btn" onclick="setIsoView()">🏠 Vista 3D</button>
+        <button class="tool-btn" id="btn-style" onclick="toggleStylePanel()">🎨 Estilo</button>
+        
+        <hr style="margin: 10px 0; border-color: rgba(255,255,255,0.2);">
+        <button class="tool-btn" id="btn-capture" onclick="captureAllViews()" 
+                style="background: rgba(155,89,182,0.3); border-color: #9B59B6;">
+            📸 Capturar Vistas
+        </button>
+        <div id="capture-status" style="font-size:11px; color:#9B59B6; margin-top:5px; display:none;">
+            ✅ Vistas capturadas
+        </div>
+        
         <hr class="divider">
         <button class="tool-btn" id="btn-roof" onclick="toggleRoof()">🏠 Tejado OFF</button>
+        <button class="tool-btn" id="btn-found" onclick="toggleFoundation()">🏗️ Cimientos OFF</button>
         <hr class="divider">
         <button class="tool-btn" onclick="resetLayout()">↩️ Reset Layout</button>
         <button class="tool-btn" onclick="undoLastAction()">⬅️ Deshacer</button>
@@ -181,6 +232,58 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             <p><strong>Coste aprox:</strong> <span id="total-cost">€0</span></p>
             <p style="font-size:11px; color:#888; margin-top:4px;" id="budget-diff"></p>
         </div>
+    </div>
+
+    <!-- PANEL ESTILOS -->
+    <div id="style-panel" style="display:none; position:absolute; top:20px; right:500px;
+         background:rgba(0,0,0,0.88); padding:14px; border-radius:12px; color:white;
+         width:210px; border:1px solid rgba(155,89,182,0.5);">
+        <h3 style="margin:0 0 10px 0; font-size:13px; color:#9B59B6;">🎨 Estilo Fachada</h3>
+        <div style="display:flex; flex-direction:column; gap:6px;">
+            <button onclick="applyStyle('Moderno')"
+                style="padding:7px; background:rgba(146,146,144,0.3); border:1px solid #929290;
+                       color:white; border-radius:6px; cursor:pointer; font-size:12px; text-align:left;">
+                🏢 Moderno — Hormigón blanco
+            </button>
+            <button onclick="applyStyle('Rural')"
+                style="padding:7px; background:rgba(120,109,88,0.3); border:1px solid #786D58;
+                       color:white; border-radius:6px; cursor:pointer; font-size:12px; text-align:left;">
+                🏡 Rural — Piedra beige
+            </button>
+            <button onclick="applyStyle('Andaluz')"
+                style="padding:7px; background:rgba(245,240,224,0.3); border:1px solid #F5F0E0;
+                       color:white; border-radius:6px; cursor:pointer; font-size:12px; text-align:left;">
+                💃 Andaluz — Cal blanca
+            </button>
+            <button onclick="applyStyle('Montaña')"
+                style="padding:7px; background:rgba(99,88,72,0.3); border:1px solid #635848;
+                       color:white; border-radius:6px; cursor:pointer; font-size:12px; text-align:left;">
+                ⛰️ Montaña — Piedra oscura
+            </button>
+            <button onclick="applyStyle('Playa')"
+                style="padding:7px; background:rgba(240,232,210,0.3); border:1px solid #F0E8D2;
+                       color:white; border-radius:6px; cursor:pointer; font-size:12px; text-align:left;">
+                🌊 Playa — Arena clara
+            </button>
+            <button onclick="applyStyle('Ecológico')"
+                style="padding:7px; background:rgba(130,116,94,0.3); border:1px solid #82745E;
+                       color:white; border-radius:6px; cursor:pointer; font-size:12px; text-align:left;">
+                🌿 Ecológico — Tierra natural
+            </button>
+        </div>
+        <p id="style-applied" style="margin:8px 0 0 0; font-size:11px; color:#9B59B6; text-align:center;"></p>
+    </div>
+
+    <!-- PANEL CIMIENTOS -->
+    <div id="found-panel" style="display:none; position:absolute; top:20px; right:500px;
+         background:rgba(0,0,0,0.88); padding:14px; border-radius:12px; color:white;
+         width:200px; border:1px solid rgba(139,90,43,0.5);">
+        <h3 style="margin:0 0 8px 0; font-size:13px; color:#CD853F;">🏗️ Cimientos</h3>
+        <p style="font-size:11px; opacity:0.7; margin-bottom:4px;">Tipo seleccionado:</p>
+        <p id="found-type-label" style="font-size:12px; color:#DEB887; margin-bottom:8px; font-weight:bold;"></p>
+        <p style="font-size:10px; opacity:0.6; line-height:1.4;">
+            Visible al rotar la cámara hacia abajo (Vista 3D).
+        </p>
     </div>
 
     <!-- PANEL TEJADO -->
@@ -222,9 +325,30 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
         const roomsData = {rooms_js};
         const totalWidth = {total_width};
         const totalDepth = {total_depth};
+        const plotAreaM2 = {plot_area_m2};
+        // Dimensiones parcela: proporción 4:5 (estándar catastral rectangular)
+        // Si plot_area_m2=0 usamos totalWidth+10 como fallback
+        const plotW = plotAreaM2 > 0 ? Math.round(Math.sqrt(plotAreaM2 * 0.8)) : totalWidth + 10;
+        const plotD = plotAreaM2 > 0 ? Math.round(plotAreaM2 / plotW)           : totalDepth + 10;
+        const plotX = (totalWidth  - plotW) / 2;  // centrado respecto a casa
+        const plotZ = (totalDepth  - plotD) / 2;
         const roofType = "{roof_type}";
+        const houseStyle = "{house_style}";
         const WALL_H = 2.7;
         const WALL_T = 0.15;
+        // Color de pared exterior según estilo elegido en Paso 1
+        const STYLE_WALL_COLORS = {{
+            'Rural':          [0.75, 0.68, 0.55],
+            'Montaña':        [0.72, 0.65, 0.52],
+            'Ecológico':      [0.80, 0.72, 0.58],
+            'Andaluz':        [0.96, 0.94, 0.88],
+            'Clásico':        [0.93, 0.90, 0.83],
+            'Playa':          [0.94, 0.91, 0.82],
+            'Moderno':        [0.92, 0.92, 0.90],
+            'Contemporáneo':  [0.90, 0.90, 0.88],
+        }};
+        const _wc = STYLE_WALL_COLORS[houseStyle] || [0.92, 0.92, 0.90];
+        const WALL_COLOR = new BABYLON.Color3(_wc[0], _wc[1], _wc[2]);
         const COST_PER_M2 = 1500;
 
         // Mínimos CTE por tipo de habitación (m²)
@@ -251,6 +375,8 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
         camera.attachControl(canvas, true);
         camera.lowerRadiusLimit = 5;
         camera.upperRadiusLimit = 80;
+        camera.upperBetaLimit = Math.PI * 0.85;  // permite ver desde abajo (cimientos)
+        camera.lowerBetaLimit = 0.1;             // permite ver desde casi arriba
 
         // Luces
         const hemi = new BABYLON.HemisphericLight("hemi", new BABYLON.Vector3(0,1,0), scene);
@@ -328,7 +454,7 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
 
         function _buildWalls(i, rx, rz, rw, rd) {{
             const wMat = new BABYLON.StandardMaterial(`wMat_${{i}}`, scene);
-            wMat.diffuseColor = new BABYLON.Color3(0.18, 0.25, 0.32);
+            wMat.diffuseColor = WALL_COLOR;
 
             // Trasera (z-)
             const bw = BABYLON.MeshBuilder.CreateBox(`wall_back_${{i}}`,
@@ -368,18 +494,18 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                 // Porche: puerta centrada en pared norte (z-) hacia salón
                 const d = BABYLON.MeshBuilder.CreateBox(`door_${{i}}`,
                     {{width: DOOR_W, height: DOOR_H, depth: DOOR_D}}, scene);
-                d.position.set(rx + rw/2, DOOR_H/2, rz);
+                d.position.set(rx + rw/2, DOOR_H/2, rz - 0.08);
                 d.material = doorMat;
             }} else if (zone === 'day') {{
                 // Salón/cocina: puerta en z- (hacia porche)
                 const d1 = BABYLON.MeshBuilder.CreateBox(`door_${{i}}_a`,
                     {{width: DOOR_W, height: DOOR_H, depth: DOOR_D}}, scene);
-                d1.position.set(rx + rw*0.25, DOOR_H/2, rz);
+                d1.position.set(rx + rw*0.25, DOOR_H/2, rz - 0.08);
                 d1.material = doorMat;
                 // Segunda puerta en z+ (hacia pasillo)
                 const d2 = BABYLON.MeshBuilder.CreateBox(`door_${{i}}_b`,
                     {{width: DOOR_W, height: DOOR_H, depth: DOOR_D}}, scene);
-                d2.position.set(rx + rw*0.25, DOOR_H/2, rz+rd);
+                d2.position.set(rx + rw*0.25, DOOR_H/2, rz + rd + 0.08);
                 d2.material = doorMat;
             }} else if (zone === 'service') {{
                 // Garaje: portón en z- (fachada) + puerta peatonal en x- (hacia salón)
@@ -387,7 +513,7 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                 portMat.diffuseColor = new BABYLON.Color3(0.8, 0.5, 0.1);
                 const port = BABYLON.MeshBuilder.CreateBox(`door_${{i}}_port`,
                     {{width: DOOR_W*2.5, height: DOOR_H, depth: DOOR_D}}, scene);
-                port.position.set(rx + rw/2, DOOR_H/2, rz);
+                port.position.set(rx + rw/2, DOOR_H/2, rz - 0.08);
                 port.material = portMat;
                 const dp = BABYLON.MeshBuilder.CreateBox(`door_${{i}}_ped`,
                     {{width: DOOR_D, height: DOOR_H, depth: DOOR_W}}, scene);
@@ -397,7 +523,7 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                 // Dormitorios/baños: puerta en z- (hacia pasillo)
                 const d = BABYLON.MeshBuilder.CreateBox(`door_${{i}}`,
                     {{width: DOOR_W, height: DOOR_H, depth: DOOR_D}}, scene);
-                d.position.set(rx + rw*0.25, DOOR_H/2, rz);
+                d.position.set(rx + rw*0.25, DOOR_H/2, rz - 0.08);
                 d.material = doorMat;
             }}
         }}
@@ -477,13 +603,22 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
 
             updateRoomInfo(idx);
 
-            // Si estamos en modo mover, enganchar gizmo
+            // Si estamos en modo mover
             if (currentMode === 'move') {{
-                gizmoManager.attachToMesh(selectedMesh);
-                gizmoManager.positionGizmoEnabled = true;
-                gizmoManager.gizmos.positionGizmo.xGizmo.isEnabled = true;
-                gizmoManager.gizmos.positionGizmo.yGizmo.isEnabled = false;
-                gizmoManager.gizmos.positionGizmo.zGizmo.isEnabled = true;
+                const rZone = (roomsData[idx].zone || '').toLowerCase();
+                const isMovable = rZone === 'garden' || rZone === 'exterior';
+                if (isMovable) {{
+                    gizmoManager.attachToMesh(selectedMesh);
+                    gizmoManager.positionGizmoEnabled = true;
+                    gizmoManager.gizmos.positionGizmo.xGizmo.isEnabled = true;
+                    gizmoManager.gizmos.positionGizmo.yGizmo.isEnabled = false;
+                    gizmoManager.gizmos.positionGizmo.zGizmo.isEnabled = true;
+                    showToast('↔️ Mueve: ' + roomsData[idx].name);
+                }} else {{
+                    gizmoManager.attachToMesh(null);
+                    gizmoManager.positionGizmoEnabled = false;
+                    showToast('💡 Para ajustar habitaciones usa Editar Dimensiones');
+                }}
             }}
 
             // Si estamos en modo scale, mostrar panel numérico
@@ -522,12 +657,28 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                     gizmoManager.gizmos.positionGizmo.xGizmo.isEnabled = true;
                     gizmoManager.gizmos.positionGizmo.yGizmo.isEnabled = false;
                     gizmoManager.gizmos.positionGizmo.zGizmo.isEnabled = true;
-                    // Al soltar: redistribuir planta completa sin colisiones
+                    // Al soltar: actualizar según tipo de zona
                     gizmoManager.gizmos.positionGizmo.onDragEndObservable.clear();
                     gizmoManager.gizmos.positionGizmo.onDragEndObservable.add(() => {{
                         saveSnapshot();
-                        const newLayout = generateLayoutJS(roomsData);
-                        rebuildScene(newLayout);
+                        const rZone = (roomsData[selectedIndex].zone || '').toLowerCase();
+                        const isMovable = rZone === 'garden' || rZone === 'exterior';
+                        if (isMovable) {{
+                            // Leer posición real del mesh y actualizar roomsData
+                            const f = scene.getMeshByName(`floor_${{selectedIndex}}`);
+                            if (f) {{
+                                const rw = roomsData[selectedIndex].width;
+                                const rd = roomsData[selectedIndex].depth;
+                                roomsData[selectedIndex].x = f.position.x - rw / 2;
+                                roomsData[selectedIndex].z = f.position.z - rd / 2;
+                            }}
+                            // Reconstruir solo ese elemento exterior, no redistribuir toda la casa
+                            rebuildScene(roomsData);
+                        }} else {{
+                            // Zona habitable: redistribuir layout completo
+                            const newLayout = generateLayoutJS(roomsData);
+                            rebuildScene(newLayout);
+                        }}
                         updateBudget();
                     }});
                 }} else {{
@@ -606,8 +757,7 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             const gdn   = rs.filter(r => r.zone === 'garden');
             const garajes   = svc.filter(r => (r.code||'').toLowerCase().includes('garaje') || (r.code||'').toLowerCase().includes('garage'));
             const otrosSvc  = svc.filter(r => !garajes.includes(r));
-            const piscinas  = gdn.filter(r => (r.code||'').toLowerCase().includes('piscin') || (r.code||'').toLowerCase().includes('pool'));
-            const laterales = gdn.filter(r => !piscinas.includes(r));
+            const laterales = gdn.filter(r => !((r.code||'').toLowerCase().includes('piscin') || (r.code||'').toLowerCase().includes('pool')));
             const layout = [];
             // Ancho casa desde fila noche
             const nightW = night.map(r => Math.max(Math.round(r.area/FILA3_D*10)/10, 2.8));
@@ -645,8 +795,6 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             const zBot = zF3 + FILA3_D;
             // Porche
             ext.forEach(r => {{ const d=Math.max(Math.round(r.area/houseW*10)/10,2); layout.push({{x:0,z:zBot,width:houseW,depth:d,name:r.name,code:r.code,zone:r.zone,area_m2:r.area}}); }});
-            // Piscina
-            piscinas.forEach(r => {{ const pw=Math.max(Math.round(Math.sqrt(r.area*2)*10)/10,5); const pd=Math.round(r.area/pw*10)/10; layout.push({{x:(houseW-pw)/2,z:zBot+3,width:pw,depth:pd,name:r.name,code:r.code,zone:r.zone,area_m2:r.area}}); }});
             // Laterales
             let xl=houseW+3, zl=0;
             laterales.forEach(r => {{ const lw=Math.round(Math.sqrt(r.area*1.3)*10)/10; const ld=Math.round(r.area/lw*10)/10; layout.push({{x:xl,z:zl,width:lw,depth:ld,name:r.name,code:r.code,zone:r.zone,area_m2:r.area}}); zl+=ld+1; }});
@@ -712,9 +860,14 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             }}
             // Actualizar área de la habitación seleccionada
             roomsData[selectedIndex].area_m2 = parseFloat((newW * newD).toFixed(2));
-            // Regenerar layout completo y reconstruir escena
-            const newLayout = generateLayoutJS(roomsData);
-            rebuildScene(newLayout);
+            // Exterior/garden: no recalcular layout, respetar posición actual
+                const rZone = (roomsData[selectedIndex].zone || '').toLowerCase();
+                if (rZone === 'exterior' || rZone === 'garden') {{
+                    rebuildScene(roomsData);
+                }} else {{
+                    const newLayout = generateLayoutJS(roomsData);
+                    rebuildScene(newLayout);
+                }}
             // Validar CTE de la habitación que se editó
             checkCTE(selectedIndex, newW, newD);
         }}
@@ -885,86 +1038,143 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
         }}
 
         // ================================================
-        // MODO CERRAMIENTO FINCA (tabiques libres)
+        // HISTORIAL — Reset y Undo
         // ================================================
-        window.customWalls = [];
-        // Snapshot inicial para Reset Layout
         const initialRoomsData = JSON.parse(JSON.stringify(roomsData));
-        // Historial de acciones para Undo (máx 20)
         const actionHistory = [];
+
         function saveSnapshot() {{
             actionHistory.push({{
                 rooms: JSON.parse(JSON.stringify(roomsData)),
-                walls: JSON.parse(JSON.stringify(window.customWalls))
+                walls: JSON.parse(JSON.stringify(window.customWalls || []))
             }});
             if (actionHistory.length > 20) actionHistory.shift();
         }}
 
-        function startWallMode() {{
-            let wallPoint1 = null;
-            let marker1    = null;
-            const infoDiv  = document.getElementById('room-info');
+        // ================================================
+        // CERRAMIENTO PERIMETRAL AUTOMÁTICO
+        // ================================================
+        window.customWalls = [];
+        let fenceActive = false;
+        let fenceMeshes = [];
 
-            infoDiv.innerHTML = '<p style="color:#E67E22;"><strong>🏗️ Cerramiento</strong></p>'
-                + '<p>Click 1: punto inicio</p><p>Click 2: punto fin</p>';
-
-            const origDown = scene.onPointerDown;
-
-            scene.onPointerDown = function(evt, pick) {{
-                if (currentMode !== 'wall') {{
-                    scene.onPointerDown = origDown; return;
-                }}
-                const ray  = scene.createPickingRay(scene.pointerX, scene.pointerY,
-                                 BABYLON.Matrix.Identity(), camera);
-                const hit  = scene.pickWithRay(ray,
-                                 m => m.name === 'ground' || m.name === 'gridPlane');
-                const pt   = (hit && hit.hit) ? hit.pickedPoint
-                           : (pick.hit ? pick.pickedPoint : null);
-                if (!pt) return;
-
-                if (!wallPoint1) {{
-                    wallPoint1 = pt.clone();
-                    if (marker1) marker1.dispose();
-                    marker1 = BABYLON.MeshBuilder.CreateSphere('wm1', {{diameter:0.28}}, scene);
-                    marker1.position = wallPoint1.clone();
-                    marker1.position.y = 0.14;
-                    const mm = new BABYLON.StandardMaterial('mmMat', scene);
-                    mm.diffuseColor  = new BABYLON.Color3(1,0.2,0.2);
-                    mm.emissiveColor = new BABYLON.Color3(0.5,0.1,0.1);
-                    marker1.material = mm;
-                    infoDiv.innerHTML = '<p style="color:#E67E22;"><strong>🏗️ Punto 1 marcado</strong></p>'
-                        + '<p>Ahora click en punto final</p>';
-                }} else {{
-                    const pt2  = pt.clone();
-                    const dx   = pt2.x - wallPoint1.x;
-                    const dz   = pt2.z - wallPoint1.z;
-                    const len  = Math.sqrt(dx*dx + dz*dz);
-                    const ang  = Math.atan2(dx, dz);
-                    if (len > 0.3) {{
-                        const wid = 'cwall_' + window.customWalls.length;
-                        const cw  = BABYLON.MeshBuilder.CreateBox(wid,
-                            {{width:len, height:WALL_H, depth:WALL_T}}, scene);
-                        cw.position.x = (wallPoint1.x + pt2.x)/2;
-                        cw.position.y = WALL_H/2;
-                        cw.position.z = (wallPoint1.z + pt2.z)/2;
-                        cw.rotation.y = ang;
-                        const cm = new BABYLON.StandardMaterial(wid+'m', scene);
-                        cm.diffuseColor = new BABYLON.Color3(0.65,0.45,0.25);
-                        cw.material = cm;
-                        window.customWalls.push({{
-                            id: wid,
-                            x1: wallPoint1.x, z1: wallPoint1.z,
-                            x2: pt2.x, z2: pt2.z,
-                            length: parseFloat(len.toFixed(2))
-                        }});
-                        infoDiv.innerHTML = '<p style="color:#2ECC71;">✅ Tabique creado: '
-                            + len.toFixed(1) + 'm</p><p>Click para otro</p>';
-                    }}
-                    if (marker1) {{ marker1.dispose(); marker1 = null; }}
-                    wallPoint1 = null;
-                }}
-            }};
+        function toggleFence() {{
+            if (fenceActive) {{
+                // Quitar cerramiento
+                fenceMeshes.forEach(m => {{ m.material && m.material.dispose(); m.dispose(); }});
+                fenceMeshes = [];
+                fenceActive = false;
+                document.getElementById('btn-fence').textContent = '🧱 Cerramiento OFF';
+                document.getElementById('btn-fence').classList.remove('active');
+                document.getElementById('fence-options').style.display = 'none';
+                showToast('Cerramiento eliminado');
+            }} else {{
+                document.getElementById('fence-options').style.display = 'block';
+                buildFence();
+                fenceActive = true;
+                document.getElementById('btn-fence').textContent = '🧱 Cerramiento ON';
+                document.getElementById('btn-fence').classList.add('active');
+                // Mostrar dimensiones reales de la finca
+                const perim = Math.round((plotW + plotD) * 2);
+                const buildable = Math.round(plotW * plotD * 0.33);
+                document.getElementById('fence-dim-w').textContent = plotW;
+                document.getElementById('fence-dim-d').textContent = plotD;
+                document.getElementById('fence-area').textContent = (plotW * plotD).toLocaleString('es-ES');
+                document.getElementById('fence-perim').textContent = perim;
+                document.getElementById('fence-build').textContent = buildable.toLocaleString('es-ES');
+                document.getElementById('fence-info').style.display = 'block';
+                showToast('Cerramiento: ' + plotW + 'm × ' + plotD + 'm · ' + (plotW*plotD) + 'm²');
+            }}
         }}
+
+        function buildFence() {{
+            // Limpiar previo
+            fenceMeshes.forEach(m => {{ m.material && m.material.dispose(); m.dispose(); }});
+            fenceMeshes = [];
+
+            const style  = document.getElementById('fence-style').value;
+            const FENCE_H = style === 'muro' ? 2.0 : 1.8;
+            const FENCE_T = style === 'muro' ? 0.20 : 0.05;
+            const alpha   = style === 'muro' ? 1.0  : 0.65;
+
+            const mat = new BABYLON.StandardMaterial('fenceMat', scene);
+            if (style === 'muro') {{
+                mat.diffuseColor = new BABYLON.Color3(0.78, 0.76, 0.72);  // cemento gris
+            }} else {{
+                mat.diffuseColor  = new BABYLON.Color3(0.30, 0.30, 0.30);  // metal oscuro
+                mat.emissiveColor = new BABYLON.Color3(0.05, 0.05, 0.05);
+                mat.alpha = alpha;
+            }}
+
+            // Perímetro: 4 lados del plot
+            // Lado Sur (fachada) — con huecos para portón (4m) + puerta (1.2m)
+            const GATE_CAR  = 4.0;   // portón vehículo
+            const GATE_PED  = 1.2;   // puerta peatonal
+            const GATE_GAP  = 0.3;   // separación entre ambas
+            const gateStart = plotX + 2.0;  // offset desde esquina
+
+            // Sur (fachada entrada — z pequeño, frente al porche)
+            _fenceSegH('fs_left', plotX, plotZ,
+                        gateStart, FENCE_H, FENCE_T, mat);
+            _fenceSegH('fs_mid', gateStart + GATE_CAR + GATE_GAP, plotZ,
+                        gateStart + GATE_CAR + GATE_GAP + GATE_PED + GATE_GAP, FENCE_H, FENCE_T, mat);
+            _fenceSegH('fs_right', gateStart + GATE_CAR + GATE_GAP + GATE_PED + GATE_GAP, plotZ,
+                        plotX + plotW, FENCE_H, FENCE_T, mat);
+
+            // Norte (fachada trasera — z grande)
+            const backGateX = plotX + plotW/2 - GATE_PED/2;
+            _fenceSegH('fn_left',  plotX, plotZ + plotD, backGateX, FENCE_H, FENCE_T, mat);
+            _fenceSegH('fn_right', backGateX + GATE_PED, plotZ + plotD,
+                        plotX + plotW, FENCE_H, FENCE_T, mat);
+
+            // Oeste completo
+            _fenceSegV('fw', plotX, plotZ, plotZ + plotD, FENCE_H, FENCE_T, mat);
+
+            // Este completo
+            _fenceSegV('fe', plotX + plotW, plotZ, plotZ + plotD, FENCE_H, FENCE_T, mat);
+
+            // Marcadores de puertas
+            _fenceGate('gate_car', gateStart, plotZ, GATE_CAR, FENCE_H);
+            _fenceGate('gate_ped', gateStart + GATE_CAR + GATE_GAP, plotZ, GATE_PED, FENCE_H);
+            _fenceGate('gate_back', backGateX, plotZ + plotD, GATE_PED, FENCE_H);
+        }}
+
+        function _fenceSegH(id, x1, z, x2, h, t, mat) {{
+            const len = x2 - x1;
+            if (len < 0.1) return;
+            const m = BABYLON.MeshBuilder.CreateBox('fence_'+id,
+                {{width: len, height: h, depth: t}}, scene);
+            m.position.set(x1 + len/2, h/2, z);
+            m.material = mat;
+            fenceMeshes.push(m);
+        }}
+
+        function _fenceSegV(id, x, z1, z2, h, t, mat) {{
+            const len = z2 - z1;
+            if (len < 0.1) return;
+            const m = BABYLON.MeshBuilder.CreateBox('fence_'+id,
+                {{width: t, height: h, depth: len}}, scene);
+            m.position.set(x, h/2, z1 + len/2);
+            m.material = mat;
+            fenceMeshes.push(m);
+        }}
+
+        function _fenceGate(id, x, z, w, h) {{
+            const mat = new BABYLON.StandardMaterial('gate_mat_'+id, scene);
+            mat.diffuseColor  = new BABYLON.Color3(0.9, 0.75, 0.1);  // dorado
+            mat.emissiveColor = new BABYLON.Color3(0.2, 0.15, 0.0);
+            mat.alpha = 0.5;
+            const m = BABYLON.MeshBuilder.CreateBox('fence_'+id,
+                {{width: w, height: h, depth: 0.05}}, scene);
+            m.position.set(x + w/2, h/2, z);
+            m.material = mat;
+            fenceMeshes.push(m);
+        }}
+
+        // Al cambiar estilo, reconstruir si está activo
+        document.getElementById('fence-style').addEventListener('change', () => {{
+            if (fenceActive) buildFence();
+        }});
 
         // ================================================
         // RESET LAYOUT — volver al estado inicial
@@ -1210,11 +1420,22 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             const btn = document.getElementById('btn-roof');
             if (roofActive) {{
                 if (roofMesh) {{ roofMesh.dispose(); roofMesh = null; }}
+                // Quitar paneles del tejado al desactivar
+                solarMeshes.forEach(m => {{ m.dispose(); }});
+                solarMeshes = [];
+                // Restaurar visibilidad del floor garden de paneles
+                roomsData.forEach((r, i) => {{
+                    if ((r.code||'').toLowerCase().includes('panel') || (r.code||'').toLowerCase().includes('solar')) {{
+                        const floorMesh = scene.getMeshByName(`floor_${{i}}`);
+                        if (floorMesh) floorMesh.isVisible = true;
+                    }}
+                }});
                 roofActive = false;
                 btn.textContent = '🏠 Tejado OFF';
                 btn.classList.remove('active');
                 document.getElementById('roof-panel').style.display = 'none';
                 showToast('Tejado ocultado');
+
             }} else {{
                 buildRoof();
                 roofActive = true;
@@ -1222,8 +1443,418 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                 btn.classList.add('active');
                 document.getElementById('roof-panel').style.display = 'block';
                 showToast('Tejado: ' + roofType.split('(')[0].trim());
+                buildSolarPanels();
             }}
         }}                                                                                                                             
+        // ================================================
+        // PANELES SOLARES EN TEJADO
+        // ================================================
+        let solarMeshes = [];
+
+        function buildSolarPanels() {{
+            // Limpiar paneles previos
+            solarMeshes.forEach(m => {{ m.material && m.material.dispose(); m.dispose(); }});
+            solarMeshes = [];
+
+            // Buscar habitaciones de paneles solares en roomsData
+            const panelRooms = roomsData.filter(r =>
+                (r.code||'').toLowerCase().includes('panel') ||
+                (r.code||'').toLowerCase().includes('solar')
+            );
+            if (panelRooms.length === 0) return;
+
+            // Ocultar el suelo garden de paneles mientras tejado está ON
+            roomsData.forEach((r, i) => {{
+                if ((r.code||'').toLowerCase().includes('panel') || (r.code||'').toLowerCase().includes('solar')) {{
+                    const floorMesh = scene.getMeshByName(`floor_${{i}}`);
+                    if (floorMesh) floorMesh.isVisible = false;
+                }}
+            }});
+
+            // Calcular bounding box de la casa (solo zonas habitables)
+            const houseRooms = roomsData.filter(r => {{
+                const z = (r.zone||'').toLowerCase();
+                return z !== 'garden' && z !== 'exterior';
+            }});
+            if (houseRooms.length === 0) return;
+
+            const minX = Math.min(...houseRooms.map(r => r.x));
+            const maxX = Math.max(...houseRooms.map(r => r.x + r.width));
+            const minZ = Math.min(...houseRooms.map(r => r.z));
+            const maxZ = Math.max(...houseRooms.map(r => r.z + r.depth));
+            const houseW = maxX - minX;
+            const houseCX = (minX + maxX) / 2;
+
+            // Calcular altura del tejado en el punto sur
+            // La cumbrera está en el centro, el alero en los extremos
+            const roofPitch = 0.35;  // pendiente estándar
+            const roofAleroZ = minZ;  // fachada sur (z menor = sur en nuestro sistema)
+            const roofHeight = WALL_H + (houseW / 2) * roofPitch;
+            const roofMidHeight = WALL_H + 0.1;
+
+            // Material panel solar — azul oscuro con brillo
+            const panMat = new BABYLON.StandardMaterial('solarMat', scene);
+            panMat.diffuseColor = new BABYLON.Color3(0.05, 0.15, 0.45);
+            panMat.emissiveColor = new BABYLON.Color3(0.05, 0.15, 0.40);  // más brillo
+            panMat.specularColor = new BABYLON.Color3(0.6, 0.7, 0.9);
+            panMat.specularPower = 32;
+
+            // Crear paneles — distribuidos en la mitad sur del tejado
+            // Cada panel real: 1.7m x 1.0m, inclinación 30° orientado sur
+            const PANEL_W = 5.1;
+            const PANEL_D = 3.0;
+            const PANEL_GAP = 0.4;
+            const PANEL_H = 0.18;  // más grueso para verse
+            const INCLINATION = 0.52;  // 30° en radianes — óptimo España
+
+            // Calcular cuántos paneles caben según el área solicitada
+            let totalPanelArea = 0;
+            panelRooms.forEach(r => {{ totalPanelArea += (r.area_m2 || 10); }});
+            const numPanels = Math.max(2, Math.round(totalPanelArea / (PANEL_W * PANEL_D)));
+            const cols = Math.min(numPanels, Math.floor(houseW / (PANEL_W + PANEL_GAP)));
+            const rows = Math.ceil(numPanels / cols);
+
+            // Posición sobre faldón sur según tipo de tejado
+            const houseD = maxZ - minZ;
+            let panelBaseY, panelBaseZ;
+
+            if (roofType.toLowerCase().includes('plana')) {{
+                panelBaseY = WALL_H + 0.35;
+                panelBaseZ = minZ + houseD * 0.25;
+            }} else if (roofType.toLowerCase().includes('cuatro')) {{
+                const pitch = (houseW / 2) * 0.4;
+                panelBaseY = WALL_H + pitch * 0.35;
+                panelBaseZ = minZ + houseD * 0.18;
+            }} else {{
+                const pitch = (houseW / 2) * 0.35;
+                panelBaseY = WALL_H + pitch * 0.3;
+                panelBaseZ = minZ + houseD * 0.15;
+            }}
+
+            const totalPanelW = cols * (PANEL_W + PANEL_GAP) - PANEL_GAP;
+            const startX = houseCX - totalPanelW / 2;
+
+            for (let row = 0; row < rows; row++) {{
+                for (let col = 0; col < cols; col++) {{
+                    if (row * cols + col >= numPanels) break;
+                    const panel = BABYLON.MeshBuilder.CreateBox(
+                        `solar_${{row}}_${{col}}`,
+                        {{width: PANEL_W, height: PANEL_H, depth: PANEL_D}},
+                        scene
+                    );
+                    panel.position.set(
+                        startX + col * (PANEL_W + PANEL_GAP) + PANEL_W / 2,
+                        panelBaseY + row * (PANEL_D * Math.cos(INCLINATION) + PANEL_GAP),
+                        panelBaseZ + row * (PANEL_D * Math.sin(INCLINATION))
+                    );
+                    panel.rotation.x = -INCLINATION;  // inclinación sur 30°
+                    panel.material = panMat;
+                    panel.isPickable = false;
+                    solarMeshes.push(panel);
+                }}
+            }}
+
+            showToast(`☀️ ${{numPanels}} paneles solares — orientación Sur, 30°`);
+        }}
+
+        // ================================================
+        // CAPTURA DE VISTAS 3D — 5 perspectivas
+        // ================================================
+        const capturedViews = {{}};
+
+        function captureFromAngle(name, alpha, beta, radius, callback) {{
+            const prevAlpha = camera.alpha;
+            const prevBeta  = camera.beta;
+            const prevRadius = camera.radius;
+
+            camera.alpha  = alpha;
+            camera.beta   = beta;
+            camera.radius = radius;
+
+            // Esperar un frame para que renderice
+            setTimeout(() => {{
+                BABYLON.Tools.CreateScreenshotUsingRenderTarget(
+                    engine, camera, {{ width: 1280, height: 720 }},
+                    (data) => {{
+                        capturedViews[name] = data;
+                        camera.alpha  = prevAlpha;
+                        camera.beta   = prevBeta;
+                        camera.radius = prevRadius;
+                        callback();
+                    }}
+                );
+            }}, 300);
+        }}
+
+        // ZIP nativo sin dependencias externas
+        // Versión simplificada para generar ZIP de imágenes PNG base64
+        function crearZipImagenes(archivos, nombreZip) {{
+            function b64ToBytes(b64) {{
+                const bin = atob(b64);
+                const out = new Uint8Array(bin.length);
+                for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+                return out;
+            }}
+            function strToBytes(s) {{
+                const out = new Uint8Array(s.length);
+                for (let i = 0; i < s.length; i++) out[i] = s.charCodeAt(i) & 0xff;
+                return out;
+            }}
+            function u32(n) {{ return [n&0xff,(n>>8)&0xff,(n>>16)&0xff,(n>>24)&0xff]; }}
+            function u16(n) {{ return [n&0xff,(n>>8)&0xff]; }}
+            function concat(...arr) {{
+                const tot = arr.reduce((s,a)=>s+a.length,0);
+                const out = new Uint8Array(tot); let off=0;
+                for (const a of arr) {{ out.set(a,off); off+=a.length; }}
+                return out;
+            }}
+            function crc32(data) {{
+                let c=0xFFFFFFFF, t=[];
+                for(let i=0;i<256;i++){{let x=i;for(let j=0;j<8;j++)x=(x&1)?(0xEDB88320^(x>>>1)):(x>>>1);t[i]=x;}}
+                for(let i=0;i<data.length;i++) c=t[(c^data[i])&0xff]^(c>>>8);
+                return (c^0xFFFFFFFF)>>>0;
+            }}
+            const locals=[]; const central=[]; let offset=0;
+            for (const [nombre, contenido, esBase64] of archivos) {{
+                const nb = strToBytes(nombre);
+                const data = esBase64 ? b64ToBytes(contenido) : strToBytes(contenido);
+                const crc = crc32(data); const sz = data.length;
+                const lh = new Uint8Array([
+                    0x50,0x4B,0x03,0x04,0x14,0x00,0x00,0x00,0x00,0x00,
+                    0x00,0x00,0x00,0x00,
+                    ...u32(crc),...u32(sz),...u32(sz),
+                    ...u16(nb.length),0x00,0x00,...nb
+                ]);
+                locals.push(concat(lh,data));
+                const cd = new Uint8Array([
+                    0x50,0x4B,0x01,0x02,0x3F,0x00,0x14,0x00,
+                    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+                    ...u32(crc),...u32(sz),...u32(sz),
+                    ...u16(nb.length),0x00,0x00,0x00,0x00,0x00,0x00,
+                    0x00,0x00,0x00,0x00,...u32(offset),...nb
+                ]);
+                central.push(cd);
+                offset += lh.length + data.length;
+            }}
+            const cdb=concat(...central);
+            const eocd=new Uint8Array([
+                0x50,0x4B,0x05,0x06,0x00,0x00,0x00,0x00,
+                ...u16(archivos.length),...u16(archivos.length),
+                ...u32(cdb.length),...u32(offset),0x00,0x00
+            ]);
+            const blob=new Blob([concat(...locals,cdb,eocd)],{{type:'application/zip'}});
+            const url=URL.createObjectURL(blob);
+            const a=document.createElement('a');
+            a.href=url; a.download=nombreZip;
+            document.body.appendChild(a); a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }}
+        function captureAllViews() {{
+            showToast('📸 Capturando 5 vistas... espera');
+            document.getElementById('btn-capture').disabled = true;
+
+            const cx = totalWidth / 2;
+            const cz = totalDepth / 2;
+            camera.target = new BABYLON.Vector3(cx, 0, cz);
+            const r = Math.max(totalWidth, totalDepth) * 2.2;
+
+            const views = [
+                {{ name: 'sur_fachada_principal', alpha: Math.PI,      beta: Math.PI/3.5 }},
+                {{ name: 'norte',                 alpha: 0,            beta: Math.PI/3.5 }},
+                {{ name: 'este',                  alpha: Math.PI/2,    beta: Math.PI/3.5 }},
+                {{ name: 'oeste',                 alpha: -Math.PI/2,   beta: Math.PI/3.5 }},
+                {{ name: 'planta_cenital',         alpha: Math.PI/4,   beta: 0.15 }},
+            ];
+
+            let idx = 0;
+            function next() {{
+                if (idx >= views.length) {{
+                    // Todas capturadas — generar ZIP y descargar directamente
+                    const nombres = {{
+                        'sur_fachada_principal': 'Vistas_3D/01_Fachada_Principal_Sur.png',
+                        'norte':                 'Vistas_3D/02_Vista_Norte.png',
+                        'este':                  'Vistas_3D/03_Vista_Este.png',
+                        'oeste':                 'Vistas_3D/04_Vista_Oeste.png',
+                        'planta_cenital':        'Vistas_3D/05_Planta_Cenital.png',
+                    }};
+                    const total = Object.keys(capturedViews).length;
+                    if (total === 0) {{
+                        showToast('⚠️ No hay capturas generadas');
+                        document.getElementById('btn-capture').disabled = false;
+                        return;
+                    }}
+                    const archivos = [];
+                    for (const [key, dataUrl] of Object.entries(capturedViews)) {{
+                        const base64 = dataUrl.split(',')[1];
+                        const filename = nombres[key] || 'Vistas_3D/' + key + '.png';
+                        archivos.push([filename, base64, true]);
+                    }}
+                    archivos.push(['Vistas_3D/INSTRUCCIONES.txt',
+                        'VISTAS 3D ArchiRapid MVP - 5 perspectivas: 01 Fachada Sur, 02 Norte, 03 Este, 04 Oeste, 05 Cenital. Adjuntalas al arquitecto. ArchiRapid MVP www.archirapid.es',
+                        false
+                    ]);
+                    crearZipImagenes(archivos, 'Vistas_3D_ArchiRapid.zip');
+                    document.getElementById('capture-status').style.display = 'block';
+                    document.getElementById('btn-capture').disabled = false;
+                    showToast('✅ ZIP con ' + total + ' vistas descargado a tu PC');
+                    return;
+                }}
+                const v = views[idx++];
+                captureFromAngle(v.name, v.alpha, v.beta, r, next);
+            }}
+            next();
+        }}
+
+        // ================================================
+        // ESTILOS DE FACHADA — cambio en tiempo real
+        // ================================================
+        const STYLE_COLORS = {{
+            'Moderno':       [0.92, 0.92, 0.90],
+            'Contemporáneo': [0.90, 0.90, 0.88],
+            'Rural':         [0.75, 0.68, 0.55],
+            'Montaña':       [0.62, 0.55, 0.45],
+            'Ecológico':     [0.80, 0.72, 0.58],
+            'Andaluz':       [0.96, 0.94, 0.88],
+            'Clásico':       [0.93, 0.90, 0.83],
+            'Playa':         [0.94, 0.91, 0.82],
+        }};
+
+        function applyStyle(styleName) {{
+            const c = STYLE_COLORS[styleName] || [0.92, 0.92, 0.90];
+            const newColor = new BABYLON.Color3(c[0], c[1], c[2]);
+            // Recorrer todos los materiales de pared existentes en la escena
+            roomsData.forEach((room, i) => {{
+                const zone = (room.zone || '').toLowerCase();
+                if (zone === 'garden' || zone === 'exterior') return;
+                const wMat = scene.getMaterialByName(`wMat_${{i}}`);
+                if (wMat) wMat.diffuseColor = newColor;
+            }});
+            document.getElementById('style-applied').textContent = '✅ ' + styleName + ' aplicado';
+            showToast('🎨 Estilo ' + styleName + ' aplicado');
+        }}
+
+        function toggleStylePanel() {{
+            const panel = document.getElementById('style-panel');
+            const isVisible = panel.style.display !== 'none';
+            panel.style.display = isVisible ? 'none' : 'block';
+            document.getElementById('btn-style').classList.toggle('active', !isVisible);
+        }}
+
+        // ================================================
+        // CIMIENTOS 3D
+        // ================================================
+        const foundationType = "{foundation_type}";
+        let foundMeshes = [];
+        let foundActive = false;
+
+        function buildFoundation() {{
+            // Limpiar previo
+            foundMeshes.forEach(m => {{ m.material && m.material.dispose(); m.dispose(); }});
+            foundMeshes = [];
+
+            // Detectar tipo
+            const ft = foundationType.toLowerCase();
+            let type = 'losa';
+            if (ft.includes('zapata')) type = 'zapatas';
+            else if (ft.includes('pilote')) type = 'pilotes';
+
+            // Material hormigón
+            const mat = new BABYLON.StandardMaterial('foundMat', scene);
+            if (type === 'zapatas') {{
+                mat.diffuseColor = new BABYLON.Color3(0.60, 0.58, 0.55);
+            }} else if (type === 'pilotes') {{
+                mat.diffuseColor = new BABYLON.Color3(0.40, 0.38, 0.36);
+            }} else {{
+                mat.diffuseColor = new BABYLON.Color3(0.70, 0.68, 0.65);
+            }}
+
+            if (type === 'losa') {{
+                // Placa continua bajo toda la casa
+                const houseRooms = roomsData.filter(r => {{
+                    const z = (r.zone||'').toLowerCase();
+                    return z !== 'garden' && z !== 'exterior';
+                }});
+                if (houseRooms.length === 0) return;
+                const minX = Math.min(...houseRooms.map(r => r.x));
+                const maxX = Math.max(...houseRooms.map(r => r.x + r.width));
+                const minZ = Math.min(...houseRooms.map(r => r.z));
+                const maxZ = Math.max(...houseRooms.map(r => r.z + r.depth));
+                const losa = BABYLON.MeshBuilder.CreateBox('found_losa', {{
+                    width: maxX - minX + 0.3,
+                    height: 0.60,
+                    depth: maxZ - minZ + 0.3
+                }}, scene);
+                losa.position.set((minX + maxX) / 2, -0.30, (minZ + maxZ) / 2);
+                losa.material = mat;
+                losa.isPickable = false;
+                foundMeshes.push(losa);
+
+            }} else if (type === 'zapatas') {{
+                // Bloque bajo cada habitación habitable
+                roomsData.forEach((room, i) => {{
+                    const z = (room.zone||'').toLowerCase();
+                    if (z === 'garden' || z === 'exterior') return;
+                    const zap = BABYLON.MeshBuilder.CreateBox(`found_zap_${{i}}`, {{
+                        width: room.width - 0.2,
+                        height: 1.20,
+                        depth: room.depth - 0.2
+                    }}, scene);
+                    zap.position.set(room.x + room.width/2, -0.60, room.z + room.depth/2);
+                    zap.material = mat;
+                    zap.isPickable = false;
+                    foundMeshes.push(zap);
+                }});
+
+            }} else if (type === 'pilotes') {{
+                // Cilindros en esquinas de cada habitación habitable
+                roomsData.forEach((room, i) => {{
+                    const z = (room.zone||'').toLowerCase();
+                    if (z === 'garden' || z === 'exterior') return;
+                    const corners = [
+                        [room.x + 0.3, room.z + 0.3],
+                        [room.x + room.width - 0.3, room.z + 0.3],
+                        [room.x + 0.3, room.z + room.depth - 0.3],
+                        [room.x + room.width - 0.3, room.z + room.depth - 0.3]
+                    ];
+                    corners.forEach((c, j) => {{
+                        const pil = BABYLON.MeshBuilder.CreateCylinder(`found_pil_${{i}}_${{j}}`, {{
+                            diameter: 0.50,
+                            height: 2.50,
+                            tessellation: 12
+                        }}, scene);
+                        pil.position.set(c[0], -1.25, c[1]);
+                        pil.material = mat;
+                        pil.isPickable = false;
+                        foundMeshes.push(pil);
+                    }});
+                }});
+            }}
+        }}
+
+        function toggleFoundation() {{
+            const btn = document.getElementById('btn-found');
+            const panel = document.getElementById('found-panel');
+            if (foundActive) {{
+                foundMeshes.forEach(m => {{ m.material && m.material.dispose(); m.dispose(); }});
+                foundMeshes = [];
+                foundActive = false;
+                btn.textContent = '🏗️ Cimientos OFF';
+                btn.classList.remove('active');
+                panel.style.display = 'none';
+                showToast('Cimientos ocultados');
+            }} else {{
+                buildFoundation();
+                foundActive = true;
+                btn.textContent = '🏗️ Cimientos ON';
+                btn.classList.add('active');
+                panel.style.display = 'block';
+                // Mostrar tipo en panel
+                document.getElementById('found-type-label').textContent =
+                    foundationType.split('(')[0].trim();
+                showToast('Cimientos: ' + foundationType.split('(')[0].trim());
+            }}
+        }}                                                                                                                              
         // ================================================
         // RENDER LOOP
         // ================================================
@@ -1275,8 +1906,22 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             ctx.fill();
         }})();
 
+        // ================================================
+        // INICIALIZACIÓN — construir escena al cargar
+        // ================================================
+        const initialLayout = generateLayoutJS(roomsData);
+        rebuildScene(initialLayout);
+
         setMode('select');
         console.log('ArchiRapid Editor 3D v3.0 —', roomsData.length, 'habitaciones cargadas');
+
+        function toggleToolbar() {{
+            const tb = document.getElementById('toolbar');
+            const btn = document.getElementById('toggle-toolbar');
+            tb.classList.toggle('collapsed');
+            btn.textContent = tb.classList.contains('collapsed') ? '▶' : '◀';
+        }}
+
     </script>
 </body>
 </html>"""
