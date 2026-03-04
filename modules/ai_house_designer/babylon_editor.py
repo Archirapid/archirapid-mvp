@@ -1700,6 +1700,8 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                         'VISTAS 3D ArchiRapid MVP - 5 perspectivas: 01 Fachada Sur, 02 Norte, 03 Este, 04 Oeste, 05 Cenital. Adjuntalas al arquitecto. ArchiRapid MVP www.archirapid.es',
                         false
                     ]);
+                    // enviar capturas al padre (Streamlit) para que pueda almacenarlas
+                    window.parent.postMessage({ type: 'archirapid_captures', views: capturedViews }, '*');
                     crearZipImagenes(archivos, 'Vistas_3D_ArchiRapid.zip');
                     document.getElementById('capture-status').style.display = 'block';
                     document.getElementById('btn-capture').disabled = false;
