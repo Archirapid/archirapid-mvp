@@ -43,3 +43,13 @@ def test_process_babylon_return_creates_thumbnails():
     # small pillow can open it
     Image.open(io.BytesIO(thumb_data))
 
+
+def test_process_babylon_return_accepts_dict():
+    # if the component sends a dict directly rather than a string
+    img = make_dummy_png((0, 128, 255))
+    url = "data:image/png;base64," + base64.b64encode(img).decode('ascii')
+    editor_obj = {"foo": url}
+    caps, thumbs = _process_babylon_return(editor_obj)
+    assert caps == editor_obj
+    assert "foo" in thumbs
+

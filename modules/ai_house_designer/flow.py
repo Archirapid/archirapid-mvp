@@ -2329,11 +2329,14 @@ def render_step3_editor():
         editor_return = components.html(
             st.session_state["babylon_html"],
             height=700,
-            scrolling=False
+            scrolling=False,
+            key="babylon_editor_component"
         )
-        if editor_return:
+        if editor_return is not None:
             # debug: show return value from component
             st.write("***DEBUG editor_return***", editor_return)
+            st.write("***DEBUG type***", type(editor_return))
+            st.write("***DEBUG repr***", repr(editor_return))
             try:
                 caps, thumbs = _process_babylon_return(editor_return)
                 st.session_state['babylon_captures'] = caps
@@ -2387,7 +2390,13 @@ def _process_babylon_return(editor_return: str):
     dict may be returned for thumbnails if the operation fails.
     """
     import json
-    caps = json.loads(editor_return)
+    # editor_return may already be a dict if the JS sent an object.
+    if isinstance(editor_return, str):
+        caps = json.loads(editor_return)
+    elif isinstance(editor_return, dict):
+        caps = editor_return
+    else:
+        raise ValueError(f"Unexpected editor_return type: {type(editor_return)}")
     thumbs = {}
     try:
         from PIL import Image

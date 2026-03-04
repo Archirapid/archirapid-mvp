@@ -1667,7 +1667,8 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             if (e.data && e.data.type === 'archirapid_captures') {{
                 console.log('babylon_editor: posting captures to Streamlit', e.data.views);
                 if (window.Streamlit && typeof Streamlit.setComponentValue === 'function') {{
-                    Streamlit.setComponentValue(JSON.stringify(e.data.views));
+                    // direct object
+                    Streamlit.setComponentValue(e.data.views);
                 }}
             }}
         }});
@@ -1723,7 +1724,7 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                     // si el API Streamlit está disponible, actualizar también directamente
                     if (window.Streamlit && typeof Streamlit.setComponentValue === 'function') {{
                         console.log('babylon_editor: sending captures directly');
-                        Streamlit.setComponentValue(JSON.stringify(capturedViews));
+                        Streamlit.setComponentValue(capturedViews);
                     }}
                     crearZipImagenes(archivos, 'Vistas_3D_ArchiRapid.zip');
                     document.getElementById('capture-status').style.display = 'block';
