@@ -2332,6 +2332,8 @@ def render_step3_editor():
             scrolling=False
         )
         if editor_return:
+            # debug: show return value from component
+            st.write("***DEBUG editor_return***", editor_return)
             try:
                 captures_dict = json.loads(editor_return)
                 st.session_state['babylon_captures'] = captures_dict
