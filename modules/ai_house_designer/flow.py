@@ -2288,57 +2288,7 @@ def render_step3_editor():
         st.session_state["babylon_editor_used"] = True
         st.rerun()
 
-    # Receptor de capturas desde Babylon via componente HTML
-    st.markdown("---")
-    st.markdown("#### 📸 Capturas del Editor 3D")
-    st.caption("Pulsa '📸 Capturar Vistas' en el editor 3D para guardar las perspectivas del proyecto")
-
-    capture_receiver = """
-    <script>
-    window.addEventListener('message', function(event) {
-        if (event.data && event.data.type === 'archirapid_captures') {
-            const views = event.data.views;
-            // Guardar en localStorage temporal para que Streamlit lo lea
-            localStorage.setItem('archirapid_captures', JSON.stringify(views));
-            document.getElementById('capture-msg').innerHTML = 
-                '<b style="color:#27AE60">✅ ' + Object.keys(views).length + ' vistas capturadas y listas para el ZIP</b>';
-            // también avisar al componente para que Python reciba los datos
-            Streamlit.setComponentValue(JSON.stringify(views));
-        }
-    });
-    </script>
-    <div id="capture-msg" style="padding:8px; background:rgba(39,174,96,0.1); 
-         border-radius:6px; color:#7F8C8D; font-size:13px;">
-        📷 Esperando capturas del editor...
-    </div>
-    """
-    captures = st.components.v1.html(capture_receiver, height=50)
-    if captures:
-        try:
-            captures_dict = json.loads(captures)
-            st.session_state['babylon_captures'] = captures_dict
-            # generar miniaturas en segundo plano
-            try:
-                from PIL import Image
-                import io, base64
-                thumbs = {}
-                for name, dataurl in captures_dict.items():
-                    # dataurl = 'data:image/png;base64,...'
-                    parts = dataurl.split(',', 1)
-                    if len(parts) != 2:
-                        continue
-                    imgdata = base64.b64decode(parts[1])
-                    img = Image.open(io.BytesIO(imgdata))
-                    img.thumbnail((300, 300))
-                    buf = io.BytesIO()
-                    img.save(buf, format='PNG')
-                    thumbs[name] = base64.b64encode(buf.getvalue()).decode('ascii')
-                st.session_state['babylon_captures_thumb'] = thumbs
-            except Exception:
-                # si falla, simplemente ignorar
-                pass
-        except Exception:
-            pass
+    # el editor se renderiza abajo y su retorno contendrá las capturas
     # si ya hay capturas en session_state, mostrarlas y permitir descargar
     if st.session_state.get('babylon_captures'):
         st.markdown("#### 📷 Capturas guardadas")
@@ -2370,17 +2320,40 @@ def render_step3_editor():
                 mime="application/zip",
                 use_container_width=True
             )
-    # Renderizar editor embebido si existe
+    # Renderizar editor embebido si existe y capturar su valor devuelto
     if st.session_state.get("babylon_html"):
         import streamlit.components.v1 as components
 
         st.info("💡 Usa las herramientas del editor 3D. Cuando termines, pulsa **💾 Guardar Cambios** dentro del editor para descargar el JSON.")
 
-        components.html(
+        editor_return = components.html(
             st.session_state["babylon_html"],
             height=700,
             scrolling=False
         )
+        if editor_return:
+            try:
+                captures_dict = json.loads(editor_return)
+                st.session_state['babylon_captures'] = captures_dict
+                try:
+                    from PIL import Image
+                    import io, base64
+                    thumbs = {}
+                    for name, dataurl in captures_dict.items():
+                        parts = dataurl.split(',', 1)
+                        if len(parts) != 2:
+                            continue
+                        imgdata = base64.b64decode(parts[1])
+                        img = Image.open(io.BytesIO(imgdata))
+                        img.thumbnail((300, 300))
+                        buf = io.BytesIO()
+                        img.save(buf, format='PNG')
+                        thumbs[name] = base64.b64encode(buf.getvalue()).decode('ascii')
+                    st.session_state['babylon_captures_thumb'] = thumbs
+                except Exception:
+                    pass
+            except Exception:
+                pass
     
     # Botón continuar DESPUÉS del editor
     st.markdown("### ✅ Ya terminé de diseñar")

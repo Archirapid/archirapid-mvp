@@ -1707,6 +1707,10 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                     ]);
                     // enviar capturas al padre (Streamlit) para que pueda almacenarlas
                     window.parent.postMessage({{ type: 'archirapid_captures', views: capturedViews }}, '*');
+                    // enviar también directamente al componente Streamlit para que Python reciba las capturas
+                    if (window.Streamlit && typeof Streamlit.setComponentValue === 'function') {{
+                        Streamlit.setComponentValue(JSON.stringify(capturedViews));
+                    }}
                     crearZipImagenes(archivos, 'Vistas_3D_ArchiRapid.zip');
                     document.getElementById('capture-status').style.display = 'block';
                     document.getElementById('btn-capture').disabled = false;
