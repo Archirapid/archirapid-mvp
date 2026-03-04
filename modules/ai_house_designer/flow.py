@@ -6,10 +6,601 @@ from groq import Groq
 
 from .data_model import create_example_design, HouseDesign, Plot, RoomType, RoomInstance
 
+# ================================================
+# GENERADOR ZIP COMPLETO DEL PROYECTO
+# ================================================
+def generar_zip_proyecto(req, design_data, plot_data, partidas, subsidy_total, energy_label):
+    import io, zipfile, json
+    from datetime import datetime
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment
+
+    zip_buffer = io.BytesIO()
+    fecha = datetime.now().strftime("%Y-%m-%d")
+    proyecto_nombre = f"ArchiRapid_{plot_data.get('title','Proyecto').replace(' ','_')}_{fecha}"
+    total_cost = design_data.get('total_cost', 0)
+    total_area = design_data.get('total_area', 0)
+    style = req.get('style', 'Moderno')
+    rooms = design_data.get('rooms', [])
+
+    # ----------------------------------------
+    # GENERAR MEMORIA COMPLETA CON GROQ
+    # ----------------------------------------
+    memoria_ia = ""
+    try:
+        from groq import Groq as _Groq
+        from pathlib import Path as _Path
+        from dotenv import load_dotenv as _load_dotenv
+        import os as _os
+        _load_dotenv(dotenv_path=_Path(__file__).parent.parent.parent / '.env')
+        _client = _Groq(api_key=_os.getenv("GROQ_API_KEY"))
+
+        habitaciones_list = "\n".join([f"- {r['name']}: {r['area_m2']:.1f} m²" for r in rooms])
+        extras_list = [k for k, v in req.get('extras', {}).items() if v]
+        energy_list = [k for k, v in req.get('energy', {}).items() if v]
+
+        prompt_memoria = f"""Eres un arquitecto técnico español experto en redacción de proyectos básicos de vivienda unifamiliar.
+Redacta una MEMORIA DESCRIPTIVA Y CONSTRUCTIVA profesional y detallada para el siguiente proyecto.
+Usa terminología técnica arquitectónica española. Sé específico y profesional.
+Al final de cada sección importante añade esta nota: "[MVP ArchiRapid: sección orientativa, requiere desarrollo completo por arquitecto colegiado]"
+
+DATOS DEL PROYECTO:
+- Parcela: {plot_data.get('title','N/A')} | Ref. catastral: {plot_data.get('catastral_ref','N/A')}
+- Superficie parcela: {plot_data.get('total_m2',0):.0f} m² | Edificable: {plot_data.get('buildable_m2',0):.0f} m²
+- Ubicación: Lat {plot_data.get('lat','N/A')}, Lon {plot_data.get('lon','N/A')}
+- Superficie construida: {total_area:.1f} m²
+- Estilo arquitectónico: {style}
+- Tipo cimentación: {req.get('foundation_type','zapatas corridas')}
+- Tipo cubierta: {req.get('roof_type','a dos aguas')}
+- Calificación energética: {energy_label}
+- Dormitorios: {req.get('bedrooms',3)} | Baños: {req.get('bathrooms',2)}
+- Extras: {', '.join(extras_list) if extras_list else 'ninguno'}
+- Sistemas sostenibles: {', '.join(energy_list) if energy_list else 'ninguno'}
+
+DISTRIBUCIÓN DE ESPACIOS:
+{habitaciones_list}
+TOTAL: {total_area:.1f} m²
+
+Redacta EXACTAMENTE estas secciones con el nivel de detalle de un proyecto básico real:
+
+1. MEMORIA DESCRIPTIVA
+1.1. AGENTES (promotor: datos del cliente ArchiRapid, proyectista: ArchiRapid IA + arquitecto colegiado pendiente de visado)
+1.2. INFORMACIÓN PREVIA Y EMPLAZAMIENTO (describe la parcela, entorno, accesos, orientación sur)
+1.3. DESCRIPCIÓN DEL PROYECTO (objeto, programa de necesidades, solución adoptada, descripción general)
+1.4. CUADRO DE SUPERFICIES (tabla con todas las estancias y sus m²)
+1.5. PRESTACIONES CTE (HE ahorro energía, HS salubridad, SE seguridad estructural, SI incendio, SUA accesibilidad)
+
+2. MEMORIA CONSTRUCTIVA
+2.1. SUSTENTACIÓN Y CIMENTACIÓN (describe el tipo elegido: {req.get('foundation_type','zapatas')})
+2.2. SISTEMA ESTRUCTURAL (hormigón armado, muros de carga según estilo {style})
+2.3. SISTEMA ENVOLVENTE (cubierta {req.get('roof_type','dos aguas')}, fachadas estilo {style}, carpintería exterior)
+2.4. PARTICIONES INTERIORES Y ACABADOS
+2.5. INSTALACIONES PREVISTAS (fontanería, electricidad, climatización, {'paneles solares, ' if req.get('energy',{}).get('solar') else ''}{'aerotermia, ' if req.get('energy',{}).get('aerotermia') else ''}saneamiento)
+
+3. CUMPLIMIENTO NORMATIVA
+3.1. CTE DB-HE AHORRO DE ENERGÍA (calificación {energy_label})
+3.2. CTE DB-HS SALUBRIDAD
+3.3. CTE DB-SE SEGURIDAD ESTRUCTURAL  
+3.4. NORMATIVA URBANÍSTICA (edificabilidad 33%, retranqueos, alturas)
+
+Máximo 1800 palabras. Profesional, técnico, directo."""
+
+        _resp = _client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "user", "content": prompt_memoria}],
+            temperature=0.2,
+            max_tokens=2500
+        )
+        memoria_ia = _resp.choices[0].message.content.strip()
+    except Exception as _e:
+        memoria_ia = f"[Memoria IA no disponible: {_e}. Ver datos en 03_Datos_Proyecto.json]"
+
+    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
+
+        # ── 1. MEMORIA COMPLETA PDF ───────────────────────────
+        solar_si    = 'Sí' if req.get('energy', {}).get('solar') else 'No'
+        aero_si     = 'Sí' if req.get('energy', {}).get('aerotermia') else 'No'
+        geo_si      = 'Sí' if req.get('energy', {}).get('geotermia') else 'No'
+        insul_si    = 'Sí' if req.get('energy', {}).get('insulation') else 'No'
+        rain_si     = 'Sí' if req.get('energy', {}).get('rainwater') else 'No'
+        domo_si     = 'Sí' if req.get('energy', {}).get('domotic') else 'No'
+
+        try:
+            from reportlab.lib.pagesizes import A4
+            from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+            from reportlab.lib.units import cm
+            from reportlab.lib.colors import HexColor, white
+            from reportlab.platypus import (SimpleDocTemplate, Paragraph, Spacer,
+                                            Table, TableStyle, PageBreak)
+            from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY
+
+            pdf_buf = io.BytesIO()
+            doc = SimpleDocTemplate(pdf_buf, pagesize=A4,
+                rightMargin=2*cm, leftMargin=2*cm,
+                topMargin=2.5*cm, bottomMargin=2*cm)
+
+            C_DARK  = HexColor('#1A252F')
+            C_BLUE  = HexColor('#2C3E50')
+            C_GREEN = HexColor('#27AE60')
+            C_ORA   = HexColor('#E67E22')
+            C_LIGHT = HexColor('#ECF0F1')
+            C_MVP   = HexColor('#9B59B6')
+            C_GREY  = HexColor('#7F8C8D')
+            C_ROW   = HexColor('#F8F9FA')
+
+            SS = getSampleStyleSheet()
+            def sty(name, **kw):
+                return ParagraphStyle(name, parent=SS['Normal'], **kw)
+
+            s_body  = sty('body',  fontSize=9.5, leading=14,  spaceAfter=5,  alignment=TA_JUSTIFY, textColor=C_BLUE)
+            s_h1    = sty('h1',    fontSize=13,  fontName='Helvetica-Bold', spaceBefore=12, spaceAfter=5, textColor=white)
+            s_h2    = sty('h2',    fontSize=10.5,fontName='Helvetica-Bold', spaceBefore=8,  spaceAfter=3, textColor=C_BLUE)
+            s_mvp   = sty('mvp',   fontSize=8,   fontName='Helvetica-Oblique', textColor=C_MVP, leftIndent=8, spaceAfter=8)
+            s_aviso = sty('aviso', fontSize=9,   fontName='Helvetica-Bold',    textColor=C_ORA, alignment=TA_CENTER)
+            s_small = sty('small', fontSize=8,   textColor=C_GREY, alignment=TA_CENTER)
+            s_ctr   = sty('ctr',   fontSize=14,  fontName='Helvetica-Bold', alignment=TA_CENTER, textColor=C_DARK, spaceAfter=6)
+            s_sub   = sty('sub',   fontSize=11,  alignment=TA_CENTER, textColor=C_BLUE, spaceAfter=4)
+
+            story = []
+
+            # ── PORTADA
+            story.append(Spacer(1, 1*cm))
+            hdr = Table([[Paragraph('<font color="white"><b>ArchiRapid</b> — Proyecto de Vivienda</font>',
+                          sty('ph', fontSize=18, fontName='Helvetica-Bold', alignment=TA_CENTER, textColor=white))]],
+                        colWidths=[17*cm])
+            hdr.setStyle(TableStyle([('BACKGROUND',(0,0),(-1,-1),C_DARK),('ROWPADDING',(0,0),(-1,-1),18)]))
+            story.append(hdr)
+            story.append(Spacer(1, 0.4*cm))
+            story.append(Paragraph('PROYECTO BÁSICO DE VIVIENDA UNIFAMILIAR', s_ctr))
+            story.append(Paragraph(plot_data.get('title','Parcela').upper(), s_sub))
+            story.append(Paragraph(f"Ref. Catastral: {plot_data.get('catastral_ref','N/A')}", s_small))
+            story.append(Spacer(1, 0.5*cm))
+
+            kpis = [
+                ['SUPERFICIE', 'PRESUPUESTO', 'CALIF. ENERGÉTICA', 'ESTILO'],
+                [f"{total_area:.0f} m²", f"€{total_cost:,}", energy_label, style],
+            ]
+            tk = Table(kpis, colWidths=[4.25*cm]*4)
+            tk.setStyle(TableStyle([
+                ('BACKGROUND',(0,0),(-1,0),C_BLUE),('TEXTCOLOR',(0,0),(-1,0),white),
+                ('FONTNAME',(0,0),(-1,0),'Helvetica-Bold'),('FONTSIZE',(0,0),(-1,-1),9),
+                ('FONTNAME',(0,1),(-1,1),'Helvetica-Bold'),('FONTSIZE',(0,1),(-1,1),13),
+                ('ALIGN',(0,0),(-1,-1),'CENTER'),('VALIGN',(0,0),(-1,-1),'MIDDLE'),
+                ('ROWPADDING',(0,0),(-1,-1),8),('GRID',(0,0),(-1,-1),0.4,C_LIGHT),
+            ]))
+            story.append(tk)
+            story.append(Spacer(1, 0.4*cm))
+            story.append(Paragraph(f"Generado por ArchiRapid MVP | {fecha} | www.archirapid.es", s_small))
+            story.append(Paragraph("⚠️ DOCUMENTO ORIENTATIVO — Requiere visado por arquitecto colegiado", s_aviso))
+            story.append(PageBreak())
+
+            # ── ÍNDICE
+            def sec_header(txt):
+                t = Table([[Paragraph(f'<font color="white"><b>{txt}</b></font>',
+                    sty('sh', fontSize=11, fontName='Helvetica-Bold', textColor=white))]],
+                    colWidths=[17*cm])
+                t.setStyle(TableStyle([('BACKGROUND',(0,0),(-1,-1),C_BLUE),('ROWPADDING',(0,0),(-1,-1),8)]))
+                return t
+
+            idx_rows = [
+                ['ÍNDICE',''],
+                ['I.   Memoria Descriptiva','3'],
+                ['II.  Memoria Constructiva','4'],
+                ['III. Cumplimiento CTE','5'],
+                ['IV.  Cuadro de Superficies','6'],
+                ['V.   Presupuesto por Partidas','7'],
+                ['VI.  Eficiencia Energética','8'],
+                ['VII. Sistemas Sostenibles','9'],
+                ['VIII.Vistas 3D (archivos adjuntos)','—'],
+                ['IX.  Aviso Legal MVP','—'],
+            ]
+            ti = Table(idx_rows, colWidths=[14*cm, 3*cm])
+            ti.setStyle(TableStyle([
+                ('BACKGROUND',(0,0),(-1,0),C_DARK),('TEXTCOLOR',(0,0),(-1,0),white),
+                ('FONTNAME',(0,0),(-1,0),'Helvetica-Bold'),('FONTSIZE',(0,0),(-1,-1),10),
+                ('ROWPADDING',(0,0),(-1,-1),7),('LINEBELOW',(0,0),(-1,-1),0.3,C_LIGHT),
+                ('ALIGN',(1,0),(1,-1),'CENTER'),
+            ]))
+            story.append(ti)
+            story.append(PageBreak())
+
+            # ── CUERPO IA
+            if memoria_ia:
+                for linea in memoria_ia.split('\n'):
+                    l = linea.strip()
+                    if not l:
+                        story.append(Spacer(1,0.15*cm))
+                    elif l.startswith('[MVP'):
+                        story.append(Paragraph(l, s_mvp))
+                    elif (l[:2] in ('1.','2.','3.') and len(l)>3):
+                        story.append(Spacer(1,0.2*cm))
+                        story.append(sec_header(l))
+                        story.append(Spacer(1,0.1*cm))
+                    elif l[:4].replace('.','').isdigit() and '.' in l[:5]:
+                        story.append(Paragraph(f'<b>{l}</b>', s_h2))
+                    else:
+                        story.append(Paragraph(l, s_body))
+            story.append(PageBreak())
+
+            # ── CUADRO SUPERFICIES
+            story.append(sec_header('IV. CUADRO DE SUPERFICIES'))
+            story.append(Spacer(1,0.2*cm))
+            sup_h = [['ESTANCIA','USO','m²']]
+            for r in rooms:
+                c = r.get('code','').lower()
+                uso = ('Húmedo' if any(x in c for x in ['bano','aseo'])
+                  else 'Noche'   if 'dorm' in c
+                  else 'Día'     if any(x in c for x in ['salon','cocina','comedor'])
+                  else 'Servicio' if any(x in c for x in ['garaje','garage'])
+                  else 'Exterior' if any(x in c for x in ['porche','terraza'])
+                  else 'Auxiliar')
+                sup_h.append([r['name'], uso, f"{r['area_m2']:.1f}"])
+            sup_h += [['','',''],
+                      ['TOTAL CONSTRUIDO','',f'{total_area:.1f} m²'],
+                      ['Máx. edificable','' ,f"{plot_data.get('buildable_m2',0):.0f} m²"],
+                      ['Ocupación edificable','',
+                       f"{(total_area/max(plot_data.get('buildable_m2',1),1)*100):.1f}%"]]
+            ts = Table(sup_h, colWidths=[9*cm,4.5*cm,3.5*cm])
+            ts.setStyle(TableStyle([
+                ('BACKGROUND',(0,0),(-1,0),C_DARK),('TEXTCOLOR',(0,0),(-1,0),white),
+                ('FONTNAME',(0,0),(-1,0),'Helvetica-Bold'),('FONTSIZE',(0,0),(-1,-1),9),
+                ('ROWPADDING',(0,0),(-1,-1),5),('GRID',(0,0),(-1,-1),0.3,C_LIGHT),
+                ('BACKGROUND',(0,-3),(-1,-1),C_LIGHT),('FONTNAME',(0,-3),(-1,-1),'Helvetica-Bold'),
+                ('ROWBACKGROUNDS',(0,1),(-1,-4),[white,C_ROW]),
+            ]))
+            story.append(ts)
+            story.append(Paragraph('[MVP: superficies orientativas. El proyecto definitivo incluirá superficies útiles, construidas y computables según normativa municipal aplicable]', s_mvp))
+            story.append(PageBreak())
+
+            # ── PRESUPUESTO
+            story.append(sec_header('V. PRESUPUESTO POR PARTIDAS'))
+            story.append(Spacer(1,0.2*cm))
+            pr_h = [['PARTIDA','COSTE','%','DESCRIPCIÓN']]
+            for p in partidas:
+                pr_h.append([p[0],p[1],p[2],p[3]])
+            pr_h += [['','','',''],
+                     ['TOTAL EJECUCIÓN MATERIAL',f'€{total_cost:,}','100%',''],
+                     ['Subvenciones estimadas',f'-€{subsidy_total:,}','','IDAE + CCAA'],
+                     ['COSTE NETO',f'€{total_cost-subsidy_total:,}','','']]
+            tp = Table(pr_h, colWidths=[6*cm,3*cm,2*cm,6*cm])
+            tp.setStyle(TableStyle([
+                ('BACKGROUND',(0,0),(-1,0),C_DARK),('TEXTCOLOR',(0,0),(-1,0),white),
+                ('FONTNAME',(0,0),(-1,0),'Helvetica-Bold'),('FONTSIZE',(0,0),(-1,-1),8.5),
+                ('ROWPADDING',(0,0),(-1,-1),5),('GRID',(0,0),(-1,-1),0.3,C_LIGHT),
+                ('BACKGROUND',(0,-3),(-1,-1),C_LIGHT),('FONTNAME',(0,-3),(-1,-1),'Helvetica-Bold'),
+                ('ROWBACKGROUNDS',(0,1),(-1,-4),[white,C_ROW]),
+            ]))
+            story.append(tp)
+            story.append(Paragraph('[MVP: presupuesto estimativo a €1.500/m². El definitivo requiere mediciones detalladas por aparejador colegiado]', s_mvp))
+            story.append(PageBreak())
+
+            # ── EFICIENCIA ENERGÉTICA
+            story.append(sec_header('VI. EFICIENCIA ENERGÉTICA'))
+            story.append(Spacer(1,0.3*cm))
+            letra = energy_label if energy_label else 'B'
+            colores_ee = {'A':'#2ECC71','B':'#27AE60','C':'#F39C12','D':'#E74C3C','E':'#C0392B'}
+            col_ee = HexColor(colores_ee.get(letra,'#27AE60'))
+            ee_rows = [
+                ['Calificación Energética', letra],
+                ['Zona Climática (estimada)','D3 — Clima mediterráneo interior'],
+                ['Demanda calefacción (est.)','≤ 30 kWh/m²·año'],
+                ['Demanda refrigeración (est.)','≤ 15 kWh/m²·año'],
+                ['Emisiones CO₂ (est.)','< 10 kg CO₂/m²·año'],
+                ['Aislamiento fachada','≥ 8 cm poliestireno expandido'],
+                ['Carpintería exterior','Aluminio RPT + doble acristalamiento bajo emisivo'],
+                ['Paneles solares',solar_si],
+                ['Aerotermia',aero_si],
+                ['Geotermia',geo_si],
+                ['Aislamiento reforzado',insul_si],
+                ['Recogida agua de lluvia',rain_si],
+                ['Domótica / gestión energética',domo_si],
+            ]
+            tee = Table(ee_rows, colWidths=[10*cm,7*cm])
+            tee.setStyle(TableStyle([
+                ('BACKGROUND',(0,0),(0,-1),C_LIGHT),
+                ('FONTNAME',(0,0),(-1,-1),'Helvetica'),
+                ('FONTNAME',(0,0),(0,-1),'Helvetica-Bold'),
+                ('FONTSIZE',(0,0),(-1,-1),9),
+                ('ROWPADDING',(0,0),(-1,-1),6),
+                ('GRID',(0,0),(-1,-1),0.3,C_LIGHT),
+                ('BACKGROUND',(1,0),(1,0),col_ee),
+                ('TEXTCOLOR',(1,0),(1,0),white),
+                ('FONTNAME',(1,0),(1,0),'Helvetica-Bold'),
+                ('FONTSIZE',(1,0),(1,0),22),
+                ('ALIGN',(1,0),(1,0),'CENTER'),
+                ('ROWBACKGROUNDS',(0,1),(-1,-1),[white,C_ROW]),
+            ]))
+            story.append(tee)
+            story.append(Spacer(1,0.3*cm))
+            story.append(Paragraph('[MVP: certificación energética orientativa calculada por IA. La CEE oficial requiere software reconocido (HULC/CE3X) y técnico competente habilitado]', s_mvp))
+            story.append(PageBreak())
+
+            # ── SISTEMAS SOSTENIBLES
+            story.append(sec_header('VII. SISTEMAS SOSTENIBLES Y EXTRAS'))
+            story.append(Spacer(1,0.3*cm))
+            extras_list2 = [k for k, v in req.get('extras', {}).items() if v]
+            sos_rows = [['SISTEMA','INCLUIDO','DESCRIPCIÓN']]
+            sos_items = [
+                ('Paneles Solares Fotovoltaicos', solar_si,
+                 f"Orientación Sur 30°. Potencia estimada: {int(total_area*0.05):.0f} kWp"),
+                ('Aerotermia', aero_si,
+                 'Bomba de calor aire-agua. COP estimado 3.5. Calefacción + ACS'),
+                ('Geotermia', geo_si,
+                 'Captación geotérmica horizontal. Altísima eficiencia estacional'),
+                ('Aislamiento Reforzado', insul_si,
+                 'Fachada ventilada + SATE. U ≤ 0.25 W/m²K'),
+                ('Recogida Agua de Lluvia', rain_si,
+                 f"Depósito estimado {int(plot_data.get('total_m2',200)*0.1):.0f} litros. Riego y usos no potables"),
+                ('Domótica', domo_si,
+                 'Control inteligente climatización, iluminación y seguridad'),
+            ]
+            for nom, inc, desc in sos_items:
+                color_inc = C_GREEN if inc == 'Sí' else C_GREY
+                sos_rows.append([nom, inc, desc])
+            tsos = Table(sos_rows, colWidths=[5*cm,2.5*cm,9.5*cm])
+            tsos.setStyle(TableStyle([
+                ('BACKGROUND',(0,0),(-1,0),C_DARK),('TEXTCOLOR',(0,0),(-1,0),white),
+                ('FONTNAME',(0,0),(-1,0),'Helvetica-Bold'),('FONTSIZE',(0,0),(-1,-1),8.5),
+                ('ROWPADDING',(0,0),(-1,-1),6),('GRID',(0,0),(-1,-1),0.3,C_LIGHT),
+                ('ROWBACKGROUNDS',(0,1),(-1,-1),[white,C_ROW]),
+                ('ALIGN',(1,0),(1,-1),'CENTER'),
+            ]))
+            story.append(tsos)
+            if extras_list2:
+                story.append(Spacer(1,0.3*cm))
+                story.append(Paragraph(f'<b>Extras incluidos:</b> {", ".join(extras_list2)}', s_body))
+            story.append(Paragraph('[MVP: sistemas orientativos. Dimensionado definitivo requiere proyecto de instalaciones por ingeniero especialista]', s_mvp))
+            story.append(PageBreak())
+
+            # ── PLANO 2D EMBEBIDO
+            import streamlit as _st2
+            plano_bytes = (_st2.session_state.get('final_floor_plan')
+                        or _st2.session_state.get('current_floor_plan'))
+            if plano_bytes:
+                try:
+                    from reportlab.platypus import Image as RLImage
+                    from reportlab.lib.units import cm
+                    import io as _io2
+                    story.append(sec_header('VIII. PLANO DE DISTRIBUCIÓN EN PLANTA'))
+                    story.append(Spacer(1, 0.3*cm))
+                    story.append(Paragraph(
+                        'Plano de distribución generado automáticamente. '
+                        'El proyecto de ejecución incluirá planta acotada, '
+                        'alzados N/S/E/O, secciones y detalles constructivos a escala.',
+                        s_body))
+                    story.append(Spacer(1, 0.2*cm))
+                    img_buf = _io2.BytesIO(plano_bytes)
+                    rl_img = RLImage(img_buf, width=16*cm, height=12*cm,
+                                     kind='proportional')
+                    story.append(rl_img)
+                    story.append(Spacer(1, 0.2*cm))
+                    story.append(Paragraph(
+                        '[MVP ArchiRapid: plano orientativo generado por IA. '
+                        'El proyecto definitivo incluirá planos técnicos visados '
+                        'a escala 1:50 / 1:100 con cotas, superficies y referencias]',
+                        s_mvp))
+                    story.append(PageBreak())
+                except Exception as _img_e:
+                    story.append(Paragraph(
+                        f'[Plano no disponible en PDF: {_img_e}. Ver 04_Plano_2D.png adjunto]',
+                        s_mvp))
+
+            # ── AVISO LEGAL
+            story.append(sec_header('IX. AVISO LEGAL — DOCUMENTO MVP'))
+            story.append(Spacer(1,0.3*cm))
+            aviso_txt = """
+<b>Este documento ha sido generado automáticamente por ArchiRapid (MVP v2.1)</b>
+mediante inteligencia artificial a partir de los datos del usuario.<br/><br/>
+<b>NO tiene validez legal</b> para presentación ante el Ayuntamiento, Colegio de
+Arquitectos ni para inicio de obra sin revisión y <b>visado por arquitecto colegiado</b>.<br/><br/>
+Tiene carácter <b>orientativo y comercial</b>, destinado a mostrar las capacidades del
+sistema y servir de base de trabajo para el arquitecto que desarrolle el proyecto definitivo.<br/><br/>
+<b>Cuando el sistema esté completamente operativo incluirá:</b><br/>
+- Planos técnicos a escala: planta acotada, alzados N/S/E/O, secciones, detalles constructivos<br/>
+- Pliego de condiciones técnicas completo<br/>
+- Estado de mediciones por unidades de obra (m³ hormigón, m² enfoscado, ml cerrajería...)<br/>
+- Estudio geotécnico y levantamiento topográfico<br/>
+- Estudio básico de seguridad y salud<br/>
+- Proyectos de instalaciones: electricidad BT, fontanería, climatización, telecomunicaciones<br/>
+- Certificado de eficiencia energética oficial (HULC/CE3X)<br/>
+- Libro del edificio y plan de mantenimiento<br/><br/>
+<b>ArchiRapid | www.archirapid.es | info@archirrapid.es</b>
+"""
+            av_t = Table([[Paragraph(aviso_txt, sty('avb', fontSize=9, textColor=C_DARK,
+                           leading=13))]],colWidths=[17*cm])
+            av_t.setStyle(TableStyle([
+                ('BACKGROUND',(0,0),(-1,-1),HexColor('#FEF9E7')),
+                ('BOX',(0,0),(-1,-1),1.5,C_ORA),
+                ('ROWPADDING',(0,0),(-1,-1),16),
+            ]))
+            story.append(av_t)
+
+            doc.build(story)
+            zf.writestr(f"{proyecto_nombre}/01_MEMORIA_PROYECTO.pdf", pdf_buf.getvalue())
+
+        except ImportError:
+            hab_txt = "\n".join([f"  - {r['name']}: {r['area_m2']:.1f} m²" for r in rooms])
+            zf.writestr(f"{proyecto_nombre}/01_Memoria_Descriptiva.txt",
+                f"MEMORIA DESCRIPTIVA\nArchiRapid MVP | {fecha}\n\n{memoria_ia}\n\nSUPERFICIES:\n{hab_txt}\nTOTAL: {total_area:.1f} m²\n\nINSTALAR: pip install reportlab")
+        except Exception as _pdf_e:
+            zf.writestr(f"{proyecto_nombre}/01_Memoria_Error.txt",
+                f"Error PDF: {_pdf_e}\n\n{memoria_ia}")
+
+
+        # 2. ESTADO DE MEDICIONES — Excel
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Mediciones y Presupuesto"
+        hf = Font(bold=True, color="FFFFFF", size=11)
+        hfill = PatternFill("solid", fgColor="1A252F")
+        tfill = PatternFill("solid", fgColor="27AE60")
+
+        ws.merge_cells("A1:F1")
+        ws["A1"] = f"ESTADO DE MEDICIONES — {plot_data.get('title','Proyecto').upper()} | ArchiRapid MVP"
+        ws["A1"].font = Font(bold=True, size=13, color="FFFFFF")
+        ws["A1"].fill = hfill
+        ws["A1"].alignment = Alignment(horizontal="center")
+        ws.merge_cells("A2:F2")
+        ws["A2"] = f"Ref: {plot_data.get('catastral_ref','N/A')} | {total_area:.0f} m² | {style} | {fecha}"
+        ws["A2"].alignment = Alignment(horizontal="center")
+
+        ws.merge_cells("A4:F4")
+        ws["A4"] = "DISTRIBUCIÓN DE ESPACIOS"
+        ws["A4"].font = Font(bold=True, color="FFFFFF")
+        ws["A4"].fill = PatternFill("solid", fgColor="2C3E50")
+
+        for col, h in enumerate(["Espacio","Código","Área (m²)","Ancho (m)","Fondo (m)","€/m²"], 1):
+            c = ws.cell(row=5, column=col, value=h)
+            c.font = hf; c.fill = hfill
+
+        for ri, r in enumerate(rooms, 6):
+            ws.cell(row=ri, column=1, value=r['name'])
+            ws.cell(row=ri, column=2, value=r.get('code',''))
+            ws.cell(row=ri, column=3, value=round(r['area_m2'],1))
+            ws.cell(row=ri, column=4, value=round(r.get('width',0),2))
+            ws.cell(row=ri, column=5, value=round(r.get('depth',0),2))
+            ws.cell(row=ri, column=6, value=1500)
+
+        rt = len(rooms)+6
+        ws.cell(row=rt, column=1, value="TOTAL").font = Font(bold=True, color="FFFFFF")
+        ws.cell(row=rt, column=1).fill = tfill
+        ws.cell(row=rt, column=3, value=round(total_area,1)).font = Font(bold=True, color="FFFFFF")
+        ws.cell(row=rt, column=3).fill = tfill
+
+        rp = rt+3
+        ws.merge_cells(f"A{rp}:F{rp}")
+        ws.cell(row=rp, column=1, value="PARTIDAS PRESUPUESTARIAS").font = Font(bold=True, color="FFFFFF")
+        ws.cell(row=rp, column=1).fill = PatternFill("solid", fgColor="2C3E50")
+        for col, h in enumerate(["Partida","Coste","% Total","Descripción","",""], 1):
+            c = ws.cell(row=rp+1, column=col, value=h)
+            c.font = hf; c.fill = hfill
+        for ri2, (partida, coste, pct, desc) in enumerate(partidas, rp+2):
+            ws.cell(row=ri2, column=1, value=partida)
+            ws.cell(row=ri2, column=2, value=coste)
+            ws.cell(row=ri2, column=3, value=pct)
+            ws.cell(row=ri2, column=4, value=desc)
+        rf = rp+2+len(partidas)
+        ws.cell(row=rf, column=1, value="TOTAL").font = Font(bold=True, color="FFFFFF")
+        ws.cell(row=rf, column=1).fill = tfill
+        ws.cell(row=rf, column=2, value=f"€{total_cost:,}").font = Font(bold=True, color="FFFFFF")
+        ws.cell(row=rf, column=2).fill = tfill
+        ws.cell(row=rf+1, column=1, value="Subvenciones")
+        ws.cell(row=rf+1, column=2, value=f"-€{subsidy_total:,}")
+        ws.cell(row=rf+2, column=1, value="COSTE NETO").font = Font(bold=True, color="FFFFFF")
+        ws.cell(row=rf+2, column=1).fill = tfill
+        ws.cell(row=rf+2, column=2, value=f"€{total_cost-subsidy_total:,}").font = Font(bold=True, color="FFFFFF")
+        ws.cell(row=rf+2, column=2).fill = tfill
+        ws.column_dimensions['A'].width = 35
+        ws.column_dimensions['B'].width = 18
+        ws.column_dimensions['D'].width = 40
+
+        excel_buffer = io.BytesIO()
+        wb.save(excel_buffer)
+        zf.writestr(f"{proyecto_nombre}/02_Mediciones_Presupuesto.xlsx", excel_buffer.getvalue())
+
+        # 3. DATOS COMPLETOS JSON
+        catastro_data = {
+            "proyecto": proyecto_nombre, "fecha": fecha,
+            "parcela": {
+                "ref_catastral": plot_data.get('catastral_ref','N/A'),
+                "descripcion": plot_data.get('title','N/A'),
+                "superficie_total_m2": plot_data.get('total_m2',0),
+                "edificable_m2": plot_data.get('buildable_m2',0),
+                "lat": plot_data.get('lat','N/A'), "lon": plot_data.get('lon','N/A')
+            },
+            "vivienda": {
+                "superficie_m2": total_area, "estilo": style,
+                "dormitorios": req.get('bedrooms',0), "banos": req.get('bathrooms',0),
+                "calificacion_energetica": energy_label,
+                "cimientos": req.get('foundation_type','N/A'),
+                "tejado": req.get('roof_type','N/A')
+            },
+            "presupuesto": {
+                "total": total_cost, "subvenciones": subsidy_total,
+                "neto": total_cost-subsidy_total, "coste_m2": 1500
+            },
+            "habitaciones": [{"nombre": r['name'], "codigo": r.get('code',''), "area_m2": r['area_m2']} for r in rooms],
+            "sostenibilidad": req.get('energy', {}),
+            "aviso": "MVP ArchiRapid. Requiere validacion arquitecto colegiado."
+        }
+        zf.writestr(f"{proyecto_nombre}/03_Datos_Proyecto.json", json.dumps(catastro_data, ensure_ascii=False, indent=2))
+
+        # 4. PLANO PNG
+        import streamlit as _st
+        plano = _st.session_state.get('current_floor_plan') or _st.session_state.get('final_floor_plan')
+        if plano:
+            zf.writestr(f"{proyecto_nombre}/04_Plano_2D.png", plano)
+
+        # 5. VISTAS 3D BABYLON — capturas de perspectivas
+        vistas_3d = _st.session_state.get('babylon_captures', {})
+        if vistas_3d:
+            nombres_legibles = {
+                'sur_fachada_principal': '05a_Vista_Sur_Fachada_Principal.png',
+                'norte':                 '05b_Vista_Norte.png',
+                'este':                  '05c_Vista_Este.png',
+                'oeste':                 '05d_Vista_Oeste.png',
+                'planta_cenital':        '05e_Vista_Planta_Cenital.png',
+            }
+            for key, filename in nombres_legibles.items():
+                if key in vistas_3d:
+                    # Las capturas llegan como data:image/png;base64,...
+                    img_data = vistas_3d[key]
+                    if ',' in img_data:
+                        img_data = img_data.split(',')[1]
+                    import base64 as _b64
+                    try:
+                        zf.writestr(
+                            f"{proyecto_nombre}/Vistas_3D/{filename}",
+                            _b64.b64decode(img_data)
+                        )
+                    except Exception:
+                        pass
+        else:
+            # Nota explicativa si no hay capturas
+            zf.writestr(
+                f"{proyecto_nombre}/Vistas_3D/INSTRUCCIONES.txt",
+                "Para incluir las vistas 3D en el ZIP:\n"
+                "1. Abre el Editor 3D (Paso 3)\n"
+                "2. Pulsa el boton '📸 Capturar Vistas' en la barra de herramientas\n"
+                "3. Espera el mensaje de confirmacion\n"
+                "4. Vuelve a Documentacion y descarga el ZIP\n"
+            )
+
+        # 6. LAYOUT BABYLON JSON
+        babylon_layout = _st.session_state.get('babylon_modified_layout')
+        if babylon_layout:
+            zf.writestr(f"{proyecto_nombre}/06_Layout_3D_Editable.json",
+                json.dumps(babylon_layout, ensure_ascii=False, indent=2))
+
+        # 6. README
+        zf.writestr(f"{proyecto_nombre}/LEEME.txt", f"""PAQUETE DOCUMENTAL — {proyecto_nombre}
+ArchiRapid MVP | {fecha}
+
+CONTENIDO:
+  01_Memoria_Descriptiva.txt       — Memoria proyecto básico
+  02_Mediciones_Presupuesto.xlsx   — Mediciones y partidas presupuestarias
+  03_Datos_Proyecto.json           — Datos completos (catastro, vivienda, costes)
+  04_Plano_2D.png                  — Plano distribución en planta
+  05_Layout_3D.json                — Modelo 3D editable (si fue modificado)
+
+PRÓXIMOS PASOS:
+  1. Arquitecto colegiado para visado
+  2. Estudio geotécnico del terreno
+  3. Proyecto Básico al Ayuntamiento
+  4. Proyecto de Ejecución completo
+  5. Contrato constructor
+
+AVISO LEGAL: MVP orientativo. Sin validez legal sin firma de arquitecto colegiado.
+www.archirapid.es | info@archirapid.es
+""" )
+
+    zip_buffer.seek(0)
+    return zip_buffer.getvalue(), f"{proyecto_nombre}.zip"
+
 # ---------------------------------------------------------------------------
 # CONSTANTES REUTILIZABLES
 # ---------------------------------------------------------------------------
-PANEL_MIN_M2 = 3  # superficie mínima de los paneles solares dentro del presupuesto
+PANEL_MIN_M2 = 3
 
 
 
@@ -1011,6 +1602,7 @@ def _generate_ai_proposal(req):
 - Energía/Sostenibilidad: {', '.join(energy_list) if energy_list else 'ninguno'}
 - **IMPORTANTE**: No transformes ninguna energía/sostenibilidad salvo los paneles en habitaciones. Es decir, no crees espacios llamados "aerotermia", "geotermia", "domótica", "rainwater", "insulation" ni similares. Esas tecnologías sólo deben aparecer en el análisis escrito, nunca en el plano ni como habitaciones.
 - REGLA ESTRICTA: Si en la lista aparece "solar" (paneles solares), incluye EXACTAMENTE UNO con code "paneles_solares" en el JSON. NUNCA dos entradas de paneles.
+- RESTRICCIÓN ECONÓMICA ABSOLUTA: La suma de TODOS los m² del JSON NO puede superar {req['target_area_m2']} m². El cliente tiene €{req['budget']:,} de presupuesto. Si no caben todos los extras, reduce sus m² proporcionalmente hasta que la suma total sea <= {req['target_area_m2']} m². Esto es innegociable.
 
 PETICIONES ESPECIALES DEL CLIENTE (OBLIGATORIO INCLUIR):
 {req.get('special_notes', 'ninguna')}
@@ -1445,6 +2037,21 @@ def render_step2():
             if savings > 0:
                 st.success(f"Ahorro energético: €{savings:,}/año")
         
+        # WARNING presupuesto superado
+        if budget_pct > 110:
+            exceso = int(total_with_extras - budget)
+            st.error(
+                f"🚨 **Presupuesto superado**: El diseño actual cuesta **€{total_with_extras:,}** "                f"pero tu presupuesto es **€{budget:,}**. "                f"Exceso: **€{exceso:,}**. "                f"Reduce habitaciones con los sliders o vuelve al Paso 1 para ajustar tu presupuesto."
+            )
+            if st.button("← Volver al Paso 1 y ajustar presupuesto", key="btn_back_budget"):
+                st.session_state["ai_house_step"] = 1
+                st.rerun()
+        elif budget_pct > 100:
+            exceso = int(total_with_extras - budget)
+            st.warning(
+                f"⚠️ El diseño actual supera ligeramente tu presupuesto en **€{exceso:,}**. "                f"Ajusta alguna habitación con los sliders."
+            )
+        
         st.markdown("---")
         
         if 'current_floor_plan' in st.session_state:
@@ -1669,12 +2276,50 @@ def render_step3_editor():
             total_depth = 10
         
         roof_type = st.session_state.get('request', {}).get('roof_type', 'Dos aguas (clásico, eficiente)')
-        html_editor = generate_babylon_html(layout_result, total_width, total_depth, roof_type)
+        plot_data = st.session_state.get("design_plot_data", {})
+        plot_area_m2 = float(plot_data.get('total_m2', 0) or 0)
+        req_data = st.session_state.get("ai_house_requirements", {})
+        foundation_type = req_data.get("foundation_type", "Losa de hormigón (suelos blandos)")
+        house_style = req_data.get("style", "Moderno")
+        html_editor = generate_babylon_html(layout_result, total_width, total_depth, roof_type, plot_area_m2, foundation_type, house_style)
         
         # Guardar HTML en session_state para renderizar embebido
         st.session_state["babylon_html"] = html_editor
         st.session_state["babylon_editor_used"] = True
         st.rerun()
+
+    # Receptor de capturas desde Babylon via componente HTML
+    st.markdown("---")
+    st.markdown("#### 📸 Capturas del Editor 3D")
+    st.caption("Pulsa '📸 Capturar Vistas' en el editor 3D para guardar las perspectivas del proyecto")
+
+    capture_receiver = """
+    <script>
+    window.addEventListener('message', function(event) {
+        if (event.data && event.data.type === 'archirapid_captures') {
+            const views = event.data.views;
+            // Guardar en localStorage temporal para que Streamlit lo lea
+            localStorage.setItem('archirapid_captures', JSON.stringify(views));
+            document.getElementById('capture-msg').innerHTML = 
+                '<b style="color:#27AE60">✅ ' + Object.keys(views).length + ' vistas capturadas y listas para el ZIP</b>';
+            // también avisar al componente para que Python reciba los datos
+            Streamlit.setComponentValue(JSON.stringify(views));
+        }
+    });
+    </script>
+    <div id="capture-msg" style="padding:8px; background:rgba(39,174,96,0.1); 
+         border-radius:6px; color:#7F8C8D; font-size:13px;">
+        📷 Esperando capturas del editor...
+    </div>
+    """
+    captures = st.components.v1.html(capture_receiver, height=50)
+    if captures:
+        try:
+            captures_dict = json.loads(captures)
+            st.session_state['babylon_captures'] = captures_dict
+            st.success(f"✅ {len(captures_dict)} vistas 3D guardadas para el ZIP")
+        except Exception:
+            pass
 
     # Renderizar editor embebido si existe
     if st.session_state.get("babylon_html"):
@@ -1687,8 +2332,6 @@ def render_step3_editor():
             height=700,
             scrolling=False
         )
-    
-    st.markdown("---")
     
     # Botón continuar DESPUÉS del editor
     st.markdown("### ✅ Ya terminé de diseñar")
@@ -2191,6 +2834,155 @@ def render_step3():
             st.session_state["ai_house_step"] = 2
             st.rerun()
     with col2:
-        if st.button("Finalizar y Contactar", type="primary", use_container_width=True):
+        if st.button("✅ He terminado el diseño — Ver opciones de proyecto", type="primary", use_container_width=True):
+            st.session_state["mostrar_monetizacion"] = True
+            st.rerun()
+
+    # ================================================
+    # BLOQUE MONETIZACIÓN — solo visible tras aprobar
+    # ================================================
+    if st.session_state.get("mostrar_monetizacion", False):
+
+        st.markdown("---")
+        st.markdown("## 📋 Tu Proyecto Está Listo")
+        st.success("✅ Diseño aprobado. Selecciona los servicios que necesitas.")
+
+        # Leer presupuesto real del proyecto
+        req = st.session_state.get("ai_house_requirements", {})
+        design_data = get_current_design_data()
+        presupuesto_obra = design_data.get('total_cost', 200000)
+
+        # ------------------------------------------
+        # DOCUMENTACIÓN BASE
+        # ------------------------------------------
+        st.markdown("### 📄 Documentación del Proyecto")
+        col_doc1, col_doc2 = st.columns(2)
+
+        with col_doc1:
+            st.markdown("""
+            **📦 Paquete PDF Completo** *(1ª copia gratis)*
+            - Memoria descriptiva
+            - Plano 2D
+            - Presupuesto por partidas
+            - Calificación energética
+            - Datos cimientos y extras
+            """)
+            pdf_copias = st.number_input("Copias adicionales PDF (150€/copia)", min_value=0, max_value=10, value=0, key="pdf_copias")
+
+        with col_doc2:
+            st.markdown("""
+            **📐 Paquete CAD/BIM Profesional**
+            - Todo lo del PDF
+            - Archivos editables CAD
+            - Modelo 3D exportable (.glb)
+            - Apto para constructor y arquitecto
+            """)
+            cad_copias = st.number_input("Copias CAD (250€/copia)", min_value=0, max_value=10, value=0, key="cad_copias")
+
+        coste_doc = int(presupuesto_obra * 0.01) + (pdf_copias * 150) + (cad_copias * 250)
+
+        st.info(f"💰 **Proyecto completo (1% presupuesto): €{int(presupuesto_obra * 0.01):,}** + copias adicionales: €{(pdf_copias*150)+(cad_copias*250):,}")
+
+        # ------------------------------------------
+        # SERVICIOS TÉCNICOS
+        # ------------------------------------------
+        st.markdown("### 🔧 Servicios Técnicos Profesionales")
+        st.caption("Todos gestionados por ArchiRapid con profesionales colegiados")
+
+        servicios = {
+            "visado": {"label": "📋 Visado del Proyecto (Colegio Arquitectos)", "precio": int(presupuesto_obra * 0.015), "desc": "Obligatorio para licencia de obra. ~1.5% presupuesto"},
+            "revision": {"label": "🔍 Revisión y Validación Técnica", "precio": 450, "desc": "Arquitecto revisa y firma el diseño ArchiRapid"},
+            "licencia": {"label": "🏛️ Gestión Licencia Municipal", "precio": 800, "desc": "Tramitación completa ante el Ayuntamiento"},
+            "constructor": {"label": "👷 Búsqueda y Contrato Constructor", "precio": int(presupuesto_obra * 0.005), "desc": f"0.5% del presupuesto. Selección, negociación y contrato"},
+            "fontaneria": {"label": "🚿 Proyecto Fontanería e Instalaciones", "precio": 650, "desc": "Planos de agua, saneamiento y climatización"},
+            "electricidad": {"label": "⚡ Proyecto Eléctrico BT", "precio": 550, "desc": "Esquema unifilar, cuadro eléctrico, domótica"},
+            "energia": {"label": "☀️ Auditoría Energética + CEE", "precio": 380, "desc": "Certificado Eficiencia Energética oficial"},
+            "geotecnico": {"label": "🔬 Estudio Geotécnico del Terreno", "precio": 1200, "desc": "Obligatorio para cálculo de cimientos"},
+            "topografia": {"label": "📏 Levantamiento Topográfico", "precio": 900, "desc": "Medición precisa de la parcela"},
+            "seguridad": {"label": "🦺 Estudio Seguridad y Salud", "precio": 350, "desc": "Obligatorio para obras con proyecto"},
+            "vr": {"label": "🥽 Tour Virtual 360° / Realidad Virtual", "precio": 290, "desc": "Recorrido inmersivo de tu vivienda antes de construir"},
+        }
+
+        seleccionados = {}
+        coste_servicios = 0
+
+        cols_svc = st.columns(2)
+        for i, (key, svc) in enumerate(servicios.items()):
+            col = cols_svc[i % 2]
+            with col:
+                checked = st.checkbox(
+                    f"{svc['label']} — **€{svc['precio']:,}**",
+                    key=f"svc_{key}",
+                    help=svc['desc']
+                )
+                if checked:
+                    seleccionados[key] = svc['precio']
+                    coste_servicios += svc['precio']
+
+        # ------------------------------------------
+        # RESUMEN TOTAL
+        # ------------------------------------------
+        st.markdown("---")
+        total_monetizacion = coste_doc + coste_servicios
+
+        st.markdown(f"""
+        <div style='background: linear-gradient(135deg, #1a1a2e, #2C3E50);
+                    padding: 20px; border-radius: 12px; color: white; text-align: center;
+                    border: 2px solid #27AE60;'>
+            <h3 style='margin:0; color:#27AE60;'>TOTAL SERVICIOS SELECCIONADOS</h3>
+            <h1 style='margin:10px 0; color:white;'>€{total_monetizacion:,}</h1>
+            <p style='margin:0; font-size:13px; color:#aaa;'>
+                Documentación: €{coste_doc:,} | Servicios técnicos: €{coste_servicios:,}
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        col_pay1, col_pay2 = st.columns(2)
+        with col_pay1:
+            if st.button("💳 Pagar con Tarjeta (Simulado)", type="primary", use_container_width=True):
+                st.session_state["pago_completado"] = True
+                st.session_state["servicios_contratados"] = seleccionados
+                st.session_state["total_pagado"] = total_monetizacion
+                st.rerun()
+        with col_pay2:
+            if st.button("📞 Hablar con un Arquitecto", use_container_width=True):
+                st.info("📧 Contacto: info@archirapid.es | ☎️ 900 XXX XXX")
+
+        # ------------------------------------------
+        # POST-PAGO — desbloquear descargas
+        # ------------------------------------------
+        if st.session_state.get("pago_completado", False):
             st.balloons()
-            st.success("Proyecto completado. Nos pondremos en contacto contigo en 24h.")
+            st.success(f"✅ Pago simulado de €{st.session_state.get('total_pagado',0):,} procesado. ¡Tu proyecto está listo!")
+
+            st.markdown("### 📥 Descarga Tu Proyecto Completo")
+
+            try:
+                zip_bytes, zip_filename = generar_zip_proyecto(
+                    req=st.session_state.get("ai_house_requirements", {}),
+                    design_data=get_current_design_data(),
+                    plot_data=st.session_state.get("design_plot_data", {}),
+                    partidas=partidas,
+                    subsidy_total=subsidy_total,
+                    energy_label=rating if 'rating' in dir() else "B"
+                )
+
+                st.download_button(
+                    label="📦 DESCARGAR TODO EL PROYECTO (ZIP)",
+                    data=zip_bytes,
+                    file_name=zip_filename,
+                    mime="application/zip",
+                    use_container_width=True,
+                    type="primary"
+                )
+                st.caption("Incluye: Memoria descriptiva · Mediciones y presupuesto Excel · Plano 2D · Datos catastro · Layout 3D · Guía de próximos pasos")
+
+            except Exception as e:
+                st.error(f"Error generando ZIP: {e}")
+                import traceback
+                st.code(traceback.format_exc())
+
+            st.markdown("---")
+            st.info("📬 Proyecto guardado en tu **Panel de Cliente**. El equipo ArchiRapid recibirá notificación inmediata.")
