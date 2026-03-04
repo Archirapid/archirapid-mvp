@@ -2335,25 +2335,10 @@ def render_step3_editor():
             # debug: show return value from component
             st.write("***DEBUG editor_return***", editor_return)
             try:
-                captures_dict = json.loads(editor_return)
-                st.session_state['babylon_captures'] = captures_dict
-                try:
-                    from PIL import Image
-                    import io, base64
-                    thumbs = {}
-                    for name, dataurl in captures_dict.items():
-                        parts = dataurl.split(',', 1)
-                        if len(parts) != 2:
-                            continue
-                        imgdata = base64.b64decode(parts[1])
-                        img = Image.open(io.BytesIO(imgdata))
-                        img.thumbnail((300, 300))
-                        buf = io.BytesIO()
-                        img.save(buf, format='PNG')
-                        thumbs[name] = base64.b64encode(buf.getvalue()).decode('ascii')
+                caps, thumbs = _process_babylon_return(editor_return)
+                st.session_state['babylon_captures'] = caps
+                if thumbs:
                     st.session_state['babylon_captures_thumb'] = thumbs
-                except Exception:
-                    pass
             except Exception:
                 pass
     
@@ -2388,6 +2373,39 @@ def _zip_images_dict(images_dict, thumb=False):
             zf.writestr(fname, data)
     buf.seek(0)
     return buf.read()
+
+
+def _process_babylon_return(editor_return: str):
+    """Parse JSON returned by the Babylon editor component.
+
+    *editor_return* is the string delivered to Streamlit by
+    ``Streamlit.setComponentValue``.  It must contain a JSON object
+    mapping view names to ``data:image/png;base64,...`` strings.
+
+    Returns ``(captures_dict, thumbnails_dict)`` where ``thumbnails_dict``
+    maps the same keys to base64-encoded PNG thumbnails.  An empty
+    dict may be returned for thumbnails if the operation fails.
+    """
+    import json
+    caps = json.loads(editor_return)
+    thumbs = {}
+    try:
+        from PIL import Image
+        import io, base64
+        for name, dataurl in caps.items():
+            parts = dataurl.split(',', 1)
+            if len(parts) != 2:
+                continue
+            imgdata = base64.b64decode(parts[1])
+            img = Image.open(io.BytesIO(imgdata))
+            img.thumbnail((300, 300))
+            buf = io.BytesIO()
+            img.save(buf, format='PNG')
+            thumbs[name] = base64.b64encode(buf.getvalue()).decode('ascii')
+    except Exception:
+        # if pillow isn't available or processing fails just ignore
+        thumbs = {}
+    return caps, thumbs
 
 
 def render_step3():
