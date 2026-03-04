@@ -1571,24 +1571,25 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             camera.beta   = beta;
             camera.radius = radius;
 
-            // Render a continuación; capturamos en el evento afterRender del motor
+            // Esperar 2 frames para que la cámara renderice
             scene.render();
-            const once = () => {{
-                scene.unregisterAfterRender(once);
-                const canvas = engine.getRenderingCanvas();
-                canvas.toBlob((blob) => {{
-                    const reader = new FileReader();
-                    reader.onloadend = () => {{
-                        capturedViews[name] = reader.result;
-                        camera.alpha  = prevAlpha;
-                        camera.beta   = prevBeta;
-                        camera.radius = prevRadius;
-                        callback();
-                    }};
-                    reader.readAsDataURL(blob);
-                }}, 'image/png');
-            }};
-            scene.registerAfterRender(once);
+            setTimeout(() => {{
+                scene.render();
+                setTimeout(() => {{
+                    const canvas = engine.getRenderingCanvas();
+                    canvas.toBlob((blob) => {{
+                        const reader = new FileReader();
+                        reader.onloadend = () => {{
+                            capturedViews[name] = reader.result;
+                            camera.alpha  = prevAlpha;
+                            camera.beta   = prevBeta;
+                            camera.radius = prevRadius;
+                            callback();
+                        }};
+                        reader.readAsDataURL(blob);
+                    }}, 'image/png');
+                }}, 400);
+            }}, 200);
         }}
 
         // ZIP nativo sin dependencias externas
@@ -1635,14 +1636,8 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                     0x50,0x4B,0x01,0x02,0x3F,0x00,0x14,0x00,
                     0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
                     ...u32(crc),...u32(sz),...u32(sz),
-                    ...u16(nb.length),
-                    // extra len (2), comment len (2), disk start (2), internal attr (2), external attr (4)
-                    0x00,0x00,  // extra
-                    0x00,0x00,  // comment
-                    0x00,0x00,  // disk start
-                    0x00,0x00,  // internal attr
-                    0x00,0x00,0x00,0x00, // external attr
-                    ...u32(offset),...nb
+                    ...u16(nb.length),0x00,0x00,0x00,0x00,0x00,0x00,
+                    0x00,0x00,0x00,0x00,...u32(offset),...nb
                 ]);
                 central.push(cd);
                 offset += lh.length + data.length;
@@ -1661,18 +1656,6 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
         }}
-        // Listener simple para retransmitir capturas a Streamlit
-        window.addEventListener('message', function(e) {{
-            console.log('babylon_editor: message event', e.data);
-            if (e.data && e.data.type === 'archirapid_captures') {{
-                console.log('babylon_editor: posting captures to Streamlit', e.data.views);
-                if (window.Streamlit && typeof Streamlit.setComponentValue === 'function') {{
-                    // direct object
-                    Streamlit.setComponentValue(e.data.views);
-                }}
-            }}
-        }});
-
         function captureAllViews() {{
             showToast('📸 Capturando 5 vistas... espera');
             document.getElementById('btn-capture').disabled = true;
@@ -1718,14 +1701,7 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                         false
                     ]);
                     // enviar capturas al padre (Streamlit) para que pueda almacenarlas
-                    // publicar en mismo contexto para que el listener interno lo recoja
-                    console.log('babylon_editor: sending captures via postMessage', capturedViews);
-                    window.postMessage({{ type: 'archirapid_captures', views: capturedViews }}, '*');
-                    // si el API Streamlit está disponible, actualizar también directamente
-                    if (window.Streamlit && typeof Streamlit.setComponentValue === 'function') {{
-                        console.log('babylon_editor: sending captures directly');
-                        Streamlit.setComponentValue(capturedViews);
-                    }}
+                    window.parent.postMessage({{ type: 'archirapid_captures', views: capturedViews }}, '*');
                     crearZipImagenes(archivos, 'Vistas_3D_ArchiRapid.zip');
                     document.getElementById('capture-status').style.display = 'block';
                     document.getElementById('btn-capture').disabled = false;
