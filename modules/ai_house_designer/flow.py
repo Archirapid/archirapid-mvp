@@ -2317,10 +2317,28 @@ def render_step3_editor():
         try:
             captures_dict = json.loads(captures)
             st.session_state['babylon_captures'] = captures_dict
-            st.success(f"✅ {len(captures_dict)} vistas 3D guardadas para el ZIP")
+            # generar miniaturas en segundo plano
+            try:
+                from PIL import Image
+                import io, base64
+                thumbs = {}
+                for name, dataurl in captures_dict.items():
+                    # dataurl = 'data:image/png;base64,...'
+                    parts = dataurl.split(',', 1)
+                    if len(parts) != 2:
+                        continue
+                    imgdata = base64.b64decode(parts[1])
+                    img = Image.open(io.BytesIO(imgdata))
+                    img.thumbnail((300, 300))
+                    buf = io.BytesIO()
+                    img.save(buf, format='PNG')
+                    thumbs[name] = base64.b64encode(buf.getvalue()).decode('ascii')
+                st.session_state['babylon_captures_thumb'] = thumbs
+            except Exception:
+                # si falla, simplemente ignorar
+                pass
         except Exception:
             pass
-
     # Renderizar editor embebido si existe
     if st.session_state.get("babylon_html"):
         import streamlit.components.v1 as components
@@ -2341,6 +2359,30 @@ def render_step3_editor():
         if st.button("Continuar a Documentación (Paso 4) →", type="primary", use_container_width=True, key="go_to_4_bottom"):
             st.session_state["ai_house_step"] = 4
             st.rerun()
+
+
+# ------------------------------------------------------------------
+# Helpers
+# ------------------------------------------------------------------
+
+def _zip_images_dict(images_dict, thumb=False):
+    """Return ZIP bytes containing png images taken from data‑URLs.
+
+    If *thumb* is True the filenames get a ``_thumb`` suffix.
+    """
+    import io, zipfile, base64
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+        for name, dataurl in images_dict.items():
+            parts = dataurl.split(',', 1)
+            if len(parts) != 2:
+                continue
+            data = base64.b64decode(parts[1])
+            fname = name + ("_thumb.png" if thumb else ".png")
+            zf.writestr(fname, data)
+    buf.seek(0)
+    return buf.read()
+
 
 def render_step3():
     """Paso 3: Documentación completa y monetización"""
@@ -2437,6 +2479,29 @@ def render_step3():
             st.image(list(st.session_state['babylon_captures'].values()), width=200)
         except Exception:
             pass
+        # archivo zip con vistas grandes
+        zip_bytes = _zip_images_dict(st.session_state['babylon_captures'], thumb=False)
+        st.download_button(
+            label="📁 Descargar vistas 3D (ZIP)",
+            data=zip_bytes,
+            file_name="vistas_3d.zip",
+            mime="application/zip"
+        )
+        # si tenemos miniaturas, mostrarlas y ofrecer descarga
+        if st.session_state.get('babylon_captures_thumb'):
+            st.markdown("#### 🔎 Miniaturas")
+            try:
+                thumb_urls = [f"data:image/png;base64,{b64}" for b64 in st.session_state['babylon_captures_thumb'].values()]
+                st.image(thumb_urls, width=100)
+            except Exception:
+                pass
+            zip_thumb = _zip_images_dict({k: f"data:image/png;base64,{b64}" for k,b64 in st.session_state['babylon_captures_thumb'].items()}, thumb=True)
+            st.download_button(
+                label="📁 Descargar miniaturas (ZIP)",
+                data=zip_thumb,
+                file_name="miniaturas_3d.zip",
+                mime="application/zip"
+            )
     # Indicador visual de origen
     if design_data['modified']:
         st.success("🏗️ **Diseño desde Editor 3D** - Versión personalizada")
