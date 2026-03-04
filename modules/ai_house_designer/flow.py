@@ -2339,6 +2339,37 @@ def render_step3_editor():
                 pass
         except Exception:
             pass
+    # si ya hay capturas en session_state, mostrarlas y permitir descargar
+    if st.session_state.get('babylon_captures'):
+        st.markdown("#### 📷 Capturas guardadas")
+        try:
+            st.image(list(st.session_state['babylon_captures'].values()), width=200)
+        except Exception:
+            pass
+        # botón descargar vistas grandes
+        zip_b = _zip_images_dict(st.session_state['babylon_captures'], thumb=False)
+        st.download_button(
+            label="📁 Descargar vistas 3D (ZIP)",
+            data=zip_b,
+            file_name="vistas_3d.zip",
+            mime="application/zip",
+            use_container_width=True
+        )
+        if st.session_state.get('babylon_captures_thumb'):
+            st.markdown("#### 🔎 Miniaturas")
+            try:
+                thumb_urls = [f"data:image/png;base64,{b64}" for b64 in st.session_state['babylon_captures_thumb'].values()]
+                st.image(thumb_urls, width=100)
+            except Exception:
+                pass
+            zip_t = _zip_images_dict({k: f"data:image/png;base64,{b64}" for k,b64 in st.session_state['babylon_captures_thumb'].items()}, thumb=True)
+            st.download_button(
+                label="📁 Descargar miniaturas (ZIP)",
+                data=zip_t,
+                file_name="miniaturas_3d.zip",
+                mime="application/zip",
+                use_container_width=True
+            )
     # Renderizar editor embebido si existe
     if st.session_state.get("babylon_html"):
         import streamlit.components.v1 as components
