@@ -1571,25 +1571,24 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             camera.beta   = beta;
             camera.radius = radius;
 
-            // Esperar 2 frames para que la cámara renderice
+            // Render a continuación; capturamos en el evento afterRender del motor
             scene.render();
-            setTimeout(() => {{
-                scene.render();
-                setTimeout(() => {{
-                    const canvas = engine.getRenderingCanvas();
-                    canvas.toBlob((blob) => {{
-                        const reader = new FileReader();
-                        reader.onloadend = () => {{
-                            capturedViews[name] = reader.result;
-                            camera.alpha  = prevAlpha;
-                            camera.beta   = prevBeta;
-                            camera.radius = prevRadius;
-                            callback();
-                        }};
-                        reader.readAsDataURL(blob);
-                    }}, 'image/png');
-                }}, 400);
-            }}, 200);
+            const once = () => {{
+                scene.unregisterAfterRender(once);
+                const canvas = engine.getRenderingCanvas();
+                canvas.toBlob((blob) => {{
+                    const reader = new FileReader();
+                    reader.onloadend = () => {{
+                        capturedViews[name] = reader.result;
+                        camera.alpha  = prevAlpha;
+                        camera.beta   = prevBeta;
+                        camera.radius = prevRadius;
+                        callback();
+                    }};
+                    reader.readAsDataURL(blob);
+                }}, 'image/png');
+            }};
+            scene.registerAfterRender(once);
         }}
 
         // ZIP nativo sin dependencias externas
