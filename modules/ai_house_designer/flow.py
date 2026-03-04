@@ -2329,8 +2329,7 @@ def render_step3_editor():
         editor_return = components.html(
             st.session_state["babylon_html"],
             height=700,
-            scrolling=False,
-            key="babylon_editor_component"
+            scrolling=False
         )
         if editor_return is not None:
             # debug: show return value from component
