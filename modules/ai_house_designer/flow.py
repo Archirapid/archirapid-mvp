@@ -2430,6 +2430,13 @@ def render_step3():
     design_data = get_current_design_data()
     total_area = design_data['total_area']
     rooms = design_data['rooms']
+    # Mostrar miniaturas si ya tenemos capturas 3D
+    if st.session_state.get('babylon_captures'):
+        st.markdown("#### 📷 Vistas 3D capturadas")
+        try:
+            st.image(list(st.session_state['babylon_captures'].values()), width=200)
+        except Exception:
+            pass
     # Indicador visual de origen
     if design_data['modified']:
         st.success("🏗️ **Diseño desde Editor 3D** - Versión personalizada")
