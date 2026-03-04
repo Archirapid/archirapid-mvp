@@ -2803,7 +2803,33 @@ def render_step3():
         
         # DESCARGAS
         st.markdown("### Descargas")
-        
+
+        # mostrar thumbnails si hay capturas previas
+        if st.session_state.get('babylon_captures'):
+            st.markdown("#### 📷 Vistas 3D capturadas")
+            try:
+                st.image(list(st.session_state['babylon_captures'].values()), width=100)
+            except Exception:
+                pass
+            # descarga rápida de todas las vistas
+            zip_all = _zip_images_dict(st.session_state['babylon_captures'], thumb=False)
+            st.download_button(
+                label="📁 Descargar vistas 3D (ZIP)",
+                data=zip_all,
+                file_name="vistas_3d.zip",
+                mime="application/zip",
+                use_container_width=True
+            )
+            if st.session_state.get('babylon_captures_thumb'):
+                zip_th = _zip_images_dict({k: f"data:image/png;base64,{b64}" for k,b64 in st.session_state['babylon_captures_thumb'].items()}, thumb=True)
+                st.download_button(
+                    label="📁 Descargar miniaturas (ZIP)",
+                    data=zip_th,
+                    file_name="miniaturas_3d.zip",
+                    mime="application/zip",
+                    use_container_width=True
+                )
+
         dl1, dl2 = st.columns(2)
         
         with dl1:
