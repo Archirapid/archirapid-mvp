@@ -197,7 +197,7 @@ def render_landing():
                 zoom_level = 6 if len(plots_with_coords) > 1 else 10
             
             # Crear mapa (MÁS ALTO)
-            m = folium.Map(location=[center_lat, center_lon], zoom_start=zoom_level, tiles="CartoDB positron")
+            m = folium.Map(location=[center_lat, center_lon], zoom_start=zoom_level, tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', attr='Esri')
             
             # Mostrar detalles de cada finca usando FincaMVP y visualización avanzada
             from src.models.finca import FincaMVP
@@ -208,7 +208,7 @@ def render_landing():
                 # 1. Convertir dict a FincaMVP
                 finca = FincaMVP.desde_dict(p)
                 # 2. Mostrar mapa de la finca
-                m_finca = folium.Map(location=[finca.lat, finca.lon], zoom_start=15, tiles="CartoDB positron")
+                m_finca = folium.Map(location=[finca.lat, finca.lon], zoom_start=15, tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', attr='Esri')
                 
                 # Verificar si la finca está vendida/reservada para definir el color del marcador
                 from src import db
@@ -236,7 +236,7 @@ def render_landing():
                 st.markdown("---")
         else:
             # Mapa sin marcadores centrado en España/Portugal
-            m = folium.Map(location=[40.0, -4.0], zoom_start=5, tiles="CartoDB positron")
+            m = folium.Map(location=[40.0, -4.0], zoom_start=5, tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', attr='Esri')
             components.html(m._repr_html_(), height=700)
             st.info("📍 No se encontraron fincas con los filtros seleccionados. Intenta cambiar los criterios de búsqueda.")
     except Exception as e:
@@ -252,7 +252,7 @@ def render_landing():
         # Fallback simple map
         import folium
         import streamlit.components.v1 as components
-        m = folium.Map(location=[40.0, -4.0], zoom_start=5, tiles="CartoDB positron")
+        m = folium.Map(location=[40.0, -4.0], zoom_start=5, tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', attr='Esri')
         components.html(m._repr_html_(), height=700)
         st.warning("⚠️ Error cargando el mapa. Por favor, recarga la página.")
 

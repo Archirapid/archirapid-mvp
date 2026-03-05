@@ -201,7 +201,7 @@ def show_plot_detail_page(plot_id: str):
             import streamlit.components.v1 as components
             lat = float(plot.get('lat', 40.4168))
             lon = float(plot.get('lon', -3.7038))
-            m = folium.Map(location=[lat, lon], zoom_start=15, tiles="CartoDB positron")
+            m = folium.Map(location=[lat, lon], zoom_start=15, tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', attr='Esri')
             
             # Verificar si la finca está vendida/reservada
             conn_check = db.get_conn()

@@ -338,7 +338,7 @@ def render_map(plots):
     zoom_level = 6 if len(plots_processed) > 1 else 12
 
     # Crear mapa con Folium
-    m = folium.Map(location=[center_lat, center_lon], zoom_start=zoom_level, tiles="CartoDB positron")
+    m = folium.Map(location=[center_lat, center_lon], zoom_start=zoom_level, tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', attr='Esri')
 
     # Todas las plots en esta lista son disponibles (ya filtradas por get_available_plots)
     for plot in plots_processed:
