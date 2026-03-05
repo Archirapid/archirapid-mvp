@@ -184,12 +184,16 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
         <button class="tool-btn" id="btn-style" onclick="toggleStylePanel()">🎨 Estilo</button>
         
         <hr style="margin: 10px 0; border-color: rgba(255,255,255,0.2);">
-        <button class="tool-btn" id="btn-capture" onclick="captureAllViews()" 
+        <button class="tool-btn" id="btn-capture" onclick="captureAllViews()"
                 style="background: rgba(155,89,182,0.3); border-color: #9B59B6;">
             📸 Capturar Vistas
         </button>
         <div id="capture-status" style="font-size:11px; color:#9B59B6; margin-top:5px; display:none;">
-            ✅ Vistas capturadas
+            ✅ ZIP descargado — sube el archivo en Streamlit
+        </div>
+        <div id="capture-thumbs" style="display:none; margin-top:8px;">
+            <p style="font-size:10px; color:#9B59B6; margin:0 0 4px 0;">Miniaturas capturadas:</p>
+            <div id="thumb-grid" style="display:flex; flex-wrap:wrap; gap:3px;"></div>
         </div>
         
         <hr class="divider">
@@ -1705,12 +1709,35 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                         'VISTAS 3D ArchiRapid MVP - 5 perspectivas: 01 Fachada Sur, 02 Norte, 03 Este, 04 Oeste, 05 Cenital. Adjuntalas al arquitecto. ArchiRapid MVP www.archirapid.es',
                         false
                     ]);
-                    // enviar capturas al padre (Streamlit) para que pueda almacenarlas
-                    window.parent.postMessage({{ type: 'archirapid_captures', views: capturedViews }}, '*');
                     crearZipImagenes(archivos, 'Vistas_3D_ArchiRapid.zip');
                     document.getElementById('capture-status').style.display = 'block';
                     document.getElementById('btn-capture').disabled = false;
-                    showToast('✅ ZIP con ' + total + ' vistas descargado a tu PC');
+                    showToast('✅ ZIP con ' + total + ' vistas descargado — súbelo en Streamlit');
+                    // Mostrar miniaturas en el toolbar
+                    const thumbGrid = document.getElementById('thumb-grid');
+                    thumbGrid.innerHTML = '';
+                    const viewLabels = {{
+                        'sur_fachada_principal': 'Sur',
+                        'norte': 'Norte',
+                        'este': 'Este',
+                        'oeste': 'Oeste',
+                        'planta_cenital': 'Planta'
+                    }};
+                    for (const [key, dataUrl] of Object.entries(capturedViews)) {{
+                        const wrap = document.createElement('div');
+                        wrap.style.cssText = 'text-align:center;';
+                        const img = document.createElement('img');
+                        img.src = dataUrl;
+                        img.style.cssText = 'width:38px;height:38px;object-fit:cover;border-radius:4px;border:1px solid #9B59B6;cursor:pointer;';
+                        img.title = viewLabels[key] || key;
+                        const lbl = document.createElement('div');
+                        lbl.textContent = viewLabels[key] || key;
+                        lbl.style.cssText = 'font-size:9px;color:#9B59B6;';
+                        wrap.appendChild(img);
+                        wrap.appendChild(lbl);
+                        thumbGrid.appendChild(wrap);
+                    }}
+                    document.getElementById('capture-thumbs').style.display = 'block';
                     return;
                 }}
                 const v = views[idx++];

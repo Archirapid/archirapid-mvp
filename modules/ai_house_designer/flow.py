@@ -2288,61 +2288,19 @@ def render_step3_editor():
         st.session_state["babylon_editor_used"] = True
         st.rerun()
 
-    # el editor se renderiza abajo y su retorno contendrá las capturas
-    # si ya hay capturas en session_state, mostrarlas y permitir descargar
-    if st.session_state.get('babylon_captures'):
-        st.markdown("#### 📷 Capturas guardadas")
-        try:
-            st.image(list(st.session_state['babylon_captures'].values()), width=200)
-        except Exception:
-            pass
-        # botón descargar vistas grandes
-        zip_b = _zip_images_dict(st.session_state['babylon_captures'], thumb=False)
-        st.download_button(
-            label="📁 Descargar vistas 3D (ZIP)",
-            data=zip_b,
-            file_name="vistas_3d.zip",
-            mime="application/zip",
-            use_container_width=True
-        )
-        if st.session_state.get('babylon_captures_thumb'):
-            st.markdown("#### 🔎 Miniaturas")
-            try:
-                thumb_urls = [f"data:image/png;base64,{b64}" for b64 in st.session_state['babylon_captures_thumb'].values()]
-                st.image(thumb_urls, width=100)
-            except Exception:
-                pass
-            zip_t = _zip_images_dict({k: f"data:image/png;base64,{b64}" for k,b64 in st.session_state['babylon_captures_thumb'].items()}, thumb=True)
-            st.download_button(
-                label="📁 Descargar miniaturas (ZIP)",
-                data=zip_t,
-                file_name="miniaturas_3d.zip",
-                mime="application/zip",
-                use_container_width=True
-            )
-    # Renderizar editor embebido si existe y capturar su valor devuelto
+    # Renderizar editor embebido
     if st.session_state.get("babylon_html"):
         import streamlit.components.v1 as components
-
-        st.info("💡 Usa las herramientas del editor 3D. Cuando termines, pulsa **💾 Guardar Cambios** dentro del editor para descargar el JSON.")
-
-        editor_return = components.html(
+        st.info(
+            "💡 Edita tu casa en 3D. "
+            "Pulsa **📸 Capturar Vistas** para guardar 5 fotos (se descargan automáticamente). "
+            "Pulsa **💾 Guardar JSON** para exportar el layout editado."
+        )
+        components.html(
             st.session_state["babylon_html"],
             height=700,
             scrolling=False
         )
-        if editor_return is not None:
-            # debug: show return value from component
-            st.write("***DEBUG editor_return***", editor_return)
-            st.write("***DEBUG type***", type(editor_return))
-            st.write("***DEBUG repr***", repr(editor_return))
-            try:
-                caps, thumbs = _process_babylon_return(editor_return)
-                st.session_state['babylon_captures'] = caps
-                if thumbs:
-                    st.session_state['babylon_captures_thumb'] = thumbs
-            except Exception:
-                pass
     
     # Botón continuar DESPUÉS del editor
     st.markdown("### ✅ Ya terminé de diseñar")
@@ -2504,36 +2462,62 @@ def render_step3():
     design_data = get_current_design_data()
     total_area = design_data['total_area']
     rooms = design_data['rooms']
-    # Mostrar miniaturas si ya tenemos capturas 3D
+    # ── CAPTURAS 3D ──────────────────────────────────────────────────────────────
+    st.markdown("### 📸 Vistas 3D de tu diseño")
     if st.session_state.get('babylon_captures'):
-        st.markdown("#### 📷 Vistas 3D capturadas")
-        try:
-            st.image(list(st.session_state['babylon_captures'].values()), width=200)
-        except Exception:
-            pass
-        # archivo zip con vistas grandes
-        zip_bytes = _zip_images_dict(st.session_state['babylon_captures'], thumb=False)
+        caps_doc = st.session_state['babylon_captures']
+        st.success(f"✅ {len(caps_doc)} vistas 3D vinculadas — se incluirán en tu proyecto")
+        cols_caps = st.columns(min(len(caps_doc), 5))
+        _cap_labels = {
+            'sur_fachada_principal': 'Fachada Sur',
+            'norte': 'Vista Norte',
+            'este': 'Vista Este',
+            'oeste': 'Vista Oeste',
+            'planta_cenital': 'Planta Cenital',
+        }
+        for i, (k, dataurl) in enumerate(caps_doc.items()):
+            with cols_caps[i % 5]:
+                st.image(dataurl, caption=_cap_labels.get(k, k), use_container_width=True)
+        zip_caps = _zip_images_dict(caps_doc, thumb=False)
         st.download_button(
             label="📁 Descargar vistas 3D (ZIP)",
-            data=zip_bytes,
+            data=zip_caps,
             file_name="vistas_3d.zip",
             mime="application/zip"
         )
-        # si tenemos miniaturas, mostrarlas y ofrecer descarga
-        if st.session_state.get('babylon_captures_thumb'):
-            st.markdown("#### 🔎 Miniaturas")
-            try:
-                thumb_urls = [f"data:image/png;base64,{b64}" for b64 in st.session_state['babylon_captures_thumb'].values()]
-                st.image(thumb_urls, width=100)
-            except Exception:
-                pass
-            zip_thumb = _zip_images_dict({k: f"data:image/png;base64,{b64}" for k,b64 in st.session_state['babylon_captures_thumb'].items()}, thumb=True)
-            st.download_button(
-                label="📁 Descargar miniaturas (ZIP)",
-                data=zip_thumb,
-                file_name="miniaturas_3d.zip",
-                mime="application/zip"
-            )
+    else:
+        st.info(
+            "Si capturaste vistas en el editor 3D, sube aquí el ZIP para incluirlas "
+            "en la documentación final y en la carpeta del proyecto."
+        )
+        uploaded_caps = st.file_uploader(
+            "Sube el ZIP de capturas (Vistas_3D_ArchiRapid.zip) o imágenes PNG sueltas",
+            type=["zip", "png"],
+            accept_multiple_files=True,
+            key="captures_doc_uploader"
+        )
+        if uploaded_caps:
+            import zipfile, io, base64 as _b64
+            _view_labels = ['sur_fachada_principal', 'norte', 'este', 'oeste', 'planta_cenital']
+            captures = {}
+            for f in uploaded_caps:
+                if f.name.lower().endswith('.zip'):
+                    with zipfile.ZipFile(io.BytesIO(f.read())) as zf:
+                        png_names = sorted(n for n in zf.namelist() if n.lower().endswith('.png'))
+                        for i, png_name in enumerate(png_names):
+                            key = _view_labels[i] if i < len(_view_labels) else f"vista_{i+1}"
+                            b64 = _b64.b64encode(zf.read(png_name)).decode()
+                            captures[key] = f"data:image/png;base64,{b64}"
+                elif f.name.lower().endswith('.png'):
+                    i = len(captures)
+                    key = _view_labels[i] if i < len(_view_labels) else f"vista_{i+1}"
+                    b64 = _b64.b64encode(f.read()).decode()
+                    captures[key] = f"data:image/png;base64,{b64}"
+            if captures:
+                st.session_state['babylon_captures'] = captures
+                st.rerun()
+    st.markdown("---")
+
     # Indicador visual de origen
     if design_data['modified']:
         st.success("🏗️ **Diseño desde Editor 3D** - Versión personalizada")
