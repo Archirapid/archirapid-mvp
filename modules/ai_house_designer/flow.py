@@ -2617,6 +2617,9 @@ def render_step3():
         import math as _math
         import streamlit.components.v1 as _cmp
 
+        # Área real desde design_data (inmune a sobrescritura por bloque babylon_json)
+        _total_area_map = design_data.get('total_area') or 80
+
         # Dimensiones reales desde Babylon (session_state), JSON subido, o aproximación
         _tw = st.session_state.get("babylon_total_width", 0)
         _td = st.session_state.get("babylon_total_depth", 0)
@@ -2630,8 +2633,8 @@ def render_step3():
                 except Exception:
                     _tw = _td = 0
         if not (_tw > 0 and _td > 0):
-            _tw = _math.sqrt(total_area * 1.3)
-            _td = _math.sqrt(total_area / 1.3)
+            _tw = _math.sqrt(_total_area_map * 1.3)
+            _td = _math.sqrt(_total_area_map / 1.3)
             _dim_source = "estimada"
 
         # Metros → grados (WGS84)
@@ -2654,7 +2657,7 @@ def render_step3():
             fill_color='#0055FF',
             fill_opacity=0.35,
             weight=2,
-            tooltip=f"Tu casa: {_tw:.1f}m × {_td:.1f}m ({total_area:.0f} m²)"
+            tooltip=f"Tu casa: {_tw:.1f}m × {_td:.1f}m ({_total_area_map:.0f} m²)"
         ).add_to(_m_map)
         _folium.Marker(
             [float(_lat_m), float(_lon_m)],
