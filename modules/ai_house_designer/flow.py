@@ -2601,7 +2601,67 @@ def render_step3():
     )
     
     st.markdown("---")
-    
+
+    # ============================================
+    # MAPA SATÉLITE CON HUELLA DE LA CASA
+    # ============================================
+    _plot_map = st.session_state.get("design_plot_data", {})
+    _lat_m = _plot_map.get('lat')
+    _lon_m = _plot_map.get('lon')
+
+    if _lat_m and _lon_m:
+        import folium as _folium
+        import math as _math
+        import streamlit.components.v1 as _cmp
+
+        # Dimensiones de la casa: desde Babylon si existe, si no aproximación
+        _babylon_lay = st.session_state.get("babylon_modified_layout")
+        if _babylon_lay:
+            try:
+                _tw = max(r.get('x', 0) + r.get('width', r.get('new_area', 0)**0.5) for r in _babylon_lay)
+                _td = max(r.get('z', 0) + r.get('depth', r.get('new_area', 0)**0.5) for r in _babylon_lay)
+                if _tw <= 0 or _td <= 0:
+                    raise ValueError
+            except Exception:
+                _tw = _math.sqrt(total_area * 1.3)
+                _td = _math.sqrt(total_area / 1.3)
+        else:
+            _tw = _math.sqrt(total_area * 1.3)
+            _td = _math.sqrt(total_area / 1.3)
+
+        # Metros → grados (WGS84)
+        _dlat = _td / 111000
+        _dlon = _tw / (111000 * _math.cos(_math.radians(float(_lat_m))))
+
+        _m_map = _folium.Map(
+            location=[float(_lat_m), float(_lon_m)],
+            zoom_start=18,
+            tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+            attr='Esri'
+        )
+        _folium.Rectangle(
+            bounds=[
+                [float(_lat_m) - _dlat / 2, float(_lon_m) - _dlon / 2],
+                [float(_lat_m) + _dlat / 2, float(_lon_m) + _dlon / 2],
+            ],
+            color='#0055FF',
+            fill=True,
+            fill_color='#0055FF',
+            fill_opacity=0.35,
+            weight=2,
+            tooltip=f"Tu casa: {_tw:.1f}m × {_td:.1f}m ({total_area:.0f} m²)"
+        ).add_to(_m_map)
+        _folium.Marker(
+            [float(_lat_m), float(_lon_m)],
+            icon=_folium.Icon(color='red', icon='home', prefix='fa'),
+            tooltip=_plot_map.get('title', 'Tu parcela')
+        ).add_to(_m_map)
+
+        st.markdown("### Ubicación de tu proyecto")
+        _cmp.html(_m_map._repr_html_(), height=420)
+        st.caption(f"Huella estimada de la casa ({_tw:.1f}m × {_td:.1f}m) sobre imagen satélite de la parcela.")
+        st.markdown("---")
+
     # ============================================
     # DOS COLUMNAS: ENERGÍA + PRESUPUESTO
     # ============================================
