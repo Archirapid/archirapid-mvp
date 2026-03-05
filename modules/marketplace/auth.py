@@ -17,17 +17,22 @@ def show_login():
     if st.session_state.get("role"):
         return
     if st.session_state.get('login_role') == 'admin':
-        # Login especial para admin
         st.title("🔐 Acceso Administrativo")
-        admin_password = st.text_input("Contraseña de Acceso Administrativo", type="password", key="admin_pass")
-        if st.button("🚀 Acceder como Admin", key="admin_login_btn"):
-            if admin_password == "admin123":
-                st.session_state['role'] = 'admin'
-                st.session_state['logged_in'] = True
-                st.session_state['selected_page'] = "Intranet"
-                st.rerun()
-            else:
-                st.error("Contraseña incorrecta")
+        with st.form("admin_login_form"):
+            admin_email = st.text_input("Email", placeholder="admin@archirapid.com")
+            admin_password = st.text_input("Contraseña", type="password")
+            submitted = st.form_submit_button("🚀 Acceder como Admin", type="primary")
+            if submitted:
+                user = authenticate_user(admin_email, admin_password)
+                if user and user.get('role') == 'admin':
+                    st.session_state['role'] = 'admin'
+                    st.session_state['logged_in'] = True
+                    st.session_state['user_email'] = admin_email
+                    st.session_state['user_name'] = user.get('name', 'Admin')
+                    st.session_state['selected_page'] = "Intranet"
+                    st.rerun()
+                else:
+                    st.error("Credenciales incorrectas o sin permisos de administrador.")
         return
     
     st.title("🔐 Iniciar Sesión")

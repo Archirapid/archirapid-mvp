@@ -1244,10 +1244,6 @@ selected_page = st.sidebar.radio(
 # Sincronizamos por si el usuario cambia el radio manualmente
 st.session_state['selected_page'] = selected_page
 
-st.write("🔍 DEBUG selected_page:", st.session_state.get("selected_page"))
-st.write("🔍 DEBUG role:", st.session_state.get("role"))
-st.write("🔍 DEBUG user_role:", st.session_state.get("user_role"))
-
 # Lógica de Redirección
 if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
     st.query_params.clear()
@@ -1332,7 +1328,8 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
     # Mostrar formulario de login si viewing_login es True
     if st.session_state.get('viewing_login', False):
         st.markdown("---")
-        st.header("🔐 Iniciar Sesión - Owner")
+        login_role_label = st.session_state.get('login_role', '').title()
+        st.header(f"🔐 Iniciar Sesión - {login_role_label}")
         
         modo_registro = st.checkbox("¿Es tu primera vez? Activa el modo registro", key="modo_registro")
         
