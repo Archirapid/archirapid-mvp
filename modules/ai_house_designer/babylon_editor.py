@@ -1430,52 +1430,61 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             const hZ = totalDepth / 2;
             const wallH = 2.7;
 
-            // --- CHIMENEA ---
+            // --- CHIMENEA — centrada sobre la casa, visible desde cámara NE ---
             if (conf.chimney) {{
                 const chimMat = new BABYLON.StandardMaterial('chimMat', scene);
-                chimMat.diffuseColor = new BABYLON.Color3(0.35, 0.32, 0.28);
-                const chimBase = BABYLON.MeshBuilder.CreateBox('chimBase', {{width:0.65, height:1.8, depth:0.65}}, scene);
-                chimBase.position.set(hX - 1, wallH + 0.9, 1.2);
+                chimMat.diffuseColor = new BABYLON.Color3(0.32, 0.28, 0.24);
+                // Fuste — sale desde el nivel de paredes hacia arriba
+                const chimBase = BABYLON.MeshBuilder.CreateBox('chimBase', {{width:0.70, height:2.2, depth:0.70}}, scene);
+                chimBase.position.set(hX - 0.5, wallH + 1.1, hZ + 1);
                 chimBase.material = chimMat; chimBase.isPickable = false;
                 styleMeshes.push(chimBase);
-                const chimTop = BABYLON.MeshBuilder.CreateBox('chimTop', {{width:0.85, height:0.18, depth:0.85}}, scene);
-                chimTop.position.set(hX - 1, wallH + 1.85, 1.2);
+                // Remate superior más ancho
+                const chimTop = BABYLON.MeshBuilder.CreateBox('chimTop', {{width:0.95, height:0.22, depth:0.95}}, scene);
+                chimTop.position.set(hX - 0.5, wallH + 2.31, hZ + 1);
                 chimTop.material = chimMat; chimTop.isPickable = false;
                 styleMeshes.push(chimTop);
             }}
 
             // --- EXTRAS SEGÚN ESTILO ---
+            // Árboles en los laterales este/oeste — siempre visibles desde cámara NE
+            const treePositions = [
+                [-3.2, hZ * 0.5],              // oeste, cuarto norte
+                [totalWidth + 3.2, hZ * 0.5],  // este, cuarto norte
+                [-3.2, hZ * 1.5],              // oeste, cuarto sur
+                [totalWidth + 3.2, hZ * 1.5]   // este, cuarto sur
+            ];
             let treeCount = 0;
             conf.extras.forEach((extra) => {{
                 if (extra === 'pool') {{
-                    // Piscina rectangular — al este de la casa
+                    // Piscina — al norte de la casa (visible desde cámara NE)
                     const bordeMat = new BABYLON.StandardMaterial('poolBordeMat', scene);
                     bordeMat.diffuseColor = new BABYLON.Color3(0.90, 0.88, 0.82);
                     const borde = BABYLON.MeshBuilder.CreateBox('pool_borde', {{width:5.2, height:0.22, depth:3.8}}, scene);
-                    borde.position.set(totalWidth + 3.8, 0.11, hZ);
+                    borde.position.set(hX, 0.11, totalDepth + 3.5);
                     borde.material = bordeMat; borde.isPickable = false;
                     styleMeshes.push(borde);
                     const poolMat = new BABYLON.StandardMaterial('poolMat', scene);
                     poolMat.diffuseColor = new BABYLON.Color3(0.20, 0.55, 0.85);
                     poolMat.alpha = 0.88;
-                    const pool = BABYLON.MeshBuilder.CreateBox('pool', {{width:4.5, height:0.5, depth:3.1}}, scene);
-                    pool.position.set(totalWidth + 3.8, 0.25, hZ);
+                    const pool = BABYLON.MeshBuilder.CreateBox('pool', {{width:4.5, height:0.55, depth:3.1}}, scene);
+                    pool.position.set(hX, 0.28, totalDepth + 3.5);
                     pool.material = poolMat; pool.isPickable = false;
                     styleMeshes.push(pool);
 
                 }} else if (extra === 'terrace') {{
-                    // Terraza porche — al sur de la casa (fachada principal)
+                    // Terraza — al norte de la casa (visible desde cámara NE)
                     const terrMat = new BABYLON.StandardMaterial('terrMat', scene);
                     terrMat.diffuseColor = new BABYLON.Color3(0.88, 0.84, 0.72);
                     const terr = BABYLON.MeshBuilder.CreateBox('terrace', {{
                         width: Math.max(totalWidth * 0.65, 4), height: 0.14, depth: 2.8
                     }}, scene);
-                    terr.position.set(hX, 0.07, -1.8);
+                    terr.position.set(hX, 0.07, totalDepth + 1.8);
                     terr.material = terrMat; terr.isPickable = false;
                     styleMeshes.push(terr);
 
                 }} else if (extra === 'patio') {{
-                    // Patio andaluz con fuente — al este
+                    // Patio andaluz con fuente — al este (visible desde NE)
                     const patioMat = new BABYLON.StandardMaterial('patioMat', scene);
                     patioMat.diffuseColor = new BABYLON.Color3(0.85, 0.78, 0.65);
                     const patio = BABYLON.MeshBuilder.CreateBox('patio', {{width:3.5, height:0.08, depth:3.5}}, scene);
@@ -1490,23 +1499,19 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                     styleMeshes.push(fuente);
 
                 }} else if (extra === 'tree') {{
-                    // Árbol — posición alternada alrededor de la casa
-                    const positions = [
-                        [-2.8, -2.2], [totalWidth + 2.8, -2.2],
-                        [-2.8, totalDepth + 2.2], [totalWidth + 2.8, totalDepth + 2.2]
-                    ];
-                    const pos = positions[treeCount % positions.length];
+                    // Árbol en lateral — siempre visible desde cámara NE
+                    const pos = treePositions[treeCount % treePositions.length];
                     treeCount++;
                     const trunkMat = new BABYLON.StandardMaterial('trunkMat' + treeCount, scene);
                     trunkMat.diffuseColor = new BABYLON.Color3(0.42, 0.28, 0.14);
-                    const trunk = BABYLON.MeshBuilder.CreateCylinder('trunk' + treeCount, {{diameter:0.38, height:2.0, tessellation:8}}, scene);
-                    trunk.position.set(pos[0], 1.0, pos[1]);
+                    const trunk = BABYLON.MeshBuilder.CreateCylinder('trunk' + treeCount, {{diameter:0.42, height:2.2, tessellation:8}}, scene);
+                    trunk.position.set(pos[0], 1.1, pos[1]);
                     trunk.material = trunkMat; trunk.isPickable = false;
                     styleMeshes.push(trunk);
                     const foliageMat = new BABYLON.StandardMaterial('foliageMat' + treeCount, scene);
-                    foliageMat.diffuseColor = new BABYLON.Color3(0.22, 0.52, 0.18);
-                    const foliage = BABYLON.MeshBuilder.CreateSphere('foliage' + treeCount, {{diameter:2.6, segments:6}}, scene);
-                    foliage.position.set(pos[0], 3.0, pos[1]);
+                    foliageMat.diffuseColor = new BABYLON.Color3(0.18, 0.50, 0.15);
+                    const foliage = BABYLON.MeshBuilder.CreateSphere('foliage' + treeCount, {{diameter:3.0, segments:6}}, scene);
+                    foliage.position.set(pos[0], 3.3, pos[1]);
                     foliage.material = foliageMat; foliage.isPickable = false;
                     styleMeshes.push(foliage);
                 }}
