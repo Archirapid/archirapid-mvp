@@ -252,10 +252,17 @@ def show_plot_detail_page(plot_id: str):
                     import os
                     from pathlib import Path
 
-                    pdf_paths = [
+                    # Prioridad: nota catastral específica de ESTA finca
+                    pdf_paths = []
+                    for field in ('registry_note_path', 'plano_catastral_path'):
+                        finca_path = plot.get(field)
+                        if finca_path:
+                            pdf_paths.append(Path(finca_path))
+                    # Fallback genérico (legacy)
+                    pdf_paths += [
                         Path("archirapid_extract/catastro_output/nota_catastral.pdf"),
                         Path("uploads/nota_catastral.pdf"),
-                        Path("catastro_output/nota_catastral.pdf")
+                        Path("catastro_output/nota_catastral.pdf"),
                     ]
 
                     pdf_encontrado = None
