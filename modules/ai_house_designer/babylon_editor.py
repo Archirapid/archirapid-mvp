@@ -1636,8 +1636,14 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                     0x50,0x4B,0x01,0x02,0x3F,0x00,0x14,0x00,
                     0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
                     ...u32(crc),...u32(sz),...u32(sz),
-                    ...u16(nb.length),0x00,0x00,0x00,0x00,0x00,0x00,
-                    0x00,0x00,0x00,0x00,...u32(offset),...nb
+                    ...u16(nb.length),
+                    // extra len (2), comment len (2), disk start (2), internal attr (2), external attr (4)
+                    0x00,0x00,  // extra
+                    0x00,0x00,  // comment
+                    0x00,0x00,  // disk start
+                    0x00,0x00,  // internal attr
+                    0x00,0x00,0x00,0x00, // external attr
+                    ...u32(offset),...nb
                 ]);
                 central.push(cd);
                 offset += lh.length + data.length;
