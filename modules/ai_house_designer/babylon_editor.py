@@ -1717,16 +1717,20 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             const houseD = maxZ - minZ;
             let panelBaseY, panelBaseZ;
 
+            // Usa la MISMA fórmula que buildRoof(): roofH = houseW * 0.28
+            const rH = houseW * 0.28;
             if (roofType.toLowerCase().includes('plana')) {{
                 panelBaseY = WALL_H + 0.35;
                 panelBaseZ = minZ + houseD * 0.25;
             }} else if (roofType.toLowerCase().includes('cuatro')) {{
-                const pitch = (houseW / 2) * 0.4;
-                panelBaseY = WALL_H + pitch * 0.35;
+                // 4 aguas: apex en centro. Panel al 18% desde sur.
+                // Fracción de descenso desde apex = (0.5-0.18)/0.5 = 0.64 → altura = rH*(1-0.64)
+                panelBaseY = WALL_H + rH * 0.36 + 0.12;
                 panelBaseZ = minZ + houseD * 0.18;
             }} else {{
-                const pitch = (houseW / 2) * 0.35;
-                panelBaseY = WALL_H + pitch * 0.3;
+                // Dos aguas (default). Cumbrera en centro X.
+                // Panel al 15% desde sur → altura = rH*(0.15/0.5) = rH*0.3
+                panelBaseY = WALL_H + rH * 0.3 + 0.12;
                 panelBaseZ = minZ + houseD * 0.15;
             }}
 
