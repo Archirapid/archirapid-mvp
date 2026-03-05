@@ -353,6 +353,20 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
         }};
         const _wc = STYLE_WALL_COLORS[houseStyle] || [0.92, 0.92, 0.90];
         const WALL_COLOR = new BABYLON.Color3(_wc[0], _wc[1], _wc[2]);
+
+        // Config 3D por estilo arquitectónico — tejado, extras y chimenea
+        const STYLE_3D_CONFIG = {{
+            'Moderno':       {{ roofColor: [0.20, 0.20, 0.22], extras: [],                  chimney: false }},
+            'Playa':         {{ roofColor: [0.90, 0.90, 0.85], extras: ['pool','terrace'],   chimney: false }},
+            'Rural':         {{ roofColor: [0.62, 0.31, 0.14], extras: ['tree','tree'],      chimney: true  }},
+            'Montaña':       {{ roofColor: [0.22, 0.22, 0.28], extras: ['tree','tree'],      chimney: true  }},
+            'Andaluz':       {{ roofColor: [0.68, 0.33, 0.16], extras: ['patio'],            chimney: false }},
+            'Ecológico':     {{ roofColor: [0.33, 0.45, 0.25], extras: ['tree'],             chimney: false }},
+            'Clásico':       {{ roofColor: [0.65, 0.32, 0.14], extras: [],                  chimney: true  }},
+            'Contemporáneo': {{ roofColor: [0.18, 0.18, 0.20], extras: [],                  chimney: false }},
+        }};
+        const styleConf = STYLE_3D_CONFIG[houseStyle] || STYLE_3D_CONFIG['Moderno'];
+
         const COST_PER_M2 = 1500;
 
         // Mínimos CTE por tipo de habitación (m²)
@@ -1311,14 +1325,17 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             const roofH = hW * 0.28;     // altura cumbrera (28% del ancho)
             const overhang = 0.6;        // voladizo perimetral
 
-            // Material tejado - teja árabe por defecto
+            // Material tejado
             const rMat = new BABYLON.StandardMaterial('roofMat', scene);
             if (roofType.includes('Plana') || roofType.includes('Invertida')) {{
-                rMat.diffuseColor = new BABYLON.Color3(0.55, 0.55, 0.58); // hormigón gris
+                rMat.diffuseColor = new BABYLON.Color3(0.55, 0.55, 0.58);
             }} else {{
-                rMat.diffuseColor = new BABYLON.Color3(0.72, 0.36, 0.18); // teja árabe terracota
+                rMat.diffuseColor = new BABYLON.Color3(0.72, 0.36, 0.18);
             }}
             rMat.specularColor = new BABYLON.Color3(0.1, 0.1, 0.1);
+            // Override con color del estilo arquitectónico elegido en Paso 1
+            const _rc = styleConf.roofColor;
+            rMat.diffuseColor = new BABYLON.Color3(_rc[0], _rc[1], _rc[2]);
 
             const rType = roofType.toLowerCase();
 
@@ -1392,6 +1409,108 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                 roofMesh.material = rMat;
                 roofMesh.isPickable = false;
             }}
+        }}
+
+        // ================================================
+        // EXTRAS DE ESTILO 3D — chimenea, piscina, terraza, árboles, patio
+        // ================================================
+        let styleMeshes = [];
+
+        function clearStyleExtras() {{
+            styleMeshes.forEach(m => {{
+                try {{ if (m.material) m.material.dispose(); m.dispose(); }} catch(e) {{}}
+            }});
+            styleMeshes = [];
+        }}
+
+        function buildStyleExtras() {{
+            clearStyleExtras();
+            const conf = STYLE_3D_CONFIG[houseStyle] || STYLE_3D_CONFIG['Moderno'];
+            const hX = totalWidth / 2;
+            const hZ = totalDepth / 2;
+            const wallH = 2.7;
+
+            // --- CHIMENEA ---
+            if (conf.chimney) {{
+                const chimMat = new BABYLON.StandardMaterial('chimMat', scene);
+                chimMat.diffuseColor = new BABYLON.Color3(0.35, 0.32, 0.28);
+                const chimBase = BABYLON.MeshBuilder.CreateBox('chimBase', {{width:0.65, height:1.8, depth:0.65}}, scene);
+                chimBase.position.set(hX - 1, wallH + 0.9, 1.2);
+                chimBase.material = chimMat; chimBase.isPickable = false;
+                styleMeshes.push(chimBase);
+                const chimTop = BABYLON.MeshBuilder.CreateBox('chimTop', {{width:0.85, height:0.18, depth:0.85}}, scene);
+                chimTop.position.set(hX - 1, wallH + 1.85, 1.2);
+                chimTop.material = chimMat; chimTop.isPickable = false;
+                styleMeshes.push(chimTop);
+            }}
+
+            // --- EXTRAS SEGÚN ESTILO ---
+            let treeCount = 0;
+            conf.extras.forEach((extra) => {{
+                if (extra === 'pool') {{
+                    // Piscina rectangular — al este de la casa
+                    const bordeMat = new BABYLON.StandardMaterial('poolBordeMat', scene);
+                    bordeMat.diffuseColor = new BABYLON.Color3(0.90, 0.88, 0.82);
+                    const borde = BABYLON.MeshBuilder.CreateBox('pool_borde', {{width:5.2, height:0.22, depth:3.8}}, scene);
+                    borde.position.set(totalWidth + 3.8, 0.11, hZ);
+                    borde.material = bordeMat; borde.isPickable = false;
+                    styleMeshes.push(borde);
+                    const poolMat = new BABYLON.StandardMaterial('poolMat', scene);
+                    poolMat.diffuseColor = new BABYLON.Color3(0.20, 0.55, 0.85);
+                    poolMat.alpha = 0.88;
+                    const pool = BABYLON.MeshBuilder.CreateBox('pool', {{width:4.5, height:0.5, depth:3.1}}, scene);
+                    pool.position.set(totalWidth + 3.8, 0.25, hZ);
+                    pool.material = poolMat; pool.isPickable = false;
+                    styleMeshes.push(pool);
+
+                }} else if (extra === 'terrace') {{
+                    // Terraza porche — al sur de la casa (fachada principal)
+                    const terrMat = new BABYLON.StandardMaterial('terrMat', scene);
+                    terrMat.diffuseColor = new BABYLON.Color3(0.88, 0.84, 0.72);
+                    const terr = BABYLON.MeshBuilder.CreateBox('terrace', {{
+                        width: Math.max(totalWidth * 0.65, 4), height: 0.14, depth: 2.8
+                    }}, scene);
+                    terr.position.set(hX, 0.07, -1.8);
+                    terr.material = terrMat; terr.isPickable = false;
+                    styleMeshes.push(terr);
+
+                }} else if (extra === 'patio') {{
+                    // Patio andaluz con fuente — al este
+                    const patioMat = new BABYLON.StandardMaterial('patioMat', scene);
+                    patioMat.diffuseColor = new BABYLON.Color3(0.85, 0.78, 0.65);
+                    const patio = BABYLON.MeshBuilder.CreateBox('patio', {{width:3.5, height:0.08, depth:3.5}}, scene);
+                    patio.position.set(totalWidth + 2.5, 0.04, hZ);
+                    patio.material = patioMat; patio.isPickable = false;
+                    styleMeshes.push(patio);
+                    const fuenteMat = new BABYLON.StandardMaterial('fuenteMat', scene);
+                    fuenteMat.diffuseColor = new BABYLON.Color3(0.20, 0.45, 0.75);
+                    const fuente = BABYLON.MeshBuilder.CreateCylinder('fuente', {{diameter:0.9, height:0.45, tessellation:12}}, scene);
+                    fuente.position.set(totalWidth + 2.5, 0.27, hZ);
+                    fuente.material = fuenteMat; fuente.isPickable = false;
+                    styleMeshes.push(fuente);
+
+                }} else if (extra === 'tree') {{
+                    // Árbol — posición alternada alrededor de la casa
+                    const positions = [
+                        [-2.8, -2.2], [totalWidth + 2.8, -2.2],
+                        [-2.8, totalDepth + 2.2], [totalWidth + 2.8, totalDepth + 2.2]
+                    ];
+                    const pos = positions[treeCount % positions.length];
+                    treeCount++;
+                    const trunkMat = new BABYLON.StandardMaterial('trunkMat' + treeCount, scene);
+                    trunkMat.diffuseColor = new BABYLON.Color3(0.42, 0.28, 0.14);
+                    const trunk = BABYLON.MeshBuilder.CreateCylinder('trunk' + treeCount, {{diameter:0.38, height:2.0, tessellation:8}}, scene);
+                    trunk.position.set(pos[0], 1.0, pos[1]);
+                    trunk.material = trunkMat; trunk.isPickable = false;
+                    styleMeshes.push(trunk);
+                    const foliageMat = new BABYLON.StandardMaterial('foliageMat' + treeCount, scene);
+                    foliageMat.diffuseColor = new BABYLON.Color3(0.22, 0.52, 0.18);
+                    const foliage = BABYLON.MeshBuilder.CreateSphere('foliage' + treeCount, {{diameter:2.6, segments:6}}, scene);
+                    foliage.position.set(pos[0], 3.0, pos[1]);
+                    foliage.material = foliageMat; foliage.isPickable = false;
+                    styleMeshes.push(foliage);
+                }}
+            }});
         }}
 
         // Colores por material
@@ -1772,6 +1891,8 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             }});
             document.getElementById('style-applied').textContent = '✅ ' + styleName + ' aplicado';
             showToast('🎨 Estilo ' + styleName + ' aplicado');
+            // Actualizar extras 3D (chimenea, piscina, árboles...)
+            buildStyleExtras();
         }}
 
         function toggleStylePanel() {{
@@ -1951,6 +2072,7 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
         // ================================================
         const initialLayout = generateLayoutJS(roomsData);
         rebuildScene(initialLayout);
+        buildStyleExtras();  // Añadir extras del estilo al cargar
 
         setMode('select');
         console.log('ArchiRapid Editor 3D v3.0 —', roomsData.length, 'habitaciones cargadas');
