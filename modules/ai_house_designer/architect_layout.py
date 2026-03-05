@@ -169,6 +169,13 @@ class ArchitectLayout:
         house_w = max(house_w, 8.0)   # mínimo 8m
         house_w = min(house_w, 18.0)  # máximo 18m
 
+        # Reescalar anchos de fila3 para que encajen EXACTAMENTE en house_w
+        # Evita que la última habitación desborde cuando hay muchas dependencias
+        raw_w = sum(item[1] for item in fila3_rooms)
+        if raw_w > 0 and abs(raw_w - house_w) > 0.01:
+            scale = house_w / raw_w
+            fila3_rooms = [(r, round(w * scale, 2), d) for (r, w, d) in fila3_rooms]
+
         # ================================================
         # PASO 2: FILA 1 - ZONA DÍA
         # [SALON | COCINA | (otros día) | GARAJE]
@@ -188,6 +195,13 @@ class ArchitectLayout:
         day_w_available = house_w - garaje_w
         day_w_available = max(day_w_available, 5.0)
 
+        # z_dia: DESPUÉS del porche y el pasillo de entrada
+        # ORDEN CORRECTO: porche(entrada) → salón/cocina → pasillo → dormitorios
+        # Porche se calcula después pero necesitamos su profundidad para z_dia
+        # Estimamos porche_d provisionalmente (se recalcula abajo)
+        PORCHE_D_EST = 2.0  # estimación conservadora
+        z_dia = PORCHE_D_EST
+
         # Distribuir zona día en el espacio disponible
         if day:
             day_area_total = sum(r.area for r in day)
@@ -198,7 +212,7 @@ class ArchitectLayout:
                 r.w = max(r.w, 3.0)
                 r.d = FILA1_D
                 r.x = x_day
-                r.z = 0.0
+                r.z = z_dia
                 layout.append(self._d(r))
                 x_day += r.w
 
@@ -209,21 +223,21 @@ class ArchitectLayout:
                 day[-1].w = max(day[-1].w, 3.0)
                 layout[-1] = self._d(day[-1])
         
-        # Otros servicios (bodega etc) en fila 1
+        # Otros servicios (bodega etc) en fila día
         x_otros = sum(r.w for r in day)
         for r in otros_svc:
             r.w = max(round(r.area / FILA1_D, 1), 2.0)
             r.d = FILA1_D
             r.x = x_otros
-            r.z = 0.0
+            r.z = z_dia
             layout.append(self._d(r))
             x_otros += r.w
 
-        # Garaje en fila 1 (pegado a la derecha)
+        # Garaje en fila día (pegado a la derecha)
         x_garaje = house_w - garaje_w
         for r in garajes:
             r.x = x_garaje
-            r.z = 0.0
+            r.z = z_dia
             layout.append(self._d(r))
             x_garaje += r.w
 
@@ -233,7 +247,7 @@ class ArchitectLayout:
         # Es el distribuidor que conecta día con noche
         # ================================================
         
-        z_pasillo = FILA1_D
+        z_pasillo = z_dia + FILA1_D
         
         # Crear pasillo si no existe
         pasillo_list = self._rooms_by_zone(all_rooms, ZONE_CIRCULATION)
@@ -272,14 +286,14 @@ class ArchitectLayout:
 
         # ================================================
         # PASO 5: PORCHE (fachada sur - ENTRADA)
-        # Todo el ancho de la casa
+        # z=0 — primer elemento, fachada de entrada
         # ================================================
         
         for r in ext:
             r.w = house_w
             r.d = max(round(r.area / house_w, 1), 2.0)
             r.x = 0.0
-            r.z = z_casa_bottom
+            r.z = 0.0
             layout.append(self._d(r))
 
         # ================================================

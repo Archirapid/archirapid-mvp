@@ -1,0 +1,190 @@
+diff --git a/modules/ai_house_designer/flow.py b/modules/ai_house_designer/flow.py
+index fb05d98..fce45a4 100644
+--- a/modules/ai_house_designer/flow.py
++++ b/modules/ai_house_designer/flow.py
+@@ -148,8 +148,8 @@ def recalculate_layout(modified_rooms: list, house_shape: str = "Rectangular") -
+             return {'success': False, 'error': 'generate_layout devolvió vacío'}
+         
+         # Calcular dimensiones totales
+-        total_width = max(item['x'] + item['width'] for item in layout)
+-        total_depth = max(item['z'] + item['depth'] for item in layout)
++        total_width = max(float(item['x']) + float(item['width']) for item in layout)
++        total_depth = max(float(item['z']) + float(item['depth']) for item in layout)
+         
+         return {
+             'success': True,
+@@ -187,31 +187,61 @@ def get_final_design():
+     
+     COST_PER_M2 = 1500
+     
+-    # PRIORIDAD 1: Babylon (diseño modificado en 3D)
++    # PRIORIDAD 1a: Layout redistribuido por recalculate_layout() (máxima prioridad)
++    redistributed = st.session_state.get("babylon_redistributed_layout")
++    if redistributed:
++        rooms = []
++        total_area = 0
++        for room in redistributed:
++            try:
++                area = float(room.get('area_m2', room.get('width', 1) * room.get('depth', 1)))
++                total_area += area
++                rooms.append({
++                    'name': room.get('name', 'Espacio'),
++                    'code': room.get('code', 'espacio'),
++                    'area_m2': area,
++                    'x': room.get('x', 0),
++                    'z': room.get('z', 0),
++                    'width': room.get('width', 0),
++                    'depth': room.get('depth', 0)
++                })
++            except (ValueError, TypeError):
++                continue
++
++        return {
++            'rooms': rooms,
++            'total_area': round(total_area, 1),
++            'total_cost': int(total_area * COST_PER_M2),
++            'source': 'babylon'
++        }
++
++    # PRIORIDAD 1b: Babylon JSON crudo (sin redistribuir)
+     babylon_data = st.session_state.get("babylon_modified_layout")
+     if babylon_data:
+         rooms = []
+         total_area = 0
+         for room in babylon_data:
++            if room.get('index') == 'custom_walls':
++                continue
+             try:
+                 area = float(room.get('new_area', room.get('original_area', 10)))
+                 total_area += area
+                 rooms.append({
+                     'name': room.get('name', 'Espacio'),
+-                    'code': room.get('name', 'generic'),
++                    'code': room.get('code', room.get('name', 'generic')),
+                     'area_m2': area,
+                     'index': room.get('index', 0)
+                 })
+             except (ValueError, TypeError):
+                 continue
+-        
++
+         return {
+             'rooms': rooms,
+             'total_area': round(total_area, 1),
+             'total_cost': int(total_area * COST_PER_M2),
+             'source': 'babylon'
+         }
+-    
++
+     # PRIORIDAD 2: Sliders Paso 2 (valores ajustados por usuario)
+     req = st.session_state.get("ai_house_requirements", {})
+     proposal = req.get("ai_room_proposal", {})
+@@ -1268,6 +1298,8 @@ def render_step3_editor():
+             height=700,
+             scrolling=False
+         )
++
++
+     
+     st.markdown("---")
+     
+@@ -1320,14 +1352,80 @@ def render_step3():
+             babylon_data = _json.load(babylon_json)
+             st.session_state["babylon_modified_layout"] = babylon_data
+ 
+-            # Calcular totales
++            # Auto-redistribución: recalcular layout completo
++            house_shape = st.session_state.get('request', {}).get('house_shape', 'Rectangular')
++            
++            rooms_for_recalc = []
++            for room in babylon_data:
++                if room.get('index') == 'custom_walls':
++                    continue
++                try:
++                    area = float(room.get('new_area', room.get('original_area', 10)))
++                    rooms_for_recalc.append({
++                        'code': room.get('code', room.get('name', 'espacio')),
++                        'name': room.get('name', 'Espacio'),
++                        'area_m2': area
++                    })
++                except (ValueError, TypeError):
++                    continue
++            
++            # Llamar recalculate_layout
++            recalc_result = recalculate_layout(rooms_for_recalc, house_shape)
++            
++            if recalc_result.get('success'):
++                st.session_state["babylon_redistributed_layout"] = recalc_result['layout']
++                st.info(f"🔄 Layout redistribuido automáticamente: {recalc_result['total_width']}m × {recalc_result['total_depth']}m")
++            else:
++                st.warning(f"⚠️ No se pudo redistribuir: {recalc_result.get('error', 'Error desconocido')}")
++
++            # Calcular totales básicos
+             total_area = sum(float(r.get('new_area', 0)) for r in babylon_data)
+             total_cost = int(total_area * 1500)
+ 
+-            st.success(f"✅ Diseño cargado: {len(babylon_data)} habitaciones | {total_area:.1f}m² | €{total_cost:,}")
+-            # NO hacer st.rerun() aquí
++            # AUTO-REDISTRIBUCIÓN: llamar recalculate_layout()
++            house_shape = st.session_state.get('request', {}).get('house_shape', 'Rectangular')
++            modified_rooms = []
++            for r in babylon_data:
++                # Ignorar entrada de tabiques personalizados
++                if r.get('index') == 'custom_walls':
++                    continue
++                try:
++                    modified_rooms.append({
++                        'code': r.get('code', r.get('name', 'espacio')),
++                        'name': r.get('name', 'Espacio'),
++                        'area_m2': float(r.get('new_area', r.get('original_area', 10)))
++                    })
++                except (ValueError, TypeError):
++                    continue
++
++            if modified_rooms:
++                result = recalculate_layout(modified_rooms, house_shape)
++
++                if result['success']:
++                    # Guardar layout redistribuido
++                    st.session_state["babylon_redistributed_layout"] = result['layout']
++
++                    # Actualizar sliders Paso 2 con áreas redistribuidas
++                    for i, room in enumerate(result['layout']):
++                        slider_key = f"step2_slider_{i}"
++                        st.session_state[slider_key] = round(float(room['area_m2']), 1)
++
++                    st.success(
++                        f"✅ Diseño cargado y redistribuido: "
++                        f"{len(result['layout'])} habitaciones | "
++                        f"{total_area:.1f}m² | €{total_cost:,} | "
++                        f"Plano: {result['total_width']:.1f}m × {result['total_depth']:.1f}m"
++                    )
++                else:
++                    st.warning(f"⚠️ Diseño cargado pero redistribución falló: {result.get('error', 'desconocido')}")
++                    st.success(f"✅ Diseño cargado: {len(babylon_data)} habitaciones | {total_area:.1f}m² | €{total_cost:,}")
++            else:
++                st.success(f"✅ Diseño cargado: {len(babylon_data)} habitaciones | {total_area:.1f}m² | €{total_cost:,}")
++
+         except Exception as e:
+             st.error(f"❌ Error: {e}")
++            import traceback
++            st.code(traceback.format_exc())
+ 
+     # Validar datos
+     req = st.session_state.get("ai_house_requirements", {})
+@@ -1570,6 +1668,15 @@ def render_step3():
+         }.get(plan_source, 'Plano de distribución')
+ 
+         if st.button("🗺️ Generar Plano Final", type="primary", use_container_width=True, key="gen_plan_paso4"):
++            # Si hay layout redistribuido, úsalo directamente
++            final_rooms_for_plan = get_final_design()
++            redistributed = st.session_state.get("babylon_redistributed_layout")
++            if redistributed:
++                final_rooms_for_plan = {
++                    'rooms': redistributed,
++                    'source': 'babylon',
++                    'total_area': sum(float(r.get('area_m2', 0)) for r in redistributed)
++                }
+             try:
+                 from .architect_layout import generate_layout
+                 from .floor_plan_svg import FloorPlanSVG

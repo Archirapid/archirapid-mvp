@@ -371,16 +371,61 @@ class FloorPlanSVG:
                     fontsize=6, color='#888888',
                     rotation=90, zorder=5)
 
-            # Símbolo de puerta (arco pequeño en esquina inferior izquierda)
+            # ================================================
+            # PUERTAS — lógica de circulación completa
+            # En pantalla: sur=abajo(porche/entrada), norte=arriba(fondo/privado)
+            # ================================================
+            door_r = min(pw, ph) * 0.18
+            door_r = min(door_r, 18)
+            theta = np.linspace(0, np.pi / 2, 20)
+
             if any(x in code for x in ['dormitorio', 'bano', 'despacho', 'bodega']):
-                door_r = min(pw, ph) * 0.18
-                door_r = min(door_r, 18)
-                theta = np.linspace(0, np.pi / 2, 20)
+                # Pared SUPERIOR — da al pasillo (norte=privado)
+                door_x = px + door_r * np.cos(theta)
+                door_y = (py + ph) - door_r * np.sin(theta)
+                ax.plot(door_x, door_y, color=wall_color, lw=1.2,
+                        linestyle='--', zorder=6)
+                ax.plot([px, px + door_r], [py + ph, py + ph],
+                        color=wall_color, lw=1.2, zorder=6)
+
+            elif any(x in code for x in ['salon', 'cocina', 'salón']):
+                # Puerta INFERIOR — da al porche (entrada sur)
                 door_x = px + door_r * np.cos(theta)
                 door_y = py + door_r * np.sin(theta)
                 ax.plot(door_x, door_y, color=wall_color, lw=1.2,
                         linestyle='--', zorder=6)
                 ax.plot([px, px], [py, py + door_r],
+                        color=wall_color, lw=1.2, zorder=6)
+                # Segunda puerta SUPERIOR — da al pasillo (hacia dormitorios)
+                door_x2 = px + door_r * np.cos(theta)
+                door_y2 = (py + ph) - door_r * np.sin(theta)
+                ax.plot(door_x2, door_y2, color=wall_color, lw=1.2,
+                        linestyle='--', zorder=6)
+                ax.plot([px, px + door_r], [py + ph, py + ph],
+                        color=wall_color, lw=1.2, zorder=6)
+
+            elif any(x in code for x in ['porche', 'terraza']):
+                # Puerta SUPERIOR — da al salón (entrada a la casa)
+                door_x = px + pw/2 - door_r/2 + door_r * np.cos(theta)
+                door_y = (py + ph) - door_r * np.sin(theta)
+                ax.plot(door_x, door_y, color=wall_color, lw=1.8,
+                        linestyle='--', zorder=6)
+                ax.plot([px + pw/2 - door_r/2, px + pw/2 + door_r/2],
+                        [py + ph, py + ph],
+                        color=wall_color, lw=1.8, zorder=6)
+
+            elif 'garaje' in code or 'garage' in code:
+                # Portón vehículo — pared INFERIOR (fachada sur, desde calle)
+                ax.plot([px + pw * 0.15, px + pw * 0.85],
+                        [py, py],
+                        color='#E67E22', lw=3.5, zorder=6)
+                # Puerta peatonal — pared IZQUIERDA (acceso desde salón/cocina)
+                mid_y = py + ph / 2
+                door_x_p = px + door_r * np.sin(theta)
+                door_y_p = mid_y + door_r * np.cos(theta)
+                ax.plot(door_x_p, door_y_p, color=wall_color, lw=1.2,
+                        linestyle='--', zorder=6)
+                ax.plot([px, px], [mid_y, mid_y + door_r],
                         color=wall_color, lw=1.2, zorder=6)
 
         # Brújula Norte
