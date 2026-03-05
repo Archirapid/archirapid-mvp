@@ -2301,7 +2301,10 @@ def render_step3_editor():
         else:
             total_width = 10
             total_depth = 10
-        
+
+        st.session_state["babylon_total_width"] = total_width
+        st.session_state["babylon_total_depth"] = total_depth
+
         roof_type = st.session_state.get('request', {}).get('roof_type', 'Dos aguas (clásico, eficiente)')
         plot_data = st.session_state.get("design_plot_data", {})
         plot_area_m2 = float(plot_data.get('total_m2', 0) or 0)
@@ -2614,20 +2617,22 @@ def render_step3():
         import math as _math
         import streamlit.components.v1 as _cmp
 
-        # Dimensiones de la casa: desde Babylon si existe, si no aproximación
-        _babylon_lay = st.session_state.get("babylon_modified_layout")
-        if _babylon_lay:
-            try:
-                _tw = max(r.get('x', 0) + r.get('width', r.get('new_area', 0)**0.5) for r in _babylon_lay)
-                _td = max(r.get('z', 0) + r.get('depth', r.get('new_area', 0)**0.5) for r in _babylon_lay)
-                if _tw <= 0 or _td <= 0:
-                    raise ValueError
-            except Exception:
-                _tw = _math.sqrt(total_area * 1.3)
-                _td = _math.sqrt(total_area / 1.3)
-        else:
+        # Dimensiones reales desde Babylon (session_state), JSON subido, o aproximación
+        _tw = st.session_state.get("babylon_total_width", 0)
+        _td = st.session_state.get("babylon_total_depth", 0)
+        _dim_source = "real"
+        if not (_tw > 0 and _td > 0):
+            _babylon_lay = st.session_state.get("babylon_modified_layout")
+            if _babylon_lay:
+                try:
+                    _tw = max(r.get('x', 0) + r.get('width', 0) for r in _babylon_lay if r.get('width'))
+                    _td = max(r.get('z', 0) + r.get('depth', 0) for r in _babylon_lay if r.get('depth'))
+                except Exception:
+                    _tw = _td = 0
+        if not (_tw > 0 and _td > 0):
             _tw = _math.sqrt(total_area * 1.3)
             _td = _math.sqrt(total_area / 1.3)
+            _dim_source = "estimada"
 
         # Metros → grados (WGS84)
         _dlat = _td / 111000
@@ -2659,7 +2664,7 @@ def render_step3():
 
         st.markdown("### Ubicación de tu proyecto")
         _cmp.html(_m_map._repr_html_(), height=420)
-        st.caption(f"Huella estimada de la casa ({_tw:.1f}m × {_td:.1f}m) sobre imagen satélite de la parcela.")
+        st.caption(f"Huella {_dim_source} de la casa ({_tw:.1f}m × {_td:.1f}m) sobre imagen satélite de la parcela.")
         st.markdown("---")
 
     # ============================================
