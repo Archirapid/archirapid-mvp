@@ -1423,9 +1423,9 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             styleMeshes = [];
         }}
 
-        function buildStyleExtras() {{
+        function buildStyleExtras(overrideStyle) {{
             clearStyleExtras();
-            const conf = STYLE_3D_CONFIG[houseStyle] || STYLE_3D_CONFIG['Moderno'];
+            const conf = STYLE_3D_CONFIG[overrideStyle || houseStyle] || STYLE_3D_CONFIG['Moderno'];
             const hX = totalWidth / 2;
             const hZ = totalDepth / 2;
             const wallH = 2.7;
@@ -1896,8 +1896,8 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             }});
             document.getElementById('style-applied').textContent = '✅ ' + styleName + ' aplicado';
             showToast('🎨 Estilo ' + styleName + ' aplicado');
-            // Actualizar extras 3D (chimenea, piscina, árboles...)
-            buildStyleExtras();
+            // Actualizar extras 3D (chimenea, piscina, árboles...) con el estilo recién elegido
+            buildStyleExtras(styleName);
         }}
 
         function toggleStylePanel() {{
