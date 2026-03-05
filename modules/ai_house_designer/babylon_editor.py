@@ -357,7 +357,7 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
         // Config 3D por estilo arquitectónico — tejado, extras y chimenea
         const STYLE_3D_CONFIG = {{
             'Moderno':       {{ roofColor: [0.20, 0.20, 0.22], extras: [],                  chimney: false }},
-            'Playa':         {{ roofColor: [0.90, 0.90, 0.85], extras: ['pool','terrace'],   chimney: false }},
+            'Playa':         {{ roofColor: [0.90, 0.90, 0.85], extras: ['sea','terrace'],    chimney: false }},
             'Rural':         {{ roofColor: [0.62, 0.31, 0.14], extras: ['tree','tree'],      chimney: true  }},
             'Montaña':       {{ roofColor: [0.22, 0.22, 0.28], extras: ['tree','tree'],      chimney: true  }},
             'Andaluz':       {{ roofColor: [0.68, 0.33, 0.16], extras: ['patio'],            chimney: false }},
@@ -1497,6 +1497,26 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                     fuente.position.set(totalWidth + 2.5, 0.27, hZ);
                     fuente.material = fuenteMat; fuente.isPickable = false;
                     styleMeshes.push(fuente);
+
+                }} else if (extra === 'sea') {{
+                    // Franja de playa+mar al norte — decorativa, sin coste
+                    const sandMat = new BABYLON.StandardMaterial('sandMat', scene);
+                    sandMat.diffuseColor = new BABYLON.Color3(0.94, 0.87, 0.68);
+                    const sand = BABYLON.MeshBuilder.CreateBox('sea_sand', {{
+                        width: totalWidth + 14, height: 0.08, depth: 5.0
+                    }}, scene);
+                    sand.position.set(hX, 0.04, totalDepth + 5.5);
+                    sand.material = sandMat; sand.isPickable = false;
+                    styleMeshes.push(sand);
+                    const seaMat = new BABYLON.StandardMaterial('seaMat', scene);
+                    seaMat.diffuseColor = new BABYLON.Color3(0.10, 0.52, 0.78);
+                    seaMat.alpha = 0.82;
+                    const sea = BABYLON.MeshBuilder.CreateBox('sea_water', {{
+                        width: totalWidth + 14, height: 0.12, depth: 8.0
+                    }}, scene);
+                    sea.position.set(hX, 0.06, totalDepth + 13.0);
+                    sea.material = seaMat; sea.isPickable = false;
+                    styleMeshes.push(sea);
 
                 }} else if (extra === 'tree') {{
                     // Árbol en lateral — siempre visible desde cámara NE

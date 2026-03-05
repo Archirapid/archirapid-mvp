@@ -22,6 +22,9 @@ def generar_zip_proyecto(req, design_data, plot_data, partidas, subsidy_total, e
     total_area = design_data.get('total_area', 0)
     style = req.get('style', 'Moderno')
     rooms = design_data.get('rooms', [])
+    # Sumar coste de chimenea si el estilo la incluye (sincronizado con Step 4)
+    _STYLE_CHIMNEY_ZIP = {'Montaña': 4500, 'Rural': 4500, 'Clásico': 3500}
+    total_cost += _STYLE_CHIMNEY_ZIP.get(style, 0)
 
     # ----------------------------------------
     # GENERAR MEMORIA COMPLETA CON GROQ
@@ -1996,17 +1999,41 @@ def render_step2():
         st.session_state['energy_cost_total'] = energy_cost_total
         st.session_state['energy_keep'] = energy_keep
 
+        # ── EXTRAS DE ESTILO (determinados por el estilo elegido, no editables) ──
+        _style_now = req.get('style', '')
+        _STYLE_EXTRAS = {
+            'Montaña': {'label': '🔥 Chimenea (Estilo Montaña)', 'cost': 4500},
+            'Rural':   {'label': '🔥 Chimenea (Estilo Rural)',   'cost': 4500},
+            'Clásico': {'label': '🔥 Chimenea (Estilo Clásico)', 'cost': 3500},
+        }
+        chimney_cost = 0
+        if _style_now in _STYLE_EXTRAS:
+            _se = _STYLE_EXTRAS[_style_now]
+            chimney_cost = _se['cost']
+            with cols[col_idx % 3]:
+                st.markdown(
+                    f"<div style='background:rgba(231,76,60,0.12); border:1px solid #E74C3C; "
+                    f"border-radius:6px; padding:8px 10px; font-size:13px; color:white;'>"
+                    f"<b>{_se['label']}</b><br>"
+                    f"<span style='color:#E74C3C; font-weight:bold;'>€{_se['cost']:,}</span> "
+                    f"<span style='font-size:11px; opacity:0.7;'>· incluido por estilo</span>"
+                    f"</div>",
+                    unsafe_allow_html=True
+                )
+        st.session_state['chimney_cost'] = chimney_cost
+
         # Eliminar desmarcados
         for idx in sorted(rooms_to_remove, reverse=True):
             design.rooms.pop(idx)
-        
+
         # RECALCULAR MÉTRICAS FINALES (después de sliders y checkboxes)
         total_area_final = sum([r.area_m2 for r in design.rooms])
         total_cost_final = sum([r.area_m2 * r.room_type.base_cost_per_m2 for r in design.rooms])
         foundation_cost = int(total_area_final * 180)
         installation_cost = int(total_area_final * 150)
         energy_cost_total = st.session_state.get('energy_cost_total', 0)
-        total_with_extras = total_cost_final + foundation_cost + installation_cost + energy_cost_total
+        chimney_cost = st.session_state.get('chimney_cost', 0)
+        total_with_extras = total_cost_final + foundation_cost + installation_cost + energy_cost_total + chimney_cost
         budget_pct = total_with_extras / budget * 100
         
         if budget_pct <= 90:
@@ -2528,7 +2555,10 @@ def render_step3():
     foundation_cost = int(total_area * 180)
     installation_cost = int(total_area * 150)
     architecture_cost = int((construction_cost + foundation_cost) * 0.08)
-    total_cost = construction_cost + foundation_cost + installation_cost + architecture_cost
+    # Coste extra por estilo arquitectónico (chimenea)
+    _STYLE_CHIMNEY = {'Montaña': 4500, 'Rural': 4500, 'Clásico': 3500}
+    chimney_cost = _STYLE_CHIMNEY.get(req.get('style', ''), 0)
+    total_cost = construction_cost + foundation_cost + installation_cost + architecture_cost + chimney_cost
     
     # Calcular subvenciones
     subsidy = 0
@@ -2702,6 +2732,14 @@ def render_step3():
             ("7. Honorarios técnicos", f"€{architecture_cost:,}",
              "8%", "Arquitecto, aparejador, licencias"),
         ]
+        # Partida extra chimenea si el estilo la incluye
+        if chimney_cost > 0:
+            partidas.append((
+                "8. Chimenea / Hogar",
+                f"€{chimney_cost:,}",
+                f"{int(chimney_cost/total_cost*100)}%",
+                f"Chimenea de leña/biomasa — Estilo {req.get('style','')}"
+            ))
         
         df = pd.DataFrame(partidas, 
                          columns=["Partida", "Coste", "%", "Descripción"])
