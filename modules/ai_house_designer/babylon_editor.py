@@ -387,7 +387,7 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
 
         // Cámara isométrica
         const camera = new BABYLON.ArcRotateCamera(
-            "cam", Math.PI/4, Math.PI/3.2, Math.max(totalWidth, totalDepth) * 2.2,
+            "cam", Math.PI/4, Math.PI/3.2, Math.max(plotW, plotD, totalWidth, totalDepth) * 1.55,
             new BABYLON.Vector3(totalWidth/2, 0, totalDepth/2), scene
         );
         camera.attachControl(canvas, true);
@@ -402,16 +402,32 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
         const dirLight = new BABYLON.DirectionalLight("dir", new BABYLON.Vector3(-1,-2,-1), scene);
         dirLight.intensity = 0.4;
 
-        // Suelo verde
+        // Centro del plot (= centro de la casa por construcción de plotX/plotZ)
+        const plotCX = totalWidth / 2;
+        const plotCZ = totalDepth / 2;
+
+        // Suelo exterior (tierra/contexto) — cubre plot + margen generoso
+        const groundW = Math.max(plotW, totalWidth) + 24;
+        const groundD = Math.max(plotD, totalDepth) + 24;
         const ground = BABYLON.MeshBuilder.CreateGround("ground", {{
-            width: totalWidth + 30, height: totalDepth + 30
+            width: groundW, height: groundD
         }}, scene);
         const groundMat = new BABYLON.StandardMaterial("gMat", scene);
-        groundMat.diffuseColor = new BABYLON.Color3(0.42, 0.68, 0.42);
+        groundMat.diffuseColor = new BABYLON.Color3(0.36, 0.58, 0.36);
         ground.material = groundMat;
+        ground.position.set(plotCX, 0, plotCZ);
 
-        // Grid 1m
-        const gridSize = Math.max(totalWidth, totalDepth) + 20;
+        // Plano de parcela — delimita exactamente los m² reales de la finca
+        const plotPlane = BABYLON.MeshBuilder.CreateGround("plotPlane", {{
+            width: plotW, height: plotD
+        }}, scene);
+        const plotMat = new BABYLON.StandardMaterial("plotMat", scene);
+        plotMat.diffuseColor = new BABYLON.Color3(0.44, 0.72, 0.44);
+        plotPlane.material = plotMat;
+        plotPlane.position.set(plotCX, 0.003, plotCZ);
+
+        // Grid 1m — sobre toda la parcela
+        const gridSize = Math.max(plotW, plotD, totalWidth, totalDepth) + 12;
         const gridMat = new BABYLON.GridMaterial("gridMat", scene);
         gridMat.majorUnitFrequency = 5;
         gridMat.minorUnitVisibility = 0.45;
@@ -423,8 +439,43 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
         const gridPlane = BABYLON.MeshBuilder.CreateGround("gridPlane",
             {{width: gridSize, height: gridSize}}, scene);
         gridPlane.material  = gridMat;
-        gridPlane.position.y = 0.01;
+        gridPlane.position.set(plotCX, 0.01, plotCZ);
         gridPlane.isPickable = false;
+
+        // Borde naranja del límite de parcela (4 líneas finas a y=0.02)
+        const borderColor = new BABYLON.Color3(0.95, 0.55, 0.10);
+        const borderH = 0.12, borderT = 0.18;
+        [['bN', plotCX, plotCZ + plotD/2, plotW, borderT],
+         ['bS', plotCX, plotCZ - plotD/2, plotW, borderT],
+         ['bE', plotCX + plotW/2, plotCZ, borderT, plotD + borderT*2],
+         ['bO', plotCX - plotW/2, plotCZ, borderT, plotD + borderT*2]
+        ].forEach(([id, bx, bz, bw, bd]) => {{
+            const b = BABYLON.MeshBuilder.CreateBox('border_'+id,
+                {{width: bw, height: borderH, depth: bd}}, scene);
+            b.position.set(bx, 0.02, bz);
+            const bm = new BABYLON.StandardMaterial('bm_'+id, scene);
+            bm.diffuseColor = borderColor;
+            bm.emissiveColor = new BABYLON.Color3(0.3, 0.15, 0.0);
+            b.material = bm;
+            b.isPickable = false;
+        }});
+
+        // Etiqueta m² en el suelo (GUI Babylon)
+        if (plotAreaM2 > 0) {{
+            const guiUI = BABYLON.GUI.AdvancedDynamicTexture.CreateFullscreenUI("plotUI", true, scene);
+            const plotLbl = new BABYLON.GUI.TextBlock("plotLbl");
+            plotLbl.text = plotAreaM2.toLocaleString('es-ES') + " m²  ·  " + plotW + "m × " + plotD + "m";
+            plotLbl.color = "rgba(255,240,200,0.92)";
+            plotLbl.fontSize = 15;
+            plotLbl.fontWeight = "bold";
+            plotLbl.outlineWidth = 3;
+            plotLbl.outlineColor = "rgba(0,0,0,0.8)";
+            guiUI.addControl(plotLbl);
+            const lblNode = new BABYLON.TransformNode("lblNode", scene);
+            lblNode.position.set(plotCX, 0.5, plotCZ - plotD/2 + 3);
+            plotLbl.linkWithMesh(lblNode);
+            plotLbl.linkOffsetY = -18;
+        }}
 
         // ================================================
         // HIGHLIGHT
