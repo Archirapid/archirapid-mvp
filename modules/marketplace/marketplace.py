@@ -708,3 +708,99 @@ def main():
 
     # Limpiar caché para asegurar sincronización
     st.cache_data.clear()
+
+    # Footer
+    st.markdown("""
+    <style>
+    .ar-footer {
+        margin-top: 48px;
+        padding: 36px 24px 24px;
+        border-top: 1px solid #E2E8F0;
+        background: linear-gradient(135deg, #0D1B2A 0%, #1E3A5F 100%);
+        border-radius: 16px;
+        color: #CBD5E1;
+        font-family: 'Segoe UI', sans-serif;
+    }
+    .ar-footer-grid {
+        display: grid;
+        grid-template-columns: 2fr 1fr 1fr;
+        gap: 32px;
+        margin-bottom: 28px;
+    }
+    .ar-footer h4 {
+        color: #F8FAFC;
+        font-size: 1em;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+        margin: 0 0 12px 0;
+        text-transform: uppercase;
+    }
+    .ar-footer p, .ar-footer a {
+        font-size: 0.85em;
+        color: #94A3B8;
+        line-height: 1.7;
+        margin: 0;
+        text-decoration: none;
+    }
+    .ar-footer a:hover { color: #F59E0B; }
+    .ar-footer-invest {
+        background: rgba(245,158,11,0.12);
+        border: 1px solid rgba(245,158,11,0.3);
+        border-radius: 10px;
+        padding: 16px 20px;
+        margin-bottom: 24px;
+    }
+    .ar-footer-invest p {
+        color: #FCD34D;
+        font-size: 0.88em;
+        line-height: 1.6;
+    }
+    .ar-footer-bottom {
+        border-top: 1px solid rgba(255,255,255,0.08);
+        padding-top: 16px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    .ar-footer-bottom span {
+        font-size: 0.78em;
+        color: #64748B;
+    }
+    </style>
+    <div class="ar-footer">
+        <div class="ar-footer-invest">
+            <p>💼 <strong style="color:#FCD34D;">Interested in investing or partnering with ARCHIRAPID?</strong><br>
+            We are an AI-powered real estate technology platform connecting landowners, architects and buyers across Spain.
+            If you are an investor, developer or industry partner and would like to explore collaboration opportunities,
+            we would love to hear from you.</p>
+        </div>
+        <div class="ar-footer-grid">
+            <div>
+                <h4>🏗️ ARCHIRAPID</h4>
+                <p>AI-powered platform for land discovery,<br>
+                architectural project marketplace<br>
+                and smart building feasibility analysis.<br><br>
+                <em style="color:#64748B;">Connecting land · architects · buyers since 2025.</em></p>
+            </div>
+            <div>
+                <h4>📍 Location</h4>
+                <p>Avda. de Europa, 15<br>
+                28224 Pozuelo de Alarcón<br>
+                Madrid — Spain</p>
+            </div>
+            <div>
+                <h4>📬 Contact</h4>
+                <p>
+                    <a href="mailto:archirapid2026@gmail.com">archirapid2026@gmail.com</a><br>
+                    <a href="tel:+35623172704">+356 23 17 27 04</a>
+                </p>
+            </div>
+        </div>
+        <div class="ar-footer-bottom">
+            <span>© 2026 ARCHIRAPID — All rights reserved. Proyecto ARCHIRAPID S.L. (en constitución)</span>
+            <span>Built with AI · Madrid, Spain 🇪🇸</span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
