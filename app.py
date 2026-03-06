@@ -1541,14 +1541,16 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
     st.markdown("""
     <div style="margin-top:40px;padding:20px 24px 16px;background:linear-gradient(135deg,#0D1B2A,#1E3A5F);border-radius:12px;font-family:'Segoe UI',sans-serif;">
         <div style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);border-radius:8px;padding:12px 16px;margin-bottom:16px;">
-            <span style="color:#FCD34D;font-size:0.84em;">💼 <strong>Interested in investing or partnering with ARCHIRAPID?</strong>
-            AI-powered platform connecting landowners, architects and buyers across Spain.
-            Contact us — we would love to hear from you.</span>
+            <span style="color:#FCD34D;font-size:0.84em;">💼 <strong>Investors & Partners — Join the PropTech revolution in Spain.</strong>
+            ARCHIRAPID is a <strong>PropTech · Real Estate Marketplace · SaaS</strong> platform built on AI:
+            we connect landowners, architects and buyers in a single end-to-end ecosystem —
+            from raw land discovery to architectural project delivery.
+            Scalable, data-driven and ready to grow. <strong>Let's talk.</strong></span>
         </div>
         <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:16px;margin-bottom:14px;">
             <div>
                 <span style="color:#F8FAFC;font-size:0.8em;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">🏗️ ARCHIRAPID</span><br>
-                <span style="color:#64748B;font-size:0.78em;">AI · Land Discovery · Architecture · PropTech · Madrid, Spain</span>
+                <span style="color:#64748B;font-size:0.78em;">PropTech · Real Estate Marketplace · SaaS · AI · Madrid, Spain</span>
             </div>
             <div style="text-align:right;">
                 <span style="color:#94A3B8;font-size:0.78em;">
