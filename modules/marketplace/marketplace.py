@@ -572,14 +572,35 @@ def main():
     .ar-icon-client { background:#ECFDF5; }
     .ar-card-title { font-size:1.05em;font-weight:800;color:#0D1B2A;margin-bottom:5px; }
     .ar-card-text  { font-size:0.85em;color:#64748B;line-height:1.4;margin-bottom:12px; }
-    /* En Streamlit el div marcador queda cerrado; el botón es hermano en el DOM.
-       Usamos :has() para detectar el marcador y apuntar al botón hermano siguiente. */
-    div:has(.ar-btn-owner)  ~ [data-testid="stButton"] button { background:#F5A623 !important;color:white !important;border:none !important;border-radius:10px !important;font-weight:700 !important; }
-    div:has(.ar-btn-arch)   ~ [data-testid="stButton"] button { background:#2563EB !important;color:white !important;border:none !important;border-radius:10px !important;font-weight:700 !important; }
-    div:has(.ar-btn-client) ~ [data-testid="stButton"] button { background:#10B981 !important;color:white !important;border:none !important;border-radius:10px !important;font-weight:700 !important; }
-    div:has(.ar-btn-pro)    ~ [data-testid="stButton"] button { background:#F5A623 !important;color:#0D1B2A !important;border:none !important;border-radius:10px !important;font-weight:700 !important; }
-    div:has(.ar-btn-search) ~ [data-testid="stButton"] button { background:rgba(255,255,255,0.08) !important;color:white !important;border:1px solid rgba(255,255,255,0.35) !important;border-radius:10px !important;font-weight:600 !important; }
     </style>
+    <script>
+    (function applyButtonColors() {
+        var rules = [
+            { text: 'Subir mi Finca',              bg: '#F5A623', fg: 'white' },
+            { text: 'Mis Proyectos',               bg: '#2563EB', fg: 'white' },
+            { text: 'Ver Proyectos',               bg: '#10B981', fg: 'white' },
+            { text: 'Mis Favoritos',               bg: '#10B981', fg: 'white' },
+            { text: 'Registrarme como Profesional',bg: '#F5A623', fg: '#0D1B2A' },
+        ];
+        function paint() {
+            document.querySelectorAll('button').forEach(function(btn) {
+                var t = btn.innerText.trim();
+                rules.forEach(function(r) {
+                    if (t.startsWith(r.text)) {
+                        btn.style.setProperty('background', r.bg, 'important');
+                        btn.style.setProperty('color',      r.fg, 'important');
+                        btn.style.setProperty('border',     'none', 'important');
+                        btn.style.setProperty('border-radius', '10px', 'important');
+                        btn.style.setProperty('font-weight', '700', 'important');
+                    }
+                });
+            });
+        }
+        paint();
+        [300, 800, 1500].forEach(function(d){ setTimeout(paint, d); });
+        new MutationObserver(paint).observe(document.body, {childList:true, subtree:true});
+    })();
+    </script>
     """, unsafe_allow_html=True)
 
     # 3. Tres tarjetas de acceso directo
