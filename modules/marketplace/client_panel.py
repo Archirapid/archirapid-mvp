@@ -1889,109 +1889,90 @@ def show_client_project_purchases(client_email):
 
 
 def show_integrated_project_search(client_email, plot_data):
-    """Buscador integrado de proyectos compatibles dentro del panel de cliente"""
-    from modules.marketplace import ai_engine_groq as ai
+    """Proyectos compatibles con la finca del cliente.
+    Filtro automático: 33% de superficie edificable. Único filtro manual: presupuesto."""
+    from modules.marketplace.marketplace import get_project_display_image
+    import base64, io
 
     st.markdown("---")
-    st.subheader("🏗️ Buscador de Proyectos Compatibles")
+    st.subheader("📐 Proyectos Compatibles con tu Finca")
 
-    # Botón para volver al panel principal
-    col_back, col_title = st.columns([1, 3])
-    with col_back:
-        if st.button("⬅️ Volver a Mi Finca", key="back_to_property"):
-            st.session_state['show_project_search'] = False
-            st.rerun()
+    if st.button("⬅️ Volver", key="back_to_property"):
+        st.session_state['show_project_search'] = False
+        st.rerun()
 
-    # Obtener superficie verificada (prioridad: verified_m2 > superficie_edificable > 33% de finca)
+    # Calcular superficie máxima edificable
+    # plot_data[3] = m2 total, plot_data[4] = superficie_edificable
+    superficie_edificable = plot_data[4] if (len(plot_data) > 4 and plot_data[4]) else None
+    m2_total = plot_data[3] if (len(plot_data) > 3 and plot_data[3]) else 0
+
     verified_m2 = st.session_state.get('verified_m2')
     if verified_m2:
-        max_surface = verified_m2
-        source_info = "datos verificados por IA"
+        max_surface = float(verified_m2)
+        source_info = "verificado por IA desde nota catastral"
+    elif superficie_edificable:
+        max_surface = float(superficie_edificable)
+        source_info = "superficie edificable registrada"
     else:
-        # Usar superficie edificable de la tabla plots o calcular 33%
-        superficie_edificable = plot_data[3] if len(plot_data) > 3 and plot_data[3] else None
-        if superficie_edificable:
-            max_surface = superficie_edificable
-            source_info = "superficie edificable registrada"
-        else:
-            max_surface = plot_data[4] * 0.33 if len(plot_data) > 4 and plot_data[4] else 0
-            source_info = "33% de la superficie total (estimación)"
+        max_surface = float(m2_total) * 0.33
+        source_info = "33% del total de la parcela (estimación)"
 
-    st.markdown(f"### 🎯 Filtro Automático Aplicado")
-    st.info(f"📐 **Superficie máxima de construcción:** {max_surface:,.0f} m² ({source_info})")
-    st.write("Solo se muestran proyectos cuya superficie construida sea ≤ a este límite.")
+    col_i1, col_i2 = st.columns(2)
+    with col_i1:
+        st.info(f"📐 **Máx. construible:** {max_surface:,.0f} m²  ·  _{source_info}_")
+    with col_i2:
+        max_precio = st.number_input(
+            "Presupuesto máximo (€)",
+            min_value=0, value=0, step=5000,
+            help="0 = sin límite de precio",
+            key="proj_max_precio"
+        )
 
-    # Buscar proyectos compatibles automáticamente
-    with st.spinner("🔍 Buscando proyectos compatibles con tu finca..."):
-        search_params = {
-            'client_parcel_size': max_surface,
-            'client_email': client_email
-        }
-        proyectos = get_proyectos_compatibles(**search_params)
+    # Buscar proyectos compatibles
+    with st.spinner("Buscando proyectos compatibles..."):
+        proyectos = get_proyectos_compatibles(client_parcel_size=max_surface, client_email=client_email)
 
-    # Mostrar resultados
-    st.markdown(f"### 🏗️ Proyectos Encontrados: {len(proyectos)}")
+    # Filtrar por presupuesto si se indicó
+    if max_precio > 0:
+        proyectos = [p for p in proyectos if (p.get('price') or 0) <= max_precio]
 
     if not proyectos:
-        st.warning("No se encontraron proyectos que quepan en tu finca con los criterios actuales.")
-        st.info("💡 Considera contactar con arquitectos para proyectos personalizados.")
+        st.warning(f"No hay proyectos que quepan en tu parcela ({max_surface:,.0f} m² máx.)" +
+                   (f" con presupuesto ≤ €{max_precio:,.0f}" if max_precio > 0 else "") + ".")
+        st.info("💡 Contacta con nosotros para proyectos personalizados.")
         return
 
-    # Mostrar proyectos en grid
-    cols = st.columns(2)
+    st.markdown(f"**{len(proyectos)} proyecto(s) compatibles:**")
+
+    N = 5
+    cols = st.columns(N)
     for idx, proyecto in enumerate(proyectos):
-        with cols[idx % 2]:
-            with st.container():
-                # Imagen del proyecto
-                foto = proyecto.get('foto_principal')
-                if foto:
-                    try:
-                        st.image(foto, width=250, caption=proyecto['title'])
-                    except:
-                        st.image("assets/fincas/image1.jpg", width=250, caption=proyecto['title'])
+        area = proyecto.get('m2_construidos') or proyecto.get('area_m2') or 0
+        precio = proyecto.get('price') or 0
+        with cols[idx % N]:
+            # Imagen base64 altura fija
+            try:
+                thumb = get_project_display_image(proyecto['id'], image_type='main')
+                if isinstance(thumb, bytes):
+                    b64 = base64.b64encode(thumb).decode()
                 else:
-                    st.image("assets/fincas/image1.jpg", width=250, caption=proyecto['title'])
+                    buf = io.BytesIO()
+                    thumb.save(buf, format='JPEG')
+                    b64 = base64.b64encode(buf.getvalue()).decode()
+                st.markdown(
+                    f'<img src="data:image/jpeg;base64,{b64}" '
+                    f'style="width:100%;height:130px;object-fit:cover;border-radius:8px;display:block;">',
+                    unsafe_allow_html=True
+                )
+            except Exception:
+                st.markdown('<div style="height:130px;background:#F1F5F9;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:2em;">🏗️</div>', unsafe_allow_html=True)
 
-                # Información básica
-                st.markdown(f"**🏗️ {proyecto['title']}**")
-                area_construida = proyecto.get('m2_construidos', proyecto.get('area_m2', 0))
-                # Asegurar que area_construida no sea None antes de dar formato
-                area_val = area_construida if area_construida is not None else 0
-                st.write(f"📐 **Área construida:** {area_val:,.0f} m²")
-                st.write(f"💰 **Precio:** €{proyecto.get('price', 0):,.0f}" if proyecto.get('price') else "💰 **Precio:** Consultar")
-
-                # Arquitecto
-                if proyecto.get('architect_name'):
-                    st.write(f"👨‍💼 **Arquitecto:** {proyecto['architect_name']}")
-
-                # Compatibilidad
-                # Filtro de seguridad: Si el área es None, lo ignoramos para evitar el crash
-                if area_construida is not None and area_construida <= max_surface:
-                    st.success(f"✅ Compatible (usa {area_construida/max_surface*100:.1f}% de tu capacidad)")
-                else:
-                    st.error("❌ No compatible")
-
-                # RECOMENDACIÓN DE IA
-                with st.expander("🤖 Recomendación de ARCHIRAPID", expanded=False):
-                    try:
-                        # Preparar contexto para Gemini
-                        finca_info = f"Finca de {plot_data[4]:,.0f} m², superficie edificable: {max_surface:,.0f} m²"
-                        proyecto_info = f"Proyecto '{proyecto['title']}' de {area_construida:,.0f} m², precio €{proyecto.get('price', 0):,.0f}"
-
-                        prompt = f"""Analiza por qué este proyecto arquitectónico es ideal para esta finca específica.
-                        Finca: {finca_info}
-                        Proyecto: {proyecto_info}
-                        Responde en 2-3 frases concisas explicando la compatibilidad técnica y valor añadido."""
-
-                        recomendacion = ai.generate_text(prompt)
-                        st.write(recomendacion)
-                    except Exception as e:
-                        st.write("🤖 Recomendación no disponible temporalmente")
-
-                # Botón de detalles
-                if st.button("Ver Proyecto Completo", key=f"view_project_{proyecto['id']}", use_container_width=True):
-                    st.session_state['selected_project_for_panel'] = proyecto['id']
-                    st.session_state['show_project_search'] = False  # Ocultar búsqueda al ver detalles
-                    st.rerun()
-
-                st.markdown("---")
+            title = proyecto.get('title', 'Proyecto')
+            pct = f"{area/max_surface*100:.0f}%" if max_surface > 0 and area > 0 else "—"
+            st.markdown(f"**{title[:26]}{'…' if len(title)>26 else ''}**")
+            st.caption(f"📐 {area:,.0f} m²  ({pct} de tu parcela)")
+            st.caption(f"💰 €{precio:,.0f}" if precio else "💰 Consultar")
+            if st.button("Ver proyecto →", key=f"ips_proj_{proyecto['id']}", use_container_width=True):
+                st.session_state['selected_project_for_panel'] = proyecto['id']
+                st.session_state['show_project_search'] = False
+                st.rerun()
