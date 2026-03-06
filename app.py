@@ -1533,12 +1533,6 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
             st.error(f"❌ Error cargando marketplace:  {e}")
             st.code(traceback.format_exc())
 
-        # RADAR DE FINCAS
-        from modules.marketplace.marketplace import get_filtered_plots
-        plots = get_filtered_plots()
-        st.sidebar.info(f"🔍 RADAR: {len(plots)} fincas detectadas")
-        if len(plots) > 0:
-            st.sidebar.write(f"Última: {plots[-1].get('title')} | m2: {plots[-1].get('m2')}")
 
         # PASO 3: Renderizar PROYECTOS ARQUITECTÓNICOS
         st.markdown("---")

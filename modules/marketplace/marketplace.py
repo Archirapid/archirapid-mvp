@@ -381,10 +381,6 @@ def render_map(plots):
         marker = folium.Marker([lat, lon], icon=icon, popup=folium.Popup(popup_html, max_width=250))
         marker.add_to(m)
 
-    # DEBUG: Detectar Espinosa
-    if any(p.get('title') == "PRUEBA DIA2 ESPINOSA" for p in plots_processed):
-        st.write("¡Espinosa detectada en la lista!")
-
     # Renderizar mapa
     try:
         st.components.v1.html(m._repr_html_(), height=600)
@@ -603,9 +599,6 @@ def main():
 
     # Obtener fincas filtradas
     plots = get_filtered_plots(min_surface, max_surface, search_query)
-
-    # DEBUG DE FINCAS
-    st.write(f"DEBUG: Veo {len(plots)} fincas en la DB")
 
     # Layout principal: mapa ocupa todo el ancho
     render_map(plots)
