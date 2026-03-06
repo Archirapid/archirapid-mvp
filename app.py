@@ -1537,6 +1537,34 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
         except Exception as e:
             st.error(f"Error cargando proyectos: {e}")
 
+    # Footer
+    st.markdown("""
+    <div style="margin-top:40px;padding:20px 24px 16px;background:linear-gradient(135deg,#0D1B2A,#1E3A5F);border-radius:12px;font-family:'Segoe UI',sans-serif;">
+        <div style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);border-radius:8px;padding:12px 16px;margin-bottom:16px;">
+            <span style="color:#FCD34D;font-size:0.84em;">💼 <strong>Interested in investing or partnering with ARCHIRAPID?</strong>
+            AI-powered platform connecting landowners, architects and buyers across Spain.
+            Contact us — we would love to hear from you.</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:16px;margin-bottom:14px;">
+            <div>
+                <span style="color:#F8FAFC;font-size:0.8em;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">🏗️ ARCHIRAPID</span><br>
+                <span style="color:#64748B;font-size:0.78em;">AI · Land Discovery · Architecture · PropTech · Madrid, Spain</span>
+            </div>
+            <div style="text-align:right;">
+                <span style="color:#94A3B8;font-size:0.78em;">
+                    📍 Avda. de Europa 15, 28224 Pozuelo de Alarcón (Madrid)<br>
+                    ✉️ <a href="mailto:archirapid2026@gmail.com" style="color:#94A3B8;text-decoration:none;">archirapid2026@gmail.com</a>
+                    &nbsp;·&nbsp; 📞 <a href="tel:+35623172704" style="color:#94A3B8;text-decoration:none;">+356 23 17 27 04</a>
+                </span>
+            </div>
+        </div>
+        <div style="border-top:1px solid rgba(255,255,255,0.07);padding-top:10px;display:flex;justify-content:space-between;flex-wrap:wrap;">
+            <span style="color:#475569;font-size:0.74em;">© 2026 ARCHIRAPID — All rights reserved. Proyecto ARCHIRAPID S.L. (en constitución)</span>
+            <span style="color:#475569;font-size:0.74em;">Built with AI · Madrid, Spain 🇪🇸</span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
     st.stop()  # Detener ejecución para Home
 
 elif st.session_state.get('selected_page') == "🏠 Propietarios":
