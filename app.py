@@ -1496,25 +1496,24 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
 
         # PASO 3: Renderizar PROYECTOS ARQUITECTÓNICOS
         st.markdown("---")
-        st.header("🏗️ Proyectos Arquitectónicos Disponibles")
+        st.markdown("#### 🏗️ Proyectos Arquitectónicos Disponibles")
 
         try:
             from src import db
             from modules.marketplace.marketplace import get_project_display_image
-            projects = db.get_featured_projects(limit=6)
-            
-            if projects: 
-                cols = st.columns(3)
-                for idx, p in enumerate(projects):
-                    with cols[idx % 3]:
-                        # Usar función unificada para obtener imagen del proyecto
+            projects = db.get_featured_projects(limit=10)
+
+            if projects:
+                N = 5
+                cols = st.columns(N)
+                for idx, p in enumerate(projects[:N*2]):  # máx 2 filas
+                    with cols[idx % N]:
                         thumbnail = get_project_display_image(p['id'], image_type='main')
-                        
-                        st.image(thumbnail, width=250)
-                        st.subheader(p.get('title', 'Proyecto'))
-                        st.write(f"**€{p.get('price', 0):,.0f}** | {p.get('area_m2', 0)} m²")
-                        if st.button("DETALLES (v2)", key=f"proj_home_{p['id']}"):
-                            # Abrir en "nueva ventana" usando query params V2
+                        st.image(thumbnail, use_container_width=True)
+                        title = p.get('title', 'Proyecto')
+                        st.markdown(f"**{title[:28]}{'…' if len(title)>28 else ''}**")
+                        st.caption(f"💰 €{p.get('price',0):,.0f}  ·  📐 {p.get('area_m2',0)} m²")
+                        if st.button("Ver Detalles →", key=f"proj_home_{p['id']}", use_container_width=True):
                             st.query_params["selected_project_v2"] = p['id']
                             st.rerun()
             else:
