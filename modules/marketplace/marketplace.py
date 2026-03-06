@@ -552,44 +552,111 @@ def main():
         
         st.success(f"👋 ¡Hola, {user_name}! | [Ir a Mi {panel_name}](?page={panel_name.replace(' ', '%20')})")
 
-    # 3. Tres tarjetas de acceso directo (única fila de navegación)
-    col1, col2, col3 = st.columns(3)
+    # CSS del sistema de diseño
+    st.markdown("""
+    <style>
+    .ar-card {
+        background: white;
+        border-radius: 18px;
+        padding: 28px 20px 14px;
+        text-align: center;
+        box-shadow: 0 4px 24px rgba(0,0,0,0.07);
+        border-top: 4px solid;
+    }
+    .ar-card-owner  { border-top-color: #F5A623; }
+    .ar-card-arch   { border-top-color: #2563EB; }
+    .ar-card-client { border-top-color: #10B981; }
+    .ar-icon { width:58px;height:58px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:26px;margin:0 auto 14px; }
+    .ar-icon-owner  { background:#FFF5E0; }
+    .ar-icon-arch   { background:#EEF4FF; }
+    .ar-icon-client { background:#ECFDF5; }
+    .ar-card-title { font-size:1.2em;font-weight:800;color:#0D1B2A;margin-bottom:8px; }
+    .ar-card-text  { font-size:0.9em;color:#64748B;line-height:1.5;margin-bottom:18px; }
+    .ar-btn-owner  > button { background:#F5A623 !important;color:white !important;border:none !important;border-radius:10px !important;font-weight:700 !important; }
+    .ar-btn-arch   > button { background:#2563EB !important;color:white !important;border:none !important;border-radius:10px !important;font-weight:700 !important; }
+    .ar-btn-client > button { background:#10B981 !important;color:white !important;border:none !important;border-radius:10px !important;font-weight:700 !important; }
+    .ar-btn-pro    > button { background:#F5A623 !important;color:#0D1B2A !important;border:none !important;border-radius:10px !important;font-weight:700 !important; }
+    .ar-btn-search > button { background:rgba(255,255,255,0.1) !important;color:white !important;border:1px solid rgba(255,255,255,0.35) !important;border-radius:10px !important;font-weight:600 !important; }
+    </style>
+    """, unsafe_allow_html=True)
+
+    # 3. Tres tarjetas de acceso directo
+    col1, col2, col3 = st.columns(3, gap="medium")
 
     with col1:
-        st.markdown("### 🏠 Tengo un Terreno")
-        st.write("Publica tu finca y recibe propuestas de arquitectos")
-        if st.button("Subir mi Finca", key="upload_plot", use_container_width=True):
+        st.markdown("""
+        <div class="ar-card ar-card-owner">
+            <div class="ar-icon ar-icon-owner">🏗️</div>
+            <div class="ar-card-title">Tengo un Terreno</div>
+            <div class="ar-card-text">Publica tu finca y recibe propuestas reales de arquitectos especializados.</div>
+        </div>
+        """, unsafe_allow_html=True)
+        st.markdown('<div class="ar-btn-owner">', unsafe_allow_html=True)
+        if st.button("Subir mi Finca →", key="upload_plot", use_container_width=True):
             if st.session_state.get("logged_in") and st.session_state.get("role") == "owner":
                 navigate_to("🏠 Propietarios")
             else:
                 st.session_state['login_role'] = 'owner'
                 st.session_state['viewing_login'] = True
                 st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
 
     with col2:
-        st.markdown("### 🏗️ Soy Arquitecto")
-        st.write("Vende tus proyectos y conecta con clientes")
-        if st.button("Mis Proyectos", key="architect_portal", use_container_width=True):
+        st.markdown("""
+        <div class="ar-card ar-card-arch">
+            <div class="ar-icon ar-icon-arch">📐</div>
+            <div class="ar-card-title">Soy Arquitecto</div>
+            <div class="ar-card-text">Comparte proyectos ejecutables y conecta con clientes de forma profesional.</div>
+        </div>
+        """, unsafe_allow_html=True)
+        st.markdown('<div class="ar-btn-arch">', unsafe_allow_html=True)
+        if st.button("Mis Proyectos →", key="architect_portal", use_container_width=True):
             navigate_to("Arquitectos (Marketplace)")
+        st.markdown('</div>', unsafe_allow_html=True)
 
     with col3:
-        st.markdown("### 🏡 Busco Casa")
-        st.write("Explora proyectos disponibles en el marketplace")
-
-        # Verificar si el usuario está logueado
+        st.markdown("""
+        <div class="ar-card ar-card-client">
+            <div class="ar-icon ar-icon-client">🏡</div>
+            <div class="ar-card-title">Busco Casa</div>
+            <div class="ar-card-text">Explora proyectos disponibles o diseña tu casa con IA en minutos.</div>
+        </div>
+        """, unsafe_allow_html=True)
         logged_in = st.session_state.get("logged_in", False)
         email = st.session_state.get("email", "")
-
+        st.markdown('<div class="ar-btn-client">', unsafe_allow_html=True)
         if logged_in and email:
-            # Usuario logueado - mostrar Mis Favoritos
-            if st.button("Mis Favoritos", key="browse_projects", use_container_width=True):
+            if st.button("Mis Favoritos →", key="browse_projects", use_container_width=True):
                 navigate_to("👤 Panel de Cliente")
         else:
-            # Usuario no logueado - mostrar mensaje de registro
-            if st.button("Ver Proyectos", key="browse_projects", use_container_width=True):
-                st.info("¡Bienvenido! Puedes explorar todos los proyectos abajo. Si quieres guardar tus favoritos o contactar con arquitectos, regístrate aquí.")
+            if st.button("Ver Proyectos →", key="browse_projects", use_container_width=True):
+                st.info("¡Bienvenido! Explora todos los proyectos abajo. Para guardar favoritos o contactar arquitectos, regístrate.")
                 if st.button("📝 Registrarme", key="register_from_marketplace"):
                     navigate_to("Registro de Usuario")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    # Banner de profesionales (antes al fondo de app.py)
+    st.markdown("<br>", unsafe_allow_html=True)
+    col_pro1, col_pro2, col_pro3 = st.columns([3, 1, 1], gap="medium")
+    with col_pro1:
+        st.markdown("""
+        <div style="background:linear-gradient(135deg,#0D1B2A 0%,#1B3558 100%);border-radius:14px;padding:20px 26px;">
+            <div style="font-size:1.1em;font-weight:800;color:white;margin-bottom:5px;">🛠️ ¿Eres profesional de la construcción o reformas?</div>
+            <div style="color:#94B8D4;font-size:0.9em;">Únete a nuestra red de proveedores y conecta con clientes que necesitan tus servicios.</div>
+        </div>
+        """, unsafe_allow_html=True)
+    with col_pro2:
+        st.markdown('<div class="ar-btn-pro" style="padding-top:6px">', unsafe_allow_html=True)
+        if st.button("Registrarme como Profesional", key="register_professional", use_container_width=True):
+            st.session_state['selected_page'] = "📝 Registro de Proveedor de Servicios"
+            st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
+    with col_pro3:
+        st.markdown('<div class="ar-btn-search" style="padding-top:6px">', unsafe_allow_html=True)
+        if st.button("🛠️ Buscar Profesionales", key="search_professionals", use_container_width=True):
+            from modules.marketplace import service_providers
+            service_providers.show_services_marketplace()
+        st.markdown('</div>', unsafe_allow_html=True)
 
     # 4. Marketplace de proyectos (siempre visible debajo)
     st.markdown("---")
