@@ -139,24 +139,28 @@ def get_project_display_image(project_id, image_type='main'):
         # En caso de error, usar placeholder
         return 'assets/branding/logo.png' if image_type == 'main' else []
 
-def get_popup_image_url(plot):
+def get_popup_image_b64(plot):
     """
-    Devuelve una URL absoluta file:// hacia la imagen de la finca,
-    para que Folium pueda mostrarla en el popup aunque se ejecute en local.
-    Si la imagen no existe, usa un placeholder en assets.
+    Devuelve un data URI base64 de la imagen de la finca para incrustar
+    directamente en el HTML del popup de Folium (los file:// URLs son bloqueados
+    por los navegadores en iframes).
     """
-    rel_path = get_plot_image_path(plot)  # 'uploads/...' o 'assets/...'
+    import base64 as _b64
+    rel_path = get_plot_image_path(plot)
     rel_path = rel_path.lstrip('/').replace('\\', '/')
-
-    # Construir ruta absoluta basada en el directorio actual del proyecto
     abs_path = Path(rel_path).resolve()
 
     if not abs_path.exists():
-        # Fallback a placeholder
         abs_path = Path("assets/branding/logo.png").resolve()
 
-    # Construir URL file:// (ej. file:///C:/ARCHIRAPID_PROYECT25/uploads/imagen.jpg)
-    return abs_path.as_uri()
+    try:
+        with open(abs_path, 'rb') as f:
+            data = _b64.b64encode(f.read()).decode()
+        ext = abs_path.suffix.lower().lstrip('.')
+        mime = 'image/png' if ext == 'png' else ('image/gif' if ext == 'gif' else 'image/jpeg')
+        return f"data:{mime};base64,{data}"
+    except Exception:
+        return ""
 
 def get_plot_detail_url(plot_id):
     """
@@ -355,8 +359,8 @@ def render_map(plots):
         # Todas las fincas en esta lista son disponibles (filtradas previamente)
         icon = folium.Icon(color='blue', icon='home', prefix='fa', icon_color='white')
 
-        # Crear popup HTML con imagen y enlace a detalles
-        img_src = get_popup_image_url(plot)  # URL completa o relativa para la imagen
+        # Crear popup HTML con imagen base64 y enlace a detalles
+        img_src = get_popup_image_b64(plot)
         detail_url = get_plot_detail_url(plot['id'])
 
         # Botón normal para fincas disponibles
@@ -370,12 +374,13 @@ def render_map(plots):
         # Nota de ubicación aproximada si aplica
         location_note = "<small style='color:orange;'>Ubicación aproximada</small><br>" if plot.get('approximate_location') else ""
 
+        img_tag = f'<img src="{img_src}" style="width:100%;height:100px;object-fit:cover;border-radius:5px;display:block;margin-bottom:6px;" alt="">' if img_src else ''
         popup_html = f'''
-        <div style="width:160px; text-align:center;">
-            <img src="{img_src}" style="width:100%; border-radius:5px;" alt="Imagen de {plot['title']}">
-            <br><b>{plot['title']}</b><br>
+        <div style="width:180px;font-family:sans-serif;font-size:13px;">
+            {img_tag}
+            <b style="font-size:13px;">{plot['title']}</b><br>
             {location_note}
-            <small>{plot.get('m2', 'N/A')} m²</small><br>
+            <span style="color:#64748B;">{plot.get('m2', 'N/A')} m²</span><br>
             {button_html}
         </div>
         '''
