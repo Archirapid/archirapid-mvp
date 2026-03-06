@@ -251,64 +251,63 @@ def get_filtered_plots(min_surface=0, max_surface=1000000, query=""):
             
     return filtered
 
-def render_featured_plots(plots):
-    """Renderiza la sección de fincas destacadas en grid de 3 columnas (2 filas = 6 fincas)."""
-    st.header("🏠 Fincas Destacadas")
+def _render_plot_card(plot, key_prefix, show_premium_badge=False):
+    """Renderiza una tarjeta de finca uniforme."""
+    img_path = get_plot_image_path(plot)
+    st.markdown("""
+    <style>
+    .finca-card { background:white; border-radius:12px; overflow:hidden; box-shadow:0 2px 12px rgba(0,0,0,0.08); margin-bottom:4px; }
+    .finca-card img { width:100%; height:160px; object-fit:cover; display:block; }
+    .finca-info { padding:10px 12px 8px; }
+    .finca-title { font-size:0.82em; font-weight:700; color:#0D1B2A; margin-bottom:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .finca-meta  { font-size:0.78em; color:#64748B; margin-bottom:2px; }
+    .finca-price { font-size:0.88em; font-weight:800; color:#2563EB; }
+    .finca-badge { display:inline-block; background:#FFF5E0; color:#F5A623; border:1px solid #F5A623; border-radius:8px; font-size:0.68em; font-weight:700; padding:1px 7px; margin-bottom:5px; }
+    </style>
+    """, unsafe_allow_html=True)
+    st.image(img_path, use_container_width=True)
+    if show_premium_badge:
+        st.markdown('<span class="finca-badge">⭐ DESTACADA</span>', unsafe_allow_html=True)
+    st.markdown(f"**{plot['title'][:28]}{'…' if len(plot.get('title',''))>28 else ''}**")
+    st.caption(f"📏 {plot.get('m2','N/A')} m²  ·  💰 €{plot.get('price',0):,.0f}")
+    if st.button("Ver Detalles", key=f"{key_prefix}_{plot['id']}", use_container_width=True):
+        set_query_param("selected_plot", plot["id"])
+        st.rerun()
 
+
+def render_featured_plots(plots):
+    """Grid 5 columnas: fila destacadas (premium) + fila recientes."""
     if not plots:
         st.info("No hay fincas disponibles con los filtros actuales.")
         return
 
-    # Separar fincas premium
-    premium = [p for p in plots if p.get("featured") == 1]
-    normal = [p for p in plots if p.get("featured") != 1]
+    # Separar premium y normales
+    premium = sorted([p for p in plots if p.get("featured") == 1],
+                     key=lambda p: str(p.get("created_at") or ""), reverse=True)
+    normal  = sorted([p for p in plots if p.get("featured") != 1],
+                     key=lambda p: str(p.get("created_at") or ""), reverse=True)
 
-    # Ordenar premium por fecha (más recientes primero)
-    premium_sorted = sorted(
-        premium,
-        key=lambda p: str(p.get("created_at") or ""),
-        reverse=True
-    )
+    N = 5  # columnas
 
-    # Ordenar normales por fecha
-    normal_sorted = sorted(
-        normal,
-        key=lambda p: str(p.get("created_at") or ""),
-        reverse=True
-    )
+    # Fila 1: Destacadas (solo si hay al menos una)
+    if premium:
+        st.markdown("#### ⭐ Fincas Destacadas")
+        cols = st.columns(N)
+        for i, plot in enumerate(premium[:N]):
+            with cols[i]:
+                _render_plot_card(plot, "prem", show_premium_badge=True)
 
-    # Construir lista final: primero premium, luego normales (6 fincas total)
-    featured = premium_sorted[:6]
-
-    if len(featured) < 6:
-        needed = 6 - len(featured)
-        featured += normal_sorted[:needed]
-
-    # Tomar solo las primeras 6 fincas
-    featured = featured[:6]
-
-    # Renderizar en grid 3 columnas (2 filas)
-    cols = st.columns(3)
-    for i, plot in enumerate(featured):
-        with cols[i % 3]:
-            # Contenedor para la tarjeta de finca
-            with st.container():
-                # Imagen de la finca
-                img_path = get_plot_image_path(plot)
-                st.image(img_path, width="stretch", caption=f"{plot['title'][:20]}...")
-
-                # Indicador especial para las 2 primeras fincas (destacadas)
-                if i < 2:
-                    st.caption("⭐ DESTACADA PREMIUM")
-
-                # Información básica
-                st.markdown(f"**📏 {plot.get('m2', 'N/A')} m²**")
-                st.markdown(f"**💰 €{plot.get('price', 0):,.0f}**")
-
-                # Botón para ver detalles (mantiene la misma lógica)
-                if st.button("Ver Detalles", key=f"featured_{plot['id']}", width="stretch"):
-                    set_query_param("selected_plot", plot["id"])
-                    st.rerun()
+    # Fila 2: Recientes
+    st.markdown("#### 🏠 Fincas Disponibles")
+    # Si no hay premium, mostrar todas las normales; si hay, excluir las ya mostradas
+    to_show = normal[:N]
+    if not to_show:
+        st.info("Sube fincas para verlas aquí.")
+        return
+    cols = st.columns(N)
+    for i, plot in enumerate(to_show):
+        with cols[i]:
+            _render_plot_card(plot, "norm", show_premium_badge=False)
 
 def render_map(plots):
     """Renderiza el mapa interactivo con las fincas."""
