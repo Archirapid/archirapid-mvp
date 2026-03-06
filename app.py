@@ -1504,12 +1504,28 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
             projects = db.get_featured_projects(limit=10)
 
             if projects:
+                import base64, io
                 N = 5
                 cols = st.columns(N)
-                for idx, p in enumerate(projects[:N*2]):  # máx 2 filas
+                for idx, p in enumerate(projects[:N*2]):
                     with cols[idx % N]:
+                        # Imagen con altura fija via HTML para uniformidad
                         thumbnail = get_project_display_image(p['id'], image_type='main')
-                        st.image(thumbnail, use_container_width=True)
+                        try:
+                            if isinstance(thumbnail, bytes):
+                                b64 = base64.b64encode(thumbnail).decode()
+                            else:
+                                buf = io.BytesIO()
+                                thumbnail.save(buf, format='JPEG')
+                                b64 = base64.b64encode(buf.getvalue()).decode()
+                            st.markdown(
+                                f'<img src="data:image/jpeg;base64,{b64}" '
+                                f'style="width:100%;height:160px;object-fit:cover;'
+                                f'border-radius:10px;display:block;">',
+                                unsafe_allow_html=True
+                            )
+                        except Exception:
+                            st.image(thumbnail, use_container_width=True)
                         title = p.get('title', 'Proyecto')
                         st.markdown(f"**{title[:28]}{'…' if len(title)>28 else ''}**")
                         st.caption(f"💰 €{p.get('price',0):,.0f}  ·  📐 {p.get('area_m2',0)} m²")

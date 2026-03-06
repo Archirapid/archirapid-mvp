@@ -253,19 +253,22 @@ def get_filtered_plots(min_surface=0, max_surface=1000000, query=""):
 
 def _render_plot_card(plot, key_prefix, show_premium_badge=False):
     """Renderiza una tarjeta de finca uniforme."""
+    import base64 as _b64
     img_path = get_plot_image_path(plot)
-    st.markdown("""
-    <style>
-    .finca-card { background:white; border-radius:12px; overflow:hidden; box-shadow:0 2px 12px rgba(0,0,0,0.08); margin-bottom:4px; }
-    .finca-card img { width:100%; height:160px; object-fit:cover; display:block; }
-    .finca-info { padding:10px 12px 8px; }
-    .finca-title { font-size:0.82em; font-weight:700; color:#0D1B2A; margin-bottom:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .finca-meta  { font-size:0.78em; color:#64748B; margin-bottom:2px; }
-    .finca-price { font-size:0.88em; font-weight:800; color:#2563EB; }
-    .finca-badge { display:inline-block; background:#FFF5E0; color:#F5A623; border:1px solid #F5A623; border-radius:8px; font-size:0.68em; font-weight:700; padding:1px 7px; margin-bottom:5px; }
-    </style>
-    """, unsafe_allow_html=True)
-    st.image(img_path, use_container_width=True)
+    st.markdown('<style>.finca-badge{display:inline-block;background:#FFF5E0;color:#F5A623;border:1px solid #F5A623;border-radius:8px;font-size:0.68em;font-weight:700;padding:1px 7px;margin-bottom:4px;}</style>', unsafe_allow_html=True)
+    # Imagen con altura fija via HTML para uniformidad entre cards
+    try:
+        with open(img_path, 'rb') as f:
+            b64 = _b64.b64encode(f.read()).decode()
+        ext = str(img_path).rsplit('.', 1)[-1].lower()
+        mime = 'image/png' if ext == 'png' else ('image/gif' if ext == 'gif' else 'image/jpeg')
+        st.markdown(
+            f'<img src="data:{mime};base64,{b64}" '
+            f'style="width:100%;height:160px;object-fit:cover;border-radius:10px;display:block;">',
+            unsafe_allow_html=True
+        )
+    except Exception:
+        st.image(img_path, use_container_width=True)
     if show_premium_badge:
         st.markdown('<span class="finca-badge">⭐ DESTACADA</span>', unsafe_allow_html=True)
     st.markdown(f"**{plot['title'][:28]}{'…' if len(plot.get('title',''))>28 else ''}**")
