@@ -464,6 +464,41 @@ def ensure_tables():
             FOREIGN KEY (project_id) REFERENCES projects(id)
         )""")
 
+        # Catálogo de casas prefabricadas
+        c.execute("""CREATE TABLE IF NOT EXISTS prefab_catalog (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            m2 REAL NOT NULL,
+            rooms INTEGER NOT NULL,
+            bathrooms INTEGER NOT NULL,
+            floors INTEGER NOT NULL,
+            material TEXT NOT NULL,
+            price REAL NOT NULL,
+            description TEXT,
+            image_path TEXT,
+            active INTEGER DEFAULT 1
+        )""")
+
+        # Seed: insertar modelos de muestra solo si la tabla está vacía
+        c.execute("SELECT COUNT(*) FROM prefab_catalog")
+        if c.fetchone()[0] == 0:
+            prefab_samples = [
+                ("Studio Modular 45",  45,  1, 1, 1, "Modular acero",     44900,  "Vivienda compacta de acero modular, ideal para parcelas pequeñas. Certificación energética A.",          "assets/branding/logo.png"),
+                ("Eco Timber 65",      65,  2, 1, 1, "Madera",            67500,  "Casa de madera laminada con aislamiento superior. Diseño nórdico, bajo mantenimiento.",                "assets/branding/logo.png"),
+                ("Nordic Home 80",     80,  3, 1, 1, "Madera",            88000,  "3 dormitorios, salón abierto, porche cubierto. Clase energética A+.",                                  "assets/branding/logo.png"),
+                ("Smart Compact 55",   55,  2, 1, 1, "Modular acero",     57500,  "Módulo doble con cocina integrada. Entrega en 90 días desde firma.",                                   "assets/branding/logo.png"),
+                ("Green Container 60", 60,  2, 1, 1, "Contenedor",        51000,  "Dos contenedores HC interconectados, acabados premium, azotea transitable.",                           "assets/branding/logo.png"),
+                ("Bioclimática 95",    95,  3, 2, 1, "Mixto",            112000,  "Orientación sur, voladizos pasivos, ventilación cruzada. Sin necesidad de A/C.",                      "assets/branding/logo.png"),
+                ("Timber XL 120",     120,  4, 2, 2, "Madera",           144000,  "4 dormitorios en dos plantas, terraza superior, estructura CLT certificada.",                          "assets/branding/logo.png"),
+                ("Modular Familiar 110",110, 4, 3, 2, "Modular acero",   128000,  "4 dormitorios, 3 baños, garaje integrado. Instalación en 2 semanas.",                                  "assets/branding/logo.png"),
+                ("Premium Hormigón 130",130, 4, 3, 2, "Hormigón prefab", 154000,  "Paneles de hormigón arquitectónico. Máxima durabilidad y aislamiento acústico.",                      "assets/branding/logo.png"),
+                ("Villa Modular 160",  160,  5, 3, 2, "Mixto",           194000,  "5 dormitorios, piscina opcional, domótica integrada. Villa de lujo prefabricada.",                    "assets/branding/logo.png"),
+            ]
+            c.executemany(
+                "INSERT INTO prefab_catalog (name, m2, rooms, bathrooms, floors, material, price, description, image_path) VALUES (?,?,?,?,?,?,?,?,?)",
+                prefab_samples
+            )
+
 def insert_plot(data: Dict):
     print("DEBUG insert_plot data:", data)
     ensure_tables()

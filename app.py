@@ -1537,6 +1537,39 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
         except Exception as e:
             st.error(f"Error cargando proyectos: {e}")
 
+    # Sección casas prefabricadas
+    st.markdown("---")
+    st.markdown("#### 🏠 Adquiere tu Finca y Ponle una Casa Prefabricada")
+    st.caption("Modelos entregables desde 45 m² · Madera · Acero modular · Hormigón prefab · Mixto")
+    try:
+        from src import db as _db
+        _conn = _db.get_conn()
+        _cur = _conn.cursor()
+        _cur.execute("SELECT id, name, m2, rooms, bathrooms, floors, material, price FROM prefab_catalog WHERE active=1 ORDER BY m2 LIMIT 10")
+        prefabs = _cur.fetchall()
+        _conn.close()
+        if prefabs:
+            _N = 5
+            _cols = st.columns(_N)
+            for _idx, _pf in enumerate(prefabs[:_N * 2]):
+                with _cols[_idx % _N]:
+                    st.markdown(
+                        f'<div style="background:#F0F9FF;border:1px solid #BAE6FD;border-radius:10px;padding:12px 10px 8px;margin-bottom:8px;text-align:center;">'
+                        f'<div style="font-size:2em;margin-bottom:4px;">🏠</div>'
+                        f'<div style="font-weight:700;font-size:0.85em;color:#0D1B2A;">{_pf[1]}</div>'
+                        f'<div style="font-size:0.78em;color:#64748B;margin:4px 0;">{_pf[2]} m² · {_pf[3]}hab · {_pf[5]}pl</div>'
+                        f'<div style="font-size:0.78em;color:#475569;">{_pf[6]}</div>'
+                        f'<div style="font-weight:700;color:#2563EB;font-size:0.9em;margin-top:6px;">€{_pf[7]:,.0f}</div>'
+                        f'</div>',
+                        unsafe_allow_html=True
+                    )
+                    if st.button("Ver modelo →", key=f"prefab_home_{_pf[0]}", use_container_width=True):
+                        st.session_state['selected_page'] = "👤 Panel de Cliente"
+                        st.session_state['prefab_highlight_id'] = _pf[0]
+                        st.rerun()
+    except Exception as _e:
+        st.info("Catálogo de prefabricadas próximamente disponible.")
+
     # Footer
     st.markdown("""
     <div style="margin-top:40px;padding:20px 24px 16px;background:linear-gradient(135deg,#0D1B2A,#1E3A5F);border-radius:12px;font-family:'Segoe UI',sans-serif;">

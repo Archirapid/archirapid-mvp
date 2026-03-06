@@ -1227,39 +1227,51 @@ def show_buyer_panel(client_email):
 
             st.markdown("---")
 
-            # HERRAMIENTAS DE ACCIÓN - Los 4 botones principales
+            # HERRAMIENTAS DE ACCIÓN - 5 botones independientes
             st.subheader("🛠️ Herramientas para tu Propiedad")
 
-            col1, col2 = st.columns(2)
-            col3, col4 = st.columns(2)
+            col1, col2, col3 = st.columns(3)
+            col4, col5, _ = st.columns(3)
 
             with col1:
                 if st.button("🎨 DISEÑAR CON IA", type="primary", use_container_width=True):
                     st.session_state["design_plot_id"] = plot_data[0]
                     st.session_state["ai_house_step"] = 1
+                    st.session_state['show_project_search'] = False
+                    st.session_state['show_prefab_config'] = False
                     st.query_params["page"] = "Diseñador de Vivienda"
                     st.rerun()
 
             with col2:
-                if st.button("📐 VER PROYECTOS COMPATIBLES", type="secondary", use_container_width=True):
-                    # Activar modo de búsqueda de proyectos dentro del panel
+                if st.button("📐 PROYECTOS COMPATIBLES", type="secondary", use_container_width=True):
                     st.session_state['show_project_search'] = True
+                    st.session_state['show_prefab_config'] = False
                     st.rerun()
 
             with col3:
-                if st.button("💰 MIS TRANSACCIONES", type="secondary", use_container_width=True):
-                    st.info("💰 Mostrando historial de transacciones...")
-                    # TODO: Mostrar recibo de compra
+                if st.button("🏠 CASA PREFABRICADA", type="secondary", use_container_width=True):
+                    st.session_state['show_prefab_config'] = True
+                    st.session_state['show_project_search'] = False
+                    st.rerun()
 
             with col4:
+                if st.button("💰 MIS TRANSACCIONES", type="secondary", use_container_width=True):
+                    st.session_state['show_prefab_config'] = False
+                    st.session_state['show_project_search'] = False
+                    st.info("💰 Mostrando historial de transacciones...")
+
+            with col5:
                 if st.button("📑 DOCUMENTACIÓN", type="secondary", use_container_width=True):
+                    st.session_state['show_prefab_config'] = False
+                    st.session_state['show_project_search'] = False
                     st.info("📑 Accediendo a documentación...")
-                    # TODO: Mostrar documentos relacionados
 
             st.markdown("---")
 
-            # BUSCADOR INTEGRADO DE PROYECTOS COMPATIBLES
-            if st.session_state.get('show_project_search', False):
+            # SECCIONES INDEPENDIENTES — solo una activa a la vez
+            if st.session_state.get('show_prefab_config', False):
+                show_prefab_configurator(plot_data)
+            elif st.session_state.get('show_project_search', False):
                 show_integrated_project_search(client_email, plot_data)
 
     # Si no tiene finca adquirida, mostrar mensaje
@@ -1273,6 +1285,112 @@ def show_buyer_panel(client_email):
 
     # ELIMINAR LAS PESTAÑAS GENÉRICAS - El cliente quiere ver SU finca, no catálogo
     # Las pestañas "🔍 Buscar Proyectos" y "📋 Mis Intereses" se eliminan por completo
+
+
+def show_prefab_configurator(plot_data):
+    """Configurador de casa prefabricada para la finca adquirida.
+    Limita el catálogo al 33% de la superficie edificable de la parcela."""
+    conn = db_conn()
+    cursor = conn.cursor()
+
+    superficie_edificable = plot_data[4] or 0   # superficie_edificable de la finca
+    superficie_total = plot_data[3] or 0         # m2 total
+    base_m2 = superficie_edificable if superficie_edificable > 0 else superficie_total
+    prefab_max_m2 = base_m2 * 0.33
+
+    st.subheader("🏠 Configurador de Casa Prefabricada")
+    st.markdown(
+        f"**Superficie edificable de tu parcela:** {base_m2:,.0f} m²  ·  "
+        f"**Máximo permitido para prefabricada (33%):** "
+        f"<span style='color:#2563EB;font-weight:700'>{prefab_max_m2:,.0f} m²</span>",
+        unsafe_allow_html=True
+    )
+
+    # Filtros
+    col_f1, col_f2, col_f3 = st.columns(3)
+    with col_f1:
+        mat_filter = st.selectbox("Material", ["Todos", "Madera", "Modular acero", "Contenedor", "Hormigón prefab", "Mixto"], key="pf_mat")
+    with col_f2:
+        rooms_filter = st.selectbox("Habitaciones mínimas", [0, 1, 2, 3, 4, 5], key="pf_rooms")
+    with col_f3:
+        floors_filter = st.selectbox("Plantas", [0, 1, 2], format_func=lambda x: "Todas" if x == 0 else str(x), key="pf_floors")
+
+    # Consulta catálogo con límite de m²
+    query = "SELECT id, name, m2, rooms, bathrooms, floors, material, price, description FROM prefab_catalog WHERE active=1 AND m2 <= ?"
+    params = [prefab_max_m2 if prefab_max_m2 > 0 else 9999]
+    if mat_filter != "Todos":
+        query += " AND material = ?"
+        params.append(mat_filter)
+    if rooms_filter > 0:
+        query += " AND rooms >= ?"
+        params.append(rooms_filter)
+    if floors_filter > 0:
+        query += " AND floors = ?"
+        params.append(floors_filter)
+    query += " ORDER BY m2"
+
+    cursor.execute(query, params)
+    prefabs = cursor.fetchall()
+    conn.close()
+
+    if not prefabs:
+        st.warning(f"No hay modelos prefabricados que quepan en tu parcela con esos filtros (máx. {prefab_max_m2:,.0f} m²).")
+        return
+
+    st.markdown(f"**{len(prefabs)} modelo(s) compatibles con tu parcela:**")
+
+    # Grid 5 columnas
+    N = 5
+    cols = st.columns(N)
+    for idx, pf in enumerate(prefabs):
+        pf_id, name, m2, rooms, bathrooms, floors, material, price, description = pf
+        with cols[idx % N]:
+            selected = st.session_state.get('prefab_selected_id') == pf_id
+            border_color = "#2563EB" if selected else "#E2E8F0"
+            bg_color = "#EFF6FF" if selected else "#F8FAFC"
+            st.markdown(
+                f'<div style="background:{bg_color};border:2px solid {border_color};border-radius:10px;'
+                f'padding:12px 8px 8px;text-align:center;margin-bottom:6px;">'
+                f'<div style="font-size:1.8em;">🏠</div>'
+                f'<div style="font-weight:700;font-size:0.82em;color:#0D1B2A;line-height:1.2;">{name}</div>'
+                f'<div style="font-size:0.75em;color:#64748B;margin:4px 0;">{m2} m² · {rooms}hab · {bathrooms}baños · {floors}pl</div>'
+                f'<div style="font-size:0.73em;color:#475569;margin-bottom:4px;">{material}</div>'
+                f'<div style="font-weight:700;color:#2563EB;font-size:0.88em;">€{price:,.0f}</div>'
+                f'</div>',
+                unsafe_allow_html=True
+            )
+            if st.button("Seleccionar" if not selected else "✓ Elegido", key=f"pf_sel_{pf_id}", use_container_width=True):
+                st.session_state['prefab_selected_id'] = pf_id
+                st.rerun()
+
+    # Detalle del modelo seleccionado
+    selected_id = st.session_state.get('prefab_selected_id')
+    if selected_id:
+        conn2 = db_conn()
+        cur2 = conn2.cursor()
+        cur2.execute("SELECT id, name, m2, rooms, bathrooms, floors, material, price, description FROM prefab_catalog WHERE id=?", (selected_id,))
+        sel = cur2.fetchone()
+        conn2.close()
+        if sel:
+            pf_id, name, m2, rooms, bathrooms, floors, material, price, description = sel
+            st.markdown("---")
+            st.markdown(f"### ✅ Modelo seleccionado: **{name}**")
+            col_d1, col_d2 = st.columns([2, 1])
+            with col_d1:
+                st.markdown(f"_{description}_")
+                st.markdown(f"- **Superficie:** {m2} m²  ·  **Habitaciones:** {rooms}  ·  **Baños:** {bathrooms}  ·  **Plantas:** {floors}")
+                st.markdown(f"- **Material:** {material}")
+            with col_d2:
+                finca_price = plot_data[8] or 0  # price column from plots
+                install_est = round(m2 * 180, -2)  # €180/m² instalación estimada
+                total = finca_price + price + install_est
+                st.metric("Precio prefabricada", f"€{price:,.0f}")
+                st.metric("Instalación estimada", f"€{install_est:,.0f}")
+                st.metric("TOTAL finca + casa", f"€{total:,.0f}", delta="precio orientativo")
+
+            if st.button("📨 Solicitar Presupuesto Detallado", type="primary", use_container_width=True, key="pf_request"):
+                st.success(f"✅ Solicitud enviada para **{name}** sobre tu finca **{plot_data[1]}**. Recibirás respuesta en 24-48h en tu email.")
+                st.balloons()
 
 
 def show_owner_panel_v2(client_email):
