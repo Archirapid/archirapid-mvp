@@ -1,0 +1,30 @@
+FICHA DE LOCALIZACIÓN CATASTRAL - 6 FINCAS INDUSTRIALES/URBANAS VACÍAS
+
+1. ESPINOSA DE LOS MONTEROS (BURGOS)
+LOCALIZACIÓN QUIRÚRGICA - BURGOS
+- RC: 09127A009000480000KX
+- Superficie: 617 m2
+- Tipo: Urbano (Suelo sin edificar)
+- Ubicación: Pedralva, Polígono 9, Parcela 48 (Espinosa de los Monteros)
+- Coordenadas Decimales: 43.06733, -3.54446
+- Coordenadas UTM (Centroide): X: 455705, Y: 4768560 (Huso 30N)
+
+2. OJÉN (MÁLAGA)
+- Ref. Catastral: 9243501UF3494S0001XG
+- Superficie: 2.115 m2
+- Tipo: Urbano Industrial (Solar)
+- Coordenadas: 36.56412, -4.85215
+
+
+
+5. MOVEROS (ZAMORA)
+- Ref. Catastral: 49081A006005230000XF
+- Superficie: 980 m2
+- Tipo: Urbano Industrial
+- Coordenadas: 41.68814, -6.34751
+
+6. LLERENA (BADAJOZ)
+- Ref. Catastral: 7319001QC5271N0001QY
+- Superficie: 1.250 m2
+- Tipo: Urbano Industrial (Solar)
+- Coordenadas: 38.23812, -6.01244
