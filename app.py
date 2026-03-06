@@ -23,7 +23,6 @@ Usar solo el wrapper como punto de entrada desde fuera de la sección.
 from dotenv import load_dotenv
 load_dotenv()
 
-import sqlite3
 import pandas as pd
 import os
 import threading
@@ -60,45 +59,6 @@ if st.session_state.get("role") == "owner":
     from modules.marketplace import owners
     owners.main()
     st.stop()
-
-# El Script de Limpieza Absoluta
-import sqlite3
-from modules.marketplace.utils import DB_PATH
-import streamlit as st
-
-def super_reset_sincronizado():
-    try:
-        conn = sqlite3.connect(str(DB_PATH))
-        cur = conn.cursor()
-        
-        # 1. Limpiamos las reservas (El origen del mal)
-        cur.execute("DELETE FROM reservations")
-        
-        # 2. Reseteamos los estados en la tabla maestra de fincas
-        cur.execute("""
-            UPDATE plots 
-            SET status = 'disponible', 
-                buyer_email = NULL, 
-                reserved_by = NULL
-        """)
-        
-        conn.commit()
-        conn.close()
-        
-        # 3. 🔥 EL CABLE: Limpieza total de la memoria de Streamlit
-        st.cache_data.clear()
-        st.cache_resource.clear()
-        
-        return True
-    except Exception as e:
-        st.error(f"Error técnico: {e}")
-        return False
-
-# Colocamos el botón en la barra lateral para que no estorbe
-if st.sidebar.button("🚨 FORZAR RESINCRONIZACIÓN TOTAL"):
-    if super_reset_sincronizado():
-        st.sidebar.success("¡Cable reparado! Todo disponible.")
-        st.rerun()
 
 # === FUNCIONES AUXILIARES V2 ===
 

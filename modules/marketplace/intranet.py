@@ -19,7 +19,7 @@ def main():
         st.success("✅ Acceso autorizado a Intranet")
 
     # PANEL DE GESTIÓN INTERNA
-    tab1, tab2, tab3, tab4, tab5 = st.tabs(["📋 Gestión de Fincas", "🏗️ Gestión de Proyectos", "💰 Ventas y Transacciones", "📞 Consultas", "🛠️ Profesionales"])
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["📋 Gestión de Fincas", "🏗️ Gestión de Proyectos", "💰 Ventas y Transacciones", "📞 Consultas", "🛠️ Profesionales", "⚙️ Admin"])
 
     with tab1:
         try:
@@ -143,3 +143,26 @@ def main():
                 st.info("No hay profesionales registrados aún.")
         except Exception as e:
             st.error(f"Error en Gestión de Profesionales: {e}")
+
+    with tab6:
+        st.header("⚙️ Herramientas de Administración")
+        st.warning("Estas acciones afectan a datos reales. Úsalas solo si sabes lo que haces.")
+
+        st.subheader("🔄 Resincronización Total")
+        st.write("Elimina todas las reservas bloqueadas, resetea fincas a 'disponible' y limpia la caché de Streamlit.")
+        if st.button("🚨 FORZAR RESINCRONIZACIÓN TOTAL", type="primary"):
+            try:
+                import sqlite3
+                from modules.marketplace.utils import DB_PATH
+                conn = sqlite3.connect(str(DB_PATH))
+                cur = conn.cursor()
+                cur.execute("DELETE FROM reservations")
+                cur.execute("UPDATE plots SET status = 'disponible', buyer_email = NULL, reserved_by = NULL")
+                conn.commit()
+                conn.close()
+                st.cache_data.clear()
+                st.cache_resource.clear()
+                st.success("✅ Resincronización completada. Todas las fincas disponibles y caché limpia.")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Error en resincronización: {e}")
