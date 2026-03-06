@@ -34,7 +34,7 @@ from datetime import datetime
 from .data_access import save_proyecto, get_usuario
 from .documentacion import generar_memoria_constructiva, generar_presupuesto_estimado
 from src import db
-from export_ops import generar_paquete_descarga
+from .export_ops import generar_paquete_descarga
 from archirapid_extract.parse_project_memoria import extract_text_from_pdf, parse_memoria_text
 
 # === CONFIGURACIÓN ===
@@ -141,7 +141,7 @@ def show_project_upload_form(arquitecto_id: int) -> Optional[Dict]:
         with col2:
             project_type = st.selectbox("Tipo de proyecto", ["Residencial unifamiliar", "Residencial plurifamiliar", "Comercial", "Industrial"])
             area_m2 = st.number_input("Superficie construida (m²)", min_value=50.0, value=150.0, step=10.0)
-            price = st.number_input("Precio de venta (€)", min_value=1000.0, value=50000.0, step=1000.0)
+            price = st.number_input("Presupuesto ejecución (€)", min_value=1000.0, value=50000.0, step=1000.0)
         
         # Archivos requeridos
         st.markdown("---")
@@ -154,7 +154,7 @@ def show_project_upload_form(arquitecto_id: int) -> Optional[Dict]:
             renders = st.file_uploader("Renders/Imágenes", type=ALLOWED_EXTENSIONS['rv'], accept_multiple_files=True)
         
         with col_files2:
-            planos_cad = st.file_uploader("Planos CAD", type=ALLOWED_EXTENSIONS['cad'], help="DXF, DWG, SVG")
+            planos_cad = st.file_uploader("Planos CAD (máx. 3)", type=ALLOWED_EXTENSIONS["cad"], help="DXF, DWG, SVG", accept_multiple_files=True)
             distribucion_json = st.file_uploader("Distribución (JSON)", type=['json'], help="Opcional - distribución de habitaciones")
         
         # Características arquitectónicas
@@ -235,9 +235,8 @@ def _process_project_upload(arquitecto_id: int, title: str, description: str, pr
         saved_files = {}
         saved_files['memoria_pdf_path'] = _save_file_to_disk(files['memoria_pdf'], project_dir, 'memoria')
         saved_files['modelo_3d_path'] = _save_file_to_disk(files['modelo_3d'], project_dir, 'modelo_3d')
-        saved_files['planos_cad_path'] = _save_file_to_disk(files['planos_cad'], project_dir, 'planos')
         saved_files['distribucion_json_path'] = _save_file_to_disk(files['distribucion_json'], project_dir, 'distribucion')
-        
+
         # Guardar renders múltiples
         render_paths = []
         if files['renders']:
@@ -245,7 +244,15 @@ def _process_project_upload(arquitecto_id: int, title: str, description: str, pr
                 render_path = _save_file_to_disk(render_file, project_dir, f'render_{i}')
                 if render_path:
                     render_paths.append(render_path)
-        
+
+        # Guardar planos CAD múltiples (máx. 3)
+        cad_paths = []
+        if files['planos_cad']:
+            for i, cad_file in enumerate(files['planos_cad'][:3]):
+                cad_path = _save_file_to_disk(cad_file, project_dir, f'planos_{i}')
+                if cad_path:
+                    cad_paths.append(cad_path)
+
         # Preparar datos del proyecto
         project_id = f"p_{timestamp}_{arquitecto_id}"
         
@@ -285,7 +292,7 @@ def _process_project_upload(arquitecto_id: int, title: str, description: str, pr
             'imagenes': render_paths[0] if render_paths else None,
             # Rutas de archivos
             'memoria_pdf': saved_files['memoria_pdf_path'],
-            'cad_dwg_path': saved_files['planos_cad_path'],
+            'cad_dwg_path': json.dumps(cad_paths) if cad_paths else None,
             'imagenes_path': render_paths[0] if render_paths else None,
             # Guardar TODAS las imágenes en la galería (la primera será la principal)
             'galeria_fotos': json.dumps(render_paths),
@@ -406,22 +413,6 @@ def display_architect_project(project: Dict, show_buy_button: bool = True):
             if archivos:
                 st.write(f"**Archivos:** {', '.join(archivos)}")
 
-            # Botón de compra
-            buyer_email = st.text_input("Email del comprador", key=f"buy_email_{project.get('id', '')}")
-            if st.button("Comprar Proyecto", key=f"buy_{project.get('id', '')}"):
-                if not buyer_email or '@' not in buyer_email:
-                    st.error("Introduce un email válido")
-                else:
-                    try:
-                        commission = db.registrar_venta_proyecto(
-                            project.get('id'),
-                            buyer_email,
-                            'Proyecto completo',
-                            float(price)
-                        )
-                        st.success(f"Compra registrada. Comisión: €{commission:.2f}")
-                    except Exception as e:
-                        st.error(f"Error en la compra: {e}")
         else:
             # Modo competencia - solo mostrar archivos disponibles, sin precio ni compra
             archivos = []

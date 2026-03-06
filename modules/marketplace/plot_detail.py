@@ -273,6 +273,22 @@ def show_plot_detail_page(plot_id: str):
 
                     if pdf_encontrado:
                         datos_extraidos = extraer_datos_catastral_completo(str(pdf_encontrado))
+                        metodo_usado = "ocr"
+
+                        # Fallback automático a Gemini Vision si el PDF es imagen escaneada
+                        if datos_extraidos and "error" in datos_extraidos and "imagen escaneada" in datos_extraidos["error"]:
+                            st.info("📷 PDF escaneado detectado — usando Gemini Vision para extraer datos...")
+                            from modules.marketplace.ai_engine import extraer_datos_nota_catastral
+                            gemini_result = extraer_datos_nota_catastral(str(pdf_encontrado))
+                            if gemini_result and "error" not in gemini_result:
+                                datos_extraidos = {
+                                    "superficie_m2": gemini_result.get("superficie_grafica_m2", 0),
+                                    "referencia_catastral": gemini_result.get("referencia_catastral", ""),
+                                    "municipio": gemini_result.get("municipio", ""),
+                                }
+                                metodo_usado = "gemini"
+                            else:
+                                datos_extraidos = gemini_result
 
                         if datos_extraidos and "error" not in datos_extraidos:
                             # Comparar datos extraídos con datos de la finca
@@ -283,7 +299,7 @@ def show_plot_detail_page(plot_id: str):
                             ref_catastral_finca = plot.get('catastral_ref', '')
 
                             # Verificar coincidencias
-                            superficie_ok = abs(superficie_pdf - superficie_finca) < 10  # Tolerancia de 10m²
+                            superficie_ok = superficie_pdf > 0 and abs(superficie_pdf - superficie_finca) < 10  # Tolerancia de 10m²
                             ref_ok = ref_catastral_pdf.strip() == ref_catastral_finca.strip()
 
                             with st.expander("📊 Resultados de Verificación IA Completa", expanded=True):

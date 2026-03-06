@@ -304,9 +304,13 @@ def extraer_datos_catastral_completo(pdf_path: str) -> dict:
             except Exception as e:
                 return {"error": f"Error leyendo archivos generados: {str(e)}"}
 
-            # Leer datos de edificabilidad
-            with open(actual_output_dir / "edificability.json", 'r', encoding='utf-8') as f:
-                edificability = json.load(f)
+            # Detectar PDF escaneado (sin texto extraíble)
+            if edificability.get('surface_m2') is None:
+                return {
+                    "error": "No se pudo extraer la superficie del PDF. "
+                             "El documento parece ser una imagen escaneada sin texto seleccionable. "
+                             "Usa la opción 'Extraer Datos con IA (Gemini)' durante la subida de la finca."
+                }
 
             # Leer datos del polígono
             with open(actual_output_dir / "plot_polygon.geojson", 'r', encoding='utf-8') as f:
@@ -338,7 +342,7 @@ def extraer_datos_catastral_completo(pdf_path: str) -> dict:
                     largo_px = distances[1] if len(distances) > 1 else distances[0]
 
                     # Estimar escala (asumiendo finca típica)
-                    superficie_real = edificability.get('surface_m2', 1000)
+                    superficie_real = edificability.get('surface_m2') or 1000
                     area_px = geojson_data['properties'].get('area_px2', 100000)
 
                     if area_px > 0:
@@ -349,10 +353,10 @@ def extraer_datos_catastral_completo(pdf_path: str) -> dict:
                         ancho_m = largo_m = (superficie_real ** 0.5)
                 else:
                     # Para formas irregulares, aproximar como cuadrado
-                    lado_m = (edificability.get('surface_m2', 1000) ** 0.5)
+                    lado_m = (edificability.get('surface_m2') or 1000 ** 0.5)
                     ancho_m = largo_m = lado_m
             else:
-                ancho_m = largo_m = (edificability.get('surface_m2', 1000) ** 0.5)
+                ancho_m = largo_m = (edificability.get('surface_m2') or 1000 ** 0.5)
 
             # Determinar forma geométrica
             if vertices == 4:
