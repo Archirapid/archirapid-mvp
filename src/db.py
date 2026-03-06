@@ -479,6 +479,13 @@ def ensure_tables():
             active INTEGER DEFAULT 1
         )""")
 
+        # Migraciones seguras: añadir columnas nuevas si no existen
+        for _col, _typedef in [("modulos", "TEXT"), ("price_label", "TEXT"), ("image_paths", "TEXT")]:
+            try:
+                c.execute(f"ALTER TABLE prefab_catalog ADD COLUMN {_col} {_typedef}")
+            except Exception:
+                pass  # columna ya existe
+
         # Seed: insertar modelos de muestra solo si la tabla está vacía
         c.execute("SELECT COUNT(*) FROM prefab_catalog")
         if c.fetchone()[0] == 0:
