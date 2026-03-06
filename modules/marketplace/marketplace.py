@@ -557,26 +557,27 @@ def main():
     <style>
     .ar-card {
         background: white;
-        border-radius: 18px;
-        padding: 28px 20px 14px;
+        border-radius: 14px;
+        padding: 18px 18px 10px;
         text-align: center;
-        box-shadow: 0 4px 24px rgba(0,0,0,0.07);
+        box-shadow: 0 3px 16px rgba(0,0,0,0.07);
         border-top: 4px solid;
     }
     .ar-card-owner  { border-top-color: #F5A623; }
     .ar-card-arch   { border-top-color: #2563EB; }
     .ar-card-client { border-top-color: #10B981; }
-    .ar-icon { width:58px;height:58px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:26px;margin:0 auto 14px; }
+    .ar-icon { width:46px;height:46px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:22px;margin:0 auto 10px; }
     .ar-icon-owner  { background:#FFF5E0; }
     .ar-icon-arch   { background:#EEF4FF; }
     .ar-icon-client { background:#ECFDF5; }
-    .ar-card-title { font-size:1.2em;font-weight:800;color:#0D1B2A;margin-bottom:8px; }
-    .ar-card-text  { font-size:0.9em;color:#64748B;line-height:1.5;margin-bottom:18px; }
-    .ar-btn-owner  > button { background:#F5A623 !important;color:white !important;border:none !important;border-radius:10px !important;font-weight:700 !important; }
-    .ar-btn-arch   > button { background:#2563EB !important;color:white !important;border:none !important;border-radius:10px !important;font-weight:700 !important; }
-    .ar-btn-client > button { background:#10B981 !important;color:white !important;border:none !important;border-radius:10px !important;font-weight:700 !important; }
-    .ar-btn-pro    > button { background:#F5A623 !important;color:#0D1B2A !important;border:none !important;border-radius:10px !important;font-weight:700 !important; }
-    .ar-btn-search > button { background:rgba(255,255,255,0.1) !important;color:white !important;border:1px solid rgba(255,255,255,0.35) !important;border-radius:10px !important;font-weight:600 !important; }
+    .ar-card-title { font-size:1.05em;font-weight:800;color:#0D1B2A;margin-bottom:5px; }
+    .ar-card-text  { font-size:0.85em;color:#64748B;line-height:1.4;margin-bottom:12px; }
+    /* Streamlit button selectors — usar descendente (no hijo directo) */
+    .ar-btn-owner  button { background:#F5A623 !important;color:white !important;border:none !important;border-radius:10px !important;font-weight:700 !important; }
+    .ar-btn-arch   button { background:#2563EB !important;color:white !important;border:none !important;border-radius:10px !important;font-weight:700 !important; }
+    .ar-btn-client button { background:#10B981 !important;color:white !important;border:none !important;border-radius:10px !important;font-weight:700 !important; }
+    .ar-btn-pro    button { background:#F5A623 !important;color:#0D1B2A !important;border:none !important;border-radius:10px !important;font-weight:700 !important; }
+    .ar-btn-search button { background:rgba(255,255,255,0.08) !important;color:white !important;border:1px solid rgba(255,255,255,0.35) !important;border-radius:10px !important;font-weight:600 !important; }
     </style>
     """, unsafe_allow_html=True)
 
