@@ -166,3 +166,116 @@ def main():
                 st.rerun()
             except Exception as e:
                 st.error(f"Error en resincronización: {e}")
+
+        st.markdown("---")
+        st.subheader("🏠 Gestión Catálogo de Prefabricadas")
+
+        try:
+            from modules.marketplace.utils import db_conn as _db_conn
+            import os as _os
+
+            # Listar modelos actuales
+            _conn = _db_conn()
+            _cur = _conn.cursor()
+            _cur.execute("SELECT id, name, m2, rooms, bathrooms, floors, material, price, active, image_path FROM prefab_catalog ORDER BY m2")
+            prefabs = _cur.fetchall()
+            _conn.close()
+
+            st.markdown(f"**{len(prefabs)} modelos en catálogo:**")
+
+            for pf in prefabs:
+                pf_id, name, m2, rooms, bathrooms, floors, material, price, active, image_path = pf
+                with st.expander(f"{'✅' if active else '🔴'} [{pf_id}] {name} — {m2} m² · {material} · €{price:,.0f}"):
+                    c1, c2 = st.columns([2, 1])
+                    with c1:
+                        new_name     = st.text_input("Nombre",      value=name,      key=f"pf_name_{pf_id}")
+                        new_m2       = st.number_input("m²",        value=float(m2), key=f"pf_m2_{pf_id}", min_value=10.0, step=5.0)
+                        new_price    = st.number_input("Precio (€)", value=float(price), key=f"pf_price_{pf_id}", min_value=0.0, step=1000.0)
+                        new_rooms    = st.number_input("Habitaciones", value=int(rooms), key=f"pf_rooms_{pf_id}", min_value=1, max_value=10)
+                        new_baths    = st.number_input("Baños",      value=int(bathrooms), key=f"pf_baths_{pf_id}", min_value=1, max_value=6)
+                        new_floors   = st.number_input("Plantas",    value=int(floors), key=f"pf_floors_{pf_id}", min_value=1, max_value=4)
+                        new_material = st.selectbox("Material", ["Madera","Modular acero","Contenedor","Hormigón prefab","Mixto"],
+                                                    index=["Madera","Modular acero","Contenedor","Hormigón prefab","Mixto"].index(material) if material in ["Madera","Modular acero","Contenedor","Hormigón prefab","Mixto"] else 0,
+                                                    key=f"pf_mat_{pf_id}")
+                        new_active   = st.checkbox("Activo (visible en catálogo)", value=bool(active), key=f"pf_active_{pf_id}")
+                    with c2:
+                        # Foto actual
+                        if image_path and _os.path.exists(image_path):
+                            st.image(image_path, width=160, caption="Foto actual")
+                        else:
+                            st.info("Sin foto")
+                        # Subir foto nueva
+                        new_img = st.file_uploader("Subir foto", type=["jpg","jpeg","png","webp"], key=f"pf_img_{pf_id}")
+                        if new_img:
+                            import pathlib as _pl
+                            _dest_dir = _pl.Path("uploads/prefab")
+                            _dest_dir.mkdir(parents=True, exist_ok=True)
+                            _dest = _dest_dir / f"prefab_{pf_id}_{new_img.name}"
+                            with open(_dest, "wb") as _f:
+                                _f.write(new_img.read())
+                            st.success(f"Foto guardada: {_dest}")
+                            image_path = str(_dest)
+
+                    if st.button(f"💾 Guardar cambios — {name}", key=f"pf_save_{pf_id}"):
+                        _conn2 = _db_conn()
+                        _cur2 = _conn2.cursor()
+                        _cur2.execute("""
+                            UPDATE prefab_catalog
+                            SET name=?, m2=?, rooms=?, bathrooms=?, floors=?, material=?, price=?, active=?, image_path=?
+                            WHERE id=?
+                        """, (new_name, new_m2, new_rooms, new_baths, new_floors, new_material, new_price, int(new_active), image_path, pf_id))
+                        _conn2.commit()
+                        _conn2.close()
+                        st.success(f"✅ Modelo '{new_name}' actualizado.")
+                        st.rerun()
+
+                    if st.button(f"🗑️ Eliminar modelo [{pf_id}]", key=f"pf_del_{pf_id}", type="secondary"):
+                        _conn3 = _db_conn()
+                        _cur3 = _conn3.cursor()
+                        _cur3.execute("DELETE FROM prefab_catalog WHERE id=?", (pf_id,))
+                        _conn3.commit()
+                        _conn3.close()
+                        st.warning(f"Modelo {name} eliminado.")
+                        st.rerun()
+
+            st.markdown("---")
+            st.markdown("**➕ Añadir nuevo modelo**")
+            with st.form("new_prefab_form"):
+                nf_c1, nf_c2 = st.columns(2)
+                with nf_c1:
+                    nf_name     = st.text_input("Nombre del modelo")
+                    nf_m2       = st.number_input("Superficie (m²)", min_value=20.0, value=80.0, step=5.0)
+                    nf_price    = st.number_input("Precio (€)", min_value=0.0, value=80000.0, step=1000.0)
+                    nf_desc     = st.text_area("Descripción corta")
+                with nf_c2:
+                    nf_rooms    = st.number_input("Habitaciones", min_value=1, max_value=10, value=3)
+                    nf_baths    = st.number_input("Baños", min_value=1, max_value=6, value=1)
+                    nf_floors   = st.number_input("Plantas", min_value=1, max_value=4, value=1)
+                    nf_material = st.selectbox("Material", ["Madera","Modular acero","Contenedor","Hormigón prefab","Mixto"])
+                    nf_img      = st.file_uploader("Foto del modelo", type=["jpg","jpeg","png","webp"])
+                if st.form_submit_button("➕ Añadir al catálogo", type="primary"):
+                    if nf_name:
+                        nf_img_path = "assets/branding/logo.png"
+                        if nf_img:
+                            import pathlib as _pl2
+                            _d = _pl2.Path("uploads/prefab")
+                            _d.mkdir(parents=True, exist_ok=True)
+                            _p = _d / f"prefab_new_{nf_img.name}"
+                            with open(_p, "wb") as _f2:
+                                _f2.write(nf_img.read())
+                            nf_img_path = str(_p)
+                        _conn4 = _db_conn()
+                        _cur4 = _conn4.cursor()
+                        _cur4.execute("""
+                            INSERT INTO prefab_catalog (name, m2, rooms, bathrooms, floors, material, price, description, image_path)
+                            VALUES (?,?,?,?,?,?,?,?,?)
+                        """, (nf_name, nf_m2, nf_rooms, nf_baths, nf_floors, nf_material, nf_price, nf_desc, nf_img_path))
+                        _conn4.commit()
+                        _conn4.close()
+                        st.success(f"✅ Modelo '{nf_name}' añadido al catálogo.")
+                        st.rerun()
+                    else:
+                        st.error("El nombre es obligatorio.")
+
+        except Exception as e:
+            st.error(f"Error gestionando catálogo de prefabricadas: {e}")
