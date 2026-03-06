@@ -44,6 +44,14 @@ init_db()
 import streamlit as st
 st.set_page_config(layout='wide')
 
+# Ocultar sidebar visualmente (navegación se mantiene funcional vía session_state)
+st.markdown("""
+<style>
+[data-testid="stSidebar"] { display: none; }
+[data-testid="collapsedControl"] { display: none; }
+</style>
+""", unsafe_allow_html=True)
+
 # HARDCODE DE ROL PARA PRUEBA
 if st.session_state.get('email') == 'asdfg@lkj.com': st.session_state['role'] = 'owner'
 
