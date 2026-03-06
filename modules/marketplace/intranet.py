@@ -233,17 +233,22 @@ def main():
                                                     key=f"pf_mat_{pf_id}")
                         new_active   = st.checkbox("Activo (visible en catálogo)", value=bool(active), key=f"pf_active_{pf_id}")
                     with c2:
-                        st.markdown("**Fotos actuales (máx. 3):**")
+                        st.markdown("**Fotos actuales:**")
                         for _pi, _pp in enumerate(existing_photos):
                             if _pp and _os.path.exists(_pp):
-                                st.image(_pp, width=140, caption=f"Foto {_pi+1}")
+                                st.image(_pp, width=130, caption=f"Foto {_pi+1}")
                             else:
                                 st.caption(f"Foto {_pi+1}: no encontrada")
-                        st.markdown("**Subir / reemplazar fotos:**")
-                        new_imgs = [
-                            st.file_uploader(f"Foto {i+1}", type=["jpg","jpeg","png","webp"], key=f"pf_img{i+1}_{pf_id}")
-                            for i in range(3)
-                        ]
+                        st.markdown("**Subir fotos (máx. 3):**")
+                        new_imgs_raw = st.file_uploader(
+                            "Selecciona hasta 3 fotos",
+                            type=["jpg","jpeg","png","webp"],
+                            accept_multiple_files=True,
+                            key=f"pf_imgs_{pf_id}"
+                        )
+                        new_imgs = list(new_imgs_raw)[:3] if new_imgs_raw else []
+                        # Rellena con None hasta tener 3 slots
+                        new_imgs += [None] * (3 - len(new_imgs))
 
                     if st.button(f"💾 Guardar cambios — {name}", key=f"pf_save_{pf_id}"):
                         new_photos = _save_prefab_photos(pf_id, new_imgs, existing_photos)
@@ -289,16 +294,14 @@ def main():
                     nf_baths    = st.number_input("Baños", min_value=1, max_value=6, value=1)
                     nf_floors   = st.number_input("Plantas", min_value=1, max_value=4, value=1)
                     nf_material = st.selectbox("Material", _MATERIALS)
-                    nf_img1     = st.file_uploader("Foto 1", type=["jpg","jpeg","png","webp"], key="nf_img1")
-                    nf_img2     = st.file_uploader("Foto 2", type=["jpg","jpeg","png","webp"], key="nf_img2")
-                    nf_img3     = st.file_uploader("Foto 3", type=["jpg","jpeg","png","webp"], key="nf_img3")
+                    nf_imgs_raw = st.file_uploader("Fotos del modelo (máx. 3)", type=["jpg","jpeg","png","webp"], accept_multiple_files=True)
                 if st.form_submit_button("➕ Añadir al catálogo", type="primary"):
                     if nf_name:
                         # Guardar fotos
                         _dest_dir2 = _pl.Path("uploads/prefab")
                         _dest_dir2.mkdir(parents=True, exist_ok=True)
                         nf_photos = []
-                        for _i, _uf in enumerate([nf_img1, nf_img2, nf_img3]):
+                        for _i, _uf in enumerate((nf_imgs_raw or [])[:3]):
                             if _uf:
                                 _dp = _dest_dir2 / f"prefab_new_img{_i+1}_{_uf.name}"
                                 with open(_dp, "wb") as _fh2:

@@ -1,6 +1,30 @@
 import streamlit as st
 import os
+import json
 from modules.marketplace.utils import db_conn
+
+
+def _load_photos(image_paths_json, image_path_single):
+    """Devuelve lista de rutas de fotos válidas."""
+    paths = []
+    try:
+        if image_paths_json:
+            parsed = json.loads(image_paths_json)
+            paths = [p for p in parsed if p and os.path.exists(p)]
+    except Exception:
+        pass
+    if not paths and image_path_single and os.path.exists(image_path_single):
+        paths = [image_path_single]
+    return paths
+
+
+def _price_display(price, price_label):
+    """Texto de precio para mostrar al cliente."""
+    if price_label and price_label.strip():
+        return price_label.strip()
+    if price and float(price) > 0:
+        return f"€{float(price):,.0f}"
+    return "PRECIO A CONSULTAR"
 
 
 def show(prefab_id):
@@ -9,7 +33,8 @@ def show(prefab_id):
     conn = db_conn()
     cur = conn.cursor()
     cur.execute(
-        "SELECT id, name, m2, rooms, bathrooms, floors, material, price, description, image_path "
+        "SELECT id, name, m2, rooms, bathrooms, floors, material, price, description, "
+        "image_path, image_paths, modulos, price_label "
         "FROM prefab_catalog WHERE id=? AND active=1",
         (prefab_id,)
     )
@@ -23,7 +48,12 @@ def show(prefab_id):
             st.rerun()
         return
 
-    pf_id, name, m2, rooms, bathrooms, floors, material, price, description, image_path = pf
+    pf_id, name, m2, rooms, bathrooms, floors, material, price, description, \
+        image_path, image_paths_json, modulos, price_label = pf
+
+    photos = _load_photos(image_paths_json, image_path)
+    price_text = _price_display(price, price_label)
+    price_numeric = float(price) if price and float(price) > 0 else 0
 
     # Botón volver
     if st.button("⬅️ Volver al catálogo", key="prefab_back"):
@@ -31,25 +61,51 @@ def show(prefab_id):
         st.rerun()
 
     st.markdown("---")
-
-    # Cabecera
     st.markdown(f"## 🏠 {name}")
-    col_img, col_data = st.columns([1, 1])
 
-    with col_img:
-        if image_path and os.path.exists(image_path):
-            st.image(image_path, use_container_width=True)
-        else:
+    # --- GALERÍA ---
+    if photos:
+        # Foto principal grande
+        # Selector de foto activa via session_state
+        photo_key = f"prefab_photo_{pf_id}"
+        if photo_key not in st.session_state or st.session_state[photo_key] >= len(photos):
+            st.session_state[photo_key] = 0
+
+        active_idx = st.session_state[photo_key]
+        col_img, col_data = st.columns([1, 1])
+
+        with col_img:
+            st.image(photos[active_idx], use_container_width=True)
+            # Miniaturas si hay más de 1 foto
+            if len(photos) > 1:
+                thumb_cols = st.columns(len(photos))
+                for i, ph in enumerate(photos):
+                    with thumb_cols[i]:
+                        border = "3px solid #2563EB" if i == active_idx else "2px solid #E2E8F0"
+                        st.markdown(
+                            f'<img src="data:image/jpeg;base64,PLACEHOLDER" '
+                            f'style="display:none">',
+                            unsafe_allow_html=True
+                        )
+                        if st.button(f"{'●' if i == active_idx else '○'} Foto {i+1}",
+                                     key=f"prefab_thumb_{pf_id}_{i}",
+                                     use_container_width=True):
+                            st.session_state[photo_key] = i
+                            st.rerun()
+    else:
+        col_img, col_data = st.columns([1, 1])
+        with col_img:
             st.markdown(
                 '<div style="background:#F0F9FF;border:2px solid #BAE6FD;border-radius:12px;'
                 'height:280px;display:flex;align-items:center;justify-content:center;font-size:5em;">🏠</div>',
                 unsafe_allow_html=True
             )
-            st.caption("Foto del modelo disponible próximamente")
+            st.caption("Fotos del modelo disponibles próximamente")
 
     with col_data:
-        st.markdown(f"### 💰 €{price:,.0f}")
-        st.caption("Precio de fábrica, instalación no incluida")
+        # Precio
+        st.markdown(f"### 💰 {price_text}")
+        st.caption("INSTALACIÓN NO INCLUIDA")
 
         st.markdown("---")
         st.markdown("#### Especificaciones")
@@ -61,6 +117,9 @@ def show(prefab_id):
             ("🏢 Plantas", str(floors)),
             ("🪵 Material", material),
         ]
+        if modulos:
+            specs.append(("🔲 Módulos", modulos))
+
         for label, value in specs:
             col_l, col_v = st.columns([1, 1])
             with col_l:
@@ -68,16 +127,18 @@ def show(prefab_id):
             with col_v:
                 st.markdown(value)
 
-        st.markdown("---")
-        install_est = round(m2 * 180, -2)
-        st.markdown(
-            f'<div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;padding:12px;">'
-            f'<span style="font-size:0.85em;color:#1E40AF;">'
-            f'💡 <strong>Instalación estimada:</strong> €{install_est:,.0f} &nbsp;·&nbsp; '
-            f'<strong>Total orientativo:</strong> €{price + install_est:,.0f}'
-            f'</span></div>',
-            unsafe_allow_html=True
-        )
+        # Estimación solo si hay precio numérico
+        if price_numeric > 0:
+            st.markdown("---")
+            install_est = round(m2 * 180, -2)
+            st.markdown(
+                f'<div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;padding:12px;">'
+                f'<span style="font-size:0.85em;color:#1E40AF;">'
+                f'💡 <strong>Instalación estimada:</strong> €{install_est:,.0f} &nbsp;·&nbsp; '
+                f'<strong>Total orientativo:</strong> €{price_numeric + install_est:,.0f}'
+                f'</span></div>',
+                unsafe_allow_html=True
+            )
 
     # Descripción
     if description:
@@ -96,7 +157,7 @@ def show(prefab_id):
             '<div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:10px;padding:16px;text-align:center;">'
             '<div style="font-size:2em;">🏡</div>'
             '<div style="font-weight:700;font-size:0.9em;margin:8px 0;">Ya tengo una finca</div>'
-            '<div style="font-size:0.78em;color:#64748B;">Accede a tu portal de cliente y configura esta casa sobre tu parcela</div>'
+            '<div style="font-size:0.78em;color:#64748B;">Configura esta casa sobre tu parcela en el portal de cliente</div>'
             '</div>',
             unsafe_allow_html=True
         )
@@ -112,7 +173,7 @@ def show(prefab_id):
             '<div style="background:#FFF7ED;border:1px solid #FED7AA;border-radius:10px;padding:16px;text-align:center;">'
             '<div style="font-size:2em;">🔍</div>'
             '<div style="font-weight:700;font-size:0.9em;margin:8px 0;">Quiero una finca primero</div>'
-            '<div style="font-size:0.78em;color:#64748B;">Explora parcelas disponibles y adquiere la tuya antes de configurar la casa</div>'
+            '<div style="font-size:0.78em;color:#64748B;">Explora parcelas disponibles y elige la tuya</div>'
             '</div>',
             unsafe_allow_html=True
         )
@@ -125,7 +186,7 @@ def show(prefab_id):
             '<div style="background:#FFF1F2;border:1px solid #FECDD3;border-radius:10px;padding:16px;text-align:center;">'
             '<div style="font-size:2em;">📨</div>'
             '<div style="font-weight:700;font-size:0.9em;margin:8px 0;">Solo quiero esta casa</div>'
-            '<div style="font-size:0.78em;color:#64748B;">Solicita presupuesto personalizado y te contactamos en 24-48h</div>'
+            '<div style="font-size:0.78em;color:#64748B;">Solicita presupuesto y te contactamos en 24-48h</div>'
             '</div>',
             unsafe_allow_html=True
         )
@@ -142,19 +203,14 @@ def show(prefab_id):
             req_notes = st.text_area("¿Tienes ya una parcela? ¿Alguna preferencia o pregunta?")
             if st.form_submit_button("Enviar solicitud", type="primary"):
                 if req_name and req_email:
-                    # Guardar solicitud en DB
                     try:
                         conn2 = db_conn()
                         cur2 = conn2.cursor()
                         cur2.execute("""
                             CREATE TABLE IF NOT EXISTS prefab_requests (
                                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                                prefab_id INTEGER,
-                                name TEXT,
-                                email TEXT,
-                                phone TEXT,
-                                notes TEXT,
-                                created_at TEXT
+                                prefab_id INTEGER, name TEXT, email TEXT,
+                                phone TEXT, notes TEXT, created_at TEXT
                             )
                         """)
                         from datetime import datetime
@@ -166,7 +222,7 @@ def show(prefab_id):
                         conn2.close()
                     except Exception:
                         pass
-                    st.success(f"✅ Solicitud enviada para **{name}**. Te contactaremos en {req_email} en 24-48h.")
+                    st.success(f"✅ Solicitud enviada. Te contactaremos en {req_email} en 24-48h.")
                     st.balloons()
                     st.session_state[f'prefab_request_sent_{pf_id}'] = False
                 else:

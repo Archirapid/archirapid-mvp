@@ -1553,26 +1553,43 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
         from src import db as _db
         _conn = _db.get_conn()
         _cur = _conn.cursor()
-        _cur.execute("SELECT id, name, m2, rooms, bathrooms, floors, material, price FROM prefab_catalog WHERE active=1 ORDER BY m2 LIMIT 10")
+        _cur.execute("SELECT id, name, m2, rooms, bathrooms, floors, material, price, image_path, image_paths, price_label FROM prefab_catalog WHERE active=1 ORDER BY m2 LIMIT 10")
         prefabs = _cur.fetchall()
         _conn.close()
         if prefabs:
+            import base64 as _b64, json as _pfjson
             _N = 5
             _cols = st.columns(_N)
             for _idx, _pf in enumerate(prefabs[:_N * 2]):
+                _pf_id, _nm, _m2, _rms, _bths, _fls, _mat, _prc, _img, _imgs_j, _plbl = _pf
+                # Primera foto válida
+                _thumb = None
+                try:
+                    for _ip in (_pfjson.loads(_imgs_j) if _imgs_j else []):
+                        if _ip and os.path.exists(_ip):
+                            _thumb = _ip; break
+                    if not _thumb and _img and os.path.exists(_img):
+                        _thumb = _img
+                except Exception:
+                    pass
+                # Precio
+                _pdsp = (_plbl.strip() if _plbl and _plbl.strip() else
+                         (f"€{float(_prc):,.0f}" if _prc and float(_prc) > 0 else "PRECIO A CONSULTAR"))
                 with _cols[_idx % _N]:
-                    st.markdown(
-                        f'<div style="background:#F0F9FF;border:1px solid #BAE6FD;border-radius:10px;padding:12px 10px 8px;margin-bottom:8px;text-align:center;">'
-                        f'<div style="font-size:2em;margin-bottom:4px;">🏠</div>'
-                        f'<div style="font-weight:700;font-size:0.85em;color:#0D1B2A;">{_pf[1]}</div>'
-                        f'<div style="font-size:0.78em;color:#64748B;margin:4px 0;">{_pf[2]} m² · {_pf[3]}hab · {_pf[5]}pl</div>'
-                        f'<div style="font-size:0.78em;color:#475569;">{_pf[6]}</div>'
-                        f'<div style="font-weight:700;color:#2563EB;font-size:0.9em;margin-top:6px;">€{_pf[7]:,.0f}</div>'
-                        f'</div>',
-                        unsafe_allow_html=True
-                    )
-                    if st.button("Ver modelo →", key=f"prefab_home_{_pf[0]}", use_container_width=True):
-                        st.query_params["selected_prefab"] = str(_pf[0])
+                    if _thumb:
+                        try:
+                            with open(_thumb, "rb") as _tf:
+                                _tb64 = _b64.b64encode(_tf.read()).decode()
+                            _ext = _thumb.rsplit(".", 1)[-1].lower()
+                            _mime = "image/png" if _ext == "png" else "image/jpeg"
+                            st.markdown(f'<img src="data:{_mime};base64,{_tb64}" style="width:100%;height:140px;object-fit:cover;border-radius:10px;display:block;margin-bottom:6px;">', unsafe_allow_html=True)
+                        except Exception:
+                            st.markdown('<div style="height:140px;background:#F0F9FF;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:2.5em;margin-bottom:6px;">🏠</div>', unsafe_allow_html=True)
+                    else:
+                        st.markdown('<div style="height:140px;background:#F0F9FF;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:2.5em;margin-bottom:6px;">🏠</div>', unsafe_allow_html=True)
+                    st.markdown(f'<div style="font-weight:700;font-size:0.85em;color:#0D1B2A;">{_nm}</div><div style="font-size:0.76em;color:#64748B;">{_m2} m² · {_rms}hab · {_mat}</div><div style="font-weight:700;color:#2563EB;font-size:0.88em;margin-top:4px;">{_pdsp}</div>', unsafe_allow_html=True)
+                    if st.button("Ver modelo →", key=f"prefab_home_{_pf_id}", use_container_width=True):
+                        st.query_params["selected_prefab"] = str(_pf_id)
                         st.rerun()
     except Exception as _e:
         st.info("Catálogo de prefabricadas próximamente disponible.")
