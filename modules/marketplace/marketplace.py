@@ -198,11 +198,14 @@ def extract_cadastral_data(plot):
     return cadastral_data
 
 def setup_filters():
-    """Configura y retorna los filtros del sidebar."""
-    st.sidebar.header("Filtros")
-    min_m = st.sidebar.number_input("Min m²", value=0)
-    max_m = st.sidebar.number_input("Max m²", value=100000)
-    q = st.sidebar.text_input("Buscar (provincia, título)")
+    """Configura y retorna los filtros encima del mapa."""
+    col_f1, col_f2, col_f3 = st.columns([1, 1, 2])
+    with col_f1:
+        min_m = st.number_input("Min m²", value=0)
+    with col_f2:
+        max_m = st.number_input("Max m²", value=100000)
+    with col_f3:
+        q = st.text_input("Buscar (provincia, título)")
     return min_m, max_m, q
 
 def get_available_plots():
