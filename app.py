@@ -972,6 +972,14 @@ def show_advanced_project_search_v2(client_email):
 
 # === NUEVAS RUTAS V2 (BORRÓN Y CUENTA NUEVA) ===
 page_from_query = False  # Variable para controlar si la página viene de query params
+if "selected_prefab" in st.query_params and not page_from_query:
+    try:
+        from modules.marketplace import prefab_detail
+        prefab_detail.show(int(st.query_params["selected_prefab"]))
+    except Exception as e:
+        st.error(f"Error mostrando detalle de prefabricada: {e}")
+    st.stop()
+
 if "selected_project_v2" in st.query_params and not page_from_query:
     try:
         project_id = st.query_params["selected_project_v2"]
@@ -1564,8 +1572,7 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
                         unsafe_allow_html=True
                     )
                     if st.button("Ver modelo →", key=f"prefab_home_{_pf[0]}", use_container_width=True):
-                        st.session_state['selected_page'] = "👤 Panel de Cliente"
-                        st.session_state['prefab_highlight_id'] = _pf[0]
+                        st.query_params["selected_prefab"] = str(_pf[0])
                         st.rerun()
     except Exception as _e:
         st.info("Catálogo de prefabricadas próximamente disponible.")
