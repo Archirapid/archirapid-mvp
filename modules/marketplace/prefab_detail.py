@@ -10,11 +10,13 @@ def _load_photos(image_paths_json, image_path_single):
     try:
         if image_paths_json:
             parsed = json.loads(image_paths_json)
-            paths = [p for p in parsed if p and os.path.exists(p)]
+            paths = [p.replace("\\", "/") for p in parsed if p and os.path.exists(p.replace("\\", "/"))]
     except Exception:
         pass
-    if not paths and image_path_single and os.path.exists(image_path_single):
-        paths = [image_path_single]
+    if not paths and image_path_single:
+        image_path_single = image_path_single.replace("\\", "/")
+        if os.path.exists(image_path_single):
+            paths = [image_path_single]
     return paths
 
 

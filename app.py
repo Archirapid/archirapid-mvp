@@ -1692,10 +1692,14 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
                 _thumb = None
                 try:
                     for _ip in (_pfjson.loads(_imgs_j) if _imgs_j else []):
-                        if _ip and os.path.exists(_ip):
-                            _thumb = _ip; break
-                    if not _thumb and _img and os.path.exists(_img):
-                        _thumb = _img
+                        if _ip:
+                            _ip = _ip.replace("\\", "/")
+                            if os.path.exists(_ip):
+                                _thumb = _ip; break
+                    if not _thumb and _img:
+                        _img = _img.replace("\\", "/")
+                        if os.path.exists(_img):
+                            _thumb = _img
                 except Exception:
                     pass
                 # Precio
