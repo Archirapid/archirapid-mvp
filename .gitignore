@@ -36,17 +36,30 @@ data.db.backup_*
 # Logs
 *.log
 
-# Database (contiene datos sensibles)
-database.db
-*.db
+# Database demo incluida para Streamlit Cloud
+*.db.backup_*
 
 # Environment files with sensitive data
 .env.txt
 .env.*
 
-# Uploads y outputs temporales
+# Uploads: solo incluir demo images
 uploads/*
 !uploads/.gitkeep
+!uploads/prefab/
+!uploads/finca_8119d273d83640f0a0215034f9c590b5.jpg
+!uploads/finca_e0afb61466074084b27fbe6a382e0002.jpg
+!uploads/finca_9a719b41209d40f49de756ed5d097354.jpg
+!uploads/finca_62fd16c384c348958b37e9c0899ec948.jpg
+!uploads/finca_dd3e8e3e21674451836659656208d85c.jpg
+!uploads/finca_e28a0a8f118b40d0beca8d0032ab418e.jpg
+!uploads/finca_2b06ebb203694424aaea06966c1adab3.jpg
+!uploads/finca_f5605c9f0eca434baf1be558f6cd6467.jpg
+!uploads/finca_e2742487be0d4d2bb40767f78e0770e4.jpg
+!uploads/finca_61dff0ae486e4c2da70995b15d609edf.jpg
+!uploads/finca_e9e909c9e43940e19e7cc8da87b3685c.jpg
+!uploads/finca_b20495165a1041c09f22665b66cd7e17.jpg
+!uploads/finca_9661cbb76f39412a9114990c6e19a5df.png
 catastro_output/
 archirapid_extract/catastro_output/
 
