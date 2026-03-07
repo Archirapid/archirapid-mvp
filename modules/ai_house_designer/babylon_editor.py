@@ -241,35 +241,39 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
     <!-- PANEL ESTILOS -->
     <div id="style-panel" style="display:none; position:absolute; top:20px; right:500px;
          background:rgba(0,0,0,0.88); padding:14px; border-radius:12px; color:white;
-         width:210px; border:1px solid rgba(155,89,182,0.5);">
-        <h3 style="margin:0 0 10px 0; font-size:13px; color:#9B59B6;">🎨 Estilo Fachada</h3>
+         width:220px; border:1px solid rgba(155,89,182,0.5);">
+        <h3 style="margin:0 0 4px 0; font-size:13px; color:#9B59B6;">🎨 Estilo Fachada</h3>
+        <p style="margin:0 0 10px 0; font-size:10px; color:#aaa; line-height:1.4;">
+            Aplicado desde el Paso 1: <strong style="color:#C39BD3;">{house_style}</strong>.<br>
+            Puedes ajustar solo la fachada aquí.
+        </p>
         <div style="display:flex; flex-direction:column; gap:6px;">
-            <button onclick="applyStyle('Moderno')"
+            <button id="style-btn-Moderno" onclick="applyStyleUI('Moderno')"
                 style="padding:7px; background:rgba(146,146,144,0.3); border:1px solid #929290;
                        color:white; border-radius:6px; cursor:pointer; font-size:12px; text-align:left;">
                 🏢 Moderno — Hormigón blanco
             </button>
-            <button onclick="applyStyle('Rural')"
+            <button id="style-btn-Rural" onclick="applyStyleUI('Rural')"
                 style="padding:7px; background:rgba(120,109,88,0.3); border:1px solid #786D58;
                        color:white; border-radius:6px; cursor:pointer; font-size:12px; text-align:left;">
                 🏡 Rural — Piedra beige
             </button>
-            <button onclick="applyStyle('Andaluz')"
+            <button id="style-btn-Andaluz" onclick="applyStyleUI('Andaluz')"
                 style="padding:7px; background:rgba(245,240,224,0.3); border:1px solid #F5F0E0;
                        color:white; border-radius:6px; cursor:pointer; font-size:12px; text-align:left;">
                 💃 Andaluz — Cal blanca
             </button>
-            <button onclick="applyStyle('Montaña')"
+            <button id="style-btn-Montaña" onclick="applyStyleUI('Montaña')"
                 style="padding:7px; background:rgba(99,88,72,0.3); border:1px solid #635848;
                        color:white; border-radius:6px; cursor:pointer; font-size:12px; text-align:left;">
                 ⛰️ Montaña — Piedra oscura
             </button>
-            <button onclick="applyStyle('Playa')"
+            <button id="style-btn-Playa" onclick="applyStyleUI('Playa')"
                 style="padding:7px; background:rgba(240,232,210,0.3); border:1px solid #F0E8D2;
                        color:white; border-radius:6px; cursor:pointer; font-size:12px; text-align:left;">
                 🌊 Playa — Arena clara
             </button>
-            <button onclick="applyStyle('Ecológico')"
+            <button id="style-btn-Ecológico" onclick="applyStyleUI('Ecológico')"
                 style="padding:7px; background:rgba(130,116,94,0.3); border:1px solid #82745E;
                        color:white; border-radius:6px; cursor:pointer; font-size:12px; text-align:left;">
                 🌿 Ecológico — Tierra natural
@@ -1975,6 +1979,26 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             buildStyleExtras(styleName);
         }}
 
+        function applyStyleUI(styleName) {{
+            // Resaltar botón activo y desmarcar el resto
+            const styleNames = ['Moderno','Rural','Andaluz','Montaña','Playa','Ecológico'];
+            styleNames.forEach(s => {{
+                const btn = document.getElementById('style-btn-' + s);
+                if (btn) {{
+                    btn.style.outline = '';
+                    btn.style.fontWeight = 'normal';
+                    btn.style.opacity = '0.85';
+                }}
+            }});
+            const active = document.getElementById('style-btn-' + styleName);
+            if (active) {{
+                active.style.outline = '2px solid #C39BD3';
+                active.style.fontWeight = 'bold';
+                active.style.opacity = '1';
+            }}
+            applyStyle(styleName);
+        }}
+
         function toggleStylePanel() {{
             const panel = document.getElementById('style-panel');
             const isVisible = panel.style.display !== 'none';
@@ -2152,7 +2176,8 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
         // ================================================
         const initialLayout = generateLayoutJS(roomsData);
         rebuildScene(initialLayout);
-        buildStyleExtras();  // Añadir extras del estilo al cargar
+        // Aplicar automáticamente el estilo elegido en el Paso 1
+        applyStyleUI(houseStyle);
 
         setMode('select');
         console.log('ArchiRapid Editor 3D v3.0 —', roomsData.length, 'habitaciones cargadas');

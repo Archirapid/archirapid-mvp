@@ -1032,39 +1032,26 @@ def render_step1():
     # ============================================
     st.subheader("🎨 ¿Qué estilo te gusta?")
 
+    def _style_img_b64(filename):
+        import base64 as _b64, os as _os
+        path = _os.path.join("assets", "estilos", filename)
+        if _os.path.exists(path):
+            with open(path, "rb") as _f:
+                data = _b64.b64encode(_f.read()).decode()
+            ext = filename.rsplit(".", 1)[-1].lower()
+            mime = "image/png" if ext == "png" else "image/jpeg"
+            return f"data:{mime};base64,{data}"
+        return ""
+
     styles_data = {
-        "Ecológico": {
-            "desc": "Materiales naturales, mínimo impacto ambiental",
-            "img": "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&h=250&fit=crop"
-        },
-        "Rural": {
-            "desc": "Piedra, madera, integrado en el paisaje",
-            "img": "https://images.unsplash.com/photo-1570129477492-45c003edd2be?w=400&h=250&fit=crop"
-        },
-        "Moderno": {
-            "desc": "Líneas limpias, grandes ventanales, minimalista",
-            "img": "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=400&h=250&fit=crop"
-        },
-        "Montaña": {
-            "desc": "Refugio alpino, tejados inclinados, madera y piedra",
-            "img": "https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?w=400&h=250&fit=crop"
-        },
-        "Playa": {
-            "desc": "Abierto, ventilado, colores claros, terrazas",
-            "img": "https://images.unsplash.com/photo-1499793983690-e29da59ef1c2?w=400&h=250&fit=crop"
-        },
-        "Clásico": {
-            "desc": "Elegante, simétrico, materiales nobles",
-            "img": "https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=400&h=250&fit=crop"
-        },
-        "Andaluz": {
-            "desc": "Patio central, cerámica, cal, frescor natural",
-            "img": "https://images.unsplash.com/photo-1534430480872-3498386e7856?w=400&h=250&fit=crop"
-        },
-        "Contemporáneo": {
-            "desc": "Vanguardista, tecnológico, sostenible",
-            "img": "https://images.unsplash.com/photo-1613490493576-7fde63acd811?w=400&h=250&fit=crop"
-        },
+        "Ecológico":    {"desc": "Materiales naturales, mínimo impacto ambiental", "img": _style_img_b64("ecologico.jpg")},
+        "Rural":        {"desc": "Piedra, madera, integrado en el paisaje",        "img": _style_img_b64("rural.jpg")},
+        "Moderno":      {"desc": "Líneas limpias, grandes ventanales, minimalista", "img": _style_img_b64("moderno.jpg")},
+        "Montaña":      {"desc": "Refugio alpino, tejados inclinados, madera y piedra", "img": _style_img_b64("montana.jpg")},
+        "Playa":        {"desc": "Abierto, ventilado, colores claros, terrazas",   "img": _style_img_b64("playa.jpg")},
+        "Clásico":      {"desc": "Elegante, simétrico, materiales nobles",          "img": _style_img_b64("clasico.jpg")},
+        "Andaluz":      {"desc": "Patio central, cerámica, cal, frescor natural",  "img": _style_img_b64("andaluz.jpg")},
+        "Contemporáneo":{"desc": "Vanguardista, tecnológico, sostenible",           "img": _style_img_b64("contemporaneo.jpg")},
     }
 
     # Inicializar selección
@@ -1111,6 +1098,7 @@ def render_step1():
 
     selected_style = st.session_state['selected_style_key']
     st.caption(f"✨ Seleccionado: **{selected_style}** — {styles_data[selected_style]['desc']}")
+    st.info(f"💡 Este estilo se aplicará automáticamente al editor 3D. Dentro del editor podrás ajustar los materiales de fachada si lo deseas.", icon=None)
     st.markdown("---")
     
     # ============================================
@@ -2406,15 +2394,112 @@ def _process_babylon_return(editor_return: str):
 
 def render_step3():
     """Paso 3: Documentación completa y monetización"""
-    
-    st.header("Paso 3 – Tu Proyecto Completo")
+
+    st.header("Paso 4 – Tu Proyecto Completo")
     st.caption("Documentación técnica, eficiencia energética y siguiente paso.")
-    
-    # Verificar si se usó el editor 3D
 
+    # ── BLOQUE WOW: referencia visual del estilo + proyecto real más parecido ──
+    try:
+        _req_wow = st.session_state.get("ai_house_requirements", {})
+        _style_wow = _req_wow.get("style", "Moderno")
+        _area_wow = get_current_design_data().get("total_area", 0)
 
+        import base64 as _b64s, os as _os2
+        def _sw(fn):
+            p = _os2.path.join("assets", "estilos", fn)
+            if _os2.path.exists(p):
+                with open(p, "rb") as _f: d = _b64s.b64encode(_f.read()).decode()
+                ext = fn.rsplit(".",1)[-1].lower()
+                return f"data:{'image/png' if ext=='png' else 'image/jpeg'};base64,{d}"
+            return ""
+        _STYLE_IMGS = {
+            "Ecológico":     _sw("ecologico.jpg"),
+            "Rural":         _sw("rural.jpg"),
+            "Moderno":       _sw("moderno.jpg"),
+            "Montaña":       _sw("montana.jpg"),
+            "Playa":         _sw("playa.jpg"),
+            "Clásico":       _sw("clasico.jpg"),
+            "Andaluz":       _sw("andaluz.jpg"),
+            "Contemporáneo": _sw("contemporaneo.jpg"),
+        }
+        _STYLE_DESCS = {
+            "Ecológico": "Materiales naturales, mínimo impacto ambiental",
+            "Rural": "Piedra, madera, integrado en el paisaje",
+            "Moderno": "Líneas limpias, grandes ventanales, minimalista",
+            "Montaña": "Refugio alpino, tejados inclinados, madera y piedra",
+            "Playa": "Abierto, ventilado, colores claros, terrazas",
+            "Clásico": "Elegante, simétrico, materiales nobles",
+            "Andaluz": "Patio central, cerámica, cal, frescor natural",
+            "Contemporáneo": "Vanguardista, tecnológico, sostenible",
+        }
+
+        col_wow1, col_wow2 = st.columns([3, 2])
+
+        with col_wow1:
+            st.markdown(f"### 🏠 Así podría quedar tu casa estilo **{_style_wow}**")
+            _img_url = _STYLE_IMGS.get(_style_wow, _STYLE_IMGS["Moderno"])
+            st.markdown(
+                f'<img src="{_img_url}" style="width:100%;height:280px;object-fit:cover;'
+                f'border-radius:12px;display:block;">',
+                unsafe_allow_html=True
+            )
+            st.caption(f"✨ {_STYLE_DESCS.get(_style_wow, '')}  ·  Tu diseño: **{_area_wow:.0f} m²**")
+
+        with col_wow2:
+            st.markdown("### 📐 Proyecto profesional más parecido")
+            try:
+                from modules.marketplace.utils import db_conn as _db_conn
+                from modules.marketplace.marketplace import get_project_display_image as _get_img
+                import os as _os, base64 as _b64
+                _conn_w = _db_conn()
+                _cur_w = _conn_w.cursor()
+                _cur_w.execute("""
+                    SELECT id, title, m2_construidos, area_m2, price, architect_name
+                    FROM projects
+                    WHERE (m2_construidos > 0 OR area_m2 > 0)
+                    ORDER BY ABS(COALESCE(m2_construidos, area_m2, 0) - ?) ASC
+                    LIMIT 1
+                """, (float(_area_wow),))
+                _row_w = _cur_w.fetchone()
+                _conn_w.close()
+
+                if _row_w:
+                    _pid, _ptitle, _pm2c, _pm2a, _pprice, _parch = _row_w
+                    _pm2 = _pm2c or _pm2a or 0
+                    _thumb_w = _get_img(_pid, image_type='main')
+                    if isinstance(_thumb_w, str) and _os.path.exists(_thumb_w):
+                        with open(_thumb_w, 'rb') as _f:
+                            _raw = _f.read()
+                        _ext = _thumb_w.rsplit('.', 1)[-1].lower()
+                        _mime = "image/png" if _ext == "png" else "image/jpeg"
+                        _b64str = _b64.b64encode(_raw).decode()
+                        st.markdown(
+                            f'<img src="data:{_mime};base64,{_b64str}" '
+                            f'style="width:100%;height:150px;object-fit:cover;border-radius:8px;display:block;margin-bottom:8px;">',
+                            unsafe_allow_html=True
+                        )
+                    st.markdown(f"**{_ptitle}**")
+                    st.caption(f"📐 {_pm2:.0f} m²  ·  💰 €{_pprice:,.0f}" if _pprice else f"📐 {_pm2:.0f} m²")
+                    if _parch:
+                        st.caption(f"👨‍💼 {_parch}")
+                    st.markdown(
+                        '<div style="background:#EBF5FB;border-radius:6px;padding:8px 10px;'
+                        'font-size:12px;color:#1A5276;margin:6px 0;">💡 Planos, memoria técnica y CAD listos para descargar.</div>',
+                        unsafe_allow_html=True
+                    )
+                    if st.button("Ver proyecto completo →", key="wow_ver_proyecto", type="primary", use_container_width=True):
+                        st.query_params["selected_project_v2"] = str(_pid)
+                        st.rerun()
+                else:
+                    st.info("Explora proyectos en el marketplace.")
+            except Exception:
+                st.info("Explora proyectos en el marketplace.")
+    except Exception:
+        pass  # Bloque silencioso — si falla no rompe nada
 
     st.markdown("---")
+
+    # Verificar si se usó el editor 3D
 
     # Verificar si se usó el editor 3D
     if st.session_state.get("babylon_editor_used", False):

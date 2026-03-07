@@ -970,6 +970,15 @@ def show_advanced_project_search_v2(client_email):
                 st.markdown("---")
 
 
+# === SCROLL TO TOP ON NAVIGATION ===
+_nav_route = str(dict(st.query_params)) + "|" + st.session_state.get('selected_page', '')
+if st.session_state.get('_nav_route') != _nav_route:
+    st.session_state['_nav_route'] = _nav_route
+    st.components.v1.html(
+        "<script>window.parent.document.querySelector('section.main').scrollTo(0,0);</script>",
+        height=0
+    )
+
 # === NUEVAS RUTAS V2 (BORRÓN Y CUENTA NUEVA) ===
 page_from_query = False  # Variable para controlar si la página viene de query params
 if "selected_prefab" in st.query_params and not page_from_query:

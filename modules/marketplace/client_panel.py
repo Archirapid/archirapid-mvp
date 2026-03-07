@@ -1951,20 +1951,33 @@ def show_integrated_project_search(client_email, plot_data):
         precio = proyecto.get('price') or 0
         with cols[idx % N]:
             # Imagen base64 altura fija
+            thumb = get_project_display_image(proyecto['id'], image_type='main')
+            _shown = False
             try:
-                thumb = get_project_display_image(proyecto['id'], image_type='main')
-                if isinstance(thumb, bytes):
+                import os as _os
+                if isinstance(thumb, str) and _os.path.exists(thumb):
+                    with open(thumb, 'rb') as _tf:
+                        _raw = _tf.read()
+                    _ext = thumb.rsplit('.', 1)[-1].lower()
+                    _mime = "image/png" if _ext == "png" else "image/jpeg"
+                    b64 = base64.b64encode(_raw).decode()
+                elif isinstance(thumb, bytes):
                     b64 = base64.b64encode(thumb).decode()
+                    _mime = "image/jpeg"
                 else:
                     buf = io.BytesIO()
                     thumb.save(buf, format='JPEG')
                     b64 = base64.b64encode(buf.getvalue()).decode()
+                    _mime = "image/jpeg"
                 st.markdown(
-                    f'<img src="data:image/jpeg;base64,{b64}" '
+                    f'<img src="data:{_mime};base64,{b64}" '
                     f'style="width:100%;height:130px;object-fit:cover;border-radius:8px;display:block;">',
                     unsafe_allow_html=True
                 )
+                _shown = True
             except Exception:
+                pass
+            if not _shown:
                 st.markdown('<div style="height:130px;background:#F1F5F9;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:2em;">🏗️</div>', unsafe_allow_html=True)
 
             title = proyecto.get('title', 'Proyecto')
