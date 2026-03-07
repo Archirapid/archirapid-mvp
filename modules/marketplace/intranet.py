@@ -19,7 +19,7 @@ def main():
         st.success("✅ Acceso autorizado a Intranet")
 
     # PANEL DE GESTIÓN INTERNA
-    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["📋 Gestión de Fincas", "🏗️ Gestión de Proyectos", "💰 Ventas y Transacciones", "📞 Consultas", "🛠️ Profesionales", "⚙️ Admin"])
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(["📋 Gestión de Fincas", "🏗️ Gestión de Proyectos", "💰 Ventas y Transacciones", "📞 Consultas", "🛠️ Profesionales", "⚙️ Admin", "🎯 Waitlist"])
 
     with tab1:
         try:
@@ -329,4 +329,40 @@ def main():
         except Exception as e:
             import traceback
             st.error(f"Error gestionando catálogo de prefabricadas: {e}")
+
+    with tab7:
+        st.header("Lista de Espera (Waitlist)")
+        try:
+            import sqlite3 as _sq3w, pandas as _pdw
+            _cw = _sq3w.connect("database.db")
+            _dfw = _pdw.read_sql_query(
+                "SELECT name, email, profile, created_at, approved FROM waitlist ORDER BY created_at DESC",
+                _cw
+            )
+            _cw.close()
+            _total = len(_dfw)
+            _approved = int(_dfw['approved'].sum()) if _total > 0 else 0
+            c1, c2, c3 = st.columns(3)
+            c1.metric("Total solicitudes", _total)
+            c2.metric("Aprobados", _approved)
+            c3.metric("Pendientes", _total - _approved)
+            st.markdown("---")
+            if _total > 0:
+                st.dataframe(_dfw.rename(columns={
+                    'name': 'Nombre', 'email': 'Email', 'profile': 'Perfil',
+                    'created_at': 'Fecha', 'approved': 'Aprobado'
+                }), use_container_width=True, hide_index=True)
+                # Exportar CSV
+                _csv = _dfw.to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    "Descargar CSV",
+                    data=_csv,
+                    file_name="waitlist_archirapid.csv",
+                    mime="text/csv",
+                    use_container_width=True
+                )
+            else:
+                st.info("Aun no hay solicitudes en la lista de espera.")
+        except Exception as _ew:
+            st.error(f"Error cargando waitlist: {_ew}")
             st.code(traceback.format_exc())
