@@ -25,6 +25,15 @@ load_dotenv()
 
 import pandas as pd
 import os
+
+# Streamlit Cloud: sync secrets → os.environ so all os.getenv() calls work in production
+try:
+    import streamlit as _st_secrets
+    for _sk, _sv in _st_secrets.secrets.items():
+        if isinstance(_sv, str):
+            os.environ.setdefault(_sk, _sv)
+except Exception:
+    pass
 import threading
 import http.server
 import socketserver
