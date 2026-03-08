@@ -39,6 +39,8 @@ def extraer_datos_catastral(pdf_path):
             if not api_key:
                 return {"error": "No se encontró GEMINI_API_KEY ni GOOGLE_API_KEY en secrets/env"}
 
+        api_key = api_key.strip()
+
         # Configurar API de Gemini
         client = genai.Client(api_key=api_key)
 
@@ -526,6 +528,8 @@ def get_ai_response(prompt: str, model_name: str = 'models/gemini-2.5-flash') ->
             api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
             if not api_key:
                 return "Error: No se encontró GEMINI_API_KEY ni GOOGLE_API_KEY en secrets/env"
+
+        api_key = api_key.strip()
 
         # Configurar cliente Gemini
         client = genai.Client(api_key=api_key)
