@@ -379,15 +379,38 @@ def render_map(plots):
     try:
         from streamlit_folium import st_folium
         _map_data = st_folium(m, height=600, use_container_width=True, returned_objects=["last_object_clicked"])
-        # Detectar clic en marcador
+        # Detectar clic en marcador → guardar en session_state, NO navegar todavía
         _clicked = _map_data.get("last_object_clicked") if _map_data else None
         if _clicked and isinstance(_clicked, dict):
             _clat = round(float(_clicked.get("lat", 0)), 6)
             _clon = round(float(_clicked.get("lng", 0)), 6)
             _clicked_id = _latlon_to_id.get((_clat, _clon))
-            if _clicked_id:
-                st.query_params["selected_plot"] = _clicked_id
-                st.rerun()
+            if _clicked_id and _clicked_id != st.session_state.get("_map_preview_id"):
+                st.session_state["_map_preview_id"] = _clicked_id
+
+        # Mini panel debajo del mapa si hay una finca seleccionada
+        _preview_id = st.session_state.get("_map_preview_id")
+        if _preview_id:
+            _preview_plot = next((p for p in plots_processed if p['id'] == _preview_id), None)
+            if _preview_plot:
+                st.markdown("---")
+                _pc1, _pc2 = st.columns([1, 3])
+                with _pc1:
+                    _prev_img = get_popup_image_b64(_preview_plot)
+                    if _prev_img:
+                        st.markdown(f'<img src="{_prev_img}" style="width:100%;border-radius:8px;">', unsafe_allow_html=True)
+                with _pc2:
+                    st.markdown(f"**{_preview_plot['title']}**")
+                    st.caption(f"{_preview_plot.get('m2','N/A')} m²  ·  {_preview_plot.get('province','')}")
+                    _bcol1, _bcol2 = st.columns(2)
+                    with _bcol1:
+                        if st.button("🔍 Ver ficha completa", key="map_go_detail", type="primary", use_container_width=True):
+                            st.query_params["selected_plot"] = _preview_id
+                            st.rerun()
+                    with _bcol2:
+                        if st.button("✕ Cerrar", key="map_close_preview", use_container_width=True):
+                            del st.session_state["_map_preview_id"]
+                            st.rerun()
     except Exception as e:
         st.error(f"No fue posible renderizar el mapa interactivo: {str(e)}")
 
