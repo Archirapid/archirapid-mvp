@@ -27,16 +27,17 @@ def extraer_datos_catastral(pdf_path):
         # Intentar usar st.secrets SOLO si estamos en Streamlit
         try:
             import streamlit as st
-            if hasattr(st, "secrets") and "GOOGLE_API_KEY" in st.secrets:
-                api_key = st.secrets["GOOGLE_API_KEY"]
+            if hasattr(st, "secrets"):
+                api_key = (st.secrets.get("GEMINI_API_KEY") or
+                           st.secrets.get("GOOGLE_API_KEY"))
         except Exception:
             pass
 
         # Fallback a .env para desarrollo local
         if not api_key:
-            api_key = os.getenv('GEMINI_API_KEY')
+            api_key = os.getenv('GEMINI_API_KEY') or os.getenv('GOOGLE_API_KEY')
             if not api_key:
-                return {"error": "No se encontró la clave GOOGLE_API_KEY en secrets de Streamlit ni GEMINI_API_KEY en .env"}
+                return {"error": "No se encontró GEMINI_API_KEY ni GOOGLE_API_KEY en secrets/env"}
 
         # Configurar API de Gemini
         client = genai.Client(api_key=api_key)
@@ -514,16 +515,17 @@ def get_ai_response(prompt: str, model_name: str = 'models/gemini-2.5-flash') ->
         # Intentar usar st.secrets SOLO si estamos en Streamlit
         try:
             import streamlit as st
-            if hasattr(st, "secrets") and "GOOGLE_API_KEY" in st.secrets:
-                api_key = st.secrets["GOOGLE_API_KEY"]
-        except:
+            if hasattr(st, "secrets"):
+                api_key = (st.secrets.get("GEMINI_API_KEY") or
+                           st.secrets.get("GOOGLE_API_KEY"))
+        except Exception:
             pass
 
         # Fallback a .env
         if not api_key:
-            api_key = os.getenv("GEMINI_API_KEY")
+            api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
             if not api_key:
-                return "Error: No se encontró la clave GOOGLE_API_KEY en secrets de Streamlit ni en .env"
+                return "Error: No se encontró GEMINI_API_KEY ni GOOGLE_API_KEY en secrets/env"
 
         # Configurar cliente Gemini
         client = genai.Client(api_key=api_key)
@@ -596,6 +598,20 @@ Incluye:
 
 Formato: Markdown, con títulos y viñetas.
 """
+
+        # Cargar API key y cliente Gemini
+        _api_key = None
+        try:
+            import streamlit as _st
+            if hasattr(_st, "secrets"):
+                _api_key = _st.secrets.get("GEMINI_API_KEY") or _st.secrets.get("GOOGLE_API_KEY")
+        except Exception:
+            pass
+        if not _api_key:
+            _api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+        if not _api_key:
+            return "Error: No se encontró GEMINI_API_KEY ni GOOGLE_API_KEY en secrets/env"
+        client = genai.Client(api_key=_api_key)
 
         # Llamar al modelo Gemini
         response = client.models.generate_content(
