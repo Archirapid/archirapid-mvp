@@ -6,6 +6,21 @@ from groq import Groq
 
 from .data_model import create_example_design, HouseDesign, Plot, RoomType, RoomInstance
 
+
+def _get_groq_key() -> str:
+    """Obtiene GROQ_API_KEY desde st.secrets o env."""
+    for k in ("GROQ_API_KEY",):
+        try:
+            v = st.secrets[k]
+            if v and str(v).strip():
+                return str(v).strip()
+        except Exception:
+            pass
+        v = os.getenv(k, "")
+        if v.strip():
+            return v.strip()
+    return None
+
 # ================================================
 # GENERADOR ZIP COMPLETO DEL PROYECTO
 # ================================================
@@ -32,11 +47,7 @@ def generar_zip_proyecto(req, design_data, plot_data, partidas, subsidy_total, e
     memoria_ia = ""
     try:
         from groq import Groq as _Groq
-        from pathlib import Path as _Path
-        from dotenv import load_dotenv as _load_dotenv
-        import os as _os
-        _load_dotenv(dotenv_path=_Path(__file__).parent.parent.parent / '.env')
-        _client = _Groq(api_key=_os.getenv("GROQ_API_KEY"))
+        _client = _Groq(api_key=_get_groq_key())
 
         habitaciones_list = "\n".join([f"- {r['name']}: {r['area_m2']:.1f} m²" for r in rooms])
         extras_list = [k for k, v in req.get('extras', {}).items() if v]
@@ -1572,14 +1583,12 @@ def _generate_ai_proposal(req):
             import json
             
             # Cargar API key
-            project_root = Path(__file__).parent.parent.parent
-            load_dotenv(dotenv_path=project_root / '.env')
-            groq_api_key = os.getenv("GROQ_API_KEY")
-            
+            groq_api_key = _get_groq_key()
+
             if not groq_api_key:
                 st.error("❌ GROQ_API_KEY no encontrada")
                 return
-            
+
             client = Groq(api_key=groq_api_key)
             
             # Construir prompt simplificado
@@ -2173,9 +2182,7 @@ def render_step2():
                     from dotenv import load_dotenv
                     from pathlib import Path
                     
-                    project_root = Path(__file__).parent.parent.parent
-                    load_dotenv(dotenv_path=project_root / '.env')
-                    client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+                    client = Groq(api_key=_get_groq_key())
                     
                     rooms_summary = "\n".join([
                         f"- {r.room_type.name}: {r.area_m2:.0f} m² ({r.area_m2:.1f}m × {r.area_m2/max(r.area_m2**0.5,1):.1f}m aprox)"
