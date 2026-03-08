@@ -63,6 +63,9 @@ uploads/*
 catastro_output/
 archirapid_extract/catastro_output/
 
+# Streamlit secrets (real keys go in Streamlit Cloud dashboard only)
+.streamlit/secrets.toml
+
 # CAD exports and test artifacts
 *.dxf
 archirapid_extract/test_catastral.pdf
