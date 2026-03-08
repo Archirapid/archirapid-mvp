@@ -24,16 +24,34 @@ def _gemini_rest(api_key: str, prompt: str, image_bytes: bytes = None, model: st
 
 
 def _get_gemini_key() -> str:
-    """Obtiene la clave Gemini de secrets o env."""
-    key = None
+    """Obtiene la clave Gemini de secrets o env. Prueba todos los métodos de acceso."""
+    debug = []
+    for k in ("GEMINI_API_KEY", "GOOGLE_API_KEY"):
+        # 1. st.secrets bracket access
+        try:
+            val = st.secrets[k]
+            if val and str(val).strip():
+                return str(val).strip()
+        except Exception as e:
+            debug.append(f"{k}[bracket]:{type(e).__name__}")
+        # 2. st.secrets attribute access
+        try:
+            val = getattr(st.secrets, k, None)
+            if val and str(val).strip():
+                return str(val).strip()
+        except Exception as e:
+            debug.append(f"{k}[attr]:{type(e).__name__}")
+        # 3. env var
+        val = os.getenv(k, "")
+        if val.strip():
+            return val.strip()
+        debug.append(f"{k}[env]:empty")
+    # Guardar debug para mensaje de error
     try:
-        if hasattr(st, "secrets"):
-            key = st.secrets.get("GEMINI_API_KEY") or st.secrets.get("GOOGLE_API_KEY")
+        st.session_state["_gemini_key_debug"] = debug
     except Exception:
         pass
-    if not key:
-        key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
-    return key.strip() if key else None
+    return None
 
 # Forzar recarga de variables de entorno
 load_dotenv(override=True)
@@ -148,7 +166,16 @@ def extraer_datos_nota_catastral(pdf_path: str) -> dict:
         # Obtener API key
         api_key = _get_gemini_key()
         if not api_key:
-            return {"error": "No se encontró GEMINI_API_KEY en secrets/env"}
+            debug = []
+            try:
+                debug = st.session_state.get("_gemini_key_debug", [])
+            except Exception:
+                pass
+            try:
+                secret_keys = list(st.secrets.keys())
+            except Exception as e:
+                secret_keys = [f"error:{type(e).__name__}:{e}"]
+            return {"error": f"No se encontró GEMINI_API_KEY. Keys en st.secrets: {secret_keys}. Debug: {debug}"}
 
         # Abrir PDF y convertir primera página a imagen
         doc = fitz.open(pdf_path)
