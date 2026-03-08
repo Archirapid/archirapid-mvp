@@ -11,7 +11,7 @@ import streamlit as st
 from src.models.finca import FincaMVP
 
 
-def _gemini_rest(api_key: str, prompt: str, image_bytes: bytes = None, model: str = "gemini-1.5-flash") -> str:
+def _gemini_rest(api_key: str, prompt: str, image_bytes: bytes = None, model: str = "gemini-2.0-flash") -> str:
     """Llama a Gemini via REST API directa. Sin SDKs, funciona en cualquier plataforma."""
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
     parts = [{"text": prompt}]

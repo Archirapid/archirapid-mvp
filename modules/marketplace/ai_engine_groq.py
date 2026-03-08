@@ -57,7 +57,7 @@ def _generate_text_gemini(prompt: str, max_tokens: int = 500) -> str:
             gemini_key = st.secrets.get("GEMINI_API_KEY")
         if not gemini_key:
             return "Error de configuración: sin API key disponible."
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key.strip()}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={gemini_key.strip()}"
         payload = {"contents": [{"parts": [{"text": prompt}]}]}
         resp = _req.post(url, json=payload, timeout=60)
         resp.raise_for_status()
