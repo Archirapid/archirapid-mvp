@@ -25,28 +25,55 @@ def _gemini_rest(api_key: str, prompt: str, image_bytes: bytes = None, model: st
 
 def _get_gemini_key() -> str:
     """Obtiene la clave Gemini de secrets o env. Prueba todos los métodos de acceso."""
+    _SKIP = {"", "tu_clave_gemini_aqui", "tu_clave_aqui"}
     debug = []
+
+    def _valid(v):
+        s = str(v).strip() if v else ""
+        return s if s and s not in _SKIP else None
+
     for k in ("GEMINI_API_KEY", "GOOGLE_API_KEY"):
-        # 1. st.secrets bracket access
+        # 1. st.secrets bracket
         try:
-            val = st.secrets[k]
-            if val and str(val).strip():
-                return str(val).strip()
+            v = _valid(st.secrets[k])
+            if v:
+                return v
         except Exception as e:
             debug.append(f"{k}[bracket]:{type(e).__name__}")
-        # 2. st.secrets attribute access
-        try:
-            val = getattr(st.secrets, k, None)
-            if val and str(val).strip():
-                return str(val).strip()
-        except Exception as e:
-            debug.append(f"{k}[attr]:{type(e).__name__}")
-        # 3. env var
-        val = os.getenv(k, "")
-        if val.strip():
-            return val.strip()
+        # 2. env var (app.py syncs st.secrets → os.environ al arrancar)
+        v = _valid(os.getenv(k, ""))
+        if v:
+            return v
         debug.append(f"{k}[env]:empty")
-    # Guardar debug para mensaje de error
+
+    # 3. Fallback: leer secrets.toml directamente del filesystem
+    import pathlib
+    _toml_candidates = [
+        pathlib.Path.home() / ".streamlit" / "secrets.toml",
+        pathlib.Path("/mount/src") / "archirapid-mvp" / ".streamlit" / "secrets.toml",
+        pathlib.Path(__file__).resolve().parents[3] / ".streamlit" / "secrets.toml",
+    ]
+    try:
+        import tomllib as _tl
+    except ImportError:
+        try:
+            import tomli as _tl
+        except ImportError:
+            _tl = None
+    if _tl:
+        for p in _toml_candidates:
+            try:
+                if p.exists():
+                    data = _tl.loads(p.read_text(encoding="utf-8"))
+                    for k in ("GEMINI_API_KEY", "GOOGLE_API_KEY"):
+                        v = _valid(data.get(k, ""))
+                        if v:
+                            return v
+                    debug.append(f"toml:{p}:no_key")
+                else:
+                    debug.append(f"toml:{p}:missing")
+            except Exception as e:
+                debug.append(f"toml:{p}:{type(e).__name__}")
     try:
         st.session_state["_gemini_key_debug"] = debug
     except Exception:
