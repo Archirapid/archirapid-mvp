@@ -1009,13 +1009,11 @@ if "selected_project_v2" in st.query_params and not page_from_query:
 if "selected_plot" in st.query_params and not page_from_query:
     try:
         plot_id = st.query_params["selected_plot"]
-        st.session_state['selected_page'] = "🔍 Detalle de Finca"
-        st.session_state['selected_plot'] = plot_id
-        del st.query_params["selected_plot"]
-        st.rerun()
+        from modules.marketplace.plot_detail import show_plot_detail_page
+        show_plot_detail_page(plot_id)
     except Exception as e:
-        st.error(f"Error procesando finca seleccionada: {e}")
-    st.stop()  # Detener la ejecución para no mostrar el resto de la app
+        st.error(f"Error mostrando finca: {e}")
+    st.stop()
 
 if st.query_params.get("page") == "👤 Panel de Cliente" and st.session_state.get('selected_page') != "🏠 Propietarios":
     try:
@@ -1240,7 +1238,8 @@ st.session_state['selected_page'] = selected_page
 
 # Lógica de Redirección
 if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
-    st.query_params.clear()
+    if "selected_plot" not in st.query_params and "selected_project_v2" not in st.query_params and "selected_prefab" not in st.query_params:
+        st.query_params.clear()
 elif st.session_state.get('selected_page') in ["👤 Panel de Proveedor", "📝 Registro de Proveedor de Servicios"]:
     st.query_params["page"] = st.session_state.get('selected_page')
 
