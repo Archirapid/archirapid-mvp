@@ -349,12 +349,10 @@ def render_map(plots):
     # Crear mapa con Folium
     m = folium.Map(location=[center_lat, center_lon], zoom_start=zoom_level, tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', attr='Esri')
 
-    # Mapa latlon → plot_id para capturar clics desde st_folium
-    _latlon_to_id = {}
-
     for plot in plots_processed:
         lat = float(plot['lat'])
         lon = float(plot['lon'])
+        _pid = plot['id']
 
         icon = folium.Icon(color='blue', icon='home', prefix='fa', icon_color='white')
         img_src = get_popup_image_b64(plot)
@@ -366,51 +364,21 @@ def render_map(plots):
             <b style="font-size:13px;">{plot['title']}</b><br>
             {location_note}
             <span style="color:#64748B;">{plot.get('m2', 'N/A')} m²</span><br>
-            <span style="color:#94A3B8;font-size:11px;">Haz clic en el marcador para ver detalles</span>
+            <a href="/?selected_plot={_pid}" target="_blank"
+               style="margin-top:6px;padding:5px 10px;background:#ff4b4b;color:white;
+                      text-decoration:none;border-radius:3px;display:inline-block;font-weight:600;">
+                Ver más detalles
+            </a>
         </div>
         '''
         marker = folium.Marker([lat, lon], icon=icon,
                                popup=folium.Popup(popup_html, max_width=250),
                                tooltip=plot['title'])
         marker.add_to(m)
-        _latlon_to_id[(round(lat, 6), round(lon, 6))] = plot['id']
 
-    # Renderizar mapa con st_folium (captura clics en Python)
+    # Renderizar mapa (srcdoc iframe: URLs relativas resuelven contra el dominio padre)
     try:
-        from streamlit_folium import st_folium
-        _map_data = st_folium(m, height=600, use_container_width=True, returned_objects=["last_object_clicked"])
-        # Detectar clic en marcador → guardar en session_state, NO navegar todavía
-        _clicked = _map_data.get("last_object_clicked") if _map_data else None
-        if _clicked and isinstance(_clicked, dict):
-            _clat = round(float(_clicked.get("lat", 0)), 6)
-            _clon = round(float(_clicked.get("lng", 0)), 6)
-            _clicked_id = _latlon_to_id.get((_clat, _clon))
-            if _clicked_id and _clicked_id != st.session_state.get("_map_preview_id"):
-                st.session_state["_map_preview_id"] = _clicked_id
-
-        # Mini panel debajo del mapa si hay una finca seleccionada
-        _preview_id = st.session_state.get("_map_preview_id")
-        if _preview_id:
-            _preview_plot = next((p for p in plots_processed if p['id'] == _preview_id), None)
-            if _preview_plot:
-                st.markdown("---")
-                _pc1, _pc2 = st.columns([1, 3])
-                with _pc1:
-                    _prev_img = get_popup_image_b64(_preview_plot)
-                    if _prev_img:
-                        st.markdown(f'<img src="{_prev_img}" style="width:100%;border-radius:8px;">', unsafe_allow_html=True)
-                with _pc2:
-                    st.markdown(f"**{_preview_plot['title']}**")
-                    st.caption(f"{_preview_plot.get('m2','N/A')} m²  ·  {_preview_plot.get('province','')}")
-                    _bcol1, _bcol2 = st.columns(2)
-                    with _bcol1:
-                        if st.button("🔍 Ver ficha completa", key="map_go_detail", type="primary", use_container_width=True):
-                            st.query_params["selected_plot"] = _preview_id
-                            st.rerun()
-                    with _bcol2:
-                        if st.button("✕ Cerrar", key="map_close_preview", use_container_width=True):
-                            del st.session_state["_map_preview_id"]
-                            st.rerun()
+        st.components.v1.html(m._repr_html_(), height=600)
     except Exception as e:
         st.error(f"No fue posible renderizar el mapa interactivo: {str(e)}")
 
