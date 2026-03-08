@@ -247,70 +247,94 @@ def show_plot_detail_page(plot_id: str):
             with st.spinner("Analizando datos catastrales completos con IA..."):
                 try:
                     from modules.marketplace.ai_engine import extraer_datos_catastral_completo
-
-                    # Buscar archivos PDF catastrales
-                    import os
+                    import json as _json
                     from pathlib import Path
+                    from modules.marketplace.utils import db_conn as _db_conn
 
-                    # Prioridad: nota catastral específica de ESTA finca
-                    pdf_paths = []
-                    for field in ('registry_note_path', 'plano_catastral_path'):
-                        finca_path = plot.get(field)
-                        if finca_path:
-                            pdf_paths.append(Path(finca_path))
-                    # Fallback genérico (legacy)
-                    pdf_paths += [
-                        Path("archirapid_extract/catastro_output/nota_catastral.pdf"),
-                        Path("uploads/nota_catastral.pdf"),
-                        Path("catastro_output/nota_catastral.pdf"),
-                    ]
+                    datos_extraidos = None
+                    metodo_usado = None
 
-                    pdf_encontrado = None
-                    for pdf_path in pdf_paths:
-                        if pdf_path.exists():
-                            pdf_encontrado = pdf_path
-                            break
+                    # 1. Comprobar caché en DB
+                    _conn_cache = _db_conn()
+                    _cached = _conn_cache.execute(
+                        "SELECT ai_verification_cache FROM plots WHERE id=?", (plot_id,)
+                    ).fetchone()
+                    _conn_cache.close()
+                    if _cached and _cached[0]:
+                        try:
+                            datos_extraidos = _json.loads(_cached[0])
+                            metodo_usado = "cache"
+                        except Exception:
+                            datos_extraidos = None
 
-                    if pdf_encontrado:
-                        datos_extraidos = extraer_datos_catastral_completo(str(pdf_encontrado))
-                        metodo_usado = "ocr"
+                    # 2. Si no hay caché, buscar PDF y llamar a la API
+                    if not datos_extraidos:
+                        pdf_paths = []
+                        for field in ('registry_note_path', 'plano_catastral_path'):
+                            finca_path = plot.get(field)
+                            if finca_path:
+                                pdf_paths.append(Path(finca_path))
+                        pdf_paths += [
+                            Path("archirapid_extract/catastro_output/nota_catastral.pdf"),
+                            Path("uploads/nota_catastral.pdf"),
+                            Path("catastro_output/nota_catastral.pdf"),
+                        ]
+                        pdf_encontrado = next((p for p in pdf_paths if p.exists()), None)
 
-                        # Fallback automático a Gemini Vision si el PDF es imagen escaneada
-                        if datos_extraidos and "error" in datos_extraidos and "imagen escaneada" in datos_extraidos["error"]:
-                            st.info("📷 PDF escaneado detectado — usando Gemini Vision para extraer datos...")
-                            from modules.marketplace.ai_engine import extraer_datos_nota_catastral
-                            gemini_result = extraer_datos_nota_catastral(str(pdf_encontrado))
-                            if gemini_result and "error" not in gemini_result:
-                                datos_extraidos = {
-                                    "superficie_m2": gemini_result.get("superficie_grafica_m2", 0),
-                                    "referencia_catastral": gemini_result.get("referencia_catastral", ""),
-                                    "municipio": gemini_result.get("municipio", ""),
-                                }
-                                metodo_usado = "gemini"
-                            else:
-                                datos_extraidos = gemini_result
+                        if not pdf_encontrado:
+                            st.warning("⚠️ No se encontró archivo PDF de nota catastral")
+                            st.info("Sube un archivo 'nota_catastral.pdf' a la carpeta uploads/ o archirapid_extract/catastro_output/")
+                        else:
+                            datos_extraidos = extraer_datos_catastral_completo(str(pdf_encontrado))
+                            metodo_usado = "ocr"
 
-                        if datos_extraidos and "error" not in datos_extraidos:
-                            # Comparar datos extraídos con datos de la finca
+                            # Fallback a Gemini Vision si PDF es imagen escaneada
+                            if datos_extraidos and "error" in datos_extraidos and "imagen escaneada" in datos_extraidos["error"]:
+                                st.info("📷 PDF escaneado detectado — usando Gemini Vision para extraer datos...")
+                                from modules.marketplace.ai_engine import extraer_datos_nota_catastral
+                                gemini_result = extraer_datos_nota_catastral(str(pdf_encontrado))
+                                if gemini_result and "error" not in gemini_result:
+                                    datos_extraidos = {
+                                        "superficie_m2": gemini_result.get("superficie_grafica_m2", 0),
+                                        "referencia_catastral": gemini_result.get("referencia_catastral", ""),
+                                        "municipio": gemini_result.get("municipio", ""),
+                                    }
+                                    metodo_usado = "gemini"
+                                    # Guardar en caché para evitar llamadas futuras a la API
+                                    try:
+                                        _cc = _db_conn()
+                                        _cc.execute(
+                                            "UPDATE plots SET ai_verification_cache=? WHERE id=?",
+                                            (_json.dumps(datos_extraidos), plot_id)
+                                        )
+                                        _cc.commit()
+                                        _cc.close()
+                                    except Exception:
+                                        pass
+                                else:
+                                    datos_extraidos = gemini_result
+
+                    # 3. Mostrar resultados (fuera del bloque cache/pdf)
+                    if datos_extraidos:
+                        if metodo_usado == "cache":
+                            st.caption("⚡ Resultado en caché — sin llamada a API")
+                        if "error" in datos_extraidos:
+                            st.error(f"❌ Error en extracción completa: {datos_extraidos['error']}")
+                        else:
                             superficie_pdf = datos_extraidos.get("superficie_m2", 0)
                             ref_catastral_pdf = datos_extraidos.get("referencia_catastral", "")
-
                             superficie_finca = plot.get('surface_m2') or plot.get('m2') or 0
                             ref_catastral_finca = plot.get('catastral_ref', '')
-
-                            # Verificar coincidencias
-                            superficie_ok = superficie_pdf > 0 and abs(superficie_pdf - superficie_finca) < 10  # Tolerancia de 10m²
+                            superficie_ok = superficie_pdf > 0 and abs(superficie_pdf - superficie_finca) < 10
                             ref_ok = ref_catastral_pdf.strip() == ref_catastral_finca.strip()
 
                             with st.expander("📊 Resultados de Verificación IA Completa", expanded=True):
                                 st.markdown("### 📋 Datos Extraídos de la Nota Catastral")
-
                                 col1, col2 = st.columns(2)
                                 with col1:
                                     st.write(f"**Superficie:** {superficie_pdf} m²")
                                     st.write(f"**Referencia Catastral:** {ref_catastral_pdf}")
                                     st.write(f"**Municipio:** {datos_extraidos.get('municipio', 'No detectado')}")
-
                                 with col2:
                                     st.write(f"**Forma Geométrica:** {datos_extraidos.get('forma_geometrica', 'No detectada')}")
                                     st.write(f"**Vértices:** {datos_extraidos.get('vertices', 0)}")
@@ -325,16 +349,12 @@ def show_plot_detail_page(plot_id: str):
                                 st.markdown("### 🧭 Orientación y Plano")
                                 st.write(f"**Orientación Norte:** {datos_extraidos.get('orientacion_norte', 'No detectada')}")
 
-                                # Mostrar plano vectorizado si existe
                                 archivos = datos_extraidos.get('archivos_generados', {})
                                 plano_visualizado = archivos.get('plano_vectorizado')
                                 plano_limpio = archivos.get('plano_limpio')
-
                                 if plano_visualizado and Path(plano_visualizado).exists():
                                     st.markdown("### 📐 Plano Catastral Vectorizado")
                                     st.image(str(plano_visualizado), caption="Plano con contornos detectados", use_container_width=True)
-
-                                    # Opción de descarga del plano técnico
                                     if plano_limpio and Path(plano_limpio).exists():
                                         with open(plano_limpio, "rb") as file:
                                             st.download_button(
@@ -342,13 +362,11 @@ def show_plot_detail_page(plot_id: str):
                                                 data=file,
                                                 file_name="plano_catastral_limpio.png",
                                                 mime="image/png",
-                                                help="Plano limpio con medidas para uso arquitectónico"
                                             )
 
                                 st.markdown("### 🔍 Comparación con Datos Publicados")
                                 st.write(f"**Superficie Finca:** {superficie_finca} m²")
                                 st.write(f"**Referencia Catastral Finca:** {ref_catastral_finca}")
-
                                 if superficie_ok and ref_ok:
                                     st.success("✅ VERIFICACIÓN EXITOSA: Los datos coinciden perfectamente")
                                     st.session_state[f'ia_verified_{plot_id}'] = True
@@ -359,12 +377,6 @@ def show_plot_detail_page(plot_id: str):
                                 else:
                                     st.error("❌ DISCREPANCIA: Los datos de superficie no coinciden")
                                     st.warning("Revisa la información antes de proceder con la compra")
-                        else:
-                            error_msg = datos_extraidos.get("error", "Error desconocido")
-                            st.error(f"❌ Error en extracción completa: {error_msg}")
-                    else:
-                        st.warning("⚠️ No se encontró archivo PDF de nota catastral")
-                        st.info("Sube un archivo 'nota_catastral.pdf' a la carpeta uploads/ o archirapid_extract/catastro_output/")
 
                 except Exception as e:
                     st.error(f"Error en verificación IA completa: {str(e)}")
