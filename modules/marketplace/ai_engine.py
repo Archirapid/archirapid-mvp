@@ -12,15 +12,31 @@ from src.models.finca import FincaMVP
 
 
 def _gemini_rest(api_key: str, prompt: str, image_bytes: bytes = None, model: str = "gemini-2.0-flash") -> str:
-    """Llama a Gemini via REST API directa. Sin SDKs, funciona en cualquier plataforma."""
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+    """Llama a Gemini via REST API directa. Sin SDKs, funciona en cualquier plataforma.
+    En caso de 429 reintenta con gemini-2.0-flash-lite."""
+    import time
+    models_to_try = [model] if model != "gemini-2.0-flash" else ["gemini-2.0-flash", "gemini-2.0-flash-lite"]
     parts = [{"text": prompt}]
     if image_bytes:
         parts.insert(0, {"inline_data": {"mime_type": "image/png", "data": base64.b64encode(image_bytes).decode()}})
     payload = {"contents": [{"parts": parts}]}
-    resp = requests.post(url, json=payload, timeout=60)
-    resp.raise_for_status()
-    return resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+    last_exc = None
+    for m in models_to_try:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{m}:generateContent?key={api_key}"
+        try:
+            resp = requests.post(url, json=payload, timeout=60)
+            if resp.status_code == 429 and m != models_to_try[-1]:
+                time.sleep(2)
+                continue  # Probar el siguiente modelo
+            resp.raise_for_status()
+            return resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+        except Exception as e:
+            last_exc = e
+            if "429" in str(e) and m != models_to_try[-1]:
+                time.sleep(2)
+                continue
+            raise
+    raise last_exc
 
 
 def _get_gemini_key() -> str:
