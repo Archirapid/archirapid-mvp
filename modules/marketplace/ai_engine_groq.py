@@ -48,22 +48,38 @@ def generate_project_report(prompt: str) -> str:
     except Exception as exc:
         return f"❌ Error: {str(exc)}"
 
-def generate_text(prompt: str, max_tokens: int = 500) -> str:
-    """Versión para chats rápidos o resúmenes usando el modelo 8B."""
-    api_key = _load_api_key()
-    if not api_key: return "Error de configuración."
-    
+def _generate_text_gemini(prompt: str, max_tokens: int = 500) -> str:
+    """Fallback: genera texto usando Gemini cuando GROQ falla."""
     try:
-        client = Groq(api_key=api_key)
-        response = client.chat.completions.create(
-            model="llama-3.1-8b-instant",
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=max_tokens,
-            temperature=0.2 # Más bajo para que sea más preciso en datos
-        )
-        return response.choices[0].message.content.strip()
+        import google.generativeai as genai
+        gemini_key = os.getenv("GEMINI_API_KEY")
+        if not gemini_key and hasattr(st, "secrets"):
+            gemini_key = st.secrets.get("GEMINI_API_KEY")
+        if not gemini_key:
+            return "Error de configuración: sin API key disponible."
+        genai.configure(api_key=gemini_key.strip())
+        model = genai.GenerativeModel("gemini-1.5-flash")
+        response = model.generate_content(prompt)
+        return response.text.strip()
     except Exception as e:
         return f"Error: {e}"
+
+def generate_text(prompt: str, max_tokens: int = 500) -> str:
+    """Versión para chats rápidos o resúmenes usando el modelo 8B. Fallback a Gemini si GROQ falla."""
+    api_key = _load_api_key()
+    if api_key:
+        try:
+            client = Groq(api_key=api_key)
+            response = client.chat.completions.create(
+                model="llama-3.1-8b-instant",
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=max_tokens,
+                temperature=0.2
+            )
+            return response.choices[0].message.content.strip()
+        except Exception:
+            pass  # Fallback to Gemini
+    return _generate_text_gemini(prompt, max_tokens)
 
 def generate_ascii_plan(prompt: str, max_tokens: int = 1000) -> str:
     """Generador de planos ASCII optimizado para Llama 3.1 8B (Gratis) - PLANO OBLIGATORIO"""

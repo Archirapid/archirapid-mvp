@@ -24,7 +24,9 @@ def save_upload(uploaded_file, prefix="file"):
     return fname  # devolver solo el nombre del archivo, no path completo
 
 def db_conn():
-    return sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=15)
+    conn.execute("PRAGMA journal_mode=WAL")
+    return conn
 
 def insert_user(user):
     conn = db_conn(); c=conn.cursor()

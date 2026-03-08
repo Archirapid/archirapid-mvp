@@ -16,7 +16,8 @@ def get_conn():
 
     Usa `DB_PATH` absoluto para evitar confusión entre rutas relativas.
     """
-    conn = sqlite3.connect(str(DB_PATH))
+    conn = sqlite3.connect(str(DB_PATH), timeout=15)
+    conn.execute("PRAGMA journal_mode=WAL")
     conn.row_factory = sqlite3.Row
     return conn
 
