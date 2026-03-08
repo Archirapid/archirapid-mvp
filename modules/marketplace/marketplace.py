@@ -365,7 +365,8 @@ def render_map(plots):
 
         # Botón normal para fincas disponibles
         button_html = f'''
-        <a href="{detail_url}" target="_blank"
+        <a href="#"
+           onclick="window.parent.location.href=window.parent.location.origin+'/?selected_plot={plot['id']}'; return false;"
            style="margin-top:5px; padding:5px 10px; background:#ff4b4b; color:white; text-decoration:none; border-radius:3px; display:inline-block;">
             Ver más detalles
         </a>
