@@ -441,6 +441,7 @@ def show_plot_detail_page(plot_id: str):
                     st.session_state['auto_owner_email'] = buyer_email  # ESTA ES LA LLAVE QUE FALTA
                     st.session_state['user_name'] = buyer_name  # Guardar nombre del usuario
                     st.session_state['selected_page'] = '👤 Panel de Cliente'
+                    st.query_params.clear()  # Eliminar ?selected_plot=... para que el routing vaya al panel
                     st.rerun()
 
                 except Exception as e:
