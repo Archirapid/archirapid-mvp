@@ -349,32 +349,16 @@ def render_map(plots):
     # Crear mapa con Folium
     m = folium.Map(location=[center_lat, center_lon], zoom_start=zoom_level, tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', attr='Esri')
 
-    # Todas las plots en esta lista son disponibles (ya filtradas por get_available_plots)
+    # Mapa latlon → plot_id para capturar clics desde st_folium
+    _latlon_to_id = {}
+
     for plot in plots_processed:
         lat = float(plot['lat'])
         lon = float(plot['lon'])
-        plot_id = plot['id']
-        img_path = get_plot_image_path(plot)
 
-        # Todas las fincas en esta lista son disponibles (filtradas previamente)
         icon = folium.Icon(color='blue', icon='home', prefix='fa', icon_color='white')
-
-        # Crear popup HTML con imagen base64 y enlace a detalles
         img_src = get_popup_image_b64(plot)
-        detail_url = get_plot_detail_url(plot['id'])
-
-        # Botón normal para fincas disponibles
-        _pid = plot['id']
-        button_html = f'''
-        <a href="/?selected_plot={_pid}" target="_top"
-           style="margin-top:5px; padding:5px 10px; background:#ff4b4b; color:white; text-decoration:none; border-radius:3px; display:inline-block;">
-            Ver más detalles
-        </a>
-        '''
-
-        # Nota de ubicación aproximada si aplica
         location_note = "<small style='color:orange;'>Ubicación aproximada</small><br>" if plot.get('approximate_location') else ""
-
         img_tag = f'<img src="{img_src}" style="width:100%;height:100px;object-fit:cover;border-radius:5px;display:block;margin-bottom:6px;" alt="">' if img_src else ''
         popup_html = f'''
         <div style="width:180px;font-family:sans-serif;font-size:13px;">
@@ -382,22 +366,30 @@ def render_map(plots):
             <b style="font-size:13px;">{plot['title']}</b><br>
             {location_note}
             <span style="color:#64748B;">{plot.get('m2', 'N/A')} m²</span><br>
-            {button_html}
+            <span style="color:#94A3B8;font-size:11px;">Haz clic en el marcador para ver detalles</span>
         </div>
         '''
-
-        marker = folium.Marker([lat, lon], icon=icon, popup=folium.Popup(popup_html, max_width=250))
+        marker = folium.Marker([lat, lon], icon=icon,
+                               popup=folium.Popup(popup_html, max_width=250),
+                               tooltip=plot['title'])
         marker.add_to(m)
+        _latlon_to_id[(round(lat, 6), round(lon, 6))] = plot['id']
 
-    # Renderizar mapa
+    # Renderizar mapa con st_folium (captura clics en Python)
     try:
-        st.components.v1.html(m._repr_html_(), height=600)
+        from streamlit_folium import st_folium
+        _map_data = st_folium(m, height=600, use_container_width=True, returned_objects=["last_object_clicked"])
+        # Detectar clic en marcador
+        _clicked = _map_data.get("last_object_clicked") if _map_data else None
+        if _clicked and isinstance(_clicked, dict):
+            _clat = round(float(_clicked.get("lat", 0)), 6)
+            _clon = round(float(_clicked.get("lng", 0)), 6)
+            _clicked_id = _latlon_to_id.get((_clat, _clon))
+            if _clicked_id:
+                st.query_params["selected_plot"] = _clicked_id
+                st.rerun()
     except Exception as e:
         st.error(f"No fue posible renderizar el mapa interactivo: {str(e)}")
-        # Fallback: mostrar coordenadas como texto
-        st.write("**Fincas encontradas:**")
-        for plot in plots_processed:
-            st.write(f"- {plot.get('title', 'Sin título')}: {plot.get('lat')}, {plot.get('lon')}")
 
     # Control nativo para navegación
     render_map_navigation(plots)
