@@ -49,18 +49,19 @@ def generate_project_report(prompt: str) -> str:
         return f"❌ Error: {str(exc)}"
 
 def _generate_text_gemini(prompt: str, max_tokens: int = 500) -> str:
-    """Fallback: genera texto usando Gemini cuando GROQ falla."""
+    """Fallback: genera texto usando Gemini REST API directa cuando GROQ falla."""
     try:
-        import google.generativeai as genai
+        import requests as _req
         gemini_key = os.getenv("GEMINI_API_KEY")
         if not gemini_key and hasattr(st, "secrets"):
             gemini_key = st.secrets.get("GEMINI_API_KEY")
         if not gemini_key:
             return "Error de configuración: sin API key disponible."
-        genai.configure(api_key=gemini_key.strip())
-        model = genai.GenerativeModel("gemini-1.5-flash")
-        response = model.generate_content(prompt)
-        return response.text.strip()
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key.strip()}"
+        payload = {"contents": [{"parts": [{"text": prompt}]}]}
+        resp = _req.post(url, json=payload, timeout=60)
+        resp.raise_for_status()
+        return resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
     except Exception as e:
         return f"Error: {e}"
 

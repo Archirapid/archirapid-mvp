@@ -1,5 +1,5 @@
 import fitz  # PyMuPDF
-import google.generativeai as genai  # Para visión con Gemini
+import requests  # Para llamadas directas a la API REST de Gemini (sin SDK)
 from groq import Groq
 from PIL import Image
 import io
@@ -9,6 +9,31 @@ import base64
 from dotenv import load_dotenv
 import streamlit as st
 from src.models.finca import FincaMVP
+
+
+def _gemini_rest(api_key: str, prompt: str, image_bytes: bytes = None, model: str = "gemini-1.5-flash") -> str:
+    """Llama a Gemini via REST API directa. Sin SDKs, funciona en cualquier plataforma."""
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+    parts = [{"text": prompt}]
+    if image_bytes:
+        parts.insert(0, {"inline_data": {"mime_type": "image/png", "data": base64.b64encode(image_bytes).decode()}})
+    payload = {"contents": [{"parts": parts}]}
+    resp = requests.post(url, json=payload, timeout=60)
+    resp.raise_for_status()
+    return resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+
+
+def _get_gemini_key() -> str:
+    """Obtiene la clave Gemini de secrets o env."""
+    key = None
+    try:
+        if hasattr(st, "secrets"):
+            key = st.secrets.get("GEMINI_API_KEY") or st.secrets.get("GOOGLE_API_KEY")
+    except Exception:
+        pass
+    if not key:
+        key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+    return key.strip() if key else None
 
 # Forzar recarga de variables de entorno
 load_dotenv(override=True)
@@ -41,9 +66,6 @@ def extraer_datos_catastral(pdf_path):
 
         api_key = api_key.strip()
 
-        # Configurar API de Gemini (SDK antiguo)
-        genai.configure(api_key=api_key)
-
         # Cargar PDF y convertir primera página a imagen
         doc = fitz.open(pdf_path)
         page = doc.load_page(0)  # Primera página
@@ -59,27 +81,15 @@ def extraer_datos_catastral(pdf_path):
             doc.close()
             return {"error": "No se pudieron generar bytes de imagen del PDF"}
 
-        img = Image.open(io.BytesIO(img_bytes))
         doc.close()
-
-        # Verificar dimensiones de la imagen
-        if img.width == 0 or img.height == 0:
-            return {"error": "La imagen procesada tiene dimensiones inválidas"}
-
-        # Modelo a usar
-        nombre_modelo = 'gemini-1.5-flash'
 
         # Prompt corto para extraer datos catastrales
         prompt = """Extrae de esta nota catastral: referencia_catastral, superficie_grafica_m2, municipio.
 Devuelve solo JSON: {"referencia_catastral":"codigo","superficie_grafica_m2":numero,"municipio":"ciudad"}"""
 
         try:
-            # Llamada a la IA con imagen PIL + prompt
-            model = genai.GenerativeModel(nombre_modelo)
-            response = model.generate_content([img, prompt])
-
-            # Limpiar respuesta
-            text = response.text.strip()
+            # Llamada directa REST (sin SDK)
+            text = _gemini_rest(api_key, prompt, img_bytes)
             if text.startswith('```json'):
                 text = text[7:]
             if text.startswith('```'):
@@ -135,35 +145,24 @@ def extraer_datos_nota_catastral(pdf_path: str) -> dict:
             - O {"error": "mensaje de error"} si falla
     """
     try:
-        # Cargar variables de entorno
-        load_dotenv()
-        
         # Obtener API key
-        api_key = os.getenv("GEMINI_API_KEY")
+        api_key = _get_gemini_key()
         if not api_key:
-            return {"error": "No se encontró GEMINI_API_KEY en el archivo .env"}
-        
-        # Configurar API de Gemini (SDK antiguo)
-        genai.configure(api_key=api_key)
+            return {"error": "No se encontró GEMINI_API_KEY en secrets/env"}
 
         # Abrir PDF y convertir primera página a imagen
         doc = fitz.open(pdf_path)
         page = doc.load_page(0)
         pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))  # Zoom x2
         img_bytes = pix.tobytes()
-        img = Image.open(io.BytesIO(img_bytes))
         doc.close()
 
         # Prompt para extraer datos catastrales
         prompt = """Extrae de esta nota catastral: referencia_catastral, superficie_grafica_m2, municipio.
 Devuelve solo JSON: {"referencia_catastral":"codigo","superficie_grafica_m2":numero,"municipio":"ciudad"}"""
 
-        # Llamada a Gemini con imagen PIL + prompt
-        model = genai.GenerativeModel("gemini-1.5-flash")
-        resp = model.generate_content([img, prompt])
-
-        # Obtener respuesta
-        text = resp.text.strip()
+        # Llamada directa REST (sin SDK)
+        text = _gemini_rest(api_key, prompt, img_bytes)
         
         # Limpiar respuesta (remover ```json si existe)
         if text.startswith('```json'):
@@ -498,12 +497,7 @@ def get_ai_response(prompt: str, model_name: str = 'models/gemini-2.5-flash') ->
                 return "Error: No se encontró GEMINI_API_KEY ni GOOGLE_API_KEY en secrets/env"
 
         api_key = api_key.strip()
-
-        # Configurar API de Gemini (SDK antiguo)
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel(model_name)
-        response = model.generate_content(prompt)
-        return response.text.strip()
+        return _gemini_rest(api_key, prompt, model=model_name)
 
     except Exception as e:
         error_msg = str(e).lower()
@@ -576,11 +570,7 @@ Formato: Markdown, con títulos y viñetas.
         if not _api_key:
             return "Error: No se encontró GEMINI_API_KEY ni GOOGLE_API_KEY en secrets/env"
 
-        # Configurar API de Gemini (SDK antiguo)
-        genai.configure(api_key=_api_key.strip())
-        model = genai.GenerativeModel("gemini-1.5-flash")
-        response = model.generate_content(prompt)
-        return response.text.strip()
+        return _gemini_rest(_api_key.strip(), prompt)
 
     except Exception as e:
         error_msg = str(e).lower()
