@@ -364,9 +364,9 @@ def render_map(plots):
         detail_url = get_plot_detail_url(plot['id'])
 
         # Botón normal para fincas disponibles
+        _pid = plot['id']
         button_html = f'''
-        <a href="#"
-           onclick="window.parent.location.href=window.parent.location.origin+'/?selected_plot={plot['id']}'; return false;"
+        <a href="/?selected_plot={_pid}" target="_top"
            style="margin-top:5px; padding:5px 10px; background:#ff4b4b; color:white; text-decoration:none; border-radius:3px; display:inline-block;">
             Ver más detalles
         </a>
