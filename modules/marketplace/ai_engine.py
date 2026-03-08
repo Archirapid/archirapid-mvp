@@ -289,16 +289,34 @@ def extraer_datos_catastral_completo(pdf_path: str) -> dict:
                 with open(edificability_path, 'r', encoding='utf-8') as f:
                     edificability = json.load(f)
 
-                # Leer datos del polígono
+                # Leer datos del polígono (opcional)
                 geojson_path = actual_output_dir / "plot_polygon.geojson"
-                with open(geojson_path, 'r', encoding='utf-8') as f:
-                    geojson_data = json.load(f)
+                geojson_data = None
+                if geojson_path.exists():
+                    with open(geojson_path, 'r', encoding='utf-8') as f:
+                        geojson_data = json.load(f)
 
-                # Leer reporte de validación
+                # Leer reporte de validación (opcional — no lo genera el pipeline, puede no existir)
                 validation_path = actual_output_dir / "validation_report.json"
-                with open(validation_path, 'r', encoding='utf-8') as f:
-                    validation = json.load(f)
-                    
+                if validation_path.exists():
+                    with open(validation_path, 'r', encoding='utf-8') as f:
+                        validation = json.load(f)
+                else:
+                    # Sintetizar desde edificability.json
+                    validation = {
+                        "cadastral_ref": edificability.get("cadastral_ref"),
+                        "soil_type": "DESCONOCIDO",
+                        "surface_m2": edificability.get("surface_m2"),
+                        "surface_source": "edificability",
+                        "edificability_percent": edificability.get("edificability_percent", 33) / 100,
+                        "max_buildable_m2": edificability.get("max_buildable_m2"),
+                        "access_detected": False,
+                        "linderos_mentioned": False,
+                        "is_buildable": True,
+                        "issues": [],
+                        "method": "synthesized_from_edificability",
+                    }
+
             except FileNotFoundError as e:
                 return {"error": f"Archivo requerido no encontrado: {e.filename}"}
             except Exception as e:
@@ -312,17 +330,18 @@ def extraer_datos_catastral_completo(pdf_path: str) -> dict:
                              "Usa la opción 'Extraer Datos con IA (Gemini)' durante la subida de la finca."
                 }
 
-            # Leer datos del polígono
-            with open(actual_output_dir / "plot_polygon.geojson", 'r', encoding='utf-8') as f:
-                geojson_data = json.load(f)
-
-            # Leer reporte de validación
-            with open(actual_output_dir / "validation_report.json", 'r', encoding='utf-8') as f:
-                validation = json.load(f)
+            # (geojson_data y validation ya cargados arriba)
 
             # Extraer medidas del polígono
-            coords = geojson_data['geometry']['coordinates'][0]
-            vertices = len(coords) - 1  # Último punto repite el primero
+            if not geojson_data or 'geometry' not in geojson_data:
+                # Sin polígono: usar valores por defecto
+                coords = []
+                vertices = 0
+                ancho_m = largo_m = ((edificability.get('surface_m2') or 1000) ** 0.5)
+                forma = "Irregular"
+            else:
+                coords = geojson_data['geometry']['coordinates'][0]
+                vertices = len(coords) - 1  # Último punto repite el primero
 
             # Calcular medidas aproximadas
             if vertices >= 3:
