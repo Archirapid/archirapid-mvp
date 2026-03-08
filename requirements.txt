@@ -39,7 +39,7 @@ python-dotenv>=1.0.0
 werkzeug>=3.0.0
 
 # AI
-google-genai>=0.3.0
+google-generativeai>=0.8.0
 groq>=0.9.0
 
 # Backend

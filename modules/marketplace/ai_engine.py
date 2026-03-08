@@ -1,5 +1,5 @@
 import fitz  # PyMuPDF
-import google.genai as genai  # Para visión con Gemini
+import google.generativeai as genai  # Para visión con Gemini
 from groq import Groq
 from PIL import Image
 import io
@@ -41,8 +41,8 @@ def extraer_datos_catastral(pdf_path):
 
         api_key = api_key.strip()
 
-        # Configurar API de Gemini
-        client = genai.Client(api_key=api_key)
+        # Configurar API de Gemini (SDK antiguo)
+        genai.configure(api_key=api_key)
 
         # Cargar PDF y convertir primera página a imagen
         doc = fitz.open(pdf_path)
@@ -66,42 +66,20 @@ def extraer_datos_catastral(pdf_path):
         if img.width == 0 or img.height == 0:
             return {"error": "La imagen procesada tiene dimensiones inválidas"}
 
-        # Codificar imagen a base64
-        img_b64 = base64.b64encode(img_bytes).decode()
-
         # Modelo a usar
-        nombre_modelo = 'gemini-2.5-flash'
-
-        # Forzar versión de API compatible
-        os.environ["GOOGLE_API_USE_MTLS"] = "never"
+        nombre_modelo = 'gemini-1.5-flash'
 
         # Prompt corto para extraer datos catastrales
         prompt = """Extrae de esta nota catastral: referencia_catastral, superficie_grafica_m2, municipio.
 Devuelve solo JSON: {"referencia_catastral":"codigo","superficie_grafica_m2":numero,"municipio":"ciudad"}"""
 
-        # Preparar contenidos para la API
-        contents = [{
-            "parts": [
-                {"text": prompt},
-                {
-                    "inline_data": {
-                        "mime_type": "image/png",
-                        "data": img_b64
-                    }
-                }
-            ]
-        }]
-
         try:
-            # Llamada a la IA
-            response = client.models.generate_content(model=nombre_modelo, contents=contents)
-
-            # Verificar que tenemos respuesta
-            if not response or not response.candidates:
-                return {"error": f"Respuesta vacía del modelo {nombre_modelo}"}
+            # Llamada a la IA con imagen PIL + prompt
+            model = genai.GenerativeModel(nombre_modelo)
+            response = model.generate_content([img, prompt])
 
             # Limpiar respuesta
-            text = response.candidates[0].content.parts[0].text.strip()
+            text = response.text.strip()
             if text.startswith('```json'):
                 text = text[7:]
             if text.startswith('```'):
@@ -165,37 +143,27 @@ def extraer_datos_nota_catastral(pdf_path: str) -> dict:
         if not api_key:
             return {"error": "No se encontró GEMINI_API_KEY en el archivo .env"}
         
-        # Configurar cliente Gemini
-        client = genai.Client(api_key=api_key)
-        
+        # Configurar API de Gemini (SDK antiguo)
+        genai.configure(api_key=api_key)
+
         # Abrir PDF y convertir primera página a imagen
         doc = fitz.open(pdf_path)
         page = doc.load_page(0)
         pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))  # Zoom x2
         img_bytes = pix.tobytes()
-        img_b64 = base64.b64encode(img_bytes).decode()
+        img = Image.open(io.BytesIO(img_bytes))
         doc.close()
-        
+
         # Prompt para extraer datos catastrales
         prompt = """Extrae de esta nota catastral: referencia_catastral, superficie_grafica_m2, municipio.
 Devuelve solo JSON: {"referencia_catastral":"codigo","superficie_grafica_m2":numero,"municipio":"ciudad"}"""
-        
-        # Preparar contenido para la API
-        contents = [{
-            "parts": [
-                {"text": prompt},
-                {"inline_data": {"mime_type": "image/png", "data": img_b64}}
-            ]
-        }]
-        
-        # Llamada a Gemini
-        resp = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=contents
-        )
-        
+
+        # Llamada a Gemini con imagen PIL + prompt
+        model = genai.GenerativeModel("gemini-1.5-flash")
+        resp = model.generate_content([img, prompt])
+
         # Obtener respuesta
-        text = resp.candidates[0].content.parts[0].text.strip()
+        text = resp.text.strip()
         
         # Limpiar respuesta (remover ```json si existe)
         if text.startswith('```json'):
@@ -531,19 +499,11 @@ def get_ai_response(prompt: str, model_name: str = 'models/gemini-2.5-flash') ->
 
         api_key = api_key.strip()
 
-        # Configurar cliente Gemini
-        client = genai.Client(api_key=api_key)
-
-        # Preparar contenido
-        contents = [{"parts": [{"text": prompt}]}]
-
-        # Llamada al modelo
-        response = client.models.generate_content(model=model_name, contents=contents)
-
-        if response and response.candidates:
-            return response.candidates[0].content.parts[0].text.strip()
-        else:
-            return "Error: No se pudo generar una respuesta válida"
+        # Configurar API de Gemini (SDK antiguo)
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel(model_name)
+        response = model.generate_content(prompt)
+        return response.text.strip()
 
     except Exception as e:
         error_msg = str(e).lower()
@@ -603,7 +563,7 @@ Incluye:
 Formato: Markdown, con títulos y viñetas.
 """
 
-        # Cargar API key y cliente Gemini
+        # Cargar API key
         _api_key = None
         try:
             import streamlit as _st
@@ -615,19 +575,12 @@ Formato: Markdown, con títulos y viñetas.
             _api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
         if not _api_key:
             return "Error: No se encontró GEMINI_API_KEY ni GOOGLE_API_KEY en secrets/env"
-        client = genai.Client(api_key=_api_key)
 
-        # Llamar al modelo Gemini
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=prompt
-        )
-
-        # Obtener respuesta
-        if response and response.candidates:
-            return response.candidates[0].content.parts[0].text.strip()
-        else:
-            return "Error: No se pudo generar un análisis válido"
+        # Configurar API de Gemini (SDK antiguo)
+        genai.configure(api_key=_api_key.strip())
+        model = genai.GenerativeModel("gemini-1.5-flash")
+        response = model.generate_content(prompt)
+        return response.text.strip()
 
     except Exception as e:
         error_msg = str(e).lower()
