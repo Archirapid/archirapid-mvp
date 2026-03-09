@@ -3266,6 +3266,25 @@ def render_step3():
             st.balloons()
             st.success(f"✅ Pago simulado de €{st.session_state.get('total_pagado',0):,} procesado. ¡Tu proyecto está listo!")
 
+            # ── Calculadora de hipoteca con datos del diseño ─────────────────
+            try:
+                from modules.marketplace.hipoteca import render_calculadora
+                _req_h    = st.session_state.get("ai_house_requirements", {})
+                _plot_h   = st.session_state.get("design_plot_data", {})
+                _precio_t = float(_plot_h.get("price") or 0)
+                _m2_h     = float(_req_h.get("total_m2") or _req_h.get("m2_construidos") or 80)
+                _style_h  = (_req_h.get("style") or "").lower()
+                _coste_m2 = 1800 if "premium" in _style_h or "lujo" in _style_h else (1200 if "eco" in _style_h or "madera" in _style_h else 1400)
+                _coste_obra = _m2_h * _coste_m2
+                with st.expander("🏦 Calculadora de Financiación — ¿Cuánto pagarías al mes?", expanded=True):
+                    render_calculadora(
+                        precio_terreno=_precio_t,
+                        coste_construccion=_coste_obra,
+                        key_prefix="flow5"
+                    )
+            except Exception:
+                pass
+
             st.markdown("### 📥 Descarga Tu Proyecto Completo")
 
             try:

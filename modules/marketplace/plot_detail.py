@@ -469,4 +469,19 @@ def show_plot_detail_page(plot_id: str):
                 except Exception as e:
                     st.error(f"Error al procesar la operación: {str(e)}")
 
+    # ── Calculadora de financiación ───────────────────────────────────────────
+    try:
+        from modules.marketplace.hipoteca import render_calculadora
+        precio_p   = float(plot.get("price") or 0)
+        sup_p      = float(plot.get("surface_m2") or plot.get("m2") or 0)
+        coste_obra = sup_p * 0.33 * 1300  # edificable × €1.300/m² orientativo
+        with st.expander("🏦 Calculadora de Financiación — ¿Cuánto pagaría al mes?", expanded=False):
+            render_calculadora(
+                precio_terreno=precio_p,
+                coste_construccion=coste_obra,
+                key_prefix=f"pd_{plot.get('id','x')}"
+            )
+    except Exception:
+        pass
+
     st.markdown("---")
