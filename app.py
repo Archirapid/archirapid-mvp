@@ -1287,6 +1287,15 @@ if st.session_state.get('_nav_route') != _nav_route:
         height=0
     )
 
+# === RUTA PÚBLICA: ?page=stats (sin login) ===
+if st.query_params.get("page") == "stats":
+    try:
+        from modules.marketplace.stats_public import render as _render_stats
+        _render_stats()
+    except Exception as _se:
+        st.error(f"Error cargando estadísticas: {_se}")
+    st.stop()
+
 # === NUEVAS RUTAS V2 (BORRÓN Y CUENTA NUEVA) ===
 page_from_query = False  # Variable para controlar si la página viene de query params
 if "selected_prefab" in st.query_params and not page_from_query:
