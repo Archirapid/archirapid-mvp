@@ -164,6 +164,19 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
         <button class="tool-btn active" id="btn-select" onclick="setMode('select')">🖱️ Seleccionar</button>
         <button class="tool-btn" id="btn-move"   onclick="setMode('move')">↔️ Mover habitación</button>
         <button class="tool-btn" id="btn-scale"  onclick="setMode('scale')">📐 Editar dimensiones</button>
+
+        <!-- PANEL NUMÉRICO — aparece al seleccionar en modo Editar dimensiones -->
+        <div id="edit-panel">
+            <h4>✏️ Editar dimensiones</h4>
+            <div id="edit-room-name" style="font-size:12px; font-weight:bold; margin-bottom:4px;"></div>
+            <label>Ancho (m)</label>
+            <input type="number" id="input-width" min="1" max="20" step="0.1">
+            <label>Fondo (m)</label>
+            <input type="number" id="input-depth" min="1" max="20" step="0.1">
+            <button id="btn-apply" onclick="applyDimensions()">✅ Aplicar</button>
+            <div id="cte-status"></div>
+        </div>
+
         <button class="tool-btn" id="btn-fence" onclick="toggleFence()">🧱 Cerramiento OFF</button>
         <div id="fence-options" style="display:none; margin-top:6px;">
             <select id="fence-style" style="width:100%;padding:4px;background:#1a1a2e;color:white;border:1px solid #3498DB;border-radius:4px;font-size:12px;">
@@ -207,18 +220,6 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
         <hr class="divider">
         <button class="tool-btn green" onclick="saveChanges()">💾 Guardar JSON</button>
         <button class="tool-btn green" id="btn-glb" onclick="exportGLB()">📦 Exportar 3D (.glb)</button>
-
-        <!-- PANEL NUMÉRICO — aparece al seleccionar en modo Editar dimensiones -->
-        <div id="edit-panel">
-            <h4>✏️ Editar dimensiones</h4>
-            <div id="edit-room-name" style="font-size:12px; font-weight:bold; margin-bottom:4px;"></div>
-            <label>Ancho (m)</label>
-            <input type="number" id="input-width" min="1" max="20" step="0.1">
-            <label>Fondo (m)</label>
-            <input type="number" id="input-depth" min="1" max="20" step="0.1">
-            <button id="btn-apply" onclick="applyDimensions()">✅ Aplicar</button>
-            <div id="cte-status"></div>
-        </div>
     </div>
 
     <!-- PANEL INFO DERECHO -->
