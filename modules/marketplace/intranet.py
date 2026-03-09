@@ -150,50 +150,88 @@ def main():
 
     with tab5:
         try:
-            st.header("🛠️ Gestión de Profesionales Registrados")
-            
-            # Función para obtener profesionales
-            def get_service_providers():
-                conn = db_conn()
-                c = conn.cursor()
-                c.execute("""
-                    SELECT name, company, specialty, experience_years, service_area, certifications
-                    FROM service_providers
-                    ORDER BY name
-                """)
-                providers = c.fetchall()
-                conn.close()
-                return providers
-            
-            providers = get_service_providers()
-            
-            if providers:
-                # Filtro por especialidad
-                specialties = list(set([p[2] for p in providers if p[2]]))  # Especialidades únicas
-                selected_specialty = st.selectbox("Filtrar por Especialidad", ["Todas"] + sorted(specialties), key="filter_specialty")
-                
-                # Filtrar datos
-                if selected_specialty != "Todas":
-                    filtered_providers = [p for p in providers if p[2] == selected_specialty]
-                else:
-                    filtered_providers = providers
-                
-                # Preparar datos para tabla
-                table_data = []
-                for p in filtered_providers:
-                    table_data.append({
-                        "Nombre": p[0],
-                        "Empresa": p[1] or "Independiente",
-                        "Especialidad": p[2],
-                        "Años Exp.": p[3],
-                        "Ciudad": p[4] or "No especificada",
-                        "Certificaciones": p[5] or "Ninguna"
-                    })
-                
-                st.dataframe(table_data, use_container_width=True)
-                st.success(f"Mostrando {len(filtered_providers)} profesionales")
-            else:
+            st.header("🛠️ Gestión de Profesionales / Constructores")
+
+            _conn5 = db_conn()
+            # Añadir columnas si no existen
+            for _col, _def in [("is_featured","INTEGER DEFAULT 0"),
+                                ("featured_until","TEXT"),
+                                ("featured_plan","TEXT DEFAULT 'free'")]:
+                try:
+                    _conn5.execute(f"ALTER TABLE service_providers ADD COLUMN {_col} {_def}")
+                    _conn5.commit()
+                except Exception:
+                    pass
+
+            _providers5 = _conn5.execute("""
+                SELECT id, name, email, company, specialty, experience_years,
+                       service_area, is_featured, featured_until, featured_plan,
+                       created_at
+                FROM service_providers ORDER BY is_featured DESC, name
+            """).fetchall()
+            _conn5.close()
+
+            if not _providers5:
                 st.info("No hay profesionales registrados aún.")
+            else:
+                # KPIs
+                _n_feat = sum(1 for p in _providers5 if p[7])
+                _n_free = len(_providers5) - _n_feat
+                _k1, _k2, _k3 = st.columns(3)
+                _k1.metric("👷 Total constructores", len(_providers5))
+                _k2.metric("⭐ Destacados (€99/mes)", _n_feat,
+                           delta=f"€{_n_feat*99}/mes MRR")
+                _k3.metric("🆓 Plan gratuito", _n_free)
+
+                st.markdown("---")
+                st.markdown("**Gestionar planes Destacado:**")
+
+                for _p5 in _providers5:
+                    (_pid5, _name5, _email5, _comp5, _spec5, _exp5,
+                     _area5, _feat5, _funtil5, _fplan5, _cat5) = _p5
+                    _badge = "⭐ DESTACADO" if _feat5 else "🆓 Gratuito"
+                    with st.expander(f"{_badge} · {_name5} ({_email5}) — {_area5}"):
+                        _ci1, _ci2 = st.columns(2)
+                        with _ci1:
+                            st.markdown(f"""
+<div style="font-size:12px;color:#CBD5E1;line-height:1.9;">
+  <b>Empresa:</b> {_comp5 or '—'}<br>
+  <b>Especialidad:</b> {_spec5 or '—'}<br>
+  <b>Experiencia:</b> {_exp5} años<br>
+  <b>Zona:</b> {_area5 or '—'}<br>
+  <b>Plan solicitado:</b> {_fplan5 or 'free'}<br>
+  <b>Registrado:</b> {(_cat5 or '')[:10]}
+</div>""", unsafe_allow_html=True)
+                        with _ci2:
+                            _new_feat = st.checkbox(
+                                "⭐ Activar/desactivar Destacado",
+                                value=bool(_feat5),
+                                key=f"feat_{_pid5}"
+                            )
+                            _new_until = st.text_input(
+                                "Válido hasta (YYYY-MM-DD)",
+                                value=_funtil5 or "",
+                                key=f"until_{_pid5}",
+                                placeholder="2026-04-09"
+                            )
+                            if st.button(f"💾 Guardar plan", key=f"savefeat_{_pid5}",
+                                         type="primary", use_container_width=True):
+                                _conn_upd = db_conn()
+                                _conn_upd.execute(
+                                    "UPDATE service_providers SET is_featured=?, featured_until=? WHERE id=?",
+                                    (int(_new_feat), _new_until or None, _pid5)
+                                )
+                                _conn_upd.commit(); _conn_upd.close()
+                                # Notificar al constructor
+                                try:
+                                    from modules.marketplace.email_notify import _send
+                                    _status = "ACTIVADO ⭐" if _new_feat else "desactivado"
+                                    _send(f"⭐ <b>Plan Destacado {_status}</b>\n{_name5} ({_email5})\nVálido hasta: {_new_until or 'indefinido'}")
+                                except Exception:
+                                    pass
+                                st.success(f"✅ Plan de {_name5} actualizado.")
+                                st.rerun()
+
         except Exception as e:
             st.error(f"Error en Gestión de Profesionales: {e}")
 

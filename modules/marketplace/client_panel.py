@@ -1393,11 +1393,12 @@ def show_construccion_offers(client_email: str):
                    co.price_no_mat, co.price_with_mat, co.includes_materials,
                    co.plazo_semanas, co.garantia_anos, co.nota_tecnica,
                    co.breakdown_json, co.estado, co.created_at,
-                   sp.experience_years, sp.specialties, sp.description, sp.service_area
+                   sp.experience_years, sp.specialties, sp.description, sp.service_area,
+                   COALESCE(sp.is_featured, 0) as is_feat
             FROM construction_offers co
             LEFT JOIN service_providers sp ON co.provider_id = sp.id
             WHERE co.tablon_id=?
-            ORDER BY co.created_at DESC
+            ORDER BY COALESCE(sp.is_featured, 0) DESC, co.created_at ASC
         """, (tid,)).fetchall()
         conn2.close()
 
@@ -1425,12 +1426,14 @@ def show_construccion_offers(client_email: str):
                  p_nm, p_wm, incl_mat,
                  plazo, garantia, nota,
                  breakdown_json, estado, of_date,
-                 exp_years, specialties_json, sp_desc, sp_area) = of
+                 exp_years, specialties_json, sp_desc, sp_area,
+                 is_feat) = of
 
                 precio_show = float(p_wm or 0) if incl_mat else float(p_nm or 0)
                 mat_label   = "con materiales" if incl_mat else "sin materiales"
                 ahorro_pct  = int((1 - precio_show / total_cost) * 100) if total_cost else 0
                 plazo_meses = round(plazo / 4.3, 1) if plazo else 0
+                featured_c  = bool(is_feat)
 
                 try:
                     specs = _json.loads(specialties_json) if specialties_json else []
@@ -1444,6 +1447,7 @@ def show_construccion_offers(client_email: str):
                     "aceptada": "#4ADE80",
                     "rechazada":"#F87171",
                 }.get(estado, "#94A3B8")
+                border_color = "#F59E0B" if featured_c else (estado_color + "55")
 
                 col_idx = idx % 3
                 with cols[col_idx]:
@@ -1460,10 +1464,13 @@ def show_construccion_offers(client_email: str):
                     except Exception:
                         pass
 
+                    feat_html = '<div style="display:inline-block;background:#F59E0B;color:#000;font-size:10px;font-weight:900;padding:2px 10px;border-radius:10px;margin-bottom:8px;">⭐ DESTACADO · VERIFICADO</div><br>' if featured_c else ''
                     st.markdown(f"""
-<div style="background:rgba(30,58,95,0.4);border:2px solid {estado_color}33;
+<div style="background:{'rgba(245,158,11,0.08)' if featured_c else 'rgba(30,58,95,0.4)'};
+            border:2px solid {border_color};
             border-radius:12px;padding:16px;margin-bottom:12px;">
 
+  {feat_html}
   <div style="font-size:14px;font-weight:800;color:#F8FAFC;margin-bottom:2px;">
     🏗️ {prov_name or 'Constructor'}
   </div>

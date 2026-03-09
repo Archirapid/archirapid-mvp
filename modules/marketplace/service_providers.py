@@ -54,6 +54,39 @@ _ESP_LABELS = {
 
 # ── DB init (seguro — ALTER TABLE si columna no existe) ────────────────────────
 
+def _is_featured(provider_id: str) -> bool:
+    """True si el constructor tiene plan Destacado vigente."""
+    try:
+        conn = db_conn()
+        row = conn.execute(
+            "SELECT is_featured, featured_until FROM service_providers WHERE id=?",
+            (provider_id,)
+        ).fetchone()
+        conn.close()
+        if not row or not row[0]:
+            return False
+        if row[1]:  # fecha de caducidad
+            return datetime.utcnow().isoformat() < row[1]
+        return bool(row[0])
+    except Exception:
+        return False
+
+
+def _offers_this_month(provider_id: str) -> int:
+    """Número de ofertas enviadas en el mes actual."""
+    try:
+        month = datetime.utcnow().strftime("%Y-%m")
+        conn = db_conn()
+        n = conn.execute(
+            "SELECT COUNT(*) FROM construction_offers WHERE provider_id=? AND created_at LIKE ?",
+            (provider_id, f"{month}%")
+        ).fetchone()[0]
+        conn.close()
+        return n
+    except Exception:
+        return 0
+
+
 def _init_sp_tables():
     """Crea/migra tablas de constructores. Siempre seguro."""
     conn = db_conn()
@@ -64,6 +97,9 @@ def _init_sp_tables():
         ("price_per_m2_with_mat", "REAL DEFAULT 0"),
         ("description",           "TEXT"),
         ("active",                "INTEGER DEFAULT 1"),
+        ("is_featured",           "INTEGER DEFAULT 0"),
+        ("featured_until",        "TEXT"),
+        ("featured_plan",         "TEXT DEFAULT 'free'"),
     ]:
         try:
             conn.execute(f"ALTER TABLE service_providers ADD COLUMN {col} {typedef}")
@@ -163,6 +199,42 @@ def show_service_provider_registration():
         with c3: password  = st.text_input("Contraseña *", type="password", key="sp_password")
         with c4: confirm   = st.text_input("Confirmar contraseña *", type="password", key="sp_confirm")
 
+        st.markdown("---")
+        st.markdown("**Elige tu plan:**")
+        plan_cols = st.columns(2)
+        with plan_cols[0]:
+            st.markdown("""
+<div style="border:2px solid rgba(255,255,255,0.15);border-radius:10px;padding:14px;text-align:center;">
+  <div style="font-weight:800;color:#F8FAFC;font-size:15px;">🆓 Plan Gratuito</div>
+  <div style="color:#4ADE80;font-size:1.3rem;font-weight:900;margin:6px 0;">€0/mes</div>
+  <div style="color:#94A3B8;font-size:11px;line-height:1.8;">
+    ✅ Registro y perfil<br>
+    ✅ Ver tablón de obras<br>
+    ✅ 3 ofertas/mes<br>
+    ❌ Sin badge Destacado<br>
+    ❌ Proyectos con 24h retraso
+  </div>
+</div>""", unsafe_allow_html=True)
+        with plan_cols[1]:
+            st.markdown("""
+<div style="border:2px solid #F59E0B;border-radius:10px;padding:14px;text-align:center;
+            background:rgba(245,158,11,0.06);">
+  <div style="font-weight:800;color:#F59E0B;font-size:15px;">⭐ Plan Destacado</div>
+  <div style="color:#F59E0B;font-size:1.3rem;font-weight:900;margin:6px 0;">€99/mes</div>
+  <div style="color:#CBD5E1;font-size:11px;line-height:1.8;">
+    ✅ Todo lo gratuito<br>
+    ✅ Ofertas ilimitadas<br>
+    ✅ Badge ⭐ VERIFICADO<br>
+    ✅ Primero en comparativas<br>
+    ✅ Notificación inmediata
+  </div>
+</div>""", unsafe_allow_html=True)
+
+        plan_elegido = st.radio("", ["free", "destacado"],
+                                format_func=lambda x: "🆓 Plan Gratuito (€0/mes)" if x == "free"
+                                                      else "⭐ Plan Destacado (€99/mes) — Activación tras confirmación de pago",
+                                key="sp_plan", horizontal=True)
+
         gdpr = st.checkbox("Acepto la Política de Privacidad y el tratamiento de mis datos profesionales.",
                            key="sp_gdpr")
 
@@ -191,15 +263,17 @@ def show_service_provider_registration():
                 pid = f"sp_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}"
                 sp_json = json.dumps(specialties)
                 sp_primary = specialties[0] if specialties else "constructor"
+                _plan = st.session_state.get("sp_plan", "free")
                 conn.execute("""
                     INSERT INTO service_providers
                         (id,name,email,nif,specialty,specialties,company,phone,address,
                          certifications,experience_years,service_area,
-                         price_per_m2_no_mat,price_per_m2_with_mat,description,active,created_at)
-                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?)
+                         price_per_m2_no_mat,price_per_m2_with_mat,description,
+                         active,featured_plan,created_at)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?)
                 """, (pid, name, email, nif, sp_primary, sp_json, company, phone, address,
                       certifications, experience_years, service_area,
-                      price_no_mat, price_with_mat, description,
+                      price_no_mat, price_with_mat, description, _plan,
                       datetime.utcnow().isoformat()))
                 pwd_hash = generate_password_hash(password)
                 conn.execute("""
@@ -208,7 +282,18 @@ def show_service_provider_registration():
                 """, (pid, email, pwd_hash, name, datetime.utcnow().isoformat()))
                 conn.commit()
                 conn.close()
-                st.success("✅ ¡Registro completado! Accede desde Home → Acceso → Servicios.")
+                # Notificar admin
+                try:
+                    from modules.marketplace.email_notify import _send
+                    _plan_txt = "⭐ DESTACADO (€99/mes) — pendiente activación" if _plan == "destacado" else "🆓 Gratuito"
+                    _send(f"🏗️ <b>Nuevo constructor registrado</b>\n{name} ({email})\nPlan: {_plan_txt}\nZona: {service_area}")
+                except Exception:
+                    pass
+                if _plan == "destacado":
+                    st.success("✅ ¡Registro completado! Tu plan Destacado está **pendiente de activación**.")
+                    st.info("💳 El equipo ArchiRapid se pondrá en contacto en las próximas horas para confirmar el pago y activar tu badge ⭐.")
+                else:
+                    st.success("✅ ¡Registro completado! Accede desde Home → Acceso → Servicios.")
                 st.balloons()
             except Exception as e:
                 st.error(f"Error en el registro: {e}")
@@ -228,7 +313,8 @@ def show_service_provider_panel():
     row = conn.execute("""
         SELECT id,name,specialty,specialties,company,phone,address,certifications,
                experience_years,service_area,
-               price_per_m2_no_mat,price_per_m2_with_mat,description
+               price_per_m2_no_mat,price_per_m2_with_mat,description,
+               is_featured,featured_until,featured_plan
         FROM service_providers WHERE email=?
     """, (user_email,)).fetchone()
     conn.close()
@@ -240,23 +326,58 @@ def show_service_provider_panel():
     (pid, name, specialty_old, specialties_json,
      company, phone, address, certifications,
      exp_years, service_area,
-     p_nm, p_wm, description) = row
+     p_nm, p_wm, description,
+     is_feat_db, featured_until, featured_plan) = row
 
     try:
         specialties = json.loads(specialties_json) if specialties_json else [specialty_old]
     except Exception:
         specialties = [specialty_old] if specialty_old else ["constructor"]
 
-    p_nm  = float(p_nm  or 650)
-    p_wm  = float(p_wm  or 1100)
+    p_nm       = float(p_nm  or 650)
+    p_wm       = float(p_wm  or 1100)
+    featured   = _is_featured(pid)
+    n_ofertas_mes = _offers_this_month(pid)
+    LIMITE_FREE = 3
+
+    # ── Banner de plan ─────────────────────────────────────────────────────────
+    if featured:
+        feat_exp = featured_until[:10] if featured_until else "indefinido"
+        st.markdown(f"""
+<div style="background:linear-gradient(135deg,rgba(245,158,11,0.15),rgba(245,158,11,0.05));
+            border:1px solid #F59E0B;border-radius:10px;padding:10px 16px;margin-bottom:12px;
+            display:flex;align-items:center;gap:10px;">
+  <div style="font-size:1.4rem;">⭐</div>
+  <div>
+    <div style="font-weight:800;color:#F59E0B;font-size:13px;">PLAN DESTACADO ACTIVO</div>
+    <div style="color:#94A3B8;font-size:11px;">Ofertas ilimitadas · Primera posición · Válido hasta {feat_exp}</div>
+  </div>
+</div>""", unsafe_allow_html=True)
+    else:
+        ofertas_restantes = max(0, LIMITE_FREE - n_ofertas_mes)
+        st.markdown(f"""
+<div style="background:rgba(30,58,95,0.3);border:1px solid rgba(255,255,255,0.1);
+            border-radius:10px;padding:10px 16px;margin-bottom:12px;
+            display:flex;align-items:center;justify-content:space-between;gap:10px;">
+  <div>
+    <div style="font-weight:700;color:#F8FAFC;font-size:12px;">🆓 Plan Gratuito
+      — <span style="color:{'#4ADE80' if ofertas_restantes>0 else '#F87171'}">
+        {ofertas_restantes}/{LIMITE_FREE} ofertas restantes este mes
+      </span>
+    </div>
+    <div style="color:#64748B;font-size:11px;">Pasa a Destacado para ofertas ilimitadas + primera posición</div>
+  </div>
+  <div style="font-size:11px;color:#F59E0B;font-weight:700;white-space:nowrap;">⭐ €99/mes →</div>
+</div>""", unsafe_allow_html=True)
 
     # ── Header ────────────────────────────────────────────────────────────────
+    feat_badge = ' <span style="background:#F59E0B;color:#000;font-size:10px;font-weight:800;padding:2px 8px;border-radius:10px;">⭐ DESTACADO</span>' if featured else ''
     st.markdown(f"""
 <div style="background:linear-gradient(135deg,#1E3A5F,#0D2A4A);border-radius:14px;
             padding:20px 24px;margin-bottom:16px;display:flex;align-items:center;gap:16px;">
   <div style="font-size:2.5rem;">🏗️</div>
   <div>
-    <div style="font-size:1.3rem;font-weight:900;color:#F8FAFC;">{name}</div>
+    <div style="font-size:1.3rem;font-weight:900;color:#F8FAFC;">{name}{feat_badge}</div>
     <div style="color:#94A3B8;font-size:13px;">{company or 'Profesional independiente'} · {service_area} · {exp_years} años exp.</div>
     <div style="margin-top:6px;">
       {''.join(f'<span style="background:rgba(37,99,235,0.2);border:1px solid rgba(37,99,235,0.3);border-radius:12px;padding:2px 10px;font-size:11px;color:#93C5FD;margin-right:4px;">{_ESP_LABELS.get(s,s)}</span>' for s in specialties)}
@@ -386,7 +507,16 @@ def show_service_provider_panel():
                             # Desglose por partidas (pre-calculado)
                             _breakdown = _build_breakdown(area, _precio_nm, _precio_wm, _incl_mat)
 
-                            if st.button("📨 Enviar oferta", key=f"send_{tid}", type="primary", use_container_width=True):
+                            # Límite plan gratuito
+                            if not featured and n_ofertas_mes >= LIMITE_FREE:
+                                st.warning(f"⚠️ Has alcanzado el límite de {LIMITE_FREE} ofertas/mes del plan gratuito.")
+                                st.markdown("""
+<div style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);
+            border-radius:8px;padding:10px 14px;font-size:12px;color:#FCD34D;">
+  ⭐ <b>Plan Destacado (€99/mes)</b> — ofertas ilimitadas + primera posición en comparativas.<br>
+  Contacta con <b>archirapid2026@gmail.com</b> para activarlo.
+</div>""", unsafe_allow_html=True)
+                            elif st.button("📨 Enviar oferta", key=f"send_{tid}", type="primary", use_container_width=True):
                                 try:
                                     oid = f"of_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}_{pid[:6]}"
                                     conn4 = db_conn()
@@ -531,6 +661,38 @@ def show_service_provider_panel():
         sc1.metric("📨 Ofertas enviadas", n_ofertas)
         sc2.metric("✅ Ofertas aceptadas", n_aceptadas)
         sc3.metric("📊 Tasa de éxito", f"{int(n_aceptadas/n_ofertas*100)}%" if n_ofertas else "—")
+
+        # ── CTA upgrade si es plan gratuito ───────────────────────────────────
+        if not featured:
+            st.markdown("---")
+            st.markdown("""
+<div style="background:linear-gradient(135deg,rgba(245,158,11,0.1),rgba(245,158,11,0.05));
+            border:2px solid rgba(245,158,11,0.4);border-radius:14px;padding:20px 24px;">
+  <div style="font-size:1.1rem;font-weight:900;color:#F59E0B;margin-bottom:8px;">
+    ⭐ Pasa a Plan Destacado — €99/mes
+  </div>
+  <div style="color:#CBD5E1;font-size:13px;line-height:1.9;margin-bottom:14px;">
+    ✅ Ofertas ilimitadas (ahora tienes 3/mes)<br>
+    ✅ Primera posición en la comparativa del cliente<br>
+    ✅ Badge <b>⭐ DESTACADO · VERIFICADO</b> en tu tarjeta<br>
+    ✅ Notificación inmediata de nuevos proyectos<br>
+    ✅ Apareces en fichas de fincas de tu provincia
+  </div>
+  <div style="font-size:12px;color:#94A3B8;">
+    💳 Para activarlo contacta con <b>archirapid2026@gmail.com</b> o al <b>+34 XXX XXX XXX</b>.<br>
+    Activación en menos de 24h.
+  </div>
+</div>""", unsafe_allow_html=True)
+            # Botón simulado para MVP
+            if st.button("⭐ Solicitar Plan Destacado (€99/mes)", type="primary", use_container_width=True,
+                         key="btn_upgrade_destacado"):
+                try:
+                    from modules.marketplace.email_notify import _send
+                    _send(f"⭐ <b>Solicitud Plan Destacado</b>\n{name} ({user_email})\nZona: {service_area}")
+                except Exception:
+                    pass
+                st.success("✅ Solicitud enviada. El equipo ArchiRapid te contactará en menos de 24h para activar tu plan.")
+                st.balloons()
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
