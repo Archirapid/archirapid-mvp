@@ -113,7 +113,7 @@ def _send_email(to_email: str, to_name: str, subject: str, html: str) -> bool:
             "https://api.resend.com/emails",
             headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
             json={
-                "from": "ArchiRapid <alertas@archirapid.es>",
+                "from": "ArchiRapid <onboarding@resend.dev>",
                 "to": [to_email],
                 "subject": subject,
                 "html": html,
