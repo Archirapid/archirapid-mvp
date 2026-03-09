@@ -370,24 +370,21 @@ def main():
     with tab8:
         st.header("📬 Actividad Reciente")
 
-        # Estado configuración email
+        # Estado configuración Telegram
         try:
-            from modules.marketplace.email_notify import _get_gmail_password
-            _gpwd = _get_gmail_password()
-            if _gpwd:
-                st.success("✅ Email configurado — notificaciones activas (archirapid2026@gmail.com)")
+            from modules.marketplace.email_notify import _get_telegram_creds
+            _tok, _cid = _get_telegram_creds()
+            if _tok and _cid:
+                st.success("✅ Telegram configurado — notificaciones activas (@archirapid_mvp_bot)")
             else:
-                st.warning("⚠️ **Notificaciones email inactivas** — añade `GMAIL_APP_PASSWORD` en Streamlit Cloud Secrets o en `.env` local.")
+                st.warning("⚠️ **Notificaciones Telegram inactivas** — añade las credenciales en Streamlit Cloud Secrets.")
                 with st.expander("¿Cómo configurar?"):
                     st.markdown("""
-1. Entra en [myaccount.google.com](https://myaccount.google.com) con `archirapid2026@gmail.com`
-2. **Seguridad → Verificación en 2 pasos** (activar si no lo está)
-3. **Seguridad → Contraseñas de aplicación** → crea una nueva → copia las 16 letras
-4. En Streamlit Cloud → Settings → Secrets, añade:
+En Streamlit Cloud → Settings → Secrets, añade:
 ```
-GMAIL_APP_PASSWORD = "xxxx xxxx xxxx xxxx"
+TELEGRAM_BOT_TOKEN = "8611167436:AAGohKZ9nKIhv_YbDNMqzcgkHZeIvr1V6j0"
+TELEGRAM_CHAT_ID   = "5712417665"
 ```
-5. En `.env` local añade: `GMAIL_APP_PASSWORD=xxxxxxxxxxxxxxxxxxxx`
 """)
         except Exception:
             pass
