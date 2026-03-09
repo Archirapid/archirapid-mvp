@@ -1525,7 +1525,7 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
 
         st.markdown(f"""
         <div style="background:linear-gradient(135deg,#0D1B2A,#1E3A5F);border-radius:14px;
-                    padding:28px 32px;margin-bottom:28px;border:1px solid rgba(245,158,11,0.3);">
+                    padding:14px 20px;margin-bottom:16px;border:1px solid rgba(245,158,11,0.3);">
             <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px;">
                 <div style="flex:1;min-width:260px;">
                     <div style="font-size:11px;font-weight:700;color:#F59E0B;letter-spacing:2px;
@@ -1539,12 +1539,10 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
                         Valida tu finca con IA, diseña tu vivienda y accede a proyectos
                         arquitectónicos reales. Sin coste durante la beta.
                     </div>
-                    <div style="font-size:0.78em;color:#64748B;margin-bottom:16px;
-                                border-top:1px solid rgba(255,255,255,0.07);padding-top:10px;">
-                        ⚠️ <b style="color:#94A3B8;">Modo demostración:</b>
-                        los datos mostrados son reales pero ninguna operación tiene validez
-                        jurídica ni implica adquisición efectiva de ningún inmueble.
-                        El acceso es exclusivamente para explorar la plataforma.
+                    <div style="font-size:0.82em;color:#94A3B8;margin-bottom:12px;
+                                border-top:1px solid rgba(255,255,255,0.07);padding-top:8px;">
+                        ⚠️ <b>Modo demostración:</b>
+                        datos reales, sin validez jurídica ni adquisición efectiva.
                     </div>
                     <div style="background:rgba(255,255,255,0.06);border-radius:8px;padding:10px 14px;
                                 display:inline-block;">
@@ -1579,7 +1577,7 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
 
         _wl_key = "waitlist_submitted"
         if not st.session_state.get(_wl_key):
-            with st.expander("Solicitar acceso anticipado gratuito", expanded=True):
+            with st.expander("Solicitar acceso anticipado gratuito", expanded=False):
                 with st.form("waitlist_form", clear_on_submit=True):
                     _wfc1, _wfc2 = st.columns(2)
                     with _wfc1:
