@@ -1079,6 +1079,47 @@ def show_buyer_panel(client_email):
                 if st.session_state.get(cache_key) and cache_valid:
                     return st.session_state[cache_key]
 
+                # Consultar DB: ai_verification_cache y plano_catastral_path
+                _plano_path_from_db = None
+                try:
+                    import sqlite3 as _sqlite3, json as _json_cache
+                    _c2 = _sqlite3.connect("database.db", timeout=10)
+                    _row = _c2.execute(
+                        "SELECT ai_verification_cache, plano_catastral_path FROM plots WHERE id=?",
+                        (plot_id,)
+                    ).fetchone()
+                    _c2.close()
+                    if _row:
+                        _plano_path_from_db = _row[1]
+                        if _row[0]:
+                            _cached = _json_cache.loads(_row[0])
+                            superficie_pdf = float(_cached.get("superficie_m2", 0))
+                            ref_catastral_pdf = _cached.get("referencia_catastral", "")
+                            superficie_finca = plot_data[3] or 0
+                            ref_catastral_finca = plot_data[2] or ''
+                            superficie_ok = abs(superficie_pdf - superficie_finca) < 10
+                            ref_ok = ref_catastral_pdf.strip() == ref_catastral_finca.strip()
+                            verification_data = {
+                                'superficie_pdf': superficie_pdf,
+                                'ref_catastral_pdf': ref_catastral_pdf,
+                                'superficie_finca': superficie_finca,
+                                'ref_catastral_finca': ref_catastral_finca,
+                                'superficie_ok': superficie_ok,
+                                'ref_ok': ref_ok,
+                                'datos_extraidos': {
+                                    'superficie_m2': superficie_pdf,
+                                    'referencia_catastral': ref_catastral_pdf,
+                                    'municipio': _cached.get('municipio', ''),
+                                },
+                                'pdf_path': 'db_cache',
+                                'timestamp': current_time,
+                            }
+                            st.session_state[cache_key] = verification_data
+                            st.session_state[cache_time_key] = current_time
+                            return verification_data
+                except Exception:
+                    pass
+
                 # Si no hay cache o expiró, ejecutar verificación
                 try:
                     from modules.marketplace.ai_engine import extraer_datos_catastral_completo
@@ -1089,6 +1130,11 @@ def show_buyer_panel(client_email):
                         Path("uploads/nota_catastral.pdf"),
                         Path("catastro_output/nota_catastral.pdf")
                     ]
+                    # Añadir PDF específico de la finca si existe en DB
+                    if _plano_path_from_db:
+                        _p = Path(_plano_path_from_db.replace("\\", "/"))
+                        if _p not in pdf_paths:
+                            pdf_paths.insert(0, _p)
 
                     pdf_encontrado = None
                     for pdf_path in pdf_paths:
