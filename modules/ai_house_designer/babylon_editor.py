@@ -1596,22 +1596,25 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                     styleMeshes.push(fuente);
 
                 }} else if (extra === 'sea') {{
-                    // Franja de playa+mar al norte — decorativa, sin coste
+                    // Playa+mar siempre FUERA del cerramiento (más allá del límite norte del solar)
+                    const fenceNorthZ = plotCZ + plotD / 2;  // borde norte del solar
+                    const seaW = plotW + 20;                 // cubre todo el ancho del solar + margen
                     const sandMat = new BABYLON.StandardMaterial('sandMat', scene);
                     sandMat.diffuseColor = new BABYLON.Color3(0.94, 0.87, 0.68);
                     const sand = BABYLON.MeshBuilder.CreateBox('sea_sand', {{
-                        width: totalWidth + 14, height: 0.08, depth: 5.0
+                        width: seaW, height: 0.10, depth: 6.0
                     }}, scene);
-                    sand.position.set(hX, 0.04, totalDepth + 5.5);
+                    sand.position.set(plotCX, 0.05, fenceNorthZ + 4.0);
                     sand.material = sandMat; sand.isPickable = false;
                     styleMeshes.push(sand);
                     const seaMat = new BABYLON.StandardMaterial('seaMat', scene);
-                    seaMat.diffuseColor = new BABYLON.Color3(0.10, 0.52, 0.78);
-                    seaMat.alpha = 0.82;
+                    seaMat.diffuseColor = new BABYLON.Color3(0.08, 0.48, 0.78);
+                    seaMat.specularColor = new BABYLON.Color3(0.6, 0.8, 1.0);
+                    seaMat.alpha = 0.88;
                     const sea = BABYLON.MeshBuilder.CreateBox('sea_water', {{
-                        width: totalWidth + 14, height: 0.12, depth: 8.0
+                        width: seaW, height: 0.14, depth: 12.0
                     }}, scene);
-                    sea.position.set(hX, 0.06, totalDepth + 13.0);
+                    sea.position.set(plotCX, 0.07, fenceNorthZ + 13.0);
                     sea.material = seaMat; sea.isPickable = false;
                     styleMeshes.push(sea);
 
