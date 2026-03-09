@@ -1277,7 +1277,7 @@ def show_buyer_panel(client_email):
             st.subheader("🛠️ Herramientas para tu Propiedad")
 
             col1, col2, col3 = st.columns(3)
-            col4, col5, _ = st.columns(3)
+            col4, col5, col6 = st.columns(3)
 
             with col1:
                 if st.button("🎨 DISEÑAR CON IA", type="primary", use_container_width=True):
@@ -1304,13 +1304,35 @@ def show_buyer_panel(client_email):
                 if st.button("💰 MIS TRANSACCIONES", type="secondary", use_container_width=True):
                     st.session_state['show_prefab_config'] = False
                     st.session_state['show_project_search'] = False
+                    st.session_state['show_construccion_offers'] = False
                     st.info("💰 Mostrando historial de transacciones...")
 
             with col5:
                 if st.button("📑 DOCUMENTACIÓN", type="secondary", use_container_width=True):
                     st.session_state['show_prefab_config'] = False
                     st.session_state['show_project_search'] = False
+                    st.session_state['show_construccion_offers'] = False
                     st.info("📑 Accediendo a documentación...")
+
+            with col6:
+                # Contar ofertas pendientes para badge
+                try:
+                    _conn_of = db_conn()
+                    _n_of = _conn_of.execute("""
+                        SELECT COUNT(*) FROM construction_offers co
+                        JOIN project_tablon pt ON co.tablon_id = pt.id
+                        WHERE pt.client_email=? AND co.estado='enviada'
+                    """, (client_email,)).fetchone()[0]
+                    _conn_of.close()
+                except Exception:
+                    _n_of = 0
+                _of_label = f"🏗️ OFERTAS ({_n_of})" if _n_of > 0 else "🏗️ OFERTAS"
+                _of_type  = "primary" if _n_of > 0 else "secondary"
+                if st.button(_of_label, type=_of_type, use_container_width=True):
+                    st.session_state['show_prefab_config'] = False
+                    st.session_state['show_project_search'] = False
+                    st.session_state['show_construccion_offers'] = True
+                    st.rerun()
 
             st.markdown("---")
 
@@ -1319,6 +1341,8 @@ def show_buyer_panel(client_email):
                 show_prefab_configurator(plot_data)
             elif st.session_state.get('show_project_search', False):
                 show_integrated_project_search(client_email, plot_data)
+            elif st.session_state.get('show_construccion_offers', False):
+                show_construccion_offers(client_email)
 
     # Si no tiene finca adquirida, mostrar mensaje
     else:
@@ -1331,6 +1355,186 @@ def show_buyer_panel(client_email):
 
     # ELIMINAR LAS PESTAÑAS GENÉRICAS - El cliente quiere ver SU finca, no catálogo
     # Las pestañas "🔍 Buscar Proyectos" y "📋 Mis Intereses" se eliminan por completo
+
+
+def show_construccion_offers(client_email: str):
+    """Comparativa de ofertas de constructores recibidas."""
+    import json as _json
+
+    st.markdown("### 🏗️ Ofertas de Construcción Recibidas")
+
+    conn = db_conn()
+    # Proyectos del cliente en el tablón
+    proyectos = conn.execute("""
+        SELECT id, project_name, province, style, total_area, total_cost, coste_m2, created_at
+        FROM project_tablon WHERE client_email=? AND active=1 ORDER BY created_at DESC
+    """, (client_email,)).fetchall()
+    conn.close()
+
+    if not proyectos:
+        st.markdown("""
+<div style="background:rgba(37,99,235,0.08);border:1px solid rgba(37,99,235,0.25);
+            border-radius:12px;padding:20px 24px;text-align:center;">
+  <div style="font-size:1.5rem;margin-bottom:8px;">🏗️</div>
+  <div style="font-weight:700;color:#F8FAFC;margin-bottom:6px;">Aún no has publicado ningún proyecto</div>
+  <div style="color:#94A3B8;font-size:13px;">
+    Diseña tu vivienda con el Diseñador IA y al final pulsa<br>
+    <b>"Publicar en Tablón de Obras"</b> para recibir ofertas de constructores.
+  </div>
+</div>""", unsafe_allow_html=True)
+        return
+
+    for proy in proyectos:
+        tid, pname, province, style, area, total_cost, coste_m2, created_at = proy
+
+        conn2 = db_conn()
+        ofertas = conn2.execute("""
+            SELECT co.id, co.provider_name, co.provider_email,
+                   co.price_no_mat, co.price_with_mat, co.includes_materials,
+                   co.plazo_semanas, co.garantia_anos, co.nota_tecnica,
+                   co.breakdown_json, co.estado, co.created_at,
+                   sp.experience_years, sp.specialties, sp.description, sp.service_area
+            FROM construction_offers co
+            LEFT JOIN service_providers sp ON co.provider_id = sp.id
+            WHERE co.tablon_id=?
+            ORDER BY co.created_at DESC
+        """, (tid,)).fetchall()
+        conn2.close()
+
+        n_of = len(ofertas)
+        with st.expander(
+            f"📋 {pname or 'Mi proyecto'} — {area:.0f} m² · {province} · "
+            f"{'🆕 ' + str(n_of) + ' oferta(s) nueva(s)' if n_of else '⏳ Sin ofertas aún'}",
+            expanded=True
+        ):
+            # Info del proyecto
+            st.markdown(f"""
+<div style="background:rgba(13,27,42,0.5);border:1px solid rgba(245,158,11,0.2);
+            border-radius:8px;padding:12px 16px;margin-bottom:14px;font-size:12px;color:#CBD5E1;">
+  <b>Presupuesto de referencia:</b> €{total_cost:,.0f} · €{coste_m2:,.0f}/m² · Estilo: {style or '—'} · Publicado: {created_at[:10]}
+</div>""", unsafe_allow_html=True)
+
+            if not ofertas:
+                st.info("⏳ Aún no has recibido ofertas. Los constructores de tu zona serán notificados.")
+                continue
+
+            # ── Comparativa lado a lado (máx 3 por fila) ────────────────────
+            cols = st.columns(min(len(ofertas), 3))
+            for idx, of in enumerate(ofertas):
+                (oid, prov_name, prov_email,
+                 p_nm, p_wm, incl_mat,
+                 plazo, garantia, nota,
+                 breakdown_json, estado, of_date,
+                 exp_years, specialties_json, sp_desc, sp_area) = of
+
+                precio_show = float(p_wm or 0) if incl_mat else float(p_nm or 0)
+                mat_label   = "con materiales" if incl_mat else "sin materiales"
+                ahorro_pct  = int((1 - precio_show / total_cost) * 100) if total_cost else 0
+                plazo_meses = round(plazo / 4.3, 1) if plazo else 0
+
+                try:
+                    specs = _json.loads(specialties_json) if specialties_json else []
+                    from modules.marketplace.service_providers import _ESP_LABELS
+                    specs_str = " · ".join(_ESP_LABELS.get(s, s) for s in specs[:3])
+                except Exception:
+                    specs_str = ""
+
+                estado_color = {
+                    "enviada":  "#F59E0B",
+                    "aceptada": "#4ADE80",
+                    "rechazada":"#F87171",
+                }.get(estado, "#94A3B8")
+
+                col_idx = idx % 3
+                with cols[col_idx]:
+                    # Desglose partidas
+                    breakdown_html = ""
+                    try:
+                        bd = _json.loads(breakdown_json) if breakdown_json else {}
+                        for p in bd.get("partidas", []):
+                            breakdown_html += (
+                                f"<div style='display:flex;justify-content:space-between;font-size:11px;"
+                                f"color:#94A3B8;border-bottom:1px solid rgba(255,255,255,0.05);padding:2px 0;'>"
+                                f"<span>{p['name']}</span><span style='color:#F8FAFC'>€{p['cost']:,}</span></div>"
+                            )
+                    except Exception:
+                        pass
+
+                    st.markdown(f"""
+<div style="background:rgba(30,58,95,0.4);border:2px solid {estado_color}33;
+            border-radius:12px;padding:16px;margin-bottom:12px;">
+
+  <div style="font-size:14px;font-weight:800;color:#F8FAFC;margin-bottom:2px;">
+    🏗️ {prov_name or 'Constructor'}
+  </div>
+  <div style="font-size:11px;color:#64748B;margin-bottom:10px;">
+    {sp_area or ''} · {exp_years or 0} años exp.
+  </div>
+
+  <div style="font-size:1.4rem;font-weight:900;color:#4ADE80;margin-bottom:2px;">
+    €{precio_show:,.0f}
+  </div>
+  <div style="font-size:11px;color:#94A3B8;margin-bottom:8px;">{mat_label}</div>
+
+  <div style="font-size:11px;color:#CBD5E1;line-height:1.9;">
+    <b>€/m²:</b> €{precio_show/area:.0f}<br>
+    <b>Plazo:</b> {plazo} sem ({plazo_meses:.0f} meses)<br>
+    <b>Garantía:</b> {garantia} años<br>
+    {'<b>Vs presupuesto:</b> <span style="color:' + ('#4ADE80' if ahorro_pct > 0 else '#F87171') + '">' + ('+' if ahorro_pct < 0 else '-') + str(abs(ahorro_pct)) + '%</span><br>' if ahorro_pct else ''}
+    <b>Estado:</b> <span style="color:{estado_color};font-weight:700;">{estado.upper()}</span>
+  </div>
+
+  {('<div style="margin-top:10px;border-top:1px solid rgba(255,255,255,0.08);padding-top:8px;">' + breakdown_html + '</div>') if breakdown_html else ''}
+
+  {('<div style="margin-top:8px;font-size:11px;color:#94A3B8;font-style:italic;">💬 ' + nota[:100] + ('…' if len(nota) > 100 else '') + '</div>') if nota else ''}
+</div>""", unsafe_allow_html=True)
+
+                    # Botones de acción
+                    if estado == "enviada":
+                        ba, br = st.columns(2)
+                        with ba:
+                            if st.button("✅ Aceptar", key=f"ac_{oid}", type="primary", use_container_width=True):
+                                try:
+                                    conn3 = db_conn()
+                                    # Aceptar esta
+                                    conn3.execute(
+                                        "UPDATE construction_offers SET estado='aceptada' WHERE id=?", (oid,)
+                                    )
+                                    # Rechazar las demás del mismo proyecto
+                                    conn3.execute(
+                                        "UPDATE construction_offers SET estado='rechazada' WHERE tablon_id=? AND id!=?",
+                                        (tid, oid)
+                                    )
+                                    conn3.commit(); conn3.close()
+                                    try:
+                                        from modules.marketplace.email_notify import _send
+                                        _send(
+                                            f"✅ <b>Oferta ACEPTADA</b>\n"
+                                            f"Constructor: {prov_name} ({prov_email})\n"
+                                            f"Proyecto: {pname} · €{precio_show:,.0f} · {plazo} sem\n"
+                                            f"Cliente: {client_email}"
+                                        )
+                                    except Exception:
+                                        pass
+                                    st.success(f"✅ Oferta de {prov_name} aceptada. Le contactaremos para iniciar el proceso.")
+                                    st.rerun()
+                                except Exception as ex:
+                                    st.error(f"Error: {ex}")
+                        with br:
+                            if st.button("❌ Rechazar", key=f"re_{oid}", use_container_width=True):
+                                try:
+                                    conn4 = db_conn()
+                                    conn4.execute(
+                                        "UPDATE construction_offers SET estado='rechazada' WHERE id=?", (oid,)
+                                    )
+                                    conn4.commit(); conn4.close()
+                                    st.rerun()
+                                except Exception as ex:
+                                    st.error(f"Error: {ex}")
+                    elif estado == "aceptada":
+                        st.success("✅ Oferta aceptada")
+                        st.markdown(f"<div style='font-size:12px;color:#94A3B8;'>Contacto: {prov_email}</div>",
+                                    unsafe_allow_html=True)
 
 
 def show_prefab_configurator(plot_data):
