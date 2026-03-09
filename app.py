@@ -60,45 +60,298 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ── Botón flotante Lola — visible en todas las páginas ───────────────────────
-st.markdown("""
+# ── Widget flotante Lola — chat bubble visible en todas las páginas ───────────
+_lola_groq_key = ""
+try:
+    _lola_groq_key = st.secrets.get("GROQ_API_KEY", "")
+except Exception:
+    pass
+if not _lola_groq_key:
+    import os as _os_lola
+    _lola_groq_key = _os_lola.getenv("GROQ_API_KEY", "")
+
+st.markdown(f"""
 <style>
-#lola-fab {
+#lola-panel {{
     position: fixed;
-    bottom: 28px;
-    right: 28px;
+    bottom: 90px;
+    right: 20px;
+    width: 360px;
+    height: 500px;
+    background: linear-gradient(180deg, #0D1B2A 0%, #0a1520 100%);
+    border-radius: 20px;
+    border: 1px solid rgba(245,158,11,0.25);
+    box-shadow: 0 20px 60px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04);
+    display: none;
+    flex-direction: column;
+    z-index: 99998;
+    overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}}
+#lola-panel.open {{ display: flex; }}
+#lola-header {{
+    background: linear-gradient(135deg, #1E3A5F, #0D2A4A);
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-bottom: 1px solid rgba(245,158,11,0.2);
+    flex-shrink: 0;
+}}
+#lola-header .lh-avatar {{ font-size: 1.5em; }}
+#lola-header .lh-info {{ flex: 1; }}
+#lola-header .lh-name {{ color: #F8FAFC; font-weight: 700; font-size: 15px; line-height: 1.2; }}
+#lola-header .lh-status {{ color: #94A3B8; font-size: 11px; margin-top: 2px; }}
+#lola-close {{
+    background: rgba(255,255,255,0.08);
+    border: none;
+    color: #94A3B8;
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 14px;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.2s, color 0.2s;
+    flex-shrink: 0;
+}}
+#lola-close:hover {{ background: rgba(255,255,255,0.18); color: white; }}
+#lola-messages {{
+    flex: 1;
+    overflow-y: auto;
+    padding: 14px 14px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,0.1) transparent;
+}}
+.lola-msg {{
+    max-width: 88%;
+    padding: 10px 13px;
+    border-radius: 14px;
+    font-size: 13.5px;
+    line-height: 1.55;
+    animation: lola-fadein 0.2s ease;
+    word-wrap: break-word;
+    white-space: pre-wrap;
+}}
+@keyframes lola-fadein {{
+    from {{ opacity:0; transform:translateY(5px); }}
+    to   {{ opacity:1; transform:none; }}
+}}
+.lola-msg.bot {{
+    background: rgba(30,58,95,0.85);
+    border: 1px solid rgba(37,99,235,0.2);
+    color: #E2E8F0;
+    align-self: flex-start;
+    border-bottom-left-radius: 4px;
+}}
+.lola-msg.user {{
+    background: linear-gradient(135deg, #2563EB, #1D4ED8);
+    color: white;
+    align-self: flex-end;
+    border-bottom-right-radius: 4px;
+}}
+.lola-msg.typing {{ color: #64748B; font-style: italic; }}
+#lola-input-area {{
+    padding: 10px 12px;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+    background: rgba(0,0,0,0.2);
+    align-items: center;
+}}
+#lola-input {{
+    flex: 1;
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 22px;
+    padding: 9px 15px;
+    color: #F8FAFC;
+    font-size: 13.5px;
+    outline: none;
+    transition: border-color 0.2s;
+    font-family: inherit;
+}}
+#lola-input::placeholder {{ color: #64748B; }}
+#lola-input:focus {{ border-color: rgba(37,99,235,0.5); }}
+#lola-send {{
+    background: linear-gradient(135deg, #2563EB, #1E40AF);
+    border: none;
+    color: white;
+    width: 38px; height: 38px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 15px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    transition: transform 0.15s, opacity 0.15s;
+}}
+#lola-send:hover {{ transform: scale(1.08); }}
+#lola-send:disabled {{ opacity: 0.4; cursor: not-allowed; transform: none; }}
+#lola-fab {{
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
     z-index: 99999;
     background: linear-gradient(135deg, #1E3A5F, #2563EB);
-    color: white !important;
+    color: white;
+    border: 1px solid rgba(255,255,255,0.18);
     border-radius: 50px;
-    padding: 13px 22px;
+    padding: 13px 20px;
     font-size: 15px;
     font-weight: 700;
-    text-decoration: none !important;
     box-shadow: 0 4px 24px rgba(37,99,235,0.55);
     display: flex;
     align-items: center;
     gap: 8px;
-    border: 1px solid rgba(255,255,255,0.18);
     cursor: pointer;
     transition: transform 0.15s ease, box-shadow 0.15s ease;
     animation: lola-pulse 3s ease-in-out infinite;
-}
-#lola-fab:hover {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}}
+#lola-fab:hover {{
     transform: translateY(-2px);
     box-shadow: 0 8px 32px rgba(37,99,235,0.7);
     animation: none;
-}
-@keyframes lola-pulse {
-    0%, 100% { box-shadow: 0 4px 24px rgba(37,99,235,0.55); }
-    50%       { box-shadow: 0 4px 32px rgba(37,99,235,0.85); }
-}
+}}
+@keyframes lola-pulse {{
+    0%, 100% {{ box-shadow: 0 4px 24px rgba(37,99,235,0.55); }}
+    50%       {{ box-shadow: 0 4px 32px rgba(37,99,235,0.85); }}
+}}
+.lola-badge {{
+    background: rgba(16,185,129,0.25);
+    border: 1px solid #10B981;
+    border-radius: 10px;
+    padding: 1px 7px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #10B981;
+}}
 </style>
-<a id="lola-fab" href="?page=chat">
+
+<!-- Panel de chat Lola -->
+<div id="lola-panel">
+    <div id="lola-header">
+        <div class="lh-avatar">🏗️</div>
+        <div class="lh-info">
+            <div class="lh-name">Lola</div>
+            <div class="lh-status">Asistente ArchiRapid &nbsp;·&nbsp; <span style="color:#10B981;">● En línea</span></div>
+        </div>
+        <button id="lola-close" onclick="toggleLola()" title="Cerrar">✕</button>
+    </div>
+    <div id="lola-messages"></div>
+    <div id="lola-input-area">
+        <input id="lola-input" type="text" placeholder="Escríbeme lo que necesites..."
+               onkeydown="if(event.key==='Enter' && !event.shiftKey){{ event.preventDefault(); sendLolaMsg(); }}"/>
+        <button id="lola-send" onclick="sendLolaMsg()" title="Enviar">➤</button>
+    </div>
+</div>
+
+<!-- FAB toggle -->
+<button id="lola-fab" onclick="toggleLola()">
     💬 <span>Lola</span>
-    <span style="background:rgba(16,185,129,0.25);border:1px solid #10B981;border-radius:10px;
-                 padding:1px 7px;font-size:11px;font-weight:600;color:#10B981;">● online</span>
-</a>
+    <span class="lola-badge">● online</span>
+</button>
+
+<script>
+(function() {{
+    const GROQ_KEY = "{_lola_groq_key}";
+    const SYS = `Eres Lola, la asistente virtual de ArchiRapid, plataforma proptech española que conecta propietarios de terrenos, compradores y arquitectos mediante IA.
+
+LO QUE HACE ARCHIRAPID:
+- Explorar fincas y terrenos reales en España con validación catastral por IA
+- Reservar o comprar terrenos directamente en la plataforma (modo demo actualmente)
+- Diseñar una vivienda personalizada en 3D con asistente de IA incluido
+- Obtener presupuesto orientativo y documentación arquitectónica descargable
+- Conectar con arquitectos y proveedores de servicios de construcción
+
+DATOS CLAVE:
+- Acceso gratuito para los primeros 50 usuarios registrados (beta privada)
+- Fincas disponibles: Madrid, Andalucía, Extremadura, Castilla y León
+- Precio orientativo: 900€–2.000€/m² según calidad y zona
+- Contacto: archirapid2026@gmail.com
+- Plataforma en modo demostración — datos reales, sin validez jurídica
+
+TU MISIÓN: Responder con calidez y concisión. Guiar al usuario: ver finca → verificar con IA → reservar → diseñar en 3D → documentación. Si muestran interés en ser contactados, pedir su nombre y email.
+
+REGLAS: Responde SIEMPRE en español. Máximo 3-4 frases por respuesta. NO inventes precios de fincas concretas. NO menciones tecnologías internas.`;
+
+    let chatHistory = [];
+    let panelOpen = false;
+    let initialized = false;
+
+    function toggleLola() {{
+        panelOpen = !panelOpen;
+        const panel = document.getElementById('lola-panel');
+        if (panelOpen) {{
+            panel.classList.add('open');
+            if (!initialized) {{
+                initialized = true;
+                appendMsg('bot', '¡Hola! Soy Lola 👋 Tu asistente de ArchiRapid.\\n\\n¿Tienes preguntas sobre fincas, precios, el diseño 3D o cómo funciona la plataforma? Estoy aquí para ayudarte. 😊');
+            }}
+            setTimeout(() => {{ const i = document.getElementById('lola-input'); if(i) i.focus(); }}, 150);
+        }} else {{
+            panel.classList.remove('open');
+        }}
+    }}
+
+    function appendMsg(role, text) {{
+        chatHistory.push({{ role: role === 'bot' ? 'assistant' : 'user', content: text }});
+        const box = document.getElementById('lola-messages');
+        const div = document.createElement('div');
+        div.className = 'lola-msg ' + (role === 'bot' ? 'bot' : 'user');
+        div.textContent = text;
+        box.appendChild(div);
+        box.scrollTop = box.scrollHeight;
+        return div;
+    }}
+
+    async function sendLolaMsg() {{
+        const inp = document.getElementById('lola-input');
+        const text = (inp.value || '').trim();
+        if (!text) return;
+        inp.value = '';
+        appendMsg('user', text);
+
+        const sendBtn = document.getElementById('lola-send');
+        sendBtn.disabled = true;
+        inp.disabled = true;
+
+        const box = document.getElementById('lola-messages');
+        const typing = document.createElement('div');
+        typing.className = 'lola-msg bot typing';
+        typing.textContent = '✦ escribiendo...';
+        box.appendChild(typing);
+        box.scrollTop = box.scrollHeight;
+
+        try {{
+            const messages = [{{ role: 'system', content: SYS }}, ...chatHistory.slice(-12)];
+            const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {{
+                method: 'POST',
+                headers: {{ 'Authorization': 'Bearer ' + GROQ_KEY, 'Content-Type': 'application/json' }},
+                body: JSON.stringify({{ model: 'llama-3.3-70b-versatile', messages, max_tokens: 280, temperature: 0.72 }})
+            }});
+            const data = await resp.json();
+            typing.remove();
+            const reply = data?.choices?.[0]?.message?.content?.trim()
+                || 'Lo siento, hubo un problema técnico. Escríbenos a archirapid2026@gmail.com 📧';
+            appendMsg('bot', reply);
+        }} catch(e) {{
+            typing.remove();
+            appendMsg('bot', 'En este momento no puedo responderte. Escríbenos a archirapid2026@gmail.com 🙏');
+        }}
+
+        sendBtn.disabled = false;
+        inp.disabled = false;
+        inp.focus();
+    }}
+
+    window.toggleLola  = toggleLola;
+    window.sendLolaMsg = sendLolaMsg;
+}})();
+</script>
 """, unsafe_allow_html=True)
 
 # HARDCODE DE ROL PARA PRUEBA
@@ -1070,10 +1323,6 @@ if st.query_params.get("page") == "Registro de Usuario":
     except Exception as e:
         st.error(f"Error mostrando registro v2: {e}")
 
-if st.query_params.get("page") == "chat":
-    st.session_state["selected_page"] = "💬 Lola"
-    st.query_params.clear()
-    st.rerun()
 
 if st.query_params.get("page") == "Diseñador de Vivienda":
     try:
