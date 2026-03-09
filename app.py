@@ -1050,6 +1050,7 @@ PAGES = {
     "👤 Panel de Cliente": ("modules.marketplace.client_panel", "main"),
     "Iniciar Sesión": ("modules.marketplace.auth", "show_login"),
     "Registro de Usuario": ("modules.marketplace.auth", "show_registration"),
+    "💬 Marina": ("modules.marketplace.virtual_assistant", "main"),
 }
 PAGES = list(PAGES.keys())
 
@@ -1733,6 +1734,27 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
     except Exception as _e:
         st.info("Catálogo de prefabricadas próximamente disponible.")
 
+    # ── Marina CTA ────────────────────────────────────────────────────────────
+    st.markdown("""
+    <div style="background:linear-gradient(135deg,#0D1B2A,#1a2f4a);border-radius:14px;
+                padding:18px 24px;margin:28px 0 12px 0;
+                border:1px solid rgba(245,158,11,0.25);display:flex;
+                align-items:center;gap:18px;flex-wrap:wrap;">
+        <div style="font-size:2em;">🏗️</div>
+        <div style="flex:1;min-width:200px;">
+            <div style="font-weight:800;color:#F8FAFC;font-size:1.05em;">
+                ¿Tienes dudas? Habla con Marina
+            </div>
+            <div style="color:#94A3B8;font-size:0.86em;margin-top:3px;">
+                Nuestra asistente de IA responde al instante sobre fincas, precios y cómo funciona ArchiRapid
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    if st.button("💬 Abrir chat con Marina →", type="primary", use_container_width=False, key="btn_marina_home"):
+        st.session_state["selected_page"] = "💬 Marina"
+        st.rerun()
+
     # Footer
     st.markdown("""
     <div style="margin-top:40px;padding:20px 24px 16px;background:linear-gradient(135deg,#0D1B2A,#1E3A5F);border-radius:12px;font-family:'Segoe UI',sans-serif;">
@@ -1825,4 +1847,10 @@ elif st.session_state.get('selected_page') == "Registro de Usuario":
     with st.container():
         from modules.marketplace import auth
         auth.show_registration()
+        st.stop()
+
+elif st.session_state.get('selected_page') == "💬 Marina":
+    with st.container():
+        from modules.marketplace import virtual_assistant
+        virtual_assistant.main()
         st.stop()
