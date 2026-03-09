@@ -3370,5 +3370,67 @@ def render_step3():
                 import traceback
                 st.code(traceback.format_exc())
 
+            # ── Tablón de Obras — publicar para recibir ofertas de constructores ──
+            try:
+                st.markdown("---")
+                st.markdown("### 🏗️ ¿Quieres recibir ofertas de constructores?")
+
+                _tab_key = f"tablon_published_{req.get('nombre_proyecto','')}"
+                if st.session_state.get(_tab_key):
+                    st.success("✅ Proyecto publicado en el Tablón de Obras. Los constructores de tu zona ya pueden enviarte ofertas.")
+                    st.info("Consulta las ofertas recibidas en tu **Panel de Cliente → Ofertas de Construcción**.")
+                else:
+                    st.markdown("""
+<div style="background:rgba(34,197,94,0.07);border:1px solid rgba(34,197,94,0.25);
+            border-radius:10px;padding:14px 18px;margin-bottom:12px;">
+  <div style="font-weight:700;color:#F8FAFC;font-size:14px;">🏗️ Red de constructores ArchiRapid</div>
+  <div style="color:#94A3B8;font-size:12px;margin-top:4px;">
+    Publicamos tu proyecto (anónimo) en el tablón. Los constructores de tu provincia ven el
+    desglose de presupuesto y te envían ofertas con precio, plazo y garantía.
+    Tú comparas y eliges. Sin compromiso.
+  </div>
+</div>""", unsafe_allow_html=True)
+
+                    _prov_tab   = (req.get("province") or
+                                   st.session_state.get("design_plot_data", {}).get("province") or "")
+                    _style_tab  = req.get("style", "")
+                    _name_tab   = req.get("nombre_proyecto") or "Mi proyecto ArchiRapid"
+                    _cemail_tab = (st.session_state.get("user_email") or
+                                   st.session_state.get("client_email") or "")
+                    _cname_tab  = (st.session_state.get("user_name") or
+                                   st.session_state.get("client_name") or "Cliente")
+
+                    if st.button("🏗️ Publicar en Tablón de Obras — Recibir ofertas",
+                                 type="primary", use_container_width=True, key="btn_tablon"):
+                        try:
+                            from modules.marketplace.service_providers import publish_to_tablon
+                            _tid = publish_to_tablon(
+                                client_email=_cemail_tab,
+                                client_name=_cname_tab,
+                                project_name=_name_tab,
+                                province=_prov_tab,
+                                style=_style_tab,
+                                total_area=float(total_area),
+                                total_cost=float(total_cost),
+                                partidas_list=[(p[0], p[1], p[2], p[3]) for p in partidas],
+                            )
+                            st.session_state[_tab_key] = True
+                            try:
+                                from modules.marketplace.email_notify import _send
+                                _send(
+                                    f"🏗️ <b>Nuevo proyecto en Tablón</b>\n"
+                                    f"ID: {_tid}\nCliente: {_cname_tab} ({_cemail_tab})\n"
+                                    f"Proyecto: {_name_tab} · {total_area:.0f} m²\n"
+                                    f"Provincia: {_prov_tab} · Coste: €{total_cost:,}"
+                                )
+                            except Exception:
+                                pass
+                            st.success("✅ Publicado. Los constructores de tu zona ya pueden enviarte ofertas.")
+                            st.rerun()
+                        except Exception as _etab:
+                            st.error(f"Error publicando: {_etab}")
+            except Exception:
+                pass  # nunca interrumpe el flujo
+
             st.markdown("---")
             st.info("📬 Proyecto guardado en tu **Panel de Cliente**. El equipo ArchiRapid recibirá notificación inmediata.")
