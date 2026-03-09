@@ -469,6 +469,14 @@ def show_plot_detail_page(plot_id: str):
                 except Exception as e:
                     st.error(f"Error al procesar la operación: {str(e)}")
 
+    # ── Alertas de nuevas fincas ──────────────────────────────────────────────
+    try:
+        from modules.marketplace.alertas import render_subscribe_form
+        with st.expander("🔔 Avisarme cuando haya fincas similares", expanded=False):
+            render_subscribe_form(plot=plot, key_prefix=f"al_{plot.get('id','x')}")
+    except Exception:
+        pass
+
     # ── Calculadora de financiación ───────────────────────────────────────────
     try:
         from modules.marketplace.hipoteca import render_calculadora

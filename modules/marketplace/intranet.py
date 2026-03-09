@@ -32,13 +32,24 @@ def main():
                         st.write(f"**Superficie:** {p['surface_m2']} m²")
                         st.write(f"**Precio:** €{p['price']}")
                         st.write(f"**Status:** {p.get('status', 'Pendiente')}")
-                        col1, col2 = st.columns(2)
+                        col1, col2, col3 = st.columns(3)
                         with col1:
                             if st.button(f"Aprobar {p['id']}", key=f"approve_plot_{p['id']}"):
                                 st.success("Finca aprobada (Admin)")
                         with col2:
                             if st.button(f"Rechazar {p['id']}", key=f"reject_plot_{p['id']}"):
                                 st.info("Funcionalidad próximamente")
+                        with col3:
+                            if st.button(f"📢 Alertar suscriptores", key=f"alert_plot_{p['id']}"):
+                                try:
+                                    from modules.marketplace.alertas import notify_new_plot
+                                    n = notify_new_plot(dict(p))
+                                    if n > 0:
+                                        st.success(f"✅ {n} email(s) enviados.")
+                                    else:
+                                        st.info("Sin suscriptores coincidentes o RESEND_API_KEY no configurada.")
+                                except Exception as _ae:
+                                    st.error(f"Error alertas: {_ae}")
             else:
                 st.info("No hay fincas publicadas")
         except Exception as e:
@@ -492,12 +503,21 @@ TELEGRAM_CHAT_ID   = "5712417665"
             k3.metric("🏗️ Proyectos activos", _n_projects)
             k4.metric("💶 Ingresos acumulados", f"€{_revenue:,.0f}", delta=f"{_n_res} transacciones")
 
+            _n_alerts = 0
+            try:
+                _n_alerts = _db9.execute("SELECT COUNT(*) FROM plot_alerts WHERE active=1").fetchone()[0]
+            except Exception:
+                pass
+
             k5, k6, k7, k8 = st.columns(4)
             k5.metric("🛒 Reservas totales", _n_res)
             k6.metric("✅ Compras efectivas", _n_purchase)
             k7.metric("🎯 Waitlist total", _n_waitlist, delta=f"{_n_approved} aprobados")
             k8.metric("📐 Conversión reserva→compra",
                       f"{(_n_purchase/_n_res*100):.1f}%" if _n_res else "—")
+
+            k9, k10, _, __ = st.columns(4)
+            k9.metric("🔔 Alertas activas", _n_alerts)
 
             st.markdown("---")
 
