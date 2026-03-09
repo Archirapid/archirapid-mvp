@@ -160,9 +160,20 @@ def show_registration():
                 empresa = ""
                 especialidad = ""
 
+        st.markdown("---")
+        gdpr_ok = st.checkbox(
+            "He leído y acepto la [Política de Privacidad](https://archirapid.streamlit.app) y el tratamiento de mis datos personales "
+            "conforme al RGPD (UE) 2016/679. Puedo solicitar su eliminación en archirapid2026@gmail.com. *",
+            key="gdpr_consent"
+        )
+
         submitted = st.form_submit_button("🚀 Registrarme y Acceder", type="primary")
 
         if submitted:
+            if not gdpr_ok:
+                st.error("Debes aceptar la Política de Privacidad para continuar.")
+                return
+
             if not nombre or not email or not password:
                 st.error("Por favor, completa los campos obligatorios marcados con *.")
                 return

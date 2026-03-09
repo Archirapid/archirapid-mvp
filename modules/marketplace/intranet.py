@@ -19,7 +19,7 @@ def main():
         st.success("✅ Acceso autorizado a Intranet")
 
     # PANEL DE GESTIÓN INTERNA
-    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs(["📋 Gestión de Fincas", "🏗️ Gestión de Proyectos", "💰 Ventas y Transacciones", "📞 Consultas", "🛠️ Profesionales", "⚙️ Admin", "🎯 Waitlist", "📬 Actividad"])
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs(["📋 Gestión de Fincas", "🏗️ Gestión de Proyectos", "💰 Ventas y Transacciones", "📞 Consultas", "🛠️ Profesionales", "⚙️ Admin", "🎯 Waitlist", "📬 Actividad", "📊 Analytics"])
 
     with tab1:
         try:
@@ -461,3 +461,148 @@ TELEGRAM_CHAT_ID   = "5712417665"
             st.error(f"Error: {_ew2}")
 
         _ca.close()
+
+    # ── TAB 9: ANALYTICS ──────────────────────────────────────────────────────
+    with tab9:
+        st.header("📊 Dashboard de Analytics — ArchiRapid")
+        import sqlite3 as _sq9
+        import pandas as _pd9
+        import datetime as _dt9
+
+        try:
+            _db9 = _sq9.connect("database.db", timeout=10)
+
+            # ── KPIs principales ──────────────────────────────────────────────
+            st.subheader("Métricas globales")
+
+            _n_users    = _db9.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+            _n_plots    = _db9.execute("SELECT COUNT(*) FROM plots").fetchone()[0]
+            _n_avail    = _db9.execute("SELECT COUNT(*) FROM plots WHERE status='disponible'").fetchone()[0]
+            _n_projects = _db9.execute("SELECT COUNT(*) FROM projects").fetchone()[0]
+            _n_res      = _db9.execute("SELECT COUNT(*) FROM reservations").fetchone()[0]
+            _n_purchase = _db9.execute("SELECT COUNT(*) FROM reservations WHERE kind='purchase'").fetchone()[0]
+            _rev_row    = _db9.execute("SELECT COALESCE(SUM(amount),0) FROM reservations").fetchone()
+            _revenue    = float(_rev_row[0]) if _rev_row else 0.0
+            _n_waitlist = _db9.execute("SELECT COUNT(*) FROM waitlist").fetchone()[0]
+            _n_approved = _db9.execute("SELECT COUNT(*) FROM waitlist WHERE approved=1").fetchone()[0]
+
+            k1, k2, k3, k4 = st.columns(4)
+            k1.metric("👤 Usuarios registrados", _n_users)
+            k2.metric("🗺️ Fincas publicadas", _n_plots, delta=f"{_n_avail} disponibles")
+            k3.metric("🏗️ Proyectos activos", _n_projects)
+            k4.metric("💶 Ingresos acumulados", f"€{_revenue:,.0f}", delta=f"{_n_res} transacciones")
+
+            k5, k6, k7, k8 = st.columns(4)
+            k5.metric("🛒 Reservas totales", _n_res)
+            k6.metric("✅ Compras efectivas", _n_purchase)
+            k7.metric("🎯 Waitlist total", _n_waitlist, delta=f"{_n_approved} aprobados")
+            k8.metric("📐 Conversión reserva→compra",
+                      f"{(_n_purchase/_n_res*100):.1f}%" if _n_res else "—")
+
+            st.markdown("---")
+
+            # ── Funnel de conversión ──────────────────────────────────────────
+            st.subheader("🔽 Funnel de conversión")
+            _funnel_data = {
+                "Etapa": ["Fincas publicadas", "Usuarios registrados", "Reservas realizadas", "Compras efectivas", "Waitlist aprobados"],
+                "Total": [_n_plots, _n_users, _n_res, _n_purchase, _n_approved]
+            }
+            _df_funnel = _pd9.DataFrame(_funnel_data).set_index("Etapa")
+            st.bar_chart(_df_funnel)
+
+            st.markdown("---")
+
+            # ── Usuarios por rol ──────────────────────────────────────────────
+            col_a, col_b = st.columns(2)
+
+            with col_a:
+                st.subheader("👥 Usuarios por rol")
+                try:
+                    _df_roles = _pd9.read_sql_query(
+                        "SELECT role as Rol, COUNT(*) as Total FROM users GROUP BY role ORDER BY Total DESC",
+                        _db9
+                    )
+                    if not _df_roles.empty:
+                        st.dataframe(_df_roles, use_container_width=True, hide_index=True)
+                        st.bar_chart(_df_roles.set_index("Rol"))
+                    else:
+                        st.info("Sin datos de roles todavía.")
+                except Exception as _er:
+                    st.warning(f"Roles: {_er}")
+
+            with col_b:
+                st.subheader("🗺️ Fincas por provincia")
+                try:
+                    _df_prov = _pd9.read_sql_query(
+                        "SELECT province as Provincia, COUNT(*) as Fincas FROM plots GROUP BY province ORDER BY Fincas DESC",
+                        _db9
+                    )
+                    if not _df_prov.empty:
+                        st.dataframe(_df_prov, use_container_width=True, hide_index=True)
+                        st.bar_chart(_df_prov.set_index("Provincia"))
+                    else:
+                        st.info("Sin datos de provincias todavía.")
+                except Exception as _ep:
+                    st.warning(f"Provincias: {_ep}")
+
+            st.markdown("---")
+
+            # ── Ingresos por tipo de operación ────────────────────────────────
+            st.subheader("💰 Ingresos por tipo de operación")
+            try:
+                _df_kind = _pd9.read_sql_query(
+                    "SELECT kind as Tipo, COUNT(*) as Operaciones, COALESCE(SUM(amount),0) as Importe FROM reservations GROUP BY kind",
+                    _db9
+                )
+                if not _df_kind.empty:
+                    _df_kind["Tipo"] = _df_kind["Tipo"].map(
+                        {"purchase": "Compra", "reservation": "Reserva", "pdf": "Docs PDF",
+                         "cad": "Docs CAD", "full": "Paquete completo"}
+                    ).fillna(_df_kind["Tipo"])
+                    st.dataframe(_df_kind, use_container_width=True, hide_index=True)
+                    st.bar_chart(_df_kind.set_index("Tipo")["Importe"])
+                else:
+                    st.info("Sin transacciones todavía.")
+            except Exception as _ek:
+                st.warning(f"Tipos: {_ek}")
+
+            st.markdown("---")
+
+            # ── Actividad diaria (últimos 30 días) ────────────────────────────
+            st.subheader("📅 Registros de usuarios — últimos 30 días")
+            try:
+                _df_daily = _pd9.read_sql_query(
+                    """SELECT DATE(created_at) as Fecha, COUNT(*) as Registros
+                       FROM users
+                       WHERE created_at >= DATE('now', '-30 days')
+                       GROUP BY DATE(created_at)
+                       ORDER BY Fecha""",
+                    _db9
+                )
+                if not _df_daily.empty:
+                    st.line_chart(_df_daily.set_index("Fecha"))
+                else:
+                    st.info("Sin registros en los últimos 30 días.")
+            except Exception as _ed:
+                st.warning(f"Actividad diaria: {_ed}")
+
+            st.markdown("---")
+
+            # ── Top fincas por precio ─────────────────────────────────────────
+            st.subheader("🏆 Top 10 fincas por precio")
+            try:
+                _df_top = _pd9.read_sql_query(
+                    "SELECT title as Finca, province as Provincia, m2 as 'm²', price as 'Precio (€)', status as Estado FROM plots ORDER BY price DESC LIMIT 10",
+                    _db9
+                )
+                if not _df_top.empty:
+                    st.dataframe(_df_top, use_container_width=True, hide_index=True)
+                else:
+                    st.info("Sin fincas en el catálogo.")
+            except Exception as _et:
+                st.warning(f"Top fincas: {_et}")
+
+            _db9.close()
+
+        except Exception as _e9:
+            st.error(f"Error en Analytics: {_e9}")

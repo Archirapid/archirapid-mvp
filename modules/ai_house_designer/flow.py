@@ -3288,6 +3288,19 @@ def render_step3():
                 )
                 st.caption("Incluye: Memoria descriptiva · Mediciones y presupuesto Excel · Plano 2D · Datos catastro · Layout 3D · Guía de próximos pasos")
 
+                # ── Certificación criptográfica del ZIP ──────────────────────
+                try:
+                    from modules.marketplace.blockchain_cert import certify, cert_badge_html
+                    _cert = certify(
+                        zip_bytes=zip_bytes,
+                        doc_name=zip_filename,
+                        user_email=st.session_state.get("client_email", ""),
+                        plot_id=str(st.session_state.get("design_plot_data", {}).get("id", ""))
+                    )
+                    st.markdown(cert_badge_html(_cert), unsafe_allow_html=True)
+                except Exception:
+                    pass  # falla silenciosamente, nunca interrumpe la descarga
+
             except Exception as e:
                 st.error(f"Error generando ZIP: {e}")
                 import traceback
