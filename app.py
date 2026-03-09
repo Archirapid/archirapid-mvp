@@ -1539,6 +1539,13 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
                         Valida tu finca con IA, diseña tu vivienda y accede a proyectos
                         arquitectónicos reales. Sin coste durante la beta.
                     </div>
+                    <div style="font-size:0.78em;color:#64748B;margin-bottom:16px;
+                                border-top:1px solid rgba(255,255,255,0.07);padding-top:10px;">
+                        ⚠️ <b style="color:#94A3B8;">Modo demostración:</b>
+                        los datos mostrados son reales pero ninguna operación tiene validez
+                        jurídica ni implica adquisición efectiva de ningún inmueble.
+                        El acceso es exclusivamente para explorar la plataforma.
+                    </div>
                     <div style="background:rgba(255,255,255,0.06);border-radius:8px;padding:10px 14px;
                                 display:inline-block;">
                         <span style="color:#F59E0B;font-weight:700;font-size:1.1em;">{_taken}</span>
@@ -1605,6 +1612,11 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
                                 _wconn2.close()
                                 st.session_state[_wl_key] = True
                                 st.session_state["waitlist_name"] = _wname.strip()
+                                try:
+                                    from modules.marketplace.email_notify import notify_waitlist
+                                    notify_waitlist(_wname.strip(), _wemail.strip().lower(), _wprofile)
+                                except Exception:
+                                    pass
                                 st.rerun()
                             except Exception as _we:
                                 if "UNIQUE" in str(_we):

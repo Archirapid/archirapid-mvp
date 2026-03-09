@@ -189,6 +189,11 @@ def reserve_plot(plot_id, buyer_name, buyer_email, amount, kind="reservation"):
     elif kind=="purchase":
         c.execute("UPDATE plots SET status='sold' WHERE id=?", (plot_id,))
     conn.commit(); conn.close()
+    try:
+        from modules.marketplace.email_notify import notify_new_reservation
+        notify_new_reservation(plot_id, buyer_name, buyer_email, amount, kind)
+    except Exception:
+        pass
     return rid
 
 def create_client_user_if_not_exists(email, name, transaction_id=None):

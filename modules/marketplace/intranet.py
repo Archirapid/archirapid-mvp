@@ -19,7 +19,7 @@ def main():
         st.success("✅ Acceso autorizado a Intranet")
 
     # PANEL DE GESTIÓN INTERNA
-    tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(["📋 Gestión de Fincas", "🏗️ Gestión de Proyectos", "💰 Ventas y Transacciones", "📞 Consultas", "🛠️ Profesionales", "⚙️ Admin", "🎯 Waitlist"])
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs(["📋 Gestión de Fincas", "🏗️ Gestión de Proyectos", "💰 Ventas y Transacciones", "📞 Consultas", "🛠️ Profesionales", "⚙️ Admin", "🎯 Waitlist", "📬 Actividad"])
 
     with tab1:
         try:
@@ -366,3 +366,101 @@ def main():
         except Exception as _ew:
             st.error(f"Error cargando waitlist: {_ew}")
             st.code(traceback.format_exc())
+
+    with tab8:
+        st.header("📬 Actividad Reciente")
+
+        # Estado configuración email
+        try:
+            from modules.marketplace.email_notify import _get_gmail_password
+            _gpwd = _get_gmail_password()
+            if _gpwd:
+                st.success("✅ Email configurado — notificaciones activas (archirapid2026@gmail.com)")
+            else:
+                st.warning("⚠️ **Notificaciones email inactivas** — añade `GMAIL_APP_PASSWORD` en Streamlit Cloud Secrets o en `.env` local.")
+                with st.expander("¿Cómo configurar?"):
+                    st.markdown("""
+1. Entra en [myaccount.google.com](https://myaccount.google.com) con `archirapid2026@gmail.com`
+2. **Seguridad → Verificación en 2 pasos** (activar si no lo está)
+3. **Seguridad → Contraseñas de aplicación** → crea una nueva → copia las 16 letras
+4. En Streamlit Cloud → Settings → Secrets, añade:
+```
+GMAIL_APP_PASSWORD = "xxxx xxxx xxxx xxxx"
+```
+5. En `.env` local añade: `GMAIL_APP_PASSWORD=xxxxxxxxxxxxxxxxxxxx`
+""")
+        except Exception:
+            pass
+
+        st.markdown("---")
+        import sqlite3 as _sq3a
+        import pandas as _pda
+
+        _ca = _sq3a.connect("database.db", timeout=10)
+
+        # Últimos registros
+        st.subheader("👤 Últimos registros de usuarios")
+        try:
+            _df_users = _pda.read_sql_query(
+                "SELECT name, email, role, created_at FROM users ORDER BY created_at DESC LIMIT 20",
+                _ca
+            )
+            if not _df_users.empty:
+                _df_users["✉️"] = _df_users["email"].apply(
+                    lambda e: f"[Escribir](mailto:{e})"
+                )
+                st.dataframe(
+                    _df_users.rename(columns={"name": "Nombre", "email": "Email", "role": "Rol", "created_at": "Fecha"}),
+                    use_container_width=True, hide_index=True
+                )
+            else:
+                st.info("Sin registros todavía.")
+        except Exception as _eu:
+            st.error(f"Error: {_eu}")
+
+        st.markdown("---")
+
+        # Últimas reservas/compras
+        st.subheader("💰 Últimas reservas y compras de fincas")
+        try:
+            _df_res = _pda.read_sql_query(
+                """SELECT r.buyer_name, r.buyer_email, p.title as finca, r.amount, r.kind, r.created_at
+                   FROM reservations r LEFT JOIN plots p ON r.plot_id=p.id
+                   ORDER BY r.created_at DESC LIMIT 20""",
+                _ca
+            )
+            if not _df_res.empty:
+                _df_res["kind"] = _df_res["kind"].map({"purchase": "Compra", "reservation": "Reserva"}).fillna(_df_res["kind"])
+                st.dataframe(
+                    _df_res.rename(columns={
+                        "buyer_name": "Comprador", "buyer_email": "Email",
+                        "finca": "Finca", "amount": "Importe (€)",
+                        "kind": "Tipo", "created_at": "Fecha"
+                    }),
+                    use_container_width=True, hide_index=True
+                )
+            else:
+                st.info("Sin transacciones todavía.")
+        except Exception as _er:
+            st.error(f"Error: {_er}")
+
+        st.markdown("---")
+
+        # Waitlist reciente
+        st.subheader("🎯 Waitlist reciente")
+        try:
+            _df_wl = _pda.read_sql_query(
+                "SELECT name, email, profile, created_at FROM waitlist ORDER BY created_at DESC LIMIT 10",
+                _ca
+            )
+            if not _df_wl.empty:
+                st.dataframe(
+                    _df_wl.rename(columns={"name": "Nombre", "email": "Email", "profile": "Perfil", "created_at": "Fecha"}),
+                    use_container_width=True, hide_index=True
+                )
+            else:
+                st.info("Sin solicitudes todavía.")
+        except Exception as _ew2:
+            st.error(f"Error: {_ew2}")
+
+        _ca.close()

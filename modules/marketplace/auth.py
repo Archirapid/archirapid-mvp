@@ -204,6 +204,12 @@ def show_registration():
                 conn.commit()
                 conn.close()
 
+                try:
+                    from modules.marketplace.email_notify import notify_new_registration
+                    notify_new_registration(nombre, email, role)
+                except Exception:
+                    pass
+
                 st.success("🎉 ¡Registro completado exitosamente!")
 
                 # ANCLAJE PERMANENTE: siempre forzamos valores de owner
