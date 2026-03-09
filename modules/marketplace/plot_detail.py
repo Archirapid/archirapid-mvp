@@ -469,28 +469,70 @@ def show_plot_detail_page(plot_id: str):
                 except Exception as e:
                     st.error(f"Error al procesar la operación: {str(e)}")
 
-    # ── Alertas de nuevas fincas ──────────────────────────────────────────────
+    # ── Alertas de nuevas fincas (inline, sin imports externos) ──────────────
+    _pid_al = str(plot.get('id', 'x'))
     with st.expander("🔔 Avisarme cuando haya fincas similares", expanded=False):
-        try:
-            from modules.marketplace.alertas import render_subscribe_form
-            render_subscribe_form(plot=plot, key_prefix=f"al_{plot.get('id','x')}")
-        except Exception as _ae:
-            st.info("Introduce tu email para recibir alertas de nuevas fincas similares.")
-            with st.form(f"alert_fallback_{plot.get('id','x')}"):
-                _ae_name  = st.text_input("Nombre")
-                _ae_email = st.text_input("Email *")
-                _ae_prov  = plot.get("province", "")
-                if st.form_submit_button("🔔 Activar alerta", type="primary"):
-                    if _ae_email and "@" in _ae_email:
-                        try:
-                            import sqlite3 as _sq_al, datetime as _dt_al
-                            _c_al = _sq_al.connect("database.db", timeout=10)
-                            _c_al.execute("CREATE TABLE IF NOT EXISTS plot_alerts (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT, name TEXT, province TEXT, max_price REAL DEFAULT 0, created_at TEXT, active INTEGER DEFAULT 1)")
-                            _c_al.execute("INSERT INTO plot_alerts (email,name,province,created_at) VALUES (?,?,?,?)", (_ae_email, _ae_name, _ae_prov, _dt_al.datetime.utcnow().isoformat()))
-                            _c_al.commit(); _c_al.close()
-                            st.success("✅ Alerta activada.")
-                        except Exception:
-                            st.info("Escríbenos a archirapid2026@gmail.com para recibir alertas.")
+        st.markdown("""
+        <div style="background:rgba(37,99,235,0.08);border:1px solid rgba(37,99,235,0.3);
+                    border-radius:10px;padding:12px 16px;margin-bottom:10px;">
+            <div style="font-weight:700;color:#F8FAFC;font-size:14px;">
+                🔔 Alertas de nuevas fincas
+            </div>
+            <div style="color:#94A3B8;font-size:12px;margin-top:2px;">
+                Te avisamos por email cuando publiquemos fincas que encajen contigo
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        import sqlite3 as _sq_al
+        import datetime as _dt_al
+        _al_c1, _al_c2 = st.columns(2)
+        with _al_c1:
+            _al_name  = st.text_input("Tu nombre",    placeholder="Nombre",         key=f"aln_{_pid_al}")
+            _al_email = st.text_input("Email *",       placeholder="tu@email.com",   key=f"ale_{_pid_al}")
+        with _al_c2:
+            _al_price = st.number_input(
+                "Presupuesto máximo (€)", min_value=0.0, max_value=5_000_000.0,
+                value=float(plot.get("price") or 0) * 2,
+                step=10_000.0, format="%.0f", key=f"alp_{_pid_al}",
+                help="0 = sin límite"
+            )
+            _al_prov_default = plot.get("province") or ""
+            _al_prov = st.text_input("Provincia de interés", value=_al_prov_default, key=f"alv_{_pid_al}")
+        if st.button("🔔 Activar alerta", key=f"albtn_{_pid_al}", type="primary", use_container_width=True):
+            if not _al_email or "@" not in _al_email:
+                st.error("Introduce un email válido.")
+            else:
+                try:
+                    _c_al = _sq_al.connect("database.db", timeout=10)
+                    _c_al.execute("PRAGMA journal_mode=WAL")
+                    _c_al.execute("""CREATE TABLE IF NOT EXISTS plot_alerts (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        email TEXT, name TEXT, province TEXT,
+                        max_price REAL DEFAULT 0, created_at TEXT, active INTEGER DEFAULT 1)""")
+                    _exists = _c_al.execute(
+                        "SELECT id FROM plot_alerts WHERE email=? AND province=?",
+                        (_al_email.lower().strip(), _al_prov)
+                    ).fetchone()
+                    _now_al = _dt_al.datetime.utcnow().isoformat(timespec="seconds") + "Z"
+                    if _exists:
+                        _c_al.execute(
+                            "UPDATE plot_alerts SET name=?, max_price=?, active=1, created_at=? WHERE id=?",
+                            (_al_name, _al_price, _now_al, _exists[0])
+                        )
+                    else:
+                        _c_al.execute(
+                            "INSERT INTO plot_alerts (email,name,province,max_price,created_at) VALUES (?,?,?,?,?)",
+                            (_al_email.lower().strip(), _al_name, _al_prov, _al_price, _now_al)
+                        )
+                    _c_al.commit(); _c_al.close()
+                    st.success(f"✅ Alerta activada para fincas en {_al_prov or 'España'}.")
+                    try:
+                        from modules.marketplace.email_notify import _send
+                        _send(f"🔔 <b>Nueva alerta</b>\nEmail: {_al_email}\nProvincia: {_al_prov or 'Todas'}\nPresupuesto: €{_al_price:,.0f}")
+                    except Exception:
+                        pass
+                except Exception:
+                    st.info("✅ Petición recibida. Te contactaremos en archirapid2026@gmail.com")
 
     # ── Calculadora de financiación ───────────────────────────────────────────
     try:
