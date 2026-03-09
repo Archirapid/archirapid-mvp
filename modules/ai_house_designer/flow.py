@@ -1734,7 +1734,7 @@ def render_step2():
     # Si hay diseño de Babylon, usar esas áreas en los sliders
     # El cable #076 ya sincronizó ai_room_proposal con new_area de Babylon
     if design_data['modified']:
-        st.info(f"📐 **Diseño editado en Babylon activo**: {design_data['total_area']}m² · "
+        st.info(f"📐 **Diseño editado en 3D activo**: {design_data['total_area']}m² · "
                 f"€{base_total_cost:,} · Los sliders reflejan tu diseño 3D")
     
     # proposal ya tiene los valores de Babylon gracias al cable #076
@@ -2521,7 +2521,7 @@ def render_step3():
     # Sincronización Babylon → Paso 4
     st.markdown("---")
     babylon_json = st.file_uploader(
-        "📐 Si modificaste el diseño en Editor 3D, sube el JSON aquí:",
+        "📐 Si modificaste el diseño en el editor 3D, sube el JSON aquí:",
         type=['json'],
         key="babylon_sync_step4",
         help="El JSON se descarga al hacer 'Guardar Cambios' en Babylon"

@@ -721,6 +721,20 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                     gizmoManager.gizmos.positionGizmo.xGizmo.isEnabled = true;
                     gizmoManager.gizmos.positionGizmo.yGizmo.isEnabled = false;
                     gizmoManager.gizmos.positionGizmo.zGizmo.isEnabled = true;
+                    // Registrar observable aquí también (flujo: selección → modo mover)
+                    gizmoManager.gizmos.positionGizmo.onDragEndObservable.clear();
+                    gizmoManager.gizmos.positionGizmo.onDragEndObservable.add(() => {{
+                        saveSnapshot();
+                        const f = scene.getMeshByName(`floor_${{idx}}`);
+                        if (f) {{
+                            const rw = roomsData[idx].width;
+                            const rd = roomsData[idx].depth;
+                            roomsData[idx].x = f.position.x - rw / 2;
+                            roomsData[idx].z = f.position.z - rd / 2;
+                        }}
+                        rebuildScene(roomsData);
+                        updateBudget();
+                    }});
                     showToast('↔️ Mueve: ' + roomsData[idx].name);
                 }} else {{
                     gizmoManager.attachToMesh(null);
@@ -966,18 +980,20 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                 showToast('Dimensiones no válidas (mínimo 0.5m)');
                 return;
             }}
-            // Actualizar área de la habitación seleccionada
+            saveSnapshot();
+            // Actualizar dimensiones Y área en roomsData
+            roomsData[selectedIndex].width  = newW;
+            roomsData[selectedIndex].depth  = newD;
             roomsData[selectedIndex].area_m2 = parseFloat((newW * newD).toFixed(2));
-            // Exterior/garden: no recalcular layout, respetar posición actual
-                const rZone = (roomsData[selectedIndex].zone || '').toLowerCase();
-                if (rZone === 'exterior' || rZone === 'garden') {{
-                    rebuildScene(roomsData);
-                }} else {{
-                    const newLayout = generateLayoutJS(roomsData);
-                    rebuildScene(newLayout);
-                }}
-            // Validar CTE de la habitación que se editó
+            const rZone = (roomsData[selectedIndex].zone || '').toLowerCase();
+            if (rZone === 'exterior' || rZone === 'garden') {{
+                rebuildScene(roomsData);
+            }} else {{
+                const newLayout = generateLayoutJS(roomsData);
+                rebuildScene(newLayout);
+            }}
             checkCTE(selectedIndex, newW, newD);
+            updateBudget();
         }}
 
         // ================================================

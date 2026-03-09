@@ -470,12 +470,27 @@ def show_plot_detail_page(plot_id: str):
                     st.error(f"Error al procesar la operación: {str(e)}")
 
     # ── Alertas de nuevas fincas ──────────────────────────────────────────────
-    try:
-        from modules.marketplace.alertas import render_subscribe_form
-        with st.expander("🔔 Avisarme cuando haya fincas similares", expanded=False):
+    with st.expander("🔔 Avisarme cuando haya fincas similares", expanded=False):
+        try:
+            from modules.marketplace.alertas import render_subscribe_form
             render_subscribe_form(plot=plot, key_prefix=f"al_{plot.get('id','x')}")
-    except Exception:
-        pass
+        except Exception as _ae:
+            st.info("Introduce tu email para recibir alertas de nuevas fincas similares.")
+            with st.form(f"alert_fallback_{plot.get('id','x')}"):
+                _ae_name  = st.text_input("Nombre")
+                _ae_email = st.text_input("Email *")
+                _ae_prov  = plot.get("province", "")
+                if st.form_submit_button("🔔 Activar alerta", type="primary"):
+                    if _ae_email and "@" in _ae_email:
+                        try:
+                            import sqlite3 as _sq_al, datetime as _dt_al
+                            _c_al = _sq_al.connect("database.db", timeout=10)
+                            _c_al.execute("CREATE TABLE IF NOT EXISTS plot_alerts (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT, name TEXT, province TEXT, max_price REAL DEFAULT 0, created_at TEXT, active INTEGER DEFAULT 1)")
+                            _c_al.execute("INSERT INTO plot_alerts (email,name,province,created_at) VALUES (?,?,?,?)", (_ae_email, _ae_name, _ae_prov, _dt_al.datetime.utcnow().isoformat()))
+                            _c_al.commit(); _c_al.close()
+                            st.success("✅ Alerta activada.")
+                        except Exception:
+                            st.info("Escríbenos a archirapid2026@gmail.com para recibir alertas.")
 
     # ── Calculadora de financiación ───────────────────────────────────────────
     try:

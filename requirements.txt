@@ -13,6 +13,7 @@ pyproj>=3.6.0
 # Data
 pandas>=2.0.0
 numpy>=1.26.0
+openpyxl>=3.1.0
 
 # Image processing
 Pillow>=10.0.0
@@ -39,7 +40,7 @@ python-dotenv>=1.0.0
 werkzeug>=3.0.0
 
 # AI
-google-generativeai>=0.3.0
+# google-generativeai ELIMINADO — usa REST API directa (ver ai_engine.py)
 groq>=0.9.0
 
 # Backend
