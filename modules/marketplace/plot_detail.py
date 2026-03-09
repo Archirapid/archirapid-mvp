@@ -469,6 +469,47 @@ def show_plot_detail_page(plot_id: str):
                 except Exception as e:
                     st.error(f"Error al procesar la operación: {str(e)}")
 
+    # ── Tour Virtual 360° ─────────────────────────────────────────────────────
+    _b64_360 = plot.get("tour_360_b64", "") or ""
+    if _b64_360:
+        with st.expander("🔭 Tour Virtual 360° — Explora la finca", expanded=True):
+            st.components.v1.html(f"""
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.css">
+  <script src="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.js"></script>
+  <style>
+    body {{ margin:0; padding:0; background:#0D1B2A; }}
+    #pano {{ width:100%; height:420px; border-radius:10px; overflow:hidden; }}
+  </style>
+</head>
+<body>
+  <div id="pano"></div>
+  <script>
+    pannellum.viewer('pano', {{
+      type: 'equirectangular',
+      panorama: 'data:image/jpeg;base64,{_b64_360}',
+      autoLoad: true,
+      autoRotate: -1.5,
+      showFullscreenCtrl: true,
+      showZoomCtrl: true,
+      mouseZoom: true,
+      hfov: 100,
+      pitch: 0,
+      yaw: 0,
+      strings: {{
+        loadButtonLabel: "Cargar Tour 360°",
+        loadingLabel: "Cargando...",
+        bylineLabel: "ArchiRapid"
+      }}
+    }});
+  </script>
+</body>
+</html>
+""", height=440, scrolling=False)
+
     # ── Alertas de nuevas fincas (inline, sin imports externos) ──────────────
     _pid_al = str(plot.get('id', 'x'))
     with st.expander("🔔 Avisarme cuando haya fincas similares", expanded=False):

@@ -50,6 +50,48 @@ def main():
                                         st.info("Sin suscriptores coincidentes o RESEND_API_KEY no configurada.")
                                 except Exception as _ae:
                                     st.error(f"Error alertas: {_ae}")
+
+                        # ── Tour 360° ──────────────────────────────────────────
+                        st.markdown("---")
+                        _has_360 = bool(p.get("tour_360_b64", ""))
+                        st.markdown(
+                            f"**🔭 Tour Virtual 360°:** {'✅ Activo' if _has_360 else '⬜ Sin tour'}"
+                        )
+                        _up360 = st.file_uploader(
+                            "Subir foto equirectangular (JPG/PNG — cualquier móvil en modo 360°)",
+                            type=["jpg", "jpeg", "png"],
+                            key=f"tour360_{p['id']}"
+                        )
+                        if _up360:
+                            try:
+                                import io as _io360
+                                import base64 as _b64mod
+                                from PIL import Image as _PIL360
+                                _img = _PIL360.open(_up360).convert("RGB")
+                                if _img.width > 2048:
+                                    _ratio = 2048 / _img.width
+                                    _img = _img.resize(
+                                        (2048, int(_img.height * _ratio)),
+                                        _PIL360.Resampling.LANCZOS
+                                    )
+                                _buf360 = _io360.BytesIO()
+                                _img.save(_buf360, format="JPEG", quality=82)
+                                _b64_val = _b64mod.b64encode(_buf360.getvalue()).decode()
+                                _conn360 = db_conn()
+                                try:
+                                    _conn360.execute("ALTER TABLE plots ADD COLUMN tour_360_b64 TEXT")
+                                    _conn360.commit()
+                                except Exception:
+                                    pass  # columna ya existe
+                                _conn360.execute(
+                                    "UPDATE plots SET tour_360_b64=? WHERE id=?",
+                                    (_b64_val, p["id"])
+                                )
+                                _conn360.commit()
+                                _conn360.close()
+                                st.success("✅ Tour 360° guardado. Recarga la página para verlo activo.")
+                            except Exception as _e360:
+                                st.error(f"Error guardando tour 360°: {_e360}")
             else:
                 st.info("No hay fincas publicadas")
         except Exception as e:
