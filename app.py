@@ -60,6 +60,47 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# ── Botón flotante Lola — visible en todas las páginas ───────────────────────
+st.markdown("""
+<style>
+#lola-fab {
+    position: fixed;
+    bottom: 28px;
+    right: 28px;
+    z-index: 99999;
+    background: linear-gradient(135deg, #1E3A5F, #2563EB);
+    color: white !important;
+    border-radius: 50px;
+    padding: 13px 22px;
+    font-size: 15px;
+    font-weight: 700;
+    text-decoration: none !important;
+    box-shadow: 0 4px 24px rgba(37,99,235,0.55);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border: 1px solid rgba(255,255,255,0.18);
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    animation: lola-pulse 3s ease-in-out infinite;
+}
+#lola-fab:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 32px rgba(37,99,235,0.7);
+    animation: none;
+}
+@keyframes lola-pulse {
+    0%, 100% { box-shadow: 0 4px 24px rgba(37,99,235,0.55); }
+    50%       { box-shadow: 0 4px 32px rgba(37,99,235,0.85); }
+}
+</style>
+<a id="lola-fab" href="?page=chat">
+    💬 <span>Lola</span>
+    <span style="background:rgba(16,185,129,0.25);border:1px solid #10B981;border-radius:10px;
+                 padding:1px 7px;font-size:11px;font-weight:600;color:#10B981;">● online</span>
+</a>
+""", unsafe_allow_html=True)
+
 # HARDCODE DE ROL PARA PRUEBA
 if st.session_state.get('email') == 'asdfg@lkj.com': st.session_state['role'] = 'owner'
 
@@ -1029,6 +1070,11 @@ if st.query_params.get("page") == "Registro de Usuario":
     except Exception as e:
         st.error(f"Error mostrando registro v2: {e}")
 
+if st.query_params.get("page") == "chat":
+    st.session_state["selected_page"] = "💬 Lola"
+    st.query_params.clear()
+    st.rerun()
+
 if st.query_params.get("page") == "Diseñador de Vivienda":
     try:
         with st.container():
@@ -1050,7 +1096,7 @@ PAGES = {
     "👤 Panel de Cliente": ("modules.marketplace.client_panel", "main"),
     "Iniciar Sesión": ("modules.marketplace.auth", "show_login"),
     "Registro de Usuario": ("modules.marketplace.auth", "show_registration"),
-    "💬 Marina": ("modules.marketplace.virtual_assistant", "main"),
+    "💬 Lola": ("modules.marketplace.virtual_assistant", "main"),
 }
 PAGES = list(PAGES.keys())
 
@@ -1743,7 +1789,7 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
         <div style="font-size:2em;">🏗️</div>
         <div style="flex:1;min-width:200px;">
             <div style="font-weight:800;color:#F8FAFC;font-size:1.05em;">
-                ¿Tienes dudas? Habla con Marina
+                ¿Tienes dudas? Habla con Lola
             </div>
             <div style="color:#94A3B8;font-size:0.86em;margin-top:3px;">
                 Nuestra asistente de IA responde al instante sobre fincas, precios y cómo funciona ArchiRapid
@@ -1751,8 +1797,8 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
         </div>
     </div>
     """, unsafe_allow_html=True)
-    if st.button("💬 Abrir chat con Marina →", type="primary", use_container_width=False, key="btn_marina_home"):
-        st.session_state["selected_page"] = "💬 Marina"
+    if st.button("💬 Abrir chat con Lola →", type="primary", use_container_width=False, key="btn_lola_home"):
+        st.session_state["selected_page"] = "💬 Lola"
         st.rerun()
 
     # Footer
@@ -1849,7 +1895,7 @@ elif st.session_state.get('selected_page') == "Registro de Usuario":
         auth.show_registration()
         st.stop()
 
-elif st.session_state.get('selected_page') == "💬 Marina":
+elif st.session_state.get('selected_page') == "💬 Lola":
     with st.container():
         from modules.marketplace import virtual_assistant
         virtual_assistant.main()

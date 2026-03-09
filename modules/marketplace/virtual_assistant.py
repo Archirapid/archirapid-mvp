@@ -1,5 +1,5 @@
 """
-Marina — Asistente Virtual de ArchiRapid
+Lola — Asistente Virtual de ArchiRapid
 IA conversacional con GROQ · Notifica al admin via Telegram
 """
 import streamlit as st
@@ -7,7 +7,7 @@ import os
 import requests as _req
 
 # ── Prompt de personalidad ────────────────────────────────────────────────────
-_SYSTEM = """Eres Marina, la asistente virtual de ArchiRapid, plataforma proptech española
+_SYSTEM = """Eres Lola, la asistente virtual de ArchiRapid, plataforma proptech española
 que conecta propietarios de terrenos, compradores y arquitectos mediante IA.
 
 LO QUE HACE ARCHIRAPID:
@@ -75,7 +75,7 @@ def _groq_reply(history: list) -> str:
 def _notify(user_msg: str):
     try:
         from modules.marketplace.email_notify import _send
-        _send(f"💬 <b>Marina — mensaje recibido</b>\n{user_msg[:400]}")
+        _send(f"💬 <b>Lola — mensaje recibido</b>\n{user_msg[:400]}")
     except Exception:
         pass
 
@@ -88,7 +88,7 @@ def main():
         <div style="display:flex;align-items:center;gap:14px;">
             <div style="font-size:2.4em;">🏗️</div>
             <div>
-                <div style="font-size:1.3em;font-weight:800;color:#F8FAFC;">Marina</div>
+                <div style="font-size:1.3em;font-weight:800;color:#F8FAFC;">Lola</div>
                 <div style="font-size:0.88em;color:#94A3B8;">
                     Asistente virtual de ArchiRapid · Online ahora
                 </div>
@@ -103,12 +103,12 @@ def main():
     """, unsafe_allow_html=True)
 
     # ── Inicializar historial ──────────────────────────────────────────────────
-    if "marina_history" not in st.session_state:
-        st.session_state.marina_history = [
+    if "lola_history" not in st.session_state:
+        st.session_state.lola_history = [
             {
                 "role": "assistant",
                 "content": (
-                    "¡Hola! Soy Marina 👋 Tu asistente de ArchiRapid.\n\n"
+                    "¡Hola! Soy Lola 👋 Tu asistente de ArchiRapid.\n\n"
                     "Puedo ayudarte con:\n"
                     "- 🏡 Información sobre fincas y terrenos disponibles\n"
                     "- 🔍 Cómo funciona la verificación catastral con IA\n"
@@ -120,7 +120,7 @@ def main():
         ]
 
     # ── Mostrar historial ──────────────────────────────────────────────────────
-    for msg in st.session_state.marina_history:
+    for msg in st.session_state.lola_history:
         with st.chat_message(
             "assistant" if msg["role"] == "assistant" else "user",
             avatar="🏗️" if msg["role"] == "assistant" else "👤"
@@ -131,26 +131,26 @@ def main():
     if prompt := st.chat_input("Escríbeme lo que necesites..."):
         with st.chat_message("user", avatar="👤"):
             st.markdown(prompt)
-        st.session_state.marina_history.append({"role": "user", "content": prompt})
+        st.session_state.lola_history.append({"role": "user", "content": prompt})
 
         _notify(prompt)
 
         with st.chat_message("assistant", avatar="🏗️"):
             with st.spinner(""):
-                reply = _groq_reply(st.session_state.marina_history)
+                reply = _groq_reply(st.session_state.lola_history)
             st.markdown(reply)
-        st.session_state.marina_history.append({"role": "assistant", "content": reply})
+        st.session_state.lola_history.append({"role": "assistant", "content": reply})
 
     # ── Footer ─────────────────────────────────────────────────────────────────
     st.markdown("---")
     c1, c2, c3 = st.columns([2, 1, 1])
     with c1:
-        st.caption("📧 Contacto directo: archirapid2026@gmail.com  ·  Marina responde en segundos")
+        st.caption("📧 Contacto directo: archirapid2026@gmail.com  ·  Lola responde en segundos")
     with c2:
         if st.button("← Volver al inicio", use_container_width=True):
             st.session_state["selected_page"] = "🏠 Inicio / Marketplace"
             st.rerun()
     with c3:
         if st.button("🗑️ Nueva conversación", use_container_width=True):
-            del st.session_state["marina_history"]
+            del st.session_state["lola_history"]
             st.rerun()
