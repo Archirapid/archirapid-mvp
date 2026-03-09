@@ -61,6 +61,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ── Widget flotante Lola — chat bubble visible en todas las páginas ───────────
+import streamlit.components.v1 as _stc
 _lola_groq_key = ""
 try:
     _lola_groq_key = st.secrets.get("GROQ_API_KEY", "")
@@ -243,55 +244,42 @@ st.markdown(f"""
     </div>
     <div id="lola-messages"></div>
     <div id="lola-input-area">
-        <input id="lola-input" type="text" placeholder="Escríbeme lo que necesites..."
-               onkeydown="if(event.key==='Enter' && !event.shiftKey){{ event.preventDefault(); sendLolaMsg(); }}"/>
+        <input id="lola-input" type="text" placeholder="Escríbeme lo que necesites..."/>
         <button id="lola-send" onclick="sendLolaMsg()" title="Enviar">➤</button>
     </div>
 </div>
 
 <!-- FAB toggle -->
-<button id="lola-fab" onclick="toggleLola()">
+<button id="lola-fab" onclick="window.toggleLola && window.toggleLola()">
     💬 <span>Lola</span>
     <span class="lola-badge">● online</span>
 </button>
+""", unsafe_allow_html=True)
 
-<script>
+# JS en iframe separado — st.components.v1.html SÍ ejecuta scripts
+_stc.html(f"""<script>
 (function() {{
-    const GROQ_KEY = "{_lola_groq_key}";
-    const SYS = `Eres Lola, la asistente virtual de ArchiRapid, plataforma proptech española que conecta propietarios de terrenos, compradores y arquitectos mediante IA.
+    var GROQ_KEY = "{_lola_groq_key}";
+    var SYS = "Eres Lola, la asistente virtual de ArchiRapid, plataforma proptech espanola que conecta propietarios de terrenos, compradores y arquitectos mediante IA.\\n\\nLO QUE HACE ARCHIRAPID:\\n- Explorar fincas y terrenos reales en Espana con validacion catastral por IA\\n- Reservar o comprar terrenos directamente en la plataforma (modo demo actualmente)\\n- Disenar una vivienda personalizada en 3D con asistente de IA incluido\\n- Obtener presupuesto orientativo y documentacion arquitectonica descargable\\n- Conectar con arquitectos y proveedores de servicios de construccion\\n\\nDATOS CLAVE:\\n- Acceso gratuito para los primeros 50 usuarios registrados (beta privada)\\n- Fincas disponibles: Madrid, Andalucia, Extremadura, Castilla y Leon\\n- Precio orientativo: 900-2000 euros/m2 segun calidad y zona\\n- Contacto: archirapid2026@gmail.com\\n- Plataforma en modo demostracion - datos reales, sin validez juridica\\n\\nTU MISION: Responder con calidez y concision. Guiar al usuario: ver finca, verificar con IA, reservar, disenar en 3D, documentacion. Si muestran interes en ser contactados, pedir su nombre y email.\\n\\nREGLAS: Responde SIEMPRE en espanol. Maximo 3-4 frases por respuesta. NO inventes precios de fincas concretas. NO menciones tecnologias internas.";
 
-LO QUE HACE ARCHIRAPID:
-- Explorar fincas y terrenos reales en España con validación catastral por IA
-- Reservar o comprar terrenos directamente en la plataforma (modo demo actualmente)
-- Diseñar una vivienda personalizada en 3D con asistente de IA incluido
-- Obtener presupuesto orientativo y documentación arquitectónica descargable
-- Conectar con arquitectos y proveedores de servicios de construcción
+    var P = parent;
+    var chatHistory = [];
+    var panelOpen = false;
+    var initialized = false;
 
-DATOS CLAVE:
-- Acceso gratuito para los primeros 50 usuarios registrados (beta privada)
-- Fincas disponibles: Madrid, Andalucía, Extremadura, Castilla y León
-- Precio orientativo: 900€–2.000€/m² según calidad y zona
-- Contacto: archirapid2026@gmail.com
-- Plataforma en modo demostración — datos reales, sin validez jurídica
-
-TU MISIÓN: Responder con calidez y concisión. Guiar al usuario: ver finca → verificar con IA → reservar → diseñar en 3D → documentación. Si muestran interés en ser contactados, pedir su nombre y email.
-
-REGLAS: Responde SIEMPRE en español. Máximo 3-4 frases por respuesta. NO inventes precios de fincas concretas. NO menciones tecnologías internas.`;
-
-    let chatHistory = [];
-    let panelOpen = false;
-    let initialized = false;
+    function el(id) {{ return P.document.getElementById(id); }}
 
     function toggleLola() {{
         panelOpen = !panelOpen;
-        const panel = document.getElementById('lola-panel');
+        var panel = el('lola-panel');
+        if (!panel) return;
         if (panelOpen) {{
             panel.classList.add('open');
             if (!initialized) {{
                 initialized = true;
-                appendMsg('bot', '¡Hola! Soy Lola 👋 Tu asistente de ArchiRapid.\\n\\n¿Tienes preguntas sobre fincas, precios, el diseño 3D o cómo funciona la plataforma? Estoy aquí para ayudarte. 😊');
+                appendMsg('bot', '\\u00a1Hola! Soy Lola \\ud83d\\udc4b Tu asistente de ArchiRapid.\\n\\n\\u00bfTienes preguntas sobre fincas, precios, el dise\\u00f1o 3D o c\\u00f3mo funciona la plataforma? Estoy aqu\\u00ed para ayudarte. \\ud83d\\ude0a');
             }}
-            setTimeout(() => {{ const i = document.getElementById('lola-input'); if(i) i.focus(); }}, 150);
+            setTimeout(function() {{ var i = el('lola-input'); if(i) i.focus(); }}, 150);
         }} else {{
             panel.classList.remove('open');
         }}
@@ -299,60 +287,77 @@ REGLAS: Responde SIEMPRE en español. Máximo 3-4 frases por respuesta. NO inven
 
     function appendMsg(role, text) {{
         chatHistory.push({{ role: role === 'bot' ? 'assistant' : 'user', content: text }});
-        const box = document.getElementById('lola-messages');
-        const div = document.createElement('div');
+        var box = el('lola-messages');
+        if (!box) return;
+        var div = P.document.createElement('div');
         div.className = 'lola-msg ' + (role === 'bot' ? 'bot' : 'user');
         div.textContent = text;
         box.appendChild(div);
         box.scrollTop = box.scrollHeight;
-        return div;
     }}
 
     async function sendLolaMsg() {{
-        const inp = document.getElementById('lola-input');
-        const text = (inp.value || '').trim();
+        var inp = el('lola-input');
+        if (!inp) return;
+        var text = (inp.value || '').trim();
         if (!text) return;
         inp.value = '';
         appendMsg('user', text);
 
-        const sendBtn = document.getElementById('lola-send');
-        sendBtn.disabled = true;
+        var sendBtn = el('lola-send');
+        if (sendBtn) sendBtn.disabled = true;
         inp.disabled = true;
 
-        const box = document.getElementById('lola-messages');
-        const typing = document.createElement('div');
+        var box = el('lola-messages');
+        var typing = P.document.createElement('div');
         typing.className = 'lola-msg bot typing';
-        typing.textContent = '✦ escribiendo...';
-        box.appendChild(typing);
-        box.scrollTop = box.scrollHeight;
+        typing.textContent = '\\u2726 escribiendo...';
+        if (box) {{ box.appendChild(typing); box.scrollTop = box.scrollHeight; }}
 
         try {{
-            const messages = [{{ role: 'system', content: SYS }}, ...chatHistory.slice(-12)];
-            const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {{
+            var messages = [{{ role: 'system', content: SYS }}].concat(chatHistory.slice(-12));
+            var resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {{
                 method: 'POST',
                 headers: {{ 'Authorization': 'Bearer ' + GROQ_KEY, 'Content-Type': 'application/json' }},
-                body: JSON.stringify({{ model: 'llama-3.3-70b-versatile', messages, max_tokens: 280, temperature: 0.72 }})
+                body: JSON.stringify({{ model: 'llama-3.3-70b-versatile', messages: messages, max_tokens: 280, temperature: 0.72 }})
             }});
-            const data = await resp.json();
+            var data = await resp.json();
             typing.remove();
-            const reply = data?.choices?.[0]?.message?.content?.trim()
-                || 'Lo siento, hubo un problema técnico. Escríbenos a archirapid2026@gmail.com 📧';
+            var reply = (data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content)
+                ? data.choices[0].message.content.trim()
+                : 'Lo siento, hubo un problema t\\u00e9cnico. Escr\\u00edbenos a archirapid2026@gmail.com';
             appendMsg('bot', reply);
         }} catch(e) {{
             typing.remove();
-            appendMsg('bot', 'En este momento no puedo responderte. Escríbenos a archirapid2026@gmail.com 🙏');
+            appendMsg('bot', 'En este momento no puedo responderte. Escr\\u00edbenos a archirapid2026@gmail.com \\ud83d\\ude4f');
         }}
 
-        sendBtn.disabled = false;
+        if (sendBtn) sendBtn.disabled = false;
         inp.disabled = false;
         inp.focus();
     }}
 
-    window.toggleLola  = toggleLola;
-    window.sendLolaMsg = sendLolaMsg;
+    P.window.toggleLola  = toggleLola;
+    P.window.sendLolaMsg = sendLolaMsg;
+
+    // Bind Enter key on input
+    var inp = el('lola-input');
+    if (inp) {{
+        inp.addEventListener('keydown', function(e) {{
+            if (e.key === 'Enter' && !e.shiftKey) {{ e.preventDefault(); sendLolaMsg(); }}
+        }});
+    }}
+    // Bind send button
+    var sb = el('lola-send');
+    if (sb) sb.addEventListener('click', sendLolaMsg);
+    // Bind close button
+    var cb = el('lola-close');
+    if (cb) cb.addEventListener('click', toggleLola);
+    // Bind FAB
+    var fab = el('lola-fab');
+    if (fab) fab.addEventListener('click', toggleLola);
 }})();
-</script>
-""", unsafe_allow_html=True)
+</script>""", height=0)
 
 # HARDCODE DE ROL PARA PRUEBA
 if st.session_state.get('email') == 'asdfg@lkj.com': st.session_state['role'] = 'owner'
@@ -2028,27 +2033,6 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
                         st.rerun()
     except Exception as _e:
         st.info("Catálogo de prefabricadas próximamente disponible.")
-
-    # ── Marina CTA ────────────────────────────────────────────────────────────
-    st.markdown("""
-    <div style="background:linear-gradient(135deg,#0D1B2A,#1a2f4a);border-radius:14px;
-                padding:18px 24px;margin:28px 0 12px 0;
-                border:1px solid rgba(245,158,11,0.25);display:flex;
-                align-items:center;gap:18px;flex-wrap:wrap;">
-        <div style="font-size:2em;">🏗️</div>
-        <div style="flex:1;min-width:200px;">
-            <div style="font-weight:800;color:#F8FAFC;font-size:1.05em;">
-                ¿Tienes dudas? Habla con Lola
-            </div>
-            <div style="color:#94A3B8;font-size:0.86em;margin-top:3px;">
-                Nuestra asistente de IA responde al instante sobre fincas, precios y cómo funciona ArchiRapid
-            </div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-    if st.button("💬 Abrir chat con Lola →", type="primary", use_container_width=False, key="btn_lola_home"):
-        st.session_state["selected_page"] = "💬 Lola"
-        st.rerun()
 
     # Footer
     st.markdown("""
