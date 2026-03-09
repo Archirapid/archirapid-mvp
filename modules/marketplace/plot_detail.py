@@ -240,6 +240,15 @@ def show_plot_detail_page(plot_id: str):
 
     if ia_verified:
         st.success("✅ Datos verificados con IA - La información catastral coincide con los datos publicados")
+        # Mostrar detalles guardados si existen
+        _saved = st.session_state.get(f'ia_verified_data_{plot_id}')
+        if _saved:
+            with st.expander("📊 Ver datos verificados", expanded=False):
+                import json as _j
+                _d = _saved if isinstance(_saved, dict) else _j.loads(_saved)
+                st.write(f"**Superficie:** {_d.get('superficie_m2', 0)} m²")
+                st.write(f"**Referencia Catastral:** {_d.get('referencia_catastral', '')}")
+                st.write(f"**Municipio:** {_d.get('municipio', '')}")
     else:
         st.info("📋 Recomendado: Verifica que los datos de la finca coincidan con la nota catastral antes de comprar")
 
@@ -370,6 +379,7 @@ def show_plot_detail_page(plot_id: str):
                                 if superficie_ok and ref_ok:
                                     st.success("✅ VERIFICACIÓN EXITOSA: Los datos coinciden perfectamente")
                                     st.session_state[f'ia_verified_{plot_id}'] = True
+                                    st.session_state[f'ia_verified_data_{plot_id}'] = datos_extraidos
                                     st.balloons()
                                 elif superficie_ok:
                                     st.warning("⚠️ Superficie correcta, pero referencia catastral diferente")
