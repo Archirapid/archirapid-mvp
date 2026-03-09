@@ -280,6 +280,95 @@ def _render_plot_card(plot, key_prefix, show_premium_badge=False):
     if st.button("Ver Detalles", key=f"{key_prefix}_{plot['id']}", use_container_width=True):
         set_query_param("selected_plot", plot["id"])
         st.rerun()
+    # ── Botón comparar ────────────────────────────────────────────────────────
+    if "compare_plots" not in st.session_state:
+        st.session_state.compare_plots = []
+    pid = plot["id"]
+    in_compare = pid in st.session_state.compare_plots
+    btn_label = "✓ En comparativa" if in_compare else "＋ Comparar"
+    btn_type  = "secondary"
+    if st.button(btn_label, key=f"cmp_{key_prefix}_{pid}", use_container_width=True, type=btn_type):
+        if in_compare:
+            st.session_state.compare_plots.remove(pid)
+        elif len(st.session_state.compare_plots) < 3:
+            st.session_state.compare_plots.append(pid)
+        else:
+            st.toast("Máximo 3 fincas en la comparativa. Quita una primero.", icon="⚠️")
+        st.rerun()
+
+
+def render_comparador(plots_all: list):
+    """Muestra la tabla comparativa de las fincas seleccionadas (2-3)."""
+    ids = st.session_state.get("compare_plots", [])
+    if len(ids) < 2:
+        return
+    selected = [p for p in plots_all if p["id"] in ids]
+    if len(selected) < 2:
+        return
+
+    import base64 as _b64
+
+    st.markdown("---")
+    st.markdown("### ⚖️ Comparativa de fincas seleccionadas")
+
+    # Cabecera: imagen + título
+    header_cols = st.columns(len(selected))
+    for i, plot in enumerate(selected):
+        with header_cols[i]:
+            img_path = get_plot_image_path(plot)
+            try:
+                with open(img_path, "rb") as f:
+                    b64 = _b64.b64encode(f.read()).decode()
+                ext = str(img_path).rsplit(".", 1)[-1].lower()
+                mime = "image/png" if ext == "png" else "image/jpeg"
+                st.markdown(
+                    f'<img src="data:{mime};base64,{b64}" '
+                    f'style="width:100%;height:140px;object-fit:cover;border-radius:10px;">',
+                    unsafe_allow_html=True
+                )
+            except Exception:
+                st.image(img_path, use_container_width=True)
+            st.markdown(f"**{plot.get('title', '—')}**")
+
+    # Filas de datos
+    def _row(label, fn):
+        row_cols = st.columns(len(selected))
+        for i, plot in enumerate(selected):
+            with row_cols[i]:
+                try:
+                    val = fn(plot)
+                except Exception:
+                    val = "—"
+                st.markdown(
+                    f'<div style="background:rgba(30,58,95,0.3);border-radius:6px;'
+                    f'padding:7px 10px;margin-bottom:4px;">'
+                    f'<div style="color:#94A3B8;font-size:11px;">{label}</div>'
+                    f'<div style="color:#F8FAFC;font-weight:600;font-size:14px;">{val}</div>'
+                    f'</div>',
+                    unsafe_allow_html=True
+                )
+
+    _row("💰 Precio",         lambda p: f"€{float(p.get('price',0)):,.0f}")
+    _row("📏 Superficie",     lambda p: f"{p.get('m2','—')} m²")
+    _row("€ / m²",            lambda p: f"€{float(p.get('price',0))/max(float(p.get('m2',1) or 1),1):,.0f}/m²")
+    _row("📐 Edificable",     lambda p: f"{p.get('superficie_edificable','—')} m²")
+    _row("📍 Provincia",      lambda p: p.get('province') or p.get('locality') or "—")
+    _row("✅ Estado",         lambda p: (p.get('status') or "—").capitalize())
+    _row("🏗️ Referencia cat.",lambda p: p.get('catastral_ref') or "—")
+
+    # CTAs
+    cta_cols = st.columns(len(selected))
+    for i, plot in enumerate(selected):
+        with cta_cols[i]:
+            if st.button("Ver Detalles →", key=f"cmp_detail_{plot['id']}", use_container_width=True, type="primary"):
+                set_query_param("selected_plot", plot["id"])
+                st.rerun()
+
+    # Limpiar comparativa
+    st.markdown("")
+    if st.button("🗑️ Limpiar comparativa", key="clear_compare"):
+        st.session_state.compare_plots = []
+        st.rerun()
 
 
 def render_featured_plots(plots):
@@ -315,6 +404,13 @@ def render_featured_plots(plots):
     for i, plot in enumerate(to_show):
         with cols[i]:
             _render_plot_card(plot, "norm", show_premium_badge=False)
+
+    # ── Comparador (aparece solo cuando hay 2-3 seleccionadas) ───────────────
+    _n_cmp = len(st.session_state.get("compare_plots", []))
+    if _n_cmp >= 2:
+        render_comparador(plots)
+    elif _n_cmp == 1:
+        st.caption("＋ Selecciona al menos una finca más para comparar.")
 
 def render_map(plots):
     """Renderiza el mapa interactivo con las fincas."""
