@@ -181,6 +181,7 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
         <hr class="divider">
         <button class="tool-btn" onclick="setTopView()">🔝 Vista Planta</button>
         <button class="tool-btn" onclick="setIsoView()">🏠 Vista 3D</button>
+        <button class="tool-btn" onclick="setStreetView()">🚶 Vista Calle</button>
         <button class="tool-btn" id="btn-style" onclick="toggleStylePanel()">🎨 Estilo</button>
         
         <hr style="margin: 10px 0; border-color: rgba(255,255,255,0.2);">
@@ -404,7 +405,13 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
         const hemi = new BABYLON.HemisphericLight("hemi", new BABYLON.Vector3(0,1,0), scene);
         hemi.intensity = 0.85;
         const dirLight = new BABYLON.DirectionalLight("dir", new BABYLON.Vector3(-1,-2,-1), scene);
-        dirLight.intensity = 0.4;
+        dirLight.intensity = 0.5;
+        dirLight.position = new BABYLON.Vector3(totalWidth/2 + 20, 30, -10);
+
+        // Sombras suaves (emisor: tejado + paredes; receptor: suelo + plantas)
+        const shadowGen = new BABYLON.ShadowGenerator(512, dirLight);
+        shadowGen.useExponentialShadowMap = true;
+        shadowGen.forceBackFacesOnly = true;
 
         // Centro del plot (= centro de la casa por construcción de plotX/plotZ)
         const plotCX = totalWidth / 2;
@@ -419,6 +426,7 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
         const groundMat = new BABYLON.StandardMaterial("gMat", scene);
         groundMat.diffuseColor = new BABYLON.Color3(0.36, 0.58, 0.36);
         ground.material = groundMat;
+        ground.receiveShadows = true;
         ground.position.set(plotCX, 0, plotCZ);
 
         // Plano de parcela — delimita exactamente los m² reales de la finca
@@ -492,6 +500,9 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
         // roomsData[i] → suelo + 4 paredes + etiqueta
         // Guardamos referencias para reconstruir paredes
 
+        // GUI para etiquetas flotantes de habitaciones
+        const roomGuiUI = BABYLON.GUI.AdvancedDynamicTexture.CreateFullscreenUI("roomLabels", true, scene);
+
         function buildRoom(i) {{
             const room = roomsData[i];
             const rx = room.x, rz = room.z, rw = room.width, rd = room.depth;
@@ -515,6 +526,7 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             else                          fMat.diffuseColor = new BABYLON.Color3(0.94, 0.93, 0.90);
 
             floor.material = fMat;
+            floor.receiveShadows = true;
 
             // Paredes solo en zonas habitables
             if (zone !== 'garden' && zone !== 'exterior') {{
@@ -554,6 +566,9 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                 {{width: WALL_T, height: WALL_H, depth: rd}}, scene);
             rw_.position.set(rx+rw, WALL_H/2, rz+rd/2);
             rw_.material = wMat;
+
+            // Sombras — paredes como emisores
+            [bw, fw, lw, rw_].forEach(w => shadowGen.addShadowCaster(w, false));
 
             // Marcador de puerta — caja delgada sobre la pared correcta según zona
             const zone = (roomsData[i].zone || '').toLowerCase();
@@ -624,9 +639,29 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
         }}
 
         function _buildLabel(i, rx, rz, rw, rd) {{
-            // Etiquetas flotantes eliminadas — info disponible en panel derecho al seleccionar
-            const oldLabel = scene.getMeshByName(`label_${{i}}`);
-            if (oldLabel) oldLabel.dispose();
+            // Limpiar etiqueta anterior si existe (rebuild)
+            const oldCtrl = roomGuiUI.getControlByName(`lbl_txt_${{i}}`);
+            if (oldCtrl) roomGuiUI.removeControl(oldCtrl);
+            const oldNode = scene.getTransformNodeByName(`lbl_node_${{i}}`);
+            if (oldNode) oldNode.dispose();
+
+            const room = roomsData[i];
+            const labelText = room.name || room.code || '';
+            if (!labelText) return;
+
+            const lbl = new BABYLON.GUI.TextBlock(`lbl_txt_${{i}}`);
+            lbl.text = labelText;
+            lbl.color = "rgba(255,255,255,0.95)";
+            lbl.fontSize = 13;
+            lbl.fontWeight = "bold";
+            lbl.outlineWidth = 3;
+            lbl.outlineColor = "rgba(0,0,0,0.85)";
+            roomGuiUI.addControl(lbl);
+
+            const node = new BABYLON.TransformNode(`lbl_node_${{i}}`, scene);
+            node.position.set(rx + rw/2, WALL_H * 0.45, rz + rd/2);
+            lbl.linkWithMesh(node);
+            lbl.linkOffsetY = -12;
         }}
 
         // Construir todas las habitaciones
@@ -1041,6 +1076,12 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             camera.beta   = Math.PI/3.2;
             camera.radius = Math.max(totalWidth, totalDepth) * 2.2;
             camera.setTarget(new BABYLON.Vector3(totalWidth/2, 0, totalDepth/2));
+        }}
+        function setStreetView() {{
+            // Vista desde la calle (sur) a altura de persona mirando la fachada principal
+            const dist = Math.max(totalWidth, totalDepth) * 1.5;
+            camera.setTarget(new BABYLON.Vector3(totalWidth/2, WALL_H * 0.55, totalDepth/2));
+            camera.setPosition(new BABYLON.Vector3(totalWidth/2, WALL_H * 0.9, totalDepth/2 - dist));
         }}
 
         // ================================================
@@ -1463,6 +1504,7 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             if (roofMesh) {{
                 roofMesh.material = rMat;
                 roofMesh.isPickable = false;
+                shadowGen.addShadowCaster(roofMesh, false);
             }}
         }}
 

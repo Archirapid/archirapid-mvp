@@ -2230,8 +2230,8 @@ Máximo 200 palabras. Usa: ✅ para correcto, ⚠️ para mejorable, ❌ para pr
 def render_step3_editor():
     """Paso 3: Editor 3D con Babylon.js"""
     
-    st.header("Paso 3 – Editor 3D Avanzado")
-    st.caption("Diseña tu casa con herramientas profesionales")
+    st.header("Paso 3 – Diseña tu Casa en 3D")
+    st.caption("Visualiza, ajusta y personaliza tu vivienda antes de construirla")
     
     # Validar datos
     req = st.session_state.get("ai_house_requirements", {})
@@ -2251,23 +2251,20 @@ def render_step3_editor():
     
     # Información del editor
     st.info("""
-    🎯 **Editor 3D Profesional con Babylon.js**
-    
-    **Herramientas disponibles:**
-    - 🖱️ Seleccionar y mover elementos
-    - ⤢ Escalar habitaciones (ancho/fondo)
-    - 🔝 Vista cenital (planta)
-    - 💾 Guardar cambios (exportar JSON)
-    
-    **El asistente IA te ayudará a:**
-    - ✅ Validar que tu diseño cumple normativa
-    - ⚠️ Alertar sobre problemas técnicos
+    🏠 **Tu casa en 3D — muévela, gírala, personalízala**
+
+    - 🚶 **Vista Calle** — ve cómo queda desde el exterior
+    - 🔝 **Vista Planta** — distribución desde arriba
+    - 🖱️ Selecciona cualquier habitación para ver sus medidas
+    - ⤢ Ajusta el tamaño de cada estancia
+    - 🏠 Activa el tejado, los cimientos o el cerramiento
+    - ✅ El sistema comprueba automáticamente la normativa CTE
     """)
     
     # Botón abrir editor - DESTACADO
     st.markdown("### 🏗️ Diseña tu casa")
     
-    if st.button("🏗️ Abrir Editor Babylon.js", type="primary", use_container_width=True, key="open_babylon"):
+    if st.button("🏠 Construir mi Casa — Ver en 3D", type="primary", use_container_width=True, key="open_babylon"):
         
         # Obtener forma de casa
         house_shape = st.session_state.get('request', {}).get('house_shape', 'Rectangular (más común)')
