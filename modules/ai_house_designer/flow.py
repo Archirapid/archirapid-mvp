@@ -3320,6 +3320,51 @@ def render_step3():
                 except Exception:
                     pass  # falla silenciosamente, nunca interrumpe la descarga
 
+                # ── Gemelo Digital BIM / IFC ──────────────────────────────────
+                try:
+                    from modules.ai_house_designer.ifc_export import generate_ifc, rooms_to_svg
+                    _rooms_src = (
+                        st.session_state.get("babylon_modified_layout")
+                        or [{"name": k, "area": float(v)}
+                            for k, v in req.get("ai_room_proposal", {}).items()
+                            if isinstance(v, (int, float))]
+                    )
+                    if _rooms_src:
+                        _pname_ifc = (req.get("nombre_proyecto") or "ArchiRapid_Proyecto").replace(" ", "_")
+                        _ifc_bytes = generate_ifc(_rooms_src, project_name=_pname_ifc)
+                        st.markdown("---")
+                        st.markdown("""
+<div style="background:linear-gradient(135deg,rgba(30,58,95,0.6),rgba(13,27,42,0.8));
+            border:1px solid rgba(245,158,11,0.35);border-radius:12px;
+            padding:16px 20px;margin-bottom:12px;">
+  <div style="font-size:15px;font-weight:800;color:#F8FAFC;margin-bottom:4px;">
+    🏗️ Gemelo Digital BIM/IFC
+  </div>
+  <div style="font-size:12px;color:#94A3B8;">
+    Formato IFC2x3 · Compatible con FreeCAD · Archicad · Revit · Navisworks · BIMvision
+  </div>
+  <div style="margin-top:8px;font-size:11px;color:#64748B;">
+    ✅ Subvencionable UE (BIM Mandate) · Cada habitación es un espacio IFC certificado
+  </div>
+</div>""", unsafe_allow_html=True)
+
+                        _ifc_col1, _ifc_col2 = st.columns([1, 1])
+                        with _ifc_col1:
+                            st.download_button(
+                                label="📐 Descargar Gemelo Digital (.ifc)",
+                                data=_ifc_bytes,
+                                file_name=f"{_pname_ifc}.ifc",
+                                mime="application/x-step",
+                                use_container_width=True,
+                                help="Ábrelo en FreeCAD (gratis) o BIMvision para ver el modelo 3D técnico"
+                            )
+                        with _ifc_col2:
+                            _svg = rooms_to_svg(_rooms_src)
+                            if _svg:
+                                st.markdown(_svg, unsafe_allow_html=True)
+                except Exception:
+                    pass  # nunca interrumpe el flujo principal
+
             except Exception as e:
                 st.error(f"Error generando ZIP: {e}")
                 import traceback
