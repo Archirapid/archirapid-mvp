@@ -176,6 +176,18 @@ img {
   max-width: 100%;
   height: auto;
 }
+
+/* ── Eliminar espacio muerto en cabecera (todas las pantallas) ─────────────
+   Streamlit añade ~80-100px vacíos arriba por defecto.
+   Reducimos al mínimo sin ocultar la toolbar de Streamlit Cloud. */
+header[data-testid="stHeader"] {
+  height: 3rem            !important;
+  min-height: 0           !important;
+  background: transparent !important;
+}
+.block-container {
+  padding-top: 0.75rem    !important;
+}
 </style>
 """
 
