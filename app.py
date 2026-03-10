@@ -260,7 +260,7 @@ st.markdown(f"""
 _stc.html(f"""<script>
 (function() {{
     var GROQ_KEY = "{_lola_groq_key}";
-    var SYS = "Eres Lola, la asistente virtual de ArchiRapid, plataforma proptech espanola que conecta propietarios de terrenos, compradores y arquitectos mediante IA.\\n\\nLO QUE HACE ARCHIRAPID:\\n- Explorar fincas y terrenos reales en Espana con validacion catastral por IA\\n- Reservar o comprar terrenos directamente en la plataforma (modo demo actualmente)\\n- Disenar una vivienda personalizada en 3D con asistente de IA incluido\\n- Obtener presupuesto orientativo y documentacion arquitectonica descargable\\n- Conectar con arquitectos y proveedores de servicios de construccion\\n\\nDATOS CLAVE:\\n- Acceso gratuito para los primeros 50 usuarios registrados (beta privada)\\n- Fincas disponibles: Madrid, Andalucia, Extremadura, Castilla y Leon\\n- Precio orientativo: 900-2000 euros/m2 segun calidad y zona\\n- Contacto: archirapid2026@gmail.com\\n- Plataforma en modo demostracion - datos reales, sin validez juridica\\n\\nTU MISION: Responder con calidez y concision. Guiar al usuario: ver finca, verificar con IA, reservar, disenar en 3D, documentacion. Si muestran interes en ser contactados, pedir su nombre y email.\\n\\nREGLAS: Responde SIEMPRE en espanol. Maximo 3-4 frases por respuesta. NO inventes precios de fincas concretas. NO menciones tecnologias internas.";
+    var SYS = "Eres Lola, la asistente virtual de ArchiRapid, plataforma proptech espanola que conecta propietarios de terrenos, compradores y arquitectos mediante IA.\\n\\nLO QUE HACE ARCHIRAPID:\\n- Explorar fincas y terrenos reales en Espana con validacion catastral por IA\\n- Reservar o comprar terrenos directamente en la plataforma (modo demo actualmente)\\n- Disenar una vivienda personalizada en 3D con asistente de IA incluido\\n- Obtener presupuesto orientativo y documentacion arquitectonica descargable\\n- Conectar con arquitectos y proveedores de servicios de construccion\\n\\nDATOS CLAVE:\\n- Acceso gratuito para los primeros 50 usuarios registrados (beta privada)\\n- Fincas disponibles: Madrid, Andalucia, Extremadura, Castilla y Leon\\n- Precio orientativo: 900-2000 euros/m2 segun calidad y zona\\n- Contacto: hola@archirapid.com\\n- Plataforma en modo demostracion - datos reales, sin validez juridica\\n\\nTU MISION: Responder con calidez y concision. Guiar al usuario: ver finca, verificar con IA, reservar, disenar en 3D, documentacion. Si muestran interes en ser contactados, pedir su nombre y email.\\n\\nREGLAS: Responde SIEMPRE en espanol. Maximo 3-4 frases por respuesta. NO inventes precios de fincas concretas. NO menciones tecnologias internas.";
 
     var P = parent;
     var chatHistory = [];
@@ -325,11 +325,11 @@ _stc.html(f"""<script>
             typing.remove();
             var reply = (data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content)
                 ? data.choices[0].message.content.trim()
-                : 'Lo siento, hubo un problema t\\u00e9cnico. Escr\\u00edbenos a archirapid2026@gmail.com';
+                : 'Lo siento, hubo un problema t\\u00e9cnico. Escr\\u00edbenos a hola@archirapid.com';
             appendMsg('bot', reply);
         }} catch(e) {{
             typing.remove();
-            appendMsg('bot', 'En este momento no puedo responderte. Escr\\u00edbenos a archirapid2026@gmail.com \\ud83d\\ude4f');
+            appendMsg('bot', 'En este momento no puedo responderte. Escr\\u00edbenos a hola@archirapid.com \\ud83d\\ude4f');
         }}
 
         if (sendBtn) sendBtn.disabled = false;
@@ -2061,7 +2061,7 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
             <div style="text-align:right;">
                 <span style="color:#94A3B8;font-size:0.78em;">
                     📍 Avda. de Europa 15, 28224 Pozuelo de Alarcón (Madrid)<br>
-                    ✉️ <a href="mailto:archirapid2026@gmail.com" style="color:#94A3B8;text-decoration:none;">archirapid2026@gmail.com</a>
+                    ✉️ <a href="mailto:hola@archirapid.com" style="color:#94A3B8;text-decoration:none;">hola@archirapid.com</a>
                     &nbsp;·&nbsp; 📞 <a href="tel:+35623172704" style="color:#94A3B8;text-decoration:none;">+356 23 17 27 04</a>
                 </span>
             </div>

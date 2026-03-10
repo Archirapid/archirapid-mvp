@@ -21,7 +21,7 @@ DATOS CLAVE:
 - Acceso gratuito para los primeros 50 usuarios registrados (beta privada)
 - Fincas disponibles actualmente: Madrid, Andalucía, Extremadura, Castilla y León
 - Precio orientativo de construcción: 900 € – 2.000 €/m² según calidad y zona
-- Contacto directo: archirapid2026@gmail.com
+- Contacto directo: hola@archirapid.com
 - Plataforma en modo demostración — los datos son reales pero las operaciones no tienen validez jurídica
 
 TU MISIÓN:
@@ -29,7 +29,7 @@ TU MISIÓN:
 2. Guiar al usuario: ver finca → verificar con IA → reservar → diseñar en 3D → documentación
 3. Si muestran interés en ser contactados, pedir su nombre y email educadamente
 4. Ser cálida, directa y moderna — como una asesora inmobiliaria joven y experta
-5. Si no sabes algo concreto, invita a escribir a archirapid2026@gmail.com
+5. Si no sabes algo concreto, invita a escribir a hola@archirapid.com
 
 REGLAS:
 - Responde SIEMPRE en español
@@ -56,7 +56,7 @@ def _get_groq_key() -> str:
 def _groq_reply(history: list) -> str:
     key = _get_groq_key()
     if not key:
-        return "Lo siento, tengo un problema técnico ahora mismo. Escríbenos a archirapid2026@gmail.com y te respondo enseguida. 📧"
+        return "Lo siento, tengo un problema técnico ahora mismo. Escríbenos a hola@archirapid.com y te respondo enseguida. 📧"
     try:
         messages = [{"role": "system", "content": _SYSTEM}] + history[-12:]
         r = _req.post(
@@ -69,7 +69,7 @@ def _groq_reply(history: list) -> str:
         r.raise_for_status()
         return r.json()["choices"][0]["message"]["content"].strip()
     except Exception:
-        return "En este momento no puedo responderte. Por favor escríbenos a archirapid2026@gmail.com 🙏"
+        return "En este momento no puedo responderte. Por favor escríbenos a hola@archirapid.com 🙏"
 
 
 def _notify(user_msg: str):
@@ -145,7 +145,7 @@ def main():
     st.markdown("---")
     c1, c2, c3 = st.columns([2, 1, 1])
     with c1:
-        st.caption("📧 Contacto directo: archirapid2026@gmail.com  ·  Lola responde en segundos")
+        st.caption("📧 Contacto directo: hola@archirapid.com  ·  Lola responde en segundos")
     with c2:
         if st.button("← Volver al inicio", use_container_width=True):
             st.session_state["selected_page"] = "🏠 Inicio / Marketplace"

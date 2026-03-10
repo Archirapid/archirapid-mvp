@@ -514,7 +514,7 @@ def show_service_provider_panel():
 <div style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);
             border-radius:8px;padding:10px 14px;font-size:12px;color:#FCD34D;">
   ⭐ <b>Plan Destacado (€99/mes)</b> — ofertas ilimitadas + primera posición en comparativas.<br>
-  Contacta con <b>archirapid2026@gmail.com</b> para activarlo.
+  Contacta con <b>hola@archirapid.com</b> para activarlo.
 </div>""", unsafe_allow_html=True)
                             elif st.button("📨 Enviar oferta", key=f"send_{tid}", type="primary", use_container_width=True):
                                 try:
@@ -679,7 +679,7 @@ def show_service_provider_panel():
     ✅ Apareces en fichas de fincas de tu provincia
   </div>
   <div style="font-size:12px;color:#94A3B8;">
-    💳 Para activarlo contacta con <b>archirapid2026@gmail.com</b> o al <b>+34 XXX XXX XXX</b>.<br>
+    💳 Para activarlo contacta con <b>hola@archirapid.com</b> o al <b>+34 XXX XXX XXX</b>.<br>
     Activación en menos de 24h.
   </div>
 </div>""", unsafe_allow_html=True)

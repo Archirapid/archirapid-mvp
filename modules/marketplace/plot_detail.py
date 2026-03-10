@@ -573,7 +573,7 @@ def show_plot_detail_page(plot_id: str):
                     except Exception:
                         pass
                 except Exception:
-                    st.info("✅ Petición recibida. Te contactaremos en archirapid2026@gmail.com")
+                    st.info("✅ Petición recibida. Te contactaremos en hola@archirapid.com")
 
     # ── Calculadora de financiación ───────────────────────────────────────────
     try:

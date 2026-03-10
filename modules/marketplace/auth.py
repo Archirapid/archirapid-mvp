@@ -163,7 +163,7 @@ def show_registration():
         st.markdown("---")
         gdpr_ok = st.checkbox(
             "He leído y acepto la [Política de Privacidad](https://archirapid.streamlit.app) y el tratamiento de mis datos personales "
-            "conforme al RGPD (UE) 2016/679. Puedo solicitar su eliminación en archirapid2026@gmail.com. *",
+            "conforme al RGPD (UE) 2016/679. Puedo solicitar su eliminación en hola@archirapid.com. *",
             key="gdpr_consent"
         )
 

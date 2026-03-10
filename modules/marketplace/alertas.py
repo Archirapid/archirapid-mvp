@@ -113,7 +113,7 @@ def _send_email(to_email: str, to_name: str, subject: str, html: str) -> bool:
             "https://api.resend.com/emails",
             headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
             json={
-                "from": "ArchiRapid <onboarding@resend.dev>",
+                "from": "ArchiRapid <noreply@archirapid.com>",
                 "to": [to_email],
                 "subject": subject,
                 "html": html,
@@ -212,7 +212,7 @@ def _html_alerta(plot: dict, subscriber_name: str) -> str:
         <tr>
           <td style="background:rgba(0,0,0,0.3);padding:16px 32px;border-top:1px solid rgba(255,255,255,0.06);">
             <p style="color:#475569;font-size:11px;margin:0;text-align:center;">
-              © 2026 ArchiRapid · archirapid2026@gmail.com ·
+              © 2026 ArchiRapid · hola@archirapid.com ·
               <a href="{url}&unsub=1" style="color:#475569;">Cancelar alertas</a>
             </p>
           </td>
