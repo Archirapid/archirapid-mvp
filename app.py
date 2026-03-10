@@ -1296,6 +1296,33 @@ if st.query_params.get("page") == "stats":
         st.error(f"Error cargando estadísticas: {_se}")
     st.stop()
 
+# === RUTA PÚBLICA: ?page=privacidad ===
+if st.query_params.get("page") == "privacidad":
+    try:
+        from modules.marketplace.privacidad import render as _render_priv
+        _render_priv()
+    except Exception as _pe:
+        st.error(f"Error cargando política de privacidad: {_pe}")
+    st.stop()
+
+# === RUTA PÚBLICA: ?reset_token=XXX (recuperar contraseña) ===
+if st.query_params.get("reset_token"):
+    try:
+        from modules.marketplace.password_reset import show_reset_password
+        show_reset_password(st.query_params["reset_token"])
+    except Exception as _re:
+        st.error(f"Error en recuperación de contraseña: {_re}")
+    st.stop()
+
+# === RUTA PÚBLICA: ?page=recuperar_contrasena ===
+if st.query_params.get("page") == "recuperar_contrasena":
+    try:
+        from modules.marketplace.password_reset import show_forgot_password
+        show_forgot_password()
+    except Exception as _fe:
+        st.error(f"Error en recuperación de contraseña: {_fe}")
+    st.stop()
+
 # === NUEVAS RUTAS V2 (BORRÓN Y CUENTA NUEVA) ===
 page_from_query = False  # Variable para controlar si la página viene de query params
 if "selected_prefab" in st.query_params and not page_from_query:

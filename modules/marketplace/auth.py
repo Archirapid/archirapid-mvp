@@ -82,7 +82,7 @@ def show_login():
     st.markdown("### 💡 ¿Acabas de comprar una finca/proyecto?")
     st.info("**Ya estabas diseñando?** Usa el email y la contraseña que configuraste durante el pago y accede para avanzar con tu proyecto.")
     st.markdown("---")
-    st.markdown("¿No tienes cuenta? [Regístrate aquí](?page=Registro%20de%20Usuario)")
+    st.markdown("¿No tienes cuenta? [Regístrate aquí](?page=Registro%20de%20Usuario)  ·  [¿Olvidaste tu contraseña?](?page=recuperar_contrasena)")
 
 def authenticate_user(email, password):
     try:
@@ -162,7 +162,7 @@ def show_registration():
 
         st.markdown("---")
         gdpr_ok = st.checkbox(
-            "He leído y acepto la [Política de Privacidad](https://archirapid.streamlit.app) y el tratamiento de mis datos personales "
+            "He leído y acepto la [Política de Privacidad](?page=privacidad) y el tratamiento de mis datos personales "
             "conforme al RGPD (UE) 2016/679. Puedo solicitar su eliminación en hola@archirapid.com. *",
             key="gdpr_consent"
         )
