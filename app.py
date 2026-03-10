@@ -52,6 +52,10 @@ init_db()
 import streamlit as st
 st.set_page_config(layout='wide')
 
+# ── CSS responsivo móvil (solo activa en <= 768px, desktop intacto) ───────────
+from modules.marketplace.mobile_css import inject as _inject_mobile_css
+_inject_mobile_css()
+
 # Ocultar sidebar visualmente (navegación se mantiene funcional vía session_state)
 st.markdown("""
 <style>
