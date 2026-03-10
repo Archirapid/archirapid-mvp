@@ -1998,6 +1998,7 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
             </div>
             """, unsafe_allow_html=True)
             if st.button("Acceso Arquitectos →", key="hp_btn_arq", use_container_width=True):
+                st.session_state['selected_page'] = "Arquitectos (Marketplace)"
                 st.query_params["page"] = "Arquitectos (Marketplace)"
                 st.rerun()
 
