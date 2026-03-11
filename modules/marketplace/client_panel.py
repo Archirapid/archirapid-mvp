@@ -667,18 +667,39 @@ def show_selected_project_panel(client_email, project_id):
 
         if ya_comprado:
             st.success("✅ Ya has adquirido este proyecto")
-            st.info("Puedes descargar los archivos desde 'Mis Proyectos'")
 
             col1, col2, col3 = st.columns(3)
             with col1:
-                if st.button("📄 Descargar Memoria PDF", use_container_width=True):
-                    st.info("Descarga iniciada...")
+                memoria_path = project.get('memoria_pdf')
+                if memoria_path and os.path.exists(memoria_path):
+                    with open(memoria_path, "rb") as f:
+                        st.download_button("📄 Descargar Memoria PDF", data=f,
+                            file_name=os.path.basename(memoria_path),
+                            mime="application/pdf", use_container_width=True)
+                else:
+                    st.button("📄 Memoria PDF", disabled=True, use_container_width=True,
+                              help="Archivo no disponible")
             with col2:
-                if st.button("🖥️ Descargar Planos CAD", use_container_width=True):
-                    st.info("Descarga iniciada...")
+                planos_path = project.get('planos_pdf')
+                if planos_path and os.path.exists(planos_path):
+                    with open(planos_path, "rb") as f:
+                        st.download_button("🖥️ Descargar Planos", data=f,
+                            file_name=os.path.basename(planos_path),
+                            mime="application/pdf", use_container_width=True)
+                else:
+                    st.button("🖥️ Planos CAD", disabled=True, use_container_width=True,
+                              help="Archivo no disponible")
             with col3:
-                if st.button("🏗️ Descargar Modelo 3D", use_container_width=True):
-                    st.info("Descarga iniciada...")
+                modelo_path = project.get('modelo_3d_glb')
+                if modelo_path and os.path.exists(str(modelo_path)):
+                    with open(modelo_path, "rb") as f:
+                        ext = os.path.splitext(str(modelo_path))[1] or ".glb"
+                        st.download_button("🏗️ Descargar Modelo 3D", data=f,
+                            file_name=os.path.basename(str(modelo_path)),
+                            mime="application/octet-stream", use_container_width=True)
+                else:
+                    st.button("🏗️ Modelo 3D", disabled=True, use_container_width=True,
+                              help="Archivo no disponible")
         else:
             st.info("💳 Selecciona el producto que deseas adquirir:")
 
