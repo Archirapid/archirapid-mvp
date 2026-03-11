@@ -622,36 +622,20 @@ def show_selected_project_panel(client_email, project_id):
                         st.error(f"Error en fallback ASCII: {e2}")
 
     with tab5:
-        st.header("🏗️ VISUALIZACIÓN 3D / VR")
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("🏗️ Generar Modelo 3D", type="secondary", use_container_width=True):
-                # Verificar si el proyecto tiene modelo 3D
-                if project.get("modelo_3d_glb"):
-                    _db_path_3d = project["modelo_3d_glb"]
-                    _fmt_3d = os.path.splitext(str(_db_path_3d))[1].lstrip(".").lower() or "glb"
-                    _model_url = _get_glb_url(_db_path_3d)
-                    if _model_url:
-                        three_html = generate_3d_viewer_html(_model_url, fmt=_fmt_3d)
-                        st.components.v1.html(three_html, height=700, scrolling=False)
-                    else:
-                        st.warning('⚠️ Modelo 3D no disponible en este entorno. Contacta con ArchiRapid.')
+        st.header("🥽 Visor 3D Inmersivo")
+        st.caption("Arrastra para rotar · Rueda del ratón para zoom · Modelo interactivo")
+        if st.button("▶ Cargar Visor 3D Inmersivo", type="primary", use_container_width=True):
+            if project.get("modelo_3d_glb"):
+                _db_path_3d = project["modelo_3d_glb"]
+                _fmt_3d = os.path.splitext(str(_db_path_3d))[1].lstrip(".").lower() or "glb"
+                _model_url = _get_glb_url(_db_path_3d)
+                if _model_url:
+                    three_html = generate_3d_viewer_html(_model_url, fmt=_fmt_3d)
+                    st.components.v1.html(three_html, height=750, scrolling=False)
                 else:
-                    st.warning('⚠️ Este proyecto específico no dispone de archivos 3D/VR originales del arquitecto.')
-        with col2:
-            if st.button("🥽 Visor VR Inmersivo", type="secondary", use_container_width=True):
-                if project.get("modelo_3d_glb"):
-                    viewer_url = _get_vr_url(project["modelo_3d_glb"])
-                    st.markdown(
-                        f'<a href="{viewer_url}" target="_blank">'
-                        f'<button style="padding:10px 16px;border-radius:6px;background:#0b5cff;color:#fff;border:none;">'
-                        f"Abrir experiencia VR en nueva pestaña"
-                        f"</button></a>",
-                        unsafe_allow_html=True,
-                    )
-                    st.caption("Se abrirá el visor VR en una nueva pestaña. Requiere navegador con WebXR.")
-                else:
-                    st.warning('⚠️ Este proyecto específico no dispone de archivos 3D/VR originales del arquitecto.')
+                    st.warning('⚠️ Modelo 3D no disponible. Contacta con ArchiRapid.')
+            else:
+                st.warning('⚠️ Este proyecto no dispone de modelo 3D del arquitecto.')
 
     with tab6:
         st.header("🛒 ADQUIRIR PROYECTO")
