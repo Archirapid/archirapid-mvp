@@ -4286,16 +4286,18 @@ def render_step6_pago():
         pass  # sin PDF proforma no bloquea el flujo
 
     st.markdown("---")
-    _cp1, _cp2 = st.columns(2)
-    with _cp1:
-        if st.button("💳 Confirmar y Pagar (Simulado)", type="primary",
-                     use_container_width=True, key="btn_pagar_s6"):
-            st.session_state["pago_completado"] = True
-            st.session_state["total_pagado"]    = _total_iva_6
-            st.rerun()
-    with _cp2:
-        if st.button("📞 Hablar con un Arquitecto", use_container_width=True, key="btn_arq_s6"):
-            st.info("📧 hola@archirapid.com · Solicita llamada en el chat →")
+    if not st.session_state.get("pago_completado"):
+        _cp1, _cp2 = st.columns(2)
+        with _cp1:
+            if st.button("💳 Confirmar y Pagar (Simulado)", type="primary",
+                         use_container_width=True, key="btn_pagar_s6"):
+                st.session_state["pago_completado"] = True
+                st.session_state["total_pagado"]    = _total_iva_6
+                st.rerun()
+        with _cp2:
+            if st.button("📞 Hablar con un Arquitecto", use_container_width=True, key="btn_arq_s6"):
+                st.info("📧 hola@archirapid.com · Solicita llamada en el chat →")
+        return  # ← nada más se renderiza hasta que se pague
 
     # ── Bloque post-pago ──────────────────────────────────────────────────────
     if st.session_state.get("pago_completado"):
