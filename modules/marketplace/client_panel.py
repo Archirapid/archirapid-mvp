@@ -429,10 +429,10 @@ def show_selected_project_panel(client_email, project_id):
         for idx, img_path in enumerate(galeria_fotos):
             with cols[idx % 3]:
                 try:
-                    # Asegurar que la ruta sea correcta
-                    if not img_path.startswith('uploads/'):
+                    # Normalizar ruta: solo añadir uploads/ si no tiene prefijo propio
+                    if not img_path.startswith(('uploads/', 'assets/', 'http://', 'https://', '/')):
                         img_path = f"uploads/{img_path}"
-                    st.image(img_path, width='stretch', caption=f"Imagen {idx + 1}")
+                    st.image(img_path, use_container_width=True, caption=f"Imagen {idx + 1}")
                 except Exception as e:
                     st.warning(f"No se pudo cargar la imagen {idx + 1}")
     else:
