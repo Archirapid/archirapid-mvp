@@ -1864,21 +1864,22 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
         _left = max(_MAX - _taken, 0)
         _pct = min(int(_taken / _MAX * 100), 100)
 
-        # ── HERO COMPACTO: banner beta full-width + 3 columnas de acceso ──────
-        st.markdown(f"""
+        # ── HERO COMPACTO: banner 75% + waitlist 25% ────────────────────────
+        _hbanner, _hwaitlist = st.columns([3, 1], gap="small")
+
+        with _hbanner:
+            st.markdown(f"""
 <div style="background:linear-gradient(135deg,#0D1B2A,#1E3A5F);border-radius:12px;
-            padding:12px 20px;margin-bottom:10px;border:1px solid rgba(245,158,11,0.3);
-            display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
-  <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
-    <div>
-      <span style="font-size:10px;font-weight:700;color:#F59E0B;letter-spacing:2px;
-                   text-transform:uppercase;">Beta Privada · Acceso Anticipado</span>
-      <div style="font-size:1em;font-weight:800;color:#F8FAFC;line-height:1.2;">
-        Acceso gratuito para los primeros {_MAX} usuarios
-        <span style="font-size:0.75em;font-weight:400;color:#94A3B8;margin-left:10px;">
-          ⚠️ Modo demo — datos reales, sin validez jurídica
-        </span>
-      </div>
+            padding:12px 20px;border:1px solid rgba(245,158,11,0.3);
+            display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;height:100%;">
+  <div>
+    <span style="font-size:10px;font-weight:700;color:#F59E0B;letter-spacing:2px;
+                 text-transform:uppercase;">Beta Privada · Acceso Anticipado</span>
+    <div style="font-size:1em;font-weight:800;color:#F8FAFC;line-height:1.2;">
+      Acceso gratuito para los primeros {_MAX} usuarios
+      <span style="font-size:0.75em;font-weight:400;color:#94A3B8;margin-left:10px;">
+        ⚠️ Modo demo — datos reales, sin validez jurídica
+      </span>
     </div>
   </div>
   <div style="display:flex;align-items:center;gap:10px;">
@@ -1894,6 +1895,48 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
     </div>
   </div>
 </div>""", unsafe_allow_html=True)
+
+        _wl_key = "waitlist_submitted"
+        with _hwaitlist:
+            if not st.session_state.get(_wl_key):
+                with st.expander("✋ Solicitar plaza gratuita", expanded=False):
+                    with st.form("waitlist_form", clear_on_submit=True):
+                        _wname  = st.text_input("Nombre", placeholder="Tu nombre")
+                        _wemail = st.text_input("Email",  placeholder="tu@email.com")
+                        _wprofile = st.selectbox("Soy...",
+                            ["Comprador / Particular", "Propietario de terreno",
+                             "Arquitecto / Profesional", "Inversor / Empresa"])
+                        _wmsg = st.text_input("¿Qué buscas?", placeholder="Construir, invertir...")
+                        _wsub = st.form_submit_button(
+                            "Solicitar plaza" if _left > 0 else "Lista de espera",
+                            type="primary", use_container_width=True)
+                        if _wsub:
+                            if not _wname or not _wemail or "@" not in _wemail:
+                                st.error("Nombre y email requeridos.")
+                            else:
+                                try:
+                                    import sqlite3 as _sq3b
+                                    _wconn2 = _sq3b.connect("database.db")
+                                    _wconn2.cursor().execute(
+                                        "INSERT INTO waitlist (name, email, profile) VALUES (?,?,?)",
+                                        (_wname.strip(), _wemail.strip().lower(), _wprofile))
+                                    _wconn2.commit(); _wconn2.close()
+                                    st.session_state[_wl_key] = True
+                                    st.session_state["waitlist_name"] = _wname.strip()
+                                    try:
+                                        from modules.marketplace.email_notify import notify_waitlist
+                                        notify_waitlist(_wname.strip(), _wemail.strip().lower(), _wprofile)
+                                    except Exception:
+                                        pass
+                                    st.rerun()
+                                except Exception as _we:
+                                    if "UNIQUE" in str(_we):
+                                        st.info("Ya estás en la lista.")
+                                    else:
+                                        st.error(f"Error: {_we}")
+            else:
+                _wname_saved = st.session_state.get("waitlist_name", "")
+                st.success(f"✅ Plaza reservada{', ' + _wname_saved if _wname_saved else ''}.")
 
         # ── 3 tarjetas de acceso en columnas iguales ─────────────────────────
         _hc1, _hc2, _hc3 = st.columns(3, gap="small")
@@ -1954,57 +1997,6 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
             if st.button("Registrarme como Profesional →", key="hp_btn_pro", use_container_width=True):
                 st.session_state['selected_page'] = "📝 Registro de Proveedor de Servicios"
                 st.rerun()
-
-        # ── Waitlist compacta ─────────────────────────────────────────────────
-        _wl_key = "waitlist_submitted"
-        if not st.session_state.get(_wl_key):
-            with st.expander("Solicitar acceso anticipado gratuito", expanded=False):
-                with st.form("waitlist_form", clear_on_submit=True):
-                    _wfc1, _wfc2 = st.columns(2)
-                    with _wfc1:
-                        _wname = st.text_input("Nombre", placeholder="Tu nombre")
-                        _wemail = st.text_input("Email", placeholder="tu@email.com")
-                    with _wfc2:
-                        _wprofile = st.selectbox(
-                            "Soy...",
-                            ["Comprador / Particular", "Propietario de terreno",
-                             "Arquitecto / Profesional", "Inversor / Empresa"]
-                        )
-                        _wmsg = st.text_input("Que buscas? (opcional)", placeholder="Construir vivienda, invertir...")
-                    _wsub = st.form_submit_button(
-                        "Solicitar mi plaza gratuita" if _left > 0 else "Unirme a la lista de espera",
-                        type="primary", use_container_width=True
-                    )
-                    if _wsub:
-                        if not _wname or not _wemail or "@" not in _wemail:
-                            st.error("Introduce nombre y email valido.")
-                        else:
-                            try:
-                                import sqlite3 as _sq3b
-                                _wconn2 = _sq3b.connect("database.db")
-                                _wc2q = _wconn2.cursor()
-                                _wc2q.execute(
-                                    "INSERT INTO waitlist (name, email, profile) VALUES (?,?,?)",
-                                    (_wname.strip(), _wemail.strip().lower(), _wprofile)
-                                )
-                                _wconn2.commit()
-                                _wconn2.close()
-                                st.session_state[_wl_key] = True
-                                st.session_state["waitlist_name"] = _wname.strip()
-                                try:
-                                    from modules.marketplace.email_notify import notify_waitlist
-                                    notify_waitlist(_wname.strip(), _wemail.strip().lower(), _wprofile)
-                                except Exception:
-                                    pass
-                                st.rerun()
-                            except Exception as _we:
-                                if "UNIQUE" in str(_we):
-                                    st.info("Ya estas en la lista. Te avisaremos pronto.")
-                                else:
-                                    st.error(f"Error: {_we}")
-        else:
-            _wname_saved = st.session_state.get("waitlist_name", "")
-            st.success(f"Tu plaza esta reservada{', ' + _wname_saved if _wname_saved else ''}. Te avisaremos cuando activemos tu acceso.")
 
         st.markdown("---")
 
