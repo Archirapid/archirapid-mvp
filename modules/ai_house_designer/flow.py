@@ -3604,6 +3604,55 @@ def render_step4_resumen():
     st.markdown("## 🏠 Tu Proyecto en Resumen")
     st.caption("Un vistazo rápido a los números clave de tu casa. Cuando estés listo, continúa al Paso 5.")
 
+    # ── Capturas 3D del editor Babylon ───────────────────────────────────────
+    if st.session_state.get("babylon_captures"):
+        _caps_r4 = st.session_state["babylon_captures"]
+        st.success(f"✅ {len(_caps_r4)} vistas 3D vinculadas al proyecto")
+        _cap_lbl = {"sur_fachada_principal": "Fachada Sur", "norte": "Norte",
+                    "este": "Este", "oeste": "Oeste", "planta_cenital": "Cenital"}
+        _ccols = st.columns(min(len(_caps_r4), 5))
+        for _ci, (_ck, _cu) in enumerate(_caps_r4.items()):
+            with _ccols[_ci % 5]:
+                st.image(_cu, caption=_cap_lbl.get(_ck, _ck), use_container_width=True)
+    else:
+        st.info(
+            "💡 Si editaste en el 3D: pulsa **📸 Capturar Vistas** (5 fotos) y **💾 Guardar JSON** "
+            "en el editor. Súbelos aquí para incluirlos en tu proyecto."
+        )
+        _up_r4 = st.file_uploader(
+            "ZIP de capturas · imágenes PNG · layout JSON",
+            type=["zip", "png", "json"], accept_multiple_files=True,
+            key="captures_s4_uploader", label_visibility="collapsed"
+        )
+        if _up_r4:
+            import zipfile as _zf4, io as _io4, base64 as _b64r4, json as _json4
+            _vlab = ["sur_fachada_principal", "norte", "este", "oeste", "planta_cenital"]
+            _caps_new = {}
+            for _uf in _up_r4:
+                _fn = _uf.name.lower()
+                if _fn.endswith(".zip"):
+                    with _zf4.ZipFile(_io4.BytesIO(_uf.read())) as _z4:
+                        for _i4, _pn in enumerate(sorted(_n for _n in _z4.namelist()
+                                                          if _n.lower().endswith(".png"))):
+                            _k4 = _vlab[_i4] if _i4 < len(_vlab) else f"vista_{_i4+1}"
+                            _caps_new[_k4] = ("data:image/png;base64,"
+                                              + _b64r4.b64encode(_z4.read(_pn)).decode())
+                elif _fn.endswith(".png"):
+                    _i4 = len(_caps_new)
+                    _k4 = _vlab[_i4] if _i4 < len(_vlab) else f"vista_{_i4+1}"
+                    _caps_new[_k4] = "data:image/png;base64," + _b64r4.b64encode(_uf.read()).decode()
+                elif _fn.endswith(".json"):
+                    try:
+                        _lay = _json4.loads(_uf.read().decode("utf-8"))
+                        if isinstance(_lay, list):
+                            st.session_state["babylon_modified_layout"] = _lay
+                    except Exception:
+                        pass
+            if _caps_new:
+                st.session_state["babylon_captures"] = _caps_new
+                st.rerun()
+    st.markdown("---")
+
     # ── KPIs ────────────────────────────────────────────────────────────────
     k1, k2, k3, k4 = st.columns(4)
     k1.metric("Coste estimado",    f"€{total_cost:,}",
@@ -3628,24 +3677,56 @@ def render_step4_resumen():
 
     st.markdown("---")
 
-    # ── Visor 3D (viewer3d.py — Three.js) ──────────────────────────────────
+    # ── Visor 3D (viewer3d.py — Three.js) + Plano BIM ───────────────────────
     try:
-        from modules.ai_house_designer.viewer3d import Viewer3D
-        from modules.ai_house_designer.architect_layout import ArchitectLayout
+        from .viewer3d import Viewer3D
+        from .data_model import HouseDesign, Plot, RoomType, RoomInstance
+        from .ifc_export import rooms_to_svg as _r2svg_s4
+        import streamlit.components.v1 as _cmp_v3d
 
-        _rooms_raw = f["design_data"].get("rooms", [])
-        if _rooms_raw:
-            st.markdown("### 🧱 Vista 3D de tu diseño")
-            _layout = ArchitectLayout(house_shape=req.get("house_shape", "Rectangular"))
-            _house_design = _layout.generate_layout(_rooms_raw)
-            _viewer = Viewer3D(_house_design)
-            _html3d = _viewer.generate_html(height=420)
-            import streamlit.components.v1 as _cmp3d
-            _cmp3d.html(_html3d, height=430, scrolling=False)
-            st.caption("Modelo Three.js interactivo · arrastra para rotar · rueda para zoom")
+        _final_d_v3 = get_final_design()
+        _rooms_v3   = _final_d_v3.get("rooms", [])
+        if _rooms_v3:
+            st.markdown("### 🏗️ Tu Casa en 3D — Vista Previa BIM")
+            st.caption("Arrastra para rotar · Rueda para zoom · Plano de distribución a la derecha")
+            _col_3d, _col_svg = st.columns([3, 2])
+
+            with _col_3d:
+                _plot_v3   = Plot(id="preview", area_m2=500, buildable_ratio=0.33)
+                _design_v3 = HouseDesign(_plot_v3)
+                _roof_v3   = req.get("roof_type", "Dos aguas (clásico, eficiente)")
+                _shape_v3  = req.get("house_shape", "Rectangular (más común)")
+                setattr(_design_v3, "request", {"house_shape": _shape_v3, "roof_type": _roof_v3})
+                for _r3 in _rooms_v3:
+                    _rt3 = RoomType(
+                        code=_r3.get("code", _r3.get("name", "espacio")),
+                        name=_r3.get("name", "Espacio"),
+                        min_m2=2, max_m2=200, base_cost_per_m2=1000
+                    )
+                    _design_v3.rooms.append(
+                        RoomInstance(room_type=_rt3, area_m2=float(_r3.get("area_m2", 10)))
+                    )
+                _viewer_v3 = Viewer3D(_design_v3, roof_type=_roof_v3)
+                _html_v3d  = _viewer_v3.generate_html()
+                _cmp_v3d.html(_html_v3d, height=520, scrolling=False)
+
+            with _col_svg:
+                # Preferir babylon_modified_layout (tiene x,z,width,depth → plano real)
+                _bim_src = (
+                    st.session_state.get("babylon_modified_layout")
+                    or [{"name": k, "area": float(v)}
+                        for k, v in req.get("ai_room_proposal", {}).items()
+                        if isinstance(v, (int, float))]
+                )
+                _svg_bim = _r2svg_s4(_bim_src, px=360)
+                if _svg_bim:
+                    st.markdown("**📐 Plano de distribución BIM**")
+                    st.markdown(_svg_bim, unsafe_allow_html=True)
+                    st.caption("Cada espacio = objeto IFC2x3 · UE BIM Mandate")
+
             st.markdown("---")
     except Exception:
-        pass  # si no hay datos 3D aún, no bloquear
+        pass  # nunca interrumpe el flujo principal
 
     # ── Mapa satélite ───────────────────────────────────────────────────────
     try:
@@ -3812,20 +3893,24 @@ def render_step5_docs():
     # ── Plano de planta SVG ──────────────────────────────────────────────────
     try:
         from modules.ai_house_designer.ifc_export import rooms_to_svg as _r2svg
-        _raw_rooms = f["design_data"].get("rooms") or []
-        # rooms_to_svg necesita clave "area", get_current_design_data() devuelve "area_m2"
-        _rooms_src = [{"name": r.get("name", r.get("code", "?")),
-                       "area": float(r.get("area", r.get("area_m2", 12.0)))}
-                      for r in _raw_rooms] if _raw_rooms else [
-            {"name": k, "area": float(v)}
-            for k, v in req.get("ai_room_proposal", {}).items()
-            if isinstance(v, (int, float))
-        ]
+        # Preferir babylon_modified_layout (tiene x,z,width,depth → plano real con posiciones)
+        _babylon_lay = st.session_state.get("babylon_modified_layout")
+        _rooms_src = (
+            _babylon_lay  # Format A: x, z, width, depth → plano real
+            if _babylon_lay else
+            [{"name": r.get("name", r.get("code", "?")),
+              "area": float(r.get("area", r.get("area_m2", 12.0)))}
+             for r in (f["design_data"].get("rooms") or [])]
+            or [{"name": k, "area": float(v)}
+                for k, v in req.get("ai_room_proposal", {}).items()
+                if isinstance(v, (int, float))]
+        )
         if _rooms_src:
             st.markdown("### 🗺️ Plano de Planta")
             _svg_data = _r2svg(_rooms_src)
-            st.image(_svg_data, use_container_width=True,
-                     caption="Distribución orientativa generada automáticamente (CTE)")
+            if _svg_data:
+                st.markdown(_svg_data, unsafe_allow_html=True)
+                st.caption("Distribución orientativa · CTE · cada espacio = objeto IFC2x3")
     except Exception:
         pass
 
