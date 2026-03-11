@@ -3890,27 +3890,94 @@ def render_step5_docs():
     _tc3.metric("Coste neto",               f"€{total_cost-subsidy_total:,}")
     st.markdown("---")
 
-    # ── Plano de planta SVG ──────────────────────────────────────────────────
+    # ── Plano de Planta Profesional (FloorPlanSVG) ───────────────────────────
+    st.markdown("### 🗺️ Plano de Planta")
+    _final_design_p5 = get_final_design()
+    _plan_source_p5  = _final_design_p5.get("source", "ai_original")
+    _plan_label_p5   = {
+        "babylon":       "🏗️ Plano desde tu diseño en Editor 3D",
+        "step2_sliders": "📊 Plano con tus ajustes del Paso 2",
+        "ai_original":   "🤖 Plano propuesta IA",
+    }.get(_plan_source_p5, "Plano de distribución")
+
+    if st.button("🗺️ Generar Plano de Planta", type="primary",
+                 use_container_width=True, key="gen_plan_s5"):
+        try:
+            from .architect_layout import generate_layout as _gen_lay
+            from .floor_plan_svg import FloorPlanSVG as _FPSVG
+            from .data_model import HouseDesign as _HD, Plot as _Plt, RoomType as _RT, RoomInstance as _RI
+            _rooms_p5 = [{"code": r.get("code", r.get("name", "espacio")),
+                          "name": r.get("name", "Espacio"),
+                          "area_m2": float(r.get("area_m2", 10))}
+                         for r in _final_design_p5["rooms"]]
+            _gen_lay(_rooms_p5, req.get("house_shape", "Rectangular"))
+            _plot_p5 = _Plt(id="s5", area_m2=500, buildable_ratio=0.33)
+            _des_p5  = _HD(_plot_p5)
+            for _rp in _final_design_p5["rooms"]:
+                _des_p5.rooms.append(_RI(
+                    room_type=_RT(code=_rp.get("code", "espacio"), name=_rp.get("name", "Espacio"),
+                                  min_m2=2, max_m2=200, base_cost_per_m2=1000),
+                    area_m2=float(_rp.get("area_m2", 10))
+                ))
+            _planner_p5 = _FPSVG(_des_p5)
+            st.session_state["final_floor_plan"] = _planner_p5.generate()
+            st.success(f"✅ {_plan_label_p5}")
+        except Exception as _ep5:
+            st.error(f"Error generando plano: {_ep5}")
+
+    if st.session_state.get("final_floor_plan"):
+        st.image(st.session_state["final_floor_plan"],
+                 caption=_plan_label_p5, use_container_width=True)
+    elif st.session_state.get("current_floor_plan"):
+        st.image(st.session_state["current_floor_plan"],
+                 caption="Plano del Paso 2 (pulsa 'Generar' para actualizarlo con tu diseño final)",
+                 use_container_width=True)
+    else:
+        st.info("Pulsa 'Generar Plano de Planta' para ver la distribución de tu casa")
+
+    st.markdown("---")
+
+    # ── Excel descargable con partidas presupuestarias ────────────────────────
     try:
-        from modules.ai_house_designer.ifc_export import rooms_to_svg as _r2svg
-        # Preferir babylon_modified_layout (tiene x,z,width,depth → plano real con posiciones)
-        _babylon_lay = st.session_state.get("babylon_modified_layout")
-        _rooms_src = (
-            _babylon_lay  # Format A: x, z, width, depth → plano real
-            if _babylon_lay else
-            [{"name": r.get("name", r.get("code", "?")),
-              "area": float(r.get("area", r.get("area_m2", 12.0)))}
-             for r in (f["design_data"].get("rooms") or [])]
-            or [{"name": k, "area": float(v)}
-                for k, v in req.get("ai_room_proposal", {}).items()
-                if isinstance(v, (int, float))]
+        import io as _io5, openpyxl as _ox5
+        from openpyxl.styles import Font as _Fnt5, PatternFill as _PF5, Alignment as _Al5
+        _wb5 = _ox5.Workbook()
+        _ws5 = _wb5.active
+        _ws5.title = "Presupuesto"
+        _hf5  = _Fnt5(bold=True, color="FFFFFF")
+        _hfil = _PF5("solid", fgColor="1E3A5F")
+        _tfil = _PF5("solid", fgColor="2C3E50")
+        for _ci5, _ch in enumerate(["Partida", "Coste (€)", "% Total", "Descripción"], 1):
+            _c5 = _ws5.cell(row=1, column=_ci5, value=_ch)
+            _c5.font = _hf5; _c5.fill = _hfil
+        for _ri5, (_pn, _pc, _pp, _pd) in enumerate(partidas, 2):
+            _ws5.cell(row=_ri5, column=1, value=_pn)
+            _ws5.cell(row=_ri5, column=2, value=_pc)
+            _ws5.cell(row=_ri5, column=3, value=_pp)
+            _ws5.cell(row=_ri5, column=4, value=_pd)
+        _rf5 = len(partidas) + 2
+        _ws5.cell(row=_rf5, column=1, value="TOTAL EJECUCIÓN").font = _Fnt5(bold=True, color="FFFFFF")
+        _ws5.cell(row=_rf5, column=1).fill = _tfil
+        _ws5.cell(row=_rf5, column=2, value=total_cost).font = _Fnt5(bold=True, color="FFFFFF")
+        _ws5.cell(row=_rf5, column=2).fill = _tfil
+        _ws5.cell(row=_rf5+1, column=1, value="Subvenciones estimadas")
+        _ws5.cell(row=_rf5+1, column=2, value=-subsidy_total)
+        _ws5.cell(row=_rf5+2, column=1, value="COSTE NETO").font = _Fnt5(bold=True, color="FFFFFF")
+        _ws5.cell(row=_rf5+2, column=1).fill = _tfil
+        _ws5.cell(row=_rf5+2, column=2, value=total_cost-subsidy_total).font = _Fnt5(bold=True, color="FFFFFF")
+        _ws5.cell(row=_rf5+2, column=2).fill = _tfil
+        _ws5.column_dimensions["A"].width = 35
+        _ws5.column_dimensions["B"].width = 16
+        _ws5.column_dimensions["D"].width = 38
+        _xls_buf = _io5.BytesIO()
+        _wb5.save(_xls_buf)
+        st.download_button(
+            label="📊 Descargar Presupuesto por Partidas (Excel)",
+            data=_xls_buf.getvalue(),
+            file_name="Presupuesto_ArchiRapid.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True,
         )
-        if _rooms_src:
-            st.markdown("### 🗺️ Plano de Planta")
-            _svg_data = _r2svg(_rooms_src)
-            if _svg_data:
-                st.markdown(_svg_data, unsafe_allow_html=True)
-                st.caption("Distribución orientativa · CTE · cada espacio = objeto IFC2x3")
     except Exception:
         pass
 
@@ -3936,36 +4003,88 @@ def render_step5_docs():
     except Exception:
         pass
 
-    # ── Servicios adicionales ─────────────────────────────────────────────────
-    st.markdown("### 🛠️ ¿Qué servicios necesitas?")
-    _srv_key = "selected_services_s5"
-    if _srv_key not in st.session_state:
-        st.session_state[_srv_key] = []
+    # ── Documentación base PDF / CAD ─────────────────────────────────────────
+    st.markdown("### 📄 Documentación del Proyecto")
+    _dcol1, _dcol2 = st.columns(2)
+    with _dcol1:
+        st.markdown("""
+**📦 Paquete PDF**
+- Memoria descriptiva
+- Plano 2D profesional
+- Presupuesto por partidas
+- Calificación energética
+- Datos cimientos y extras
+""")
+        _pdf_copias = st.number_input("Copias PDF — €1.800/copia",
+                                      min_value=0, max_value=10, value=0, key="pdf_copias_s5")
+    with _dcol2:
+        st.markdown("""
+**📐 Paquete CAD/BIM Profesional**
+- Todo lo del PDF
+- Archivos editables CAD
+- Modelo 3D exportable (.glb)
+- Apto para constructor y arquitecto
+""")
+        _cad_copias = st.number_input("Copias CAD — €2.500/copia",
+                                      min_value=0, max_value=10, value=0, key="cad_copias_s5")
 
-    _SERVICES = [
-        ("📐 Proyecto de Arquitectura completo",    "proyecto_arquitectura",  990),
-        ("🏗️ Dirección de Obra",                   "direccion_obra",         790),
-        ("📊 Informe de Eficiencia Energética",      "eficiencia_energetica",  290),
-        ("🔒 Certificación BIM/IFC Notarial",        "bim_notarial",           490),
-        ("🌿 Estudio de Impacto Ambiental",          "impacto_ambiental",      390),
-        ("💧 Proyecto Fontanería y Saneamiento",     "fontaneria",             350),
-        ("⚡ Proyecto Instalación Eléctrica",        "electrica",              350),
-    ]
+    _coste_doc = (_pdf_copias * 1800) + (_cad_copias * 2500)
+    if _coste_doc > 0:
+        st.info(f"💰 Documentación seleccionada: PDF ×{_pdf_copias} + CAD ×{_cad_copias} = **€{_coste_doc:,}**")
 
-    _selected = []
+    st.markdown("---")
+
+    # ── Servicios técnicos profesionales ─────────────────────────────────────
+    st.markdown("### 🔧 Servicios Técnicos Profesionales")
+    st.caption("Todos gestionados por ArchiRapid con profesionales colegiados")
+
+    _hipoteca_pct   = int(total_cost * 0.005)   # 0,5% del coste de obra
+    _hipoteca_total = _hipoteca_pct + 200        # + €200 contratación
+
+    _SERVICIOS_S5 = {
+        "visado":      {"label": "📋 Visado del Proyecto (Colegio Arquitectos)",  "precio": int(total_cost * 0.015), "desc": "Obligatorio para licencia de obra. ~1,5% presupuesto"},
+        "revision":    {"label": "🔍 Revisión y Validación Técnica",              "precio": 450,                     "desc": "Arquitecto revisa y firma el diseño ArchiRapid"},
+        "licencia":    {"label": "🏛️ Gestión Licencia Municipal",                 "precio": 800,                     "desc": "Tramitación completa ante el Ayuntamiento"},
+        "constructor": {"label": "👷 Búsqueda y Contrato Constructor",            "precio": int(total_cost * 0.005), "desc": "0,5% del presupuesto. Selección, negociación y contrato"},
+        "fontaneria":  {"label": "🚿 Proyecto Fontanería e Instalaciones",        "precio": 650,                     "desc": "Planos de agua, saneamiento y climatización"},
+        "electricidad":{"label": "⚡ Proyecto Eléctrico BT",                      "precio": 550,                     "desc": "Esquema unifilar, cuadro eléctrico, domótica"},
+        "energia":     {"label": "☀️ Auditoría Energética + CEE",                 "precio": 380,                     "desc": "Certificado Eficiencia Energética oficial"},
+        "geotecnico":  {"label": "🔬 Estudio Geotécnico del Terreno",             "precio": 1200,                    "desc": "Obligatorio para cálculo de cimientos"},
+        "topografia":  {"label": "📏 Levantamiento Topográfico",                  "precio": 900,                     "desc": "Medición precisa de la parcela"},
+        "seguridad":   {"label": "🦺 Estudio Seguridad y Salud",                  "precio": 350,                     "desc": "Obligatorio para obras con proyecto"},
+        "vr":          {"label": "🥽 Tour Virtual 360° / Realidad Virtual",       "precio": 290,                     "desc": "Recorrido inmersivo de tu vivienda antes de construir"},
+        "hipoteca":    {"label": "🏦 Tramitación de Hipoteca",                    "precio": _hipoteca_total,         "desc": f"0,5% coste obra (€{_hipoteca_pct:,}) + €200 gestión contratación"},
+    }
+
+    _seleccionados_s5 = {}
+    _coste_servicios  = 0
     _sv_cols = st.columns(2)
-    for _i, (_label, _code, _price) in enumerate(_SERVICES):
-        with _sv_cols[_i % 2]:
-            _checked = st.checkbox(f"{_label} — €{_price:,}",
-                                   key=f"svc_{_code}_s5",
-                                   value=_code in st.session_state[_srv_key])
-            if _checked:
-                _selected.append((_code, _label, _price))
+    for _i5, (_key5, _svc5) in enumerate(_SERVICIOS_S5.items()):
+        with _sv_cols[_i5 % 2]:
+            _chk = st.checkbox(
+                f"{_svc5['label']} — **€{_svc5['precio']:,}**",
+                key=f"svc_{_key5}_s5", help=_svc5["desc"]
+            )
+            if _chk:
+                _seleccionados_s5[_key5] = _svc5["precio"]
+                _coste_servicios += _svc5["precio"]
 
-    st.session_state[_srv_key] = [c for c, _, __ in _selected]
-    _svc_total = sum(p for _, __, p in _selected)
-    if _selected:
-        st.success(f"✅ Servicios seleccionados: {len(_selected)} · Subtotal: €{_svc_total:,}")
+    st.session_state["selected_services_s5"] = list(_seleccionados_s5.keys())
+    st.session_state["coste_doc_s5"]         = _coste_doc
+    st.session_state["coste_servicios_s5"]   = _coste_servicios
+
+    _total_s5 = _coste_doc + _coste_servicios
+    st.markdown("---")
+    st.markdown(f"""
+<div style='background:linear-gradient(135deg,#1a1a2e,#2C3E50);
+            padding:20px;border-radius:12px;color:white;text-align:center;
+            border:2px solid #27AE60;'>
+  <h3 style='margin:0;color:#27AE60;'>TOTAL SERVICIOS SELECCIONADOS</h3>
+  <h1 style='margin:10px 0;color:white;'>€{_total_s5:,}</h1>
+  <p style='margin:0;font-size:13px;color:#aaa;'>
+    Documentación: €{_coste_doc:,} | Servicios técnicos: €{_coste_servicios:,}
+  </p>
+</div>""", unsafe_allow_html=True)
 
     # ── Botones de navegación ─────────────────────────────────────────────────
     st.markdown("---")
@@ -4000,10 +4119,57 @@ def render_step6_pago():
             st.rerun()
         return
 
-    st.markdown("## 🛒 Descarga tu Proyecto")
-    st.caption("Todo listo. Descarga la documentación completa o contrata los servicios seleccionados.")
+    st.markdown("## 🛒 Pago y Descarga")
 
-    # ── Resumen de lo que se descarga ─────────────────────────────────────────
+    # ── Resumen de lo seleccionado en paso 5 ─────────────────────────────────
+    _coste_doc_6    = st.session_state.get("coste_doc_s5", 0)
+    _coste_svc_6    = st.session_state.get("coste_servicios_s5", 0)
+    _total_pago     = _coste_doc_6 + _coste_svc_6
+    _svc_sel_6      = st.session_state.get("selected_services_s5", [])
+
+    st.markdown(f"""
+<div style='background:linear-gradient(135deg,#1a1a2e,#2C3E50);
+            padding:20px;border-radius:12px;color:white;text-align:center;
+            border:2px solid #27AE60;margin-bottom:16px;'>
+  <h3 style='margin:0;color:#27AE60;'>TOTAL A PAGAR</h3>
+  <h1 style='margin:10px 0;color:white;'>€{_total_pago:,}</h1>
+  <p style='margin:0;font-size:13px;color:#aaa;'>
+    Documentación: €{_coste_doc_6:,} | Servicios técnicos: €{_coste_svc_6:,}
+  </p>
+</div>""", unsafe_allow_html=True)
+
+    _cp1, _cp2 = st.columns(2)
+    with _cp1:
+        if st.button("💳 Pagar con Tarjeta (Simulado)", type="primary",
+                     use_container_width=True, key="btn_pagar_s6"):
+            st.session_state["pago_completado"] = True
+            st.session_state["total_pagado"]    = _total_pago
+            st.rerun()
+    with _cp2:
+        if st.button("📞 Hablar con un Arquitecto", use_container_width=True, key="btn_arq_s6"):
+            st.info("📧 hola@archirapid.com | ☎️ Solicita llamada en el chat →")
+
+    # ── Bloque post-pago ──────────────────────────────────────────────────────
+    if st.session_state.get("pago_completado"):
+        st.balloons()
+        st.success(f"✅ Pago de €{st.session_state.get('total_pagado', 0):,} procesado. ¡Tu proyecto está listo!")
+
+        # Calculadora de hipoteca
+        try:
+            from modules.marketplace.hipoteca import render_calculadora as _rc_hip
+            _plot_h  = st.session_state.get("design_plot_data", {})
+            _precio_t = float(_plot_h.get("price") or 0)
+            _style_h  = style.lower()
+            _coste_m2h = 1800 if "premium" in _style_h or "lujo" in _style_h else (1200 if "eco" in _style_h or "madera" in _style_h else 1400)
+            _coste_obra_h = total_area * _coste_m2h
+            with st.expander("🏦 Calculadora de Financiación — ¿Cuánto pagarías al mes?", expanded=True):
+                _rc_hip(precio_terreno=_precio_t, coste_construccion=_coste_obra_h, key_prefix="s6_hip")
+        except Exception:
+            pass
+
+        st.markdown("### 📥 Descarga Tu Proyecto Completo")
+
+    # ── Botón de descarga ZIP (siempre visible, sin muro de pago) ─────────────
     st.markdown("""
 <div style="background:rgba(37,99,235,0.12);border:1px solid rgba(37,99,235,0.35);
             border-radius:12px;padding:16px 20px;margin-bottom:16px;">
@@ -4011,17 +4177,16 @@ def render_step6_pago():
     📦 Contenido del ZIP del Proyecto
   </div>
   <ul style="color:#CBD5E1;font-size:13px;margin:0;padding-left:20px;line-height:1.9;">
-    <li>📄 Memoria descriptiva del proyecto (PDF)</li>
+    <li>📄 Memoria descriptiva (PDF)</li>
     <li>📊 Mediciones y presupuesto (Excel)</li>
-    <li>🗺️ Plano de planta (SVG)</li>
+    <li>🗺️ Plano de planta (PNG)</li>
     <li>🏗️ Archivo BIM/IFC (IFC2x3)</li>
-    <li>📸 Vistas 3D (si se capturaron)</li>
-    <li>📋 Informe de eficiencia energética</li>
+    <li>📸 Vistas 3D (si capturaste en el editor)</li>
+    <li>📋 Informe eficiencia energética</li>
     <li>🌿 Estimación huella de carbono</li>
   </ul>
 </div>""", unsafe_allow_html=True)
 
-    # ── Botón de descarga ZIP ─────────────────────────────────────────────────
     try:
         _plot_data = st.session_state.get("design_plot_data", {})
         _design_d  = f["design_data"]
@@ -4034,13 +4199,28 @@ def render_step6_pago():
             energy_label=energy_label,
         )
         st.download_button(
-            label="📦 Descargar Proyecto Completo (ZIP)",
+            label="📦 DESCARGAR TODO EL PROYECTO (ZIP)",
             data=_zip_bytes,
             file_name=_zip_filename,
             mime="application/zip",
             type="primary",
             use_container_width=True,
         )
+        st.caption("Incluye: Memoria descriptiva · Mediciones Excel · Plano 2D · Datos catastro · Layout 3D")
+
+        # Certificación blockchain del ZIP
+        try:
+            from modules.marketplace.blockchain_cert import certify, cert_badge_html
+            _cert6 = certify(
+                zip_bytes=_zip_bytes,
+                doc_name=_zip_filename,
+                user_email=st.session_state.get("client_email", ""),
+                plot_id=str(st.session_state.get("design_plot_data", {}).get("id", ""))
+            )
+            st.markdown(cert_badge_html(_cert6), unsafe_allow_html=True)
+        except Exception:
+            pass
+
     except Exception as _ez:
         st.error(f"Error generando ZIP: {_ez}")
 
