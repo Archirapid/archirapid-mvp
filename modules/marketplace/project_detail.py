@@ -9,6 +9,9 @@ import json
 from modules.marketplace.plot_detail import get_project_images
 from src import db
 from .marketplace import get_project_display_image
+from modules.marketplace.client_panel import (
+    generate_3d_viewer_html, _get_glb_url, _get_vr_url
+)
 
 def normalize_gallery(galeria_fotos):
     import json

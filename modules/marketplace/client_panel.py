@@ -11,9 +11,53 @@ except ImportError:
         return db_module.get_conn()
 import json
 import os
+import base64 as _b64
 from pathlib import Path
 from modules.marketplace.compatibilidad import get_proyectos_compatibles
 from modules.ai_house_designer import flow as ai_house_flow
+
+
+def _get_glb_url(db_path: str) -> str | None:
+    """Construye una URL válida para un GLB en cualquier entorno.
+
+    - static/*  → Streamlit static serving (Cloud y localhost)
+    - uploads/* → base64 data URL embebido (upload fresco en sesión)
+    - no existe → None
+    """
+    rel = str(db_path).replace("\\", "/").lstrip("/")
+
+    # Caso 1: archivo en static/ → usar static serving de Streamlit
+    if rel.startswith("static/"):
+        rel_no_static = rel[len("static/"):]
+        try:
+            host = st.context.headers.get("host", "localhost:8501")
+        except Exception:
+            host = "localhost:8501"
+        protocol = "https" if ("." in host and "localhost" not in host) else "http"
+        return f"{protocol}://{host}/app/static/{rel_no_static}"
+
+    # Caso 2: archivo en disco (upload fresco) → base64
+    if os.path.isfile(rel):
+        with open(rel, "rb") as fh:
+            b64data = _b64.b64encode(fh.read()).decode()
+        return f"data:model/gltf-binary;base64,{b64data}"
+
+    return None
+
+
+def _get_vr_url(db_path: str) -> str | None:
+    """Construye la URL del visor VR estático con el modelo incrustado."""
+    glb_url = _get_glb_url(db_path)
+    if not glb_url:
+        return None
+    try:
+        host = st.context.headers.get("host", "localhost:8501")
+    except Exception:
+        host = "localhost:8501"
+    protocol = "https" if ("." in host and "localhost" not in host) else "http"
+    import urllib.parse
+    return f"{protocol}://{host}/app/static/vr_viewer.html?model={urllib.parse.quote(glb_url, safe='')}"
+
 
 def generate_3d_viewer_html(model_url):
     return f'''
@@ -527,23 +571,18 @@ def show_selected_project_panel(client_email, project_id):
             if st.button("🏗️ Generar Modelo 3D", type="secondary", use_container_width=True):
                 # Verificar si el proyecto tiene modelo 3D
                 if project.get("modelo_3d_glb"):
-                    # Mostrar visor 3D completo
-                    rel_path = str(project["modelo_3d_glb"]).replace("\\", "/").lstrip("/")
-                    model_url = f"http://localhost:8000/{rel_path}".replace(" ", "%20")
-
-                    # Usar la función dedicada para generar el HTML del visor 3D
-                    three_html = generate_3d_viewer_html(model_url)
-
-                    st.components.v1.html(three_html, height=700, scrolling=False)
+                    _model_url = _get_glb_url(project["modelo_3d_glb"])
+                    if _model_url:
+                        three_html = generate_3d_viewer_html(_model_url)
+                        st.components.v1.html(three_html, height=700, scrolling=False)
+                    else:
+                        st.warning('⚠️ Modelo 3D no disponible en este entorno. Contacta con ArchiRapid.')
                 else:
                     st.warning('⚠️ Este proyecto específico no dispone de archivos 3D/VR originales del arquitecto.')
         with col2:
             if st.button("🥽 Visor VR Inmersivo", type="secondary", use_container_width=True):
-                # Verificar si el proyecto tiene modelo 3D para VR
                 if project.get("modelo_3d_glb"):
-                    rel = str(project["modelo_3d_glb"]).replace("\\", "/").lstrip("/")
-                    glb_url = f"http://localhost:8000/{rel}".replace(" ", "%20")
-                    viewer_url = f"http://localhost:8000/static/vr_viewer.html?model={glb_url}"
+                    viewer_url = _get_vr_url(project["modelo_3d_glb"])
                     st.markdown(
                         f'<a href="{viewer_url}" target="_blank">'
                         f'<button style="padding:10px 16px;border-radius:6px;background:#0b5cff;color:#fff;border:none;">'
