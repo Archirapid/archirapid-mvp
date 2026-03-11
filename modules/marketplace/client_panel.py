@@ -17,13 +17,13 @@ from modules.marketplace.compatibilidad import get_proyectos_compatibles
 from modules.ai_house_designer import flow as ai_house_flow
 
 
-_JSDELIVR = "https://cdn.jsdelivr.net/gh/Archirapid/archirapid-mvp@main"
+_GITHUB_RAW = "https://raw.githubusercontent.com/Archirapid/archirapid-mvp/main"
 
 
 def _get_glb_url(db_path: str) -> str | None:
     """Construye una URL válida para un GLB en cualquier entorno.
 
-    - static/* en Cloud  → jsDelivr CDN (CORS *, MIME correcto, sin iframe issues)
+    - static/* en Cloud  → raw.githubusercontent.com (CORS *, sin límite tamaño)
     - static/* localhost → Streamlit static serving local
     - uploads/* frescos  → base64 data URL embebido
     - no existe          → None
@@ -32,17 +32,15 @@ def _get_glb_url(db_path: str) -> str | None:
 
     # Caso 1: archivo en static/
     if rel.startswith("static/"):
-        # Detectar si estamos en Cloud (no localhost)
         try:
             host = st.context.headers.get("host", "localhost:8501")
         except Exception:
             host = "localhost:8501"
         is_cloud = "." in host and "localhost" not in host
         if is_cloud:
-            # jsDelivr sirve desde GitHub con CORS * — funciona en iframes srcdoc
-            return f"{_JSDELIVR}/{rel}"
+            # GitHub raw: CORS *, sin límite de tamaño, repo público
+            return f"{_GITHUB_RAW}/{rel}"
         else:
-            # Localhost: Streamlit static serving normal
             return f"http://localhost:8501/app/static/{rel[len('static/'):]}"
 
     # Caso 2: archivo en disco (upload fresco en sesión) → base64
