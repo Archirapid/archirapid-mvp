@@ -55,9 +55,12 @@ sun.position.set(100, 200, 100);
 scene.add(sun);
 
 if (modelUrl) {
+    info.innerText = '⏳ Descargando modelo… (puede tardar unos segundos)';
     const loader = new GLTFLoader();
-    loader.load(modelUrl,
-        gltf => {
+    fetch(modelUrl)
+        .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status + ' — ' + modelUrl); return r.arrayBuffer(); })
+        .then(buf => loader.parseAsync(buf, ''))
+        .then(gltf => {
             const root = gltf.scene;
             scene.add(root);
             const box    = new THREE.Box3().setFromObject(root);
@@ -66,16 +69,14 @@ if (modelUrl) {
             const d      = Math.max(size.x, size.y, size.z);
             root.position.sub(center);
             camera.position.set(d*1.2, d*0.8, d*1.8);
-            camera.lookAt(0,0,0);
-            ctrl.target.set(0,0,0); ctrl.update();
+            camera.lookAt(0, 0, 0);
+            ctrl.target.set(0, 0, 0); ctrl.update();
             info.innerText = '✅ Modelo cargado · Arrastra para rotar · Pulsa VR para modo inmersivo';
-        },
-        undefined,
-        err => {
+        })
+        .catch(err => {
             console.error(err);
-            info.innerText = '⚠️ Error al cargar el modelo 3D';
-        }
-    );
+            info.innerText = '⚠️ ' + String(err.message || err);
+        });
 } else {
     info.innerText = '⚠️ No se especificó modelo. Añade ?model=URL a la dirección.';
 }

@@ -72,20 +72,31 @@ def generate_3d_viewer_html(model_url: str, fmt: str = "glb") -> str:
 
     if fmt == "obj":
         _loader_import = f"import {{ OBJLoader }}     from '{_THREE_JSM}/loaders/OBJLoader.js';"
-        _loader_create = "const loader = new OBJLoader();"
-        _loader_cb = """loader.load(MODEL_URL, (obj) => {{ scene.add(obj); _fit(obj); }}, undefined, _err);"""
+        _loader_cb = """
+  const loader = new OBJLoader();
+  fetch(MODEL_URL).then(r=>{{if(!r.ok)throw new Error('HTTP '+r.status);return r.text();}})
+    .then(t=>{{const obj=loader.parse(t);scene.add(obj);_fit(obj);}}).catch(_err);"""
     elif fmt == "dae":
         _loader_import = f"import {{ ColladaLoader }} from '{_THREE_JSM}/loaders/ColladaLoader.js';"
-        _loader_create = "const loader = new ColladaLoader();"
-        _loader_cb = """loader.load(MODEL_URL, (c) => {{ scene.add(c.scene); _fit(c.scene); }}, undefined, _err);"""
+        _loader_cb = """
+  const loader = new ColladaLoader();
+  fetch(MODEL_URL).then(r=>{{if(!r.ok)throw new Error('HTTP '+r.status);return r.text();}})
+    .then(t=>{{const c=loader.parse(t);scene.add(c.scene);_fit(c.scene);}}).catch(_err);"""
     elif fmt == "fbx":
         _loader_import = f"import {{ FBXLoader }}     from '{_THREE_JSM}/loaders/FBXLoader.js';"
-        _loader_create = "const loader = new FBXLoader();"
-        _loader_cb = """loader.load(MODEL_URL, (obj) => {{ scene.add(obj); _fit(obj); }}, undefined, _err);"""
-    else:  # glb / gltf
+        _loader_cb = """
+  const loader = new FBXLoader();
+  fetch(MODEL_URL).then(r=>{{if(!r.ok)throw new Error('HTTP '+r.status);return r.arrayBuffer();}})
+    .then(buf=>{{const obj=loader.parse(buf);scene.add(obj);_fit(obj);}}).catch(_err);"""
+    else:  # glb / gltf — fetch como ArrayBuffer para evitar problemas de MIME
         _loader_import = f"import {{ GLTFLoader }}    from '{_THREE_JSM}/loaders/GLTFLoader.js';"
-        _loader_create = "const loader = new GLTFLoader();"
-        _loader_cb = """loader.load(MODEL_URL, (g) => {{ scene.add(g.scene); _fit(g.scene); }}, undefined, _err);"""
+        _loader_cb = """
+  const loader = new GLTFLoader();
+  fetch(MODEL_URL)
+    .then(r=>{{if(!r.ok)throw new Error('HTTP '+r.status+' — '+MODEL_URL);return r.arrayBuffer();}})
+    .then(buf=>loader.parseAsync(buf,''))
+    .then(g=>{{scene.add(g.scene);_fit(g.scene);}})
+    .catch(_err);"""
 
     # Escapar la URL del modelo para JS (las data-URLs con base64 son seguras; las HTTPS también)
     _js_model_url = model_url.replace("\\", "\\\\").replace("`", "\\`")
@@ -116,6 +127,7 @@ def generate_3d_viewer_html(model_url: str, fmt: str = "glb") -> str:
   import {{ OrbitControls }} from 'three/examples/jsm/controls/OrbitControls.js';
   {_loader_import}
 
+  const MODEL_URL = `{_js_model_url}`;
   const info = document.getElementById('info');
   const W = window.innerWidth, H = window.innerHeight;
 
@@ -154,11 +166,8 @@ def generate_3d_viewer_html(model_url: str, fmt: str = "glb") -> str:
   }}
   function _err(e){{
     console.error(e);
-    info.innerText='⚠️ Error al cargar el modelo — '+String(e.message||e);
+    info.innerText='⚠️ '+String(e.message||e);
   }}
-
-  const MODEL_URL = `{_js_model_url}`;
-  {_loader_create}
   {_loader_cb}
 
   (function loop(){{requestAnimationFrame(loop);ctrl.update();renderer.render(scene,camera);}})();
