@@ -88,14 +88,13 @@ def generate_3d_viewer_html(model_url: str, fmt: str = "glb") -> str:
   const loader = new FBXLoader();
   fetch(MODEL_URL).then(r=>{{if(!r.ok)throw new Error('HTTP '+r.status);return r.arrayBuffer();}})
     .then(buf=>{{const obj=loader.parse(buf);scene.add(obj);_fit(obj);}}).catch(_err);"""
-    else:  # glb / gltf — fetch como ArrayBuffer para evitar problemas de MIME
+    else:  # glb / gltf — fetch ArrayBuffer + parse con callback (three.js 0.128.0)
         _loader_import = f"import {{ GLTFLoader }}    from '{_THREE_JSM}/loaders/GLTFLoader.js';"
         _loader_cb = """
   const loader = new GLTFLoader();
   fetch(MODEL_URL)
-    .then(r=>{{if(!r.ok)throw new Error('HTTP '+r.status+' — '+MODEL_URL);return r.arrayBuffer();}})
-    .then(buf=>loader.parseAsync(buf,''))
-    .then(g=>{{scene.add(g.scene);_fit(g.scene);}})
+    .then(r=>{{if(!r.ok)throw new Error('HTTP '+r.status);return r.arrayBuffer();}})
+    .then(buf=>{{loader.parse(buf,'',g=>{{scene.add(g.scene);_fit(g.scene);}},_err);}})
     .catch(_err);"""
 
     # Escapar la URL del modelo para JS (las data-URLs con base64 son seguras; las HTTPS también)
