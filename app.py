@@ -1864,113 +1864,53 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
         _left = max(_MAX - _taken, 0)
         _pct = min(int(_taken / _MAX * 100), 100)
 
-        # ── LAYOUT 2 COLUMNAS: beta banner (izq) + accesos directos (der) ──
-        _col_l, _col_r = st.columns([1, 1.1], gap="large")
+        # ── HERO COMPACTO: banner beta full-width + 3 columnas de acceso ──────
+        st.markdown(f"""
+<div style="background:linear-gradient(135deg,#0D1B2A,#1E3A5F);border-radius:12px;
+            padding:12px 20px;margin-bottom:10px;border:1px solid rgba(245,158,11,0.3);
+            display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+  <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+    <div>
+      <span style="font-size:10px;font-weight:700;color:#F59E0B;letter-spacing:2px;
+                   text-transform:uppercase;">Beta Privada · Acceso Anticipado</span>
+      <div style="font-size:1em;font-weight:800;color:#F8FAFC;line-height:1.2;">
+        Acceso gratuito para los primeros {_MAX} usuarios
+        <span style="font-size:0.75em;font-weight:400;color:#94A3B8;margin-left:10px;">
+          ⚠️ Modo demo — datos reales, sin validez jurídica
+        </span>
+      </div>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px;">
+    <div style="background:rgba(255,255,255,0.06);border-radius:8px;padding:6px 12px;white-space:nowrap;">
+      <span style="color:#F59E0B;font-weight:700;">{_taken}</span>
+      <span style="color:#94A3B8;font-size:0.85em;"> / {_MAX}</span>
+      &nbsp;
+      <span style="color:#10B981;font-weight:600;font-size:0.85em;">{_left} disponibles</span>
+    </div>
+    <div style="background:rgba(255,255,255,0.08);border-radius:6px;height:8px;width:80px;overflow:hidden;">
+      <div style="background:linear-gradient(90deg,#F59E0B,#EF4444);
+                  width:{_pct}%;height:100%;border-radius:6px;"></div>
+    </div>
+  </div>
+</div>""", unsafe_allow_html=True)
 
-        with _col_l:
-            st.markdown(f"""
-            <div style="background:linear-gradient(135deg,#0D1B2A,#1E3A5F);border-radius:14px;
-                        padding:20px 22px;margin-bottom:12px;border:1px solid rgba(245,158,11,0.3);">
-                <div style="font-size:11px;font-weight:700;color:#F59E0B;letter-spacing:2px;
-                            text-transform:uppercase;margin-bottom:8px;">
-                    Beta Privada &middot; Acceso Anticipado
-                </div>
-                <div style="font-size:1.35em;font-weight:800;color:#F8FAFC;line-height:1.3;margin-bottom:10px;">
-                    Acceso gratuito para los primeros {_MAX} usuarios
-                </div>
-                <div style="font-size:0.92em;color:#94A3B8;margin-bottom:14px;">
-                    Valida tu finca con IA, diseña tu vivienda y accede a proyectos
-                    arquitectónicos reales. Sin coste durante la beta.
-                </div>
-                <div style="font-size:0.78em;color:#94A3B8;margin-bottom:10px;
-                            border-top:1px solid rgba(255,255,255,0.07);padding-top:8px;">
-                    ⚠️ <b>Modo demostración:</b>
-                    datos reales, sin validez jurídica ni adquisición efectiva.
-                </div>
-                <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
-                    <div style="background:rgba(255,255,255,0.06);border-radius:8px;padding:8px 12px;">
-                        <span style="color:#F59E0B;font-weight:700;font-size:1.05em;">{_taken}</span>
-                        <span style="color:#94A3B8;font-size:0.85em;"> / {_MAX} ocupadas</span>
-                        &nbsp;
-                        <span style="color:#10B981;font-weight:600;font-size:0.85em;">{_left} disponibles</span>
-                    </div>
-                </div>
-                <div style="margin-top:10px;background:rgba(255,255,255,0.08);
-                            border-radius:6px;height:5px;overflow:hidden;">
-                    <div style="background:linear-gradient(90deg,#F59E0B,#EF4444);
-                                width:{_pct}%;height:100%;border-radius:6px;"></div>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
+        # ── 3 tarjetas de acceso en columnas iguales ─────────────────────────
+        _hc1, _hc2, _hc3 = st.columns(3, gap="small")
 
-            _wl_key = "waitlist_submitted"
-            if not st.session_state.get(_wl_key):
-                with st.expander("Solicitar acceso anticipado gratuito", expanded=False):
-                    with st.form("waitlist_form", clear_on_submit=True):
-                        _wfc1, _wfc2 = st.columns(2)
-                        with _wfc1:
-                            _wname = st.text_input("Nombre", placeholder="Tu nombre")
-                            _wemail = st.text_input("Email", placeholder="tu@email.com")
-                        with _wfc2:
-                            _wprofile = st.selectbox(
-                                "Soy...",
-                                ["Comprador / Particular", "Propietario de terreno",
-                                 "Arquitecto / Profesional", "Inversor / Empresa"]
-                            )
-                            _wmsg = st.text_input("Que buscas? (opcional)", placeholder="Construir vivienda, invertir...")
-                        _wsub = st.form_submit_button(
-                            "Solicitar mi plaza gratuita" if _left > 0 else "Unirme a la lista de espera",
-                            type="primary", use_container_width=True
-                        )
-                        if _wsub:
-                            if not _wname or not _wemail or "@" not in _wemail:
-                                st.error("Introduce nombre y email valido.")
-                            else:
-                                try:
-                                    import sqlite3 as _sq3b
-                                    _wconn2 = _sq3b.connect("database.db")
-                                    _wc2q = _wconn2.cursor()
-                                    _wc2q.execute(
-                                        "INSERT INTO waitlist (name, email, profile) VALUES (?,?,?)",
-                                        (_wname.strip(), _wemail.strip().lower(), _wprofile)
-                                    )
-                                    _wconn2.commit()
-                                    _wconn2.close()
-                                    st.session_state[_wl_key] = True
-                                    st.session_state["waitlist_name"] = _wname.strip()
-                                    try:
-                                        from modules.marketplace.email_notify import notify_waitlist
-                                        notify_waitlist(_wname.strip(), _wemail.strip().lower(), _wprofile)
-                                    except Exception:
-                                        pass
-                                    st.rerun()
-                                except Exception as _we:
-                                    if "UNIQUE" in str(_we):
-                                        st.info("Ya estas en la lista. Te avisaremos pronto.")
-                                    else:
-                                        st.error(f"Error: {_we}")
-            else:
-                _wname_saved = st.session_state.get("waitlist_name", "")
-                st.success(f"Tu plaza esta reservada{', ' + _wname_saved if _wname_saved else ''}. Te avisaremos cuando activemos tu acceso.")
-
-        with _col_r:
-            # ── Fila 1: Tengo un Terreno ──────────────────────────────────────
+        with _hc1:
             st.markdown("""
-            <div style="background:white;border-radius:12px;padding:16px 18px;
-                        border-top:4px solid #F5A623;box-shadow:0 2px 12px rgba(0,0,0,0.07);
-                        margin-bottom:10px;">
-                <div style="display:flex;align-items:center;gap:12px;">
-                    <div style="width:42px;height:42px;border-radius:50%;background:#FFF5E0;
-                                display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">🏗️</div>
-                    <div>
-                        <div style="font-weight:800;color:#0D1B2A;font-size:1em;">Tengo un Terreno</div>
-                        <div style="color:#64748B;font-size:0.82em;line-height:1.4;">
-                            Publica tu finca y recibe propuestas reales de arquitectos.
-                        </div>
-                    </div>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
+<div style="background:white;border-radius:10px;padding:14px 16px;
+            border-top:3px solid #F5A623;box-shadow:0 2px 8px rgba(0,0,0,0.07);
+            margin-bottom:4px;">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
+    <span style="font-size:22px;">🏗️</span>
+    <div>
+      <div style="font-weight:800;color:#0D1B2A;font-size:0.95em;">Tengo un Terreno</div>
+      <div style="color:#64748B;font-size:0.78em;">Publica tu finca y recibe propuestas de arquitectos.</div>
+    </div>
+  </div>
+</div>""", unsafe_allow_html=True)
             if st.button("Subir Mi Finca →", key="hp_btn_prop", use_container_width=True):
                 if st.session_state.get("logged_in") and st.session_state.get("role") == "owner":
                     st.query_params["page"] = "🏠 Propietarios"
@@ -1980,48 +1920,91 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
                     st.session_state['viewing_login'] = True
                     st.rerun()
 
-            # ── Fila 2: Soy Arquitecto ────────────────────────────────────────
+        with _hc2:
             st.markdown("""
-            <div style="background:white;border-radius:12px;padding:16px 18px;
-                        border-top:4px solid #2563EB;box-shadow:0 2px 12px rgba(0,0,0,0.07);
-                        margin-bottom:10px;">
-                <div style="display:flex;align-items:center;gap:12px;">
-                    <div style="width:42px;height:42px;border-radius:50%;background:#EEF4FF;
-                                display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">📐</div>
-                    <div>
-                        <div style="font-weight:800;color:#0D1B2A;font-size:1em;">Soy Arquitecto</div>
-                        <div style="color:#64748B;font-size:0.82em;line-height:1.4;">
-                            Comparte proyectos ejecutables y conecta con clientes reales.
-                        </div>
-                    </div>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
+<div style="background:white;border-radius:10px;padding:14px 16px;
+            border-top:3px solid #2563EB;box-shadow:0 2px 8px rgba(0,0,0,0.07);
+            margin-bottom:4px;">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
+    <span style="font-size:22px;">📐</span>
+    <div>
+      <div style="font-weight:800;color:#0D1B2A;font-size:0.95em;">Soy Arquitecto</div>
+      <div style="color:#64748B;font-size:0.78em;">Comparte proyectos ejecutables y conecta con clientes reales.</div>
+    </div>
+  </div>
+</div>""", unsafe_allow_html=True)
             if st.button("Acceso Arquitectos →", key="hp_btn_arq", use_container_width=True):
                 st.session_state['selected_page'] = "Arquitectos (Marketplace)"
                 st.query_params["page"] = "Arquitectos (Marketplace)"
                 st.rerun()
 
-            # ── Fila 3: ¿Eres profesional? ────────────────────────────────────
+        with _hc3:
             st.markdown("""
-            <div style="background:white;border-radius:12px;padding:16px 18px;
-                        border-top:4px solid #F59E0B;box-shadow:0 2px 12px rgba(0,0,0,0.07);
-                        margin-bottom:10px;">
-                <div style="display:flex;align-items:center;gap:12px;">
-                    <div style="width:42px;height:42px;border-radius:50%;background:#FFFBEB;
-                                display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">🛠️</div>
-                    <div>
-                        <div style="font-weight:800;color:#0D1B2A;font-size:1em;">¿Eres profesional?</div>
-                        <div style="color:#64748B;font-size:0.82em;line-height:1.4;">
-                            Constructor, reformista o proveedor. Únete a la red ArchiRapid.
-                        </div>
-                    </div>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
+<div style="background:white;border-radius:10px;padding:14px 16px;
+            border-top:3px solid #F59E0B;box-shadow:0 2px 8px rgba(0,0,0,0.07);
+            margin-bottom:4px;">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
+    <span style="font-size:22px;">🛠️</span>
+    <div>
+      <div style="font-weight:800;color:#0D1B2A;font-size:0.95em;">¿Eres profesional?</div>
+      <div style="color:#64748B;font-size:0.78em;">Constructor, reformista o proveedor. Únete a la red.</div>
+    </div>
+  </div>
+</div>""", unsafe_allow_html=True)
             if st.button("Registrarme como Profesional →", key="hp_btn_pro", use_container_width=True):
                 st.session_state['selected_page'] = "📝 Registro de Proveedor de Servicios"
                 st.rerun()
+
+        # ── Waitlist compacta ─────────────────────────────────────────────────
+        _wl_key = "waitlist_submitted"
+        if not st.session_state.get(_wl_key):
+            with st.expander("Solicitar acceso anticipado gratuito", expanded=False):
+                with st.form("waitlist_form", clear_on_submit=True):
+                    _wfc1, _wfc2 = st.columns(2)
+                    with _wfc1:
+                        _wname = st.text_input("Nombre", placeholder="Tu nombre")
+                        _wemail = st.text_input("Email", placeholder="tu@email.com")
+                    with _wfc2:
+                        _wprofile = st.selectbox(
+                            "Soy...",
+                            ["Comprador / Particular", "Propietario de terreno",
+                             "Arquitecto / Profesional", "Inversor / Empresa"]
+                        )
+                        _wmsg = st.text_input("Que buscas? (opcional)", placeholder="Construir vivienda, invertir...")
+                    _wsub = st.form_submit_button(
+                        "Solicitar mi plaza gratuita" if _left > 0 else "Unirme a la lista de espera",
+                        type="primary", use_container_width=True
+                    )
+                    if _wsub:
+                        if not _wname or not _wemail or "@" not in _wemail:
+                            st.error("Introduce nombre y email valido.")
+                        else:
+                            try:
+                                import sqlite3 as _sq3b
+                                _wconn2 = _sq3b.connect("database.db")
+                                _wc2q = _wconn2.cursor()
+                                _wc2q.execute(
+                                    "INSERT INTO waitlist (name, email, profile) VALUES (?,?,?)",
+                                    (_wname.strip(), _wemail.strip().lower(), _wprofile)
+                                )
+                                _wconn2.commit()
+                                _wconn2.close()
+                                st.session_state[_wl_key] = True
+                                st.session_state["waitlist_name"] = _wname.strip()
+                                try:
+                                    from modules.marketplace.email_notify import notify_waitlist
+                                    notify_waitlist(_wname.strip(), _wemail.strip().lower(), _wprofile)
+                                except Exception:
+                                    pass
+                                st.rerun()
+                            except Exception as _we:
+                                if "UNIQUE" in str(_we):
+                                    st.info("Ya estas en la lista. Te avisaremos pronto.")
+                                else:
+                                    st.error(f"Error: {_we}")
+        else:
+            _wname_saved = st.session_state.get("waitlist_name", "")
+            st.success(f"Tu plaza esta reservada{', ' + _wname_saved if _wname_saved else ''}. Te avisaremos cuando activemos tu acceso.")
 
         st.markdown("---")
 
