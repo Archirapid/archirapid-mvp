@@ -670,7 +670,7 @@ def show_selected_project_panel(client_email, project_id):
 
             col1, col2, col3 = st.columns(3)
             with col1:
-                memoria_path = project.get('memoria_pdf')
+                memoria_path = (project.get('memoria_pdf') or '').replace('\\', '/')
                 if memoria_path and os.path.exists(memoria_path):
                     with open(memoria_path, "rb") as f:
                         st.download_button("📄 Descargar Memoria PDF", data=f,
@@ -680,7 +680,7 @@ def show_selected_project_panel(client_email, project_id):
                     st.button("📄 Memoria PDF", disabled=True, use_container_width=True,
                               help="Archivo no disponible")
             with col2:
-                planos_path = project.get('planos_pdf')
+                planos_path = (project.get('planos_pdf') or '').replace('\\', '/')
                 if planos_path and os.path.exists(planos_path):
                     with open(planos_path, "rb") as f:
                         st.download_button("🖥️ Descargar Planos", data=f,
@@ -690,12 +690,11 @@ def show_selected_project_panel(client_email, project_id):
                     st.button("🖥️ Planos CAD", disabled=True, use_container_width=True,
                               help="Archivo no disponible")
             with col3:
-                modelo_path = project.get('modelo_3d_glb')
-                if modelo_path and os.path.exists(str(modelo_path)):
+                modelo_path = (project.get('modelo_3d_glb') or '').replace('\\', '/')
+                if modelo_path and os.path.exists(modelo_path):
                     with open(modelo_path, "rb") as f:
-                        ext = os.path.splitext(str(modelo_path))[1] or ".glb"
                         st.download_button("🏗️ Descargar Modelo 3D", data=f,
-                            file_name=os.path.basename(str(modelo_path)),
+                            file_name=os.path.basename(modelo_path),
                             mime="application/octet-stream", use_container_width=True)
                 else:
                     st.button("🏗️ Modelo 3D", disabled=True, use_container_width=True,
