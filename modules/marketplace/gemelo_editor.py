@@ -57,7 +57,7 @@ def editor_tabiques(plan_json, superficie_finca):
     # Mostrar validaciones
     st.markdown("### 📏 Validación local (reglas genéricas)")
     if resultado["ok"]:
-        st.success(".1f"".1f")
+        st.success(f"✅ Plan válido: {plan_json.get('total_m2', 0):.1f} m² construidos dentro de normativa")
     else:
         for e in resultado["errores"]:
             st.error(e)

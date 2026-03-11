@@ -3080,7 +3080,58 @@ def render_step3():
                 st.warning(f"Excel no disponible: {e}")
     
     st.markdown("---")
-    
+
+    # ── VISTA 3D BIM — preview gratuita antes del pago ───────────────────────
+    try:
+        from .viewer3d import Viewer3D
+        from .data_model import HouseDesign, Plot, RoomType, RoomInstance
+        import streamlit.components.v1 as _cmp_v3d
+        from modules.ai_house_designer.ifc_export import rooms_to_svg as _rooms_to_svg
+
+        _final_d_v3 = get_final_design()
+        _rooms_v3 = _final_d_v3.get('rooms', [])
+        if _rooms_v3:
+            st.markdown("### 🏗️ Tu Casa en 3D — Vista Previa BIM")
+            st.caption("Visualización interactiva de tu diseño · Arrastra para rotar · Rueda para zoom")
+
+            _col_3d, _col_svg = st.columns([3, 2])
+
+            with _col_3d:
+                _plot_v3 = Plot(id='preview', area_m2=500, buildable_ratio=0.33)
+                _design_v3 = HouseDesign(_plot_v3)
+                _roof_v3 = req.get('roof_type', 'Dos aguas (clásico, eficiente)')
+                _shape_v3 = req.get('house_shape', 'Rectangular (más común)')
+                setattr(_design_v3, 'request', {'house_shape': _shape_v3, 'roof_type': _roof_v3})
+                for _r3 in _rooms_v3:
+                    _rt3 = RoomType(
+                        code=_r3.get('code', _r3.get('name', 'espacio')),
+                        name=_r3.get('name', 'Espacio'),
+                        min_m2=2, max_m2=200, base_cost_per_m2=1000
+                    )
+                    _design_v3.rooms.append(
+                        RoomInstance(room_type=_rt3, area_m2=float(_r3.get('area_m2', 10)))
+                    )
+                _viewer_v3 = Viewer3D(_design_v3, roof_type=_roof_v3)
+                _html_v3d = _viewer_v3.generate_html()
+                _cmp_v3d.html(_html_v3d, height=520, scrolling=False)
+
+            with _col_svg:
+                _bim_src_v3 = (
+                    st.session_state.get("babylon_modified_layout")
+                    or [{"name": k, "area": float(v)}
+                        for k, v in proposal.items()
+                        if isinstance(v, (int, float))]
+                )
+                _svg_bim = _rooms_to_svg(_bim_src_v3, px=360)
+                if _svg_bim:
+                    st.markdown("**📐 Plano de distribución BIM**")
+                    st.markdown(_svg_bim, unsafe_allow_html=True)
+                    st.caption("Cada espacio = objeto IFC2x3 certificable · Compatible UE BIM Mandate")
+
+            st.markdown("---")
+    except Exception:
+        pass  # nunca interrumpe el flujo principal
+
     # ============================================
     # CONSTRUCTORES ASOCIADOS - MONETIZACIÓN
     # ============================================
@@ -3348,20 +3399,15 @@ def render_step3():
   </div>
 </div>""", unsafe_allow_html=True)
 
-                        _ifc_col1, _ifc_col2 = st.columns([1, 1])
-                        with _ifc_col1:
-                            st.download_button(
-                                label="📐 Descargar Gemelo Digital (.ifc)",
-                                data=_ifc_bytes,
-                                file_name=f"{_pname_ifc}.ifc",
-                                mime="application/x-step",
-                                use_container_width=True,
-                                help="Ábrelo en FreeCAD (gratis) o BIMvision para ver el modelo 3D técnico"
-                            )
-                        with _ifc_col2:
-                            _svg = rooms_to_svg(_rooms_src)
-                            if _svg:
-                                st.markdown(_svg, unsafe_allow_html=True)
+                        st.download_button(
+                            label="📐 Descargar Gemelo Digital (.ifc)",
+                            data=_ifc_bytes,
+                            file_name=f"{_pname_ifc}.ifc",
+                            mime="application/x-step",
+                            use_container_width=True,
+                            help="Ábrelo en FreeCAD (gratis) o BIMvision para ver el modelo 3D técnico"
+                        )
+                        st.caption("IFC2x3 · FreeCAD · Archicad · Revit · Navisworks · BIMvision · UE BIM Mandate")
                 except Exception:
                     pass  # nunca interrumpe el flujo principal
 
