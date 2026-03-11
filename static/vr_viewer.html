@@ -5,71 +5,87 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>ARCHIRAPID VR Viewer</title>
     <style>
-        html, body { margin:0; padding:0; overflow:hidden; background:#87CEEB; } /* Fondo azul cielo */
-        #info { position:absolute; top:10px; left:10px; color:white; font-family:Arial; z-index:10; background:rgba(0,0,0,0.5); padding:5px; }
+        html,body{margin:0;padding:0;overflow:hidden;background:#0f172a;}
+        #info{position:absolute;top:12px;left:50%;transform:translateX(-50%);
+              color:#e2e8f0;font-family:Arial,sans-serif;font-size:13px;
+              background:rgba(0,0,0,.55);padding:6px 14px;border-radius:8px;
+              z-index:10;white-space:nowrap;}
     </style>
 </head>
 <body>
-<div id="info">Cargando casa 3D...</div>
+<div id="info">⏳ Cargando vista VR…</div>
 
+<script type="importmap">
+{"imports":{
+  "three":"https://unpkg.com/three@0.128.0/build/three.module.js",
+  "three/examples/jsm/":"https://unpkg.com/three@0.128.0/examples/jsm/"
+}}
+</script>
 <script type="module">
-import * as THREE from "./three/three.module.js";
-import { GLTFLoader } from "./three/GLTFLoader.js";
-import { OrbitControls } from "./three/OrbitControls.js";
-import { VRButton } from "./three/VRButton.js";
+import * as THREE        from 'three';
+import { GLTFLoader }    from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { VRButton }      from 'three/examples/jsm/webxr/VRButton.js';
 
-const params = new URLSearchParams(window.location.search);
-const modelUrl = params.get("model");
-const info = document.getElementById("info");
+const info     = document.getElementById('info');
+const params   = new URLSearchParams(window.location.search);
+const modelUrl = params.get('model');
 
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x87CEEB); // Fondo azul para saber que el visor funciona
+const scene    = new THREE.Scene();
+scene.background = new THREE.Color(0x87ceeb);
+scene.add(new THREE.GridHelper(500,50,0x334155,0x1e293b));
 
-const camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerWidth, 0.1, 2000);
-const renderer = new THREE.WebGLRenderer({ antialias:true });
+const camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 5000);
+camera.position.set(0, 5, 20);
+
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.xr.enabled = true;
-renderer.setPixelRatio(window.devicePixelRatio);
+renderer.outputEncoding = THREE.sRGBEncoding;
 document.body.appendChild(renderer.domElement);
 document.body.appendChild(VRButton.createButton(renderer));
 
-const controls = new OrbitControls(camera, renderer.domElement);
+const ctrl = new OrbitControls(camera, renderer.domElement);
+ctrl.enableDamping = true;
 
-// --- LUCES POTENTES ---
 scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1.5));
-const dirLight = new THREE.DirectionalLight(0xffffff, 1);
-dirLight.position.set(5, 10, 7);
-scene.add(dirLight);
+const sun = new THREE.DirectionalLight(0xffffff, 1.0);
+sun.position.set(100, 200, 100);
+scene.add(sun);
 
-if(modelUrl){
-    console.log("Cargando desde:", modelUrl);
+if (modelUrl) {
     const loader = new GLTFLoader();
-    loader.load(modelUrl, gltf => {
-        const root = gltf.scene;
-        scene.add(root);
-        
-        // --- AUTO-ENFOQUE (Zoom Extents) ---
-        const box = new THREE.Box3().setFromObject(root);
-        const center = box.getCenter(new THREE.Vector3());
-        const size = box.getSize(new THREE.Vector3());
-        const maxDim = Math.max(size.x, size.y, size.z);
-        
-        camera.position.set(center.x, center.y + maxDim/2, center.x + maxDim * 1.5);
-        controls.target.copy(center);
-        controls.update();
-        
-        info.innerText = "¡Casa cargada! Mueve el ratón o pulsa VR";
-    }, undefined, err => {
-        console.error("Error:", err);
-        info.innerText = "Error al cargar el archivo .glb";
-    });
+    loader.load(modelUrl,
+        gltf => {
+            const root = gltf.scene;
+            scene.add(root);
+            const box    = new THREE.Box3().setFromObject(root);
+            const center = box.getCenter(new THREE.Vector3());
+            const size   = box.getSize(new THREE.Vector3());
+            const d      = Math.max(size.x, size.y, size.z);
+            root.position.sub(center);
+            camera.position.set(d*1.2, d*0.8, d*1.8);
+            camera.lookAt(0,0,0);
+            ctrl.target.set(0,0,0); ctrl.update();
+            info.innerText = '✅ Modelo cargado · Arrastra para rotar · Pulsa VR para modo inmersivo';
+        },
+        undefined,
+        err => {
+            console.error(err);
+            info.innerText = '⚠️ Error al cargar el modelo 3D';
+        }
+    );
+} else {
+    info.innerText = '⚠️ No se especificó modelo. Añade ?model=URL a la dirección.';
 }
 
 renderer.setAnimationLoop(() => {
+    ctrl.update();
     renderer.render(scene, camera);
 });
 
-window.addEventListener("resize", () => {
+window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth/window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);

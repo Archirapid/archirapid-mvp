@@ -65,128 +65,107 @@ def generate_3d_viewer_html(model_url: str, fmt: str = "glb") -> str:
     fmt: 'glb' | 'gltf' | 'obj' | 'dae'  (auto-detectado si se llama
     via _get_glb_url que ya normaliza la URL)
     """
-    _CDN = "https://cdn.skypack.dev/three@0.128.0"
+    # unpkg es el CDN oficial y más estable para three.js
+    _THREE_CORE   = "https://unpkg.com/three@0.128.0/build/three.module.js"
+    _THREE_JSM    = "https://unpkg.com/three@0.128.0/examples/jsm"
     fmt = fmt.lower().lstrip(".")
 
-    # Importaciones y lógica de carga según formato
-    if fmt in ("obj",):
-        _loader_import = f"import {{ OBJLoader }} from '{_CDN}/examples/jsm/loaders/OBJLoader.js';"
+    if fmt == "obj":
+        _loader_import = f"import {{ OBJLoader }}     from '{_THREE_JSM}/loaders/OBJLoader.js';"
         _loader_create = "const loader = new OBJLoader();"
-        _loader_cb = r"""loader.load("{url}", (obj) => {{
-            scene.add(obj);
-            _centerAndFit(obj);
-        }}, undefined, _onErr);"""
-    elif fmt in ("dae",):
-        _loader_import = f"import {{ ColladaLoader }} from '{_CDN}/examples/jsm/loaders/ColladaLoader.js';"
+        _loader_cb = """loader.load(MODEL_URL, (obj) => {{ scene.add(obj); _fit(obj); }}, undefined, _err);"""
+    elif fmt == "dae":
+        _loader_import = f"import {{ ColladaLoader }} from '{_THREE_JSM}/loaders/ColladaLoader.js';"
         _loader_create = "const loader = new ColladaLoader();"
-        _loader_cb = r"""loader.load("{url}", (collada) => {{
-            scene.add(collada.scene);
-            _centerAndFit(collada.scene);
-        }}, undefined, _onErr);"""
-    elif fmt in ("fbx",):
-        _loader_import = f"import {{ FBXLoader }} from '{_CDN}/examples/jsm/loaders/FBXLoader.js';"
+        _loader_cb = """loader.load(MODEL_URL, (c) => {{ scene.add(c.scene); _fit(c.scene); }}, undefined, _err);"""
+    elif fmt == "fbx":
+        _loader_import = f"import {{ FBXLoader }}     from '{_THREE_JSM}/loaders/FBXLoader.js';"
         _loader_create = "const loader = new FBXLoader();"
-        _loader_cb = r"""loader.load("{url}", (obj) => {{
-            scene.add(obj);
-            _centerAndFit(obj);
-        }}, undefined, _onErr);"""
-    else:  # glb / gltf (default)
-        _loader_import = f"import {{ GLTFLoader }} from '{_CDN}/examples/jsm/loaders/GLTFLoader.js';"
+        _loader_cb = """loader.load(MODEL_URL, (obj) => {{ scene.add(obj); _fit(obj); }}, undefined, _err);"""
+    else:  # glb / gltf
+        _loader_import = f"import {{ GLTFLoader }}    from '{_THREE_JSM}/loaders/GLTFLoader.js';"
         _loader_create = "const loader = new GLTFLoader();"
-        _loader_cb = r"""loader.load("{url}", (gltf) => {{
-            scene.add(gltf.scene);
-            _centerAndFit(gltf.scene);
-        }}, undefined, _onErr);"""
+        _loader_cb = """loader.load(MODEL_URL, (g) => {{ scene.add(g.scene); _fit(g.scene); }}, undefined, _err);"""
 
-    _loader_call = _loader_cb.replace("{url}", model_url)
+    # Escapar la URL del modelo para JS (las data-URLs con base64 son seguras; las HTTPS también)
+    _js_model_url = model_url.replace("\\", "\\\\").replace("`", "\\`")
 
     return f'''<!DOCTYPE html>
 <html>
 <head>
+<meta charset="utf-8">
 <style>
-  body {{ margin:0; background:#1a1a2e; }}
-  canvas {{ display:block; }}
-  #info {{
-    position:absolute; top:10px; width:100%; text-align:center;
-    font-family:sans-serif; color:#F8FAFC; font-size:13px;
-    pointer-events:none; text-shadow:0 1px 3px rgba(0,0,0,.8);
-  }}
-  #fmt-badge {{
-    position:absolute; top:10px; right:12px;
-    background:rgba(37,99,235,.7); color:#fff;
-    font-size:11px; padding:3px 8px; border-radius:6px;
-    font-family:monospace;
-  }}
+  body{{margin:0;background:#0f172a;overflow:hidden;}}
+  canvas{{display:block;}}
+  #info{{position:absolute;top:10px;width:100%;text-align:center;
+         font:13px/1 sans-serif;color:#e2e8f0;pointer-events:none;
+         text-shadow:0 1px 4px #000;}}
+  #badge{{position:absolute;top:10px;right:12px;
+          background:rgba(37,99,235,.8);color:#fff;
+          font:bold 11px monospace;padding:3px 9px;border-radius:6px;}}
 </style>
 </head>
 <body>
-<div id="info">⏳ Cargando modelo 3D...</div>
-<div id="fmt-badge">.{fmt.upper()}</div>
+<div id="info">⏳ Cargando modelo 3D…</div>
+<div id="badge">.{fmt.upper()}</div>
+<script type="importmap">
+{{"imports":{{"three":"{_THREE_CORE}","three/examples/jsm/":"{_THREE_JSM}/"}}}}
+</script>
 <script type="module">
-  import * as THREE from '{_CDN}';
-  import {{ OrbitControls }} from '{_CDN}/examples/jsm/controls/OrbitControls.js';
+  import * as THREE from 'three';
+  import {{ OrbitControls }} from 'three/examples/jsm/controls/OrbitControls.js';
   {_loader_import}
 
-  const scene    = new THREE.Scene();
-  scene.background = new THREE.Color(0x1a1a2e);
-
+  const info = document.getElementById('info');
   const W = window.innerWidth, H = window.innerHeight;
-  const camera   = new THREE.PerspectiveCamera(45, W/H, 0.01, 50000);
-  const renderer = new THREE.WebGLRenderer({{ antialias:true }});
-  renderer.setPixelRatio(window.devicePixelRatio);
-  renderer.setSize(W, H);
+
+  const renderer = new THREE.WebGLRenderer({{antialias:true}});
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+  renderer.setSize(W,H);
   renderer.outputEncoding = THREE.sRGBEncoding;
   renderer.shadowMap.enabled = true;
   document.body.appendChild(renderer.domElement);
 
-  // Iluminación profesional
-  scene.add(new THREE.AmbientLight(0xffffff, 0.6));
-  const sun = new THREE.DirectionalLight(0xfff4e0, 1.2);
-  sun.position.set(200, 400, 200);
-  sun.castShadow = true;
-  scene.add(sun);
-  scene.add(new THREE.DirectionalLight(0xc9d9ff, 0.4).position.set(-100, 100, -100));
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x0f172a);
+  scene.add(new THREE.GridHelper(500,50,0x334155,0x1e293b));
 
-  // Grid suelo
-  scene.add(new THREE.GridHelper(500, 50, 0x334155, 0x1e293b));
+  const camera = new THREE.PerspectiveCamera(45,W/H,0.01,50000);
+  camera.position.set(20,15,25);
 
-  const controls = new OrbitControls(camera, renderer.domElement);
-  controls.enableDamping = true;
-  controls.dampingFactor = 0.08;
+  scene.add(new THREE.AmbientLight(0xffffff,0.7));
+  const sun = new THREE.DirectionalLight(0xfff4e0,1.2);
+  sun.position.set(200,400,200); sun.castShadow=true; scene.add(sun);
+  const fill = new THREE.DirectionalLight(0xc9d9ff,0.35);
+  fill.position.set(-100,100,-100); scene.add(fill);
 
-  function _centerAndFit(obj) {{
-    const box    = new THREE.Box3().setFromObject(obj);
-    const center = box.getCenter(new THREE.Vector3());
-    const size   = box.getSize(new THREE.Vector3());
-    const maxDim = Math.max(size.x, size.y, size.z);
-    obj.position.sub(center);
-    camera.position.set(maxDim * 1.5, maxDim * 1.0, maxDim * 2.0);
-    camera.lookAt(0, 0, 0);
-    controls.target.set(0, 0, 0);
-    controls.update();
-    document.getElementById('info').innerText =
-      '✅ Modelo cargado · Arrastra para rotar · Rueda para zoom';
+  const ctrl = new OrbitControls(camera,renderer.domElement);
+  ctrl.enableDamping=true; ctrl.dampingFactor=0.08;
+
+  function _fit(obj){{
+    const box=new THREE.Box3().setFromObject(obj);
+    const c=box.getCenter(new THREE.Vector3());
+    const s=box.getSize(new THREE.Vector3());
+    const d=Math.max(s.x,s.y,s.z);
+    obj.position.sub(c);
+    camera.position.set(d*1.4,d*0.9,d*1.8);
+    camera.lookAt(0,0,0); ctrl.target.set(0,0,0); ctrl.update();
+    info.innerText='✅ Modelo cargado · Arrastra para rotar · Rueda para zoom';
+  }}
+  function _err(e){{
+    console.error(e);
+    info.innerText='⚠️ Error al cargar el modelo — '+String(e.message||e);
   }}
 
-  function _onErr(err) {{
-    console.error(err);
-    document.getElementById('info').innerText = '⚠️ Error al cargar el modelo 3D';
-  }}
-
+  const MODEL_URL = `{_js_model_url}`;
   {_loader_create}
-  {_loader_call}
+  {_loader_cb}
 
-  function animate() {{
-    requestAnimationFrame(animate);
-    controls.update();
-    renderer.render(scene, camera);
-  }}
-  animate();
-
-  window.addEventListener('resize', () => {{
-    camera.aspect = window.innerWidth / window.innerHeight;
+  (function loop(){{requestAnimationFrame(loop);ctrl.update();renderer.render(scene,camera);}})();
+  window.addEventListener('resize',()=>{{
+    camera.aspect=window.innerWidth/window.innerHeight;
     camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setSize(window.innerWidth,window.innerHeight);
   }});
 </script>
 </body>
