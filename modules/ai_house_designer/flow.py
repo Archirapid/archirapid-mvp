@@ -790,9 +790,26 @@ def main():
     # Título principal
     st.title("🏠 Diseñador de Vivienda con IA (MVP) v2.1 🔧")
     
-    # Mostrar paso actual
-    st.subheader(f"Paso {ai_house_step} de 4")
-    
+    # Barra de progreso visual
+    _step_labels = ["", "Requisitos", "Habitaciones", "Editor 3D", "Resumen", "Servicios", "Pago"]
+    _prog_cols = st.columns(6)
+    for _si, _slabel in enumerate(_step_labels[1:], 1):
+        with _prog_cols[_si - 1]:
+            _active = _si == ai_house_step
+            _done   = _si < ai_house_step
+            _color  = "#F59E0B" if _active else ("#22C55E" if _done else "#374151")
+            _weight = "800" if _active else "600"
+            st.markdown(
+                f'<div style="text-align:center;padding:6px 2px;border-radius:8px;'
+                f'background:{"rgba(245,158,11,0.15)" if _active else "transparent"};'
+                f'border:{"2px solid #F59E0B" if _active else "1px solid #374151"};'
+                f'font-size:11px;font-weight:{_weight};color:{_color};">'
+                f'{"✓ " if _done else f"{_si}. "}{_slabel}</div>',
+                unsafe_allow_html=True,
+            )
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
     # Llamar a la función correspondiente según el paso
     if ai_house_step == 1:
         render_step1()
@@ -801,8 +818,12 @@ def main():
     elif ai_house_step == 3:
         render_step3_editor()
     elif ai_house_step == 4:
-        render_step3()  # Documentación ahora es paso 4
-    
+        render_step4_resumen()
+    elif ai_house_step == 5:
+        render_step5_docs()
+    elif ai_house_step == 6:
+        render_step6_pago()
+
     # CRÍTICO: Salir para no ejecutar código del marketplace
     return
 
@@ -3480,3 +3501,577 @@ def render_step3():
 
             st.markdown("---")
             st.info("📬 Proyecto guardado en tu **Panel de Cliente**. El equipo ArchiRapid recibirá notificación inmediata.")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# HELPER COMPARTIDO — cálculos financieros y energéticos (pasos 4/5/6)
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _get_financials() -> dict:
+    """Cálculo determinista de presupuesto, subvenciones y energía.
+    Lee de session_state → siempre devuelve los mismos números independientemente
+    del paso en el que se llame."""
+    req         = st.session_state.get("ai_house_requirements", {})
+    design_data = get_current_design_data()
+    total_area  = design_data.get("total_area", 0) or 0
+    rooms       = design_data.get("rooms", [])
+    style       = req.get("style", "Moderno")
+    energy      = req.get("energy", {})
+    budget      = req.get("budget", 150000)
+
+    # Partidas de coste
+    construction_cost  = int(total_area * 1100)
+    foundation_cost    = int(total_area * 180)
+    installation_cost  = int(total_area * 150)
+    architecture_cost  = int((construction_cost + foundation_cost) * 0.08)
+    _STYLE_CHIMNEY     = {"Montaña": 4500, "Rural": 4500, "Clásico": 3500}
+    chimney_cost       = _STYLE_CHIMNEY.get(style, 0)
+    total_cost = (construction_cost + foundation_cost + installation_cost
+                  + architecture_cost + chimney_cost)
+
+    partidas = [
+        ("Obra civil / estructura",  construction_cost,  f"{construction_cost/max(total_cost,1)*100:.0f}%",  "Cimientos + estructura"),
+        ("Cimentación",              foundation_cost,    f"{foundation_cost/max(total_cost,1)*100:.0f}%",    "Hormigón armado"),
+        ("Instalaciones",            installation_cost,  f"{installation_cost/max(total_cost,1)*100:.0f}%",  "Eléctrica·fontanería·calefacción"),
+        ("Honorarios arquitecto",    architecture_cost,  f"{architecture_cost/max(total_cost,1)*100:.0f}%",  "Proyecto + dirección de obra"),
+    ]
+    if chimney_cost:
+        partidas.append(("Chimenea / extras estilo", chimney_cost, f"{chimney_cost/max(total_cost,1)*100:.0f}%", style))
+
+    # Subvenciones
+    subsidy = 0
+    if energy.get("solar"):        subsidy += 3000
+    if energy.get("aerotermia"):   subsidy += 5000
+    if energy.get("geotermia"):    subsidy += 8000
+    if energy.get("insulation"):   subsidy += 2000
+    if energy.get("rainwater"):    subsidy += 1000
+    if energy.get("domotic"):      subsidy += 500
+    subsidy_total = min(subsidy, int(total_cost * 0.40))
+
+    # Calificación energética
+    energy_score = 0
+    if energy.get("solar"):        energy_score += 25
+    if energy.get("aerotermia"):   energy_score += 20
+    if energy.get("geotermia"):    energy_score += 20
+    if energy.get("insulation"):   energy_score += 15
+    if energy.get("rainwater"):    energy_score += 10
+    if energy.get("domotic"):      energy_score += 10
+
+    if energy_score >= 60:   energy_label, energy_color = "A", "#2ECC71"
+    elif energy_score >= 40: energy_label, energy_color = "B", "#27AE60"
+    elif energy_score >= 20: energy_label, energy_color = "C", "#F39C12"
+    else:                    energy_label, energy_color = "D", "#E74C3C"
+
+    consumo_base  = total_area * 120
+    ahorro_pct    = energy_score * 0.9
+    consumo_real  = int(consumo_base * (1 - ahorro_pct / 100))
+    ahorro_euros  = int((consumo_base - consumo_real) * 0.18)
+    co2_evitado   = round((consumo_base - consumo_real) * 0.25 / 1000, 1)
+
+    return {
+        "req": req, "design_data": design_data, "total_area": total_area,
+        "rooms": rooms, "style": style, "energy": energy, "budget": budget,
+        "construction_cost": construction_cost, "foundation_cost": foundation_cost,
+        "installation_cost": installation_cost, "architecture_cost": architecture_cost,
+        "chimney_cost": chimney_cost, "total_cost": total_cost,
+        "partidas": partidas, "subsidy_total": subsidy_total,
+        "energy_score": energy_score, "energy_label": energy_label,
+        "energy_color": energy_color, "consumo_real": consumo_real,
+        "ahorro_euros": ahorro_euros, "co2_evitado": co2_evitado,
+    }
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PASO 4 — RESUMEN EJECUTIVO
+# ══════════════════════════════════════════════════════════════════════════════
+
+def render_step4_resumen():
+    """Paso 4: Resumen limpio — KPIs + visor 3D + mapa satélite + Gemelo Digital (opcional)."""
+
+    f = _get_financials()
+    req, total_area, total_cost = f["req"], f["total_area"], f["total_cost"]
+    subsidy_total = f["subsidy_total"]
+    energy_label, energy_color = f["energy_label"], f["energy_color"]
+    style = f["style"]
+
+    if not req.get("ai_room_proposal"):
+        st.warning("Primero completa los pasos anteriores.")
+        if st.button("← Inicio"):
+            st.session_state["ai_house_step"] = 1
+            st.rerun()
+        return
+
+    st.markdown("## 🏠 Tu Proyecto en Resumen")
+    st.caption("Un vistazo rápido a los números clave de tu casa. Cuando estés listo, continúa al Paso 5.")
+
+    # ── KPIs ────────────────────────────────────────────────────────────────
+    k1, k2, k3, k4 = st.columns(4)
+    k1.metric("Coste estimado",    f"€{total_cost:,}",
+              delta=f"vs €{int(total_area*3500):,} piso ciudad")
+    k2.metric("Subvenciones",      f"€{subsidy_total:,}",
+              delta=f"Neto: €{total_cost-subsidy_total:,}")
+    k3.metric("Superficie",        f"{total_area:.0f} m²",
+              delta=f"Estilo {style.split()[-1]}")
+    k4.metric("Ahorro vs piso",    f"€{int(total_area*3500)-(total_cost-subsidy_total):,}",
+              delta="con subvenciones")
+
+    # Badge energético
+    st.markdown(f"""
+<div style="display:inline-block;background:{energy_color};color:#fff;
+            padding:8px 22px;border-radius:8px;font-size:20px;font-weight:900;
+            margin:12px 0;">
+  Calificación Energética: <b>{energy_label}</b>
+  &nbsp;·&nbsp; <span style="font-size:14px;font-weight:400;">
+  Ahorro ~€{f['ahorro_euros']:,}/año · CO₂ evitado {f['co2_evitado']} t/año
+  </span>
+</div>""", unsafe_allow_html=True)
+
+    st.markdown("---")
+
+    # ── Visor 3D (viewer3d.py — Three.js) ──────────────────────────────────
+    try:
+        from modules.ai_house_designer.viewer3d import Viewer3D
+        from modules.ai_house_designer.architect_layout import ArchitectLayout
+
+        _rooms_raw = f["design_data"].get("rooms", [])
+        if _rooms_raw:
+            st.markdown("### 🧱 Vista 3D de tu diseño")
+            _layout = ArchitectLayout(house_shape=req.get("house_shape", "Rectangular"))
+            _house_design = _layout.generate_layout(_rooms_raw)
+            _viewer = Viewer3D(_house_design)
+            _html3d = _viewer.generate_html(height=420)
+            import streamlit.components.v1 as _cmp3d
+            _cmp3d.html(_html3d, height=430, scrolling=False)
+            st.caption("Modelo Three.js interactivo · arrastra para rotar · rueda para zoom")
+            st.markdown("---")
+    except Exception:
+        pass  # si no hay datos 3D aún, no bloquear
+
+    # ── Mapa satélite ───────────────────────────────────────────────────────
+    try:
+        import folium as _fol, math as _m, streamlit.components.v1 as _cv
+        _pd = st.session_state.get("design_plot_data", {})
+        _lat, _lon = _pd.get("lat"), _pd.get("lon")
+        if _lat and _lon:
+            _ta = total_area or 80
+            _tw = _m.sqrt(_ta * 1.3)
+            _td = _m.sqrt(_ta / 1.3)
+            _dlat = _td / 111000
+            _dlon = _tw / (111000 * _m.cos(_m.radians(float(_lat))))
+            _mm = _fol.Map(location=[float(_lat), float(_lon)], zoom_start=18,
+                           tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+                           attr="Esri")
+            _fol.Rectangle(
+                bounds=[[float(_lat)-_dlat/2, float(_lon)-_dlon/2],
+                        [float(_lat)+_dlat/2, float(_lon)+_dlon/2]],
+                color="#0055FF", fill=True, fill_color="#0055FF",
+                fill_opacity=0.35, weight=2,
+                tooltip=f"Tu casa: {_tw:.1f}m × {_td:.1f}m ({_ta:.0f} m²)"
+            ).add_to(_mm)
+            _fol.Marker([float(_lat), float(_lon)],
+                        icon=_fol.Icon(color="red", icon="home", prefix="fa"),
+                        tooltip=_pd.get("title", "Tu parcela")).add_to(_mm)
+            st.markdown("### 📍 Ubicación del proyecto")
+            _cv.html(_mm._repr_html_(), height=380)
+            st.caption(f"Parcela: {_pd.get('title', '')} · Huella aproximada {_tw:.1f}m × {_td:.1f}m")
+            st.markdown("---")
+    except Exception:
+        pass
+
+    # ── Gemelo Digital (expander opcional) ─────────────────────────────────
+    with st.expander("🏗️ Ver Gemelo Digital — Análisis BIM / Energía / Carbono", expanded=False):
+        try:
+            import plotly.graph_objects as go
+            tab_bim, tab_energia, tab_carbono, tab_whatif = st.tabs(
+                ["📐 BIM / Espacios", "⚡ Energía", "🌿 Carbono", "🔮 What-If"])
+
+            with tab_bim:
+                st.markdown("#### Distribución de espacios IFC")
+                _rooms = f["design_data"].get("rooms", [])
+                if _rooms:
+                    _names  = [r.get("name", "?") for r in _rooms]
+                    _areas  = [r.get("area", r.get("area_m2", 0)) for r in _rooms]
+                    _fig_bim = go.Figure(go.Pie(labels=_names, values=_areas, hole=0.35,
+                                                marker_colors=["#1E3A5F","#2563EB","#3B82F6",
+                                                               "#60A5FA","#93C5FD","#BFDBFE"]))
+                    _fig_bim.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                                           font_color="#F8FAFC", height=320, margin=dict(t=20,b=20))
+                    st.plotly_chart(_fig_bim, use_container_width=True)
+                    st.caption("Cada segmento = objeto IFC2x3 certificable · Compatible BIM Mandate UE")
+                else:
+                    st.info("Completa el diseño para ver la distribución de espacios.")
+
+            with tab_energia:
+                st.markdown("#### Consumo energético anual estimado")
+                _e = f["energy"]
+                _consumo_base = total_area * 120
+                _sistemas = []
+                _ahorros   = []
+                if _e.get("solar"):        _sistemas.append("Solar PV"); _ahorros.append(_consumo_base*0.25)
+                if _e.get("aerotermia"):   _sistemas.append("Aerotermia"); _ahorros.append(_consumo_base*0.20)
+                if _e.get("geotermia"):    _sistemas.append("Geotermia"); _ahorros.append(_consumo_base*0.20)
+                if _e.get("insulation"):   _sistemas.append("Aislamiento"); _ahorros.append(_consumo_base*0.15)
+                if _e.get("rainwater"):    _sistemas.append("Agua lluvia"); _ahorros.append(_consumo_base*0.05)
+                if _e.get("domotic"):      _sistemas.append("Domótica"); _ahorros.append(_consumo_base*0.05)
+                if _sistemas:
+                    _fig_e = go.Figure(go.Bar(x=_sistemas, y=[int(a) for a in _ahorros],
+                                              marker_color="#2563EB", text=[f"{int(a):,} kWh" for a in _ahorros],
+                                              textposition="outside"))
+                    _fig_e.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                                         font_color="#F8FAFC", height=300, yaxis_title="kWh/año ahorrado",
+                                         margin=dict(t=20,b=40))
+                    st.plotly_chart(_fig_e, use_container_width=True)
+                else:
+                    st.info("Activa sistemas energéticos en el Paso 2 para ver el análisis.")
+                st.metric("Consumo estimado", f"{f['consumo_real']:,} kWh/año",
+                          delta=f"Ahorro: €{f['ahorro_euros']:,}/año")
+
+            with tab_carbono:
+                st.markdown("#### Huella de carbono del proyecto")
+                _carbon_construccion = int(total_area * 350)  # kg CO2 construcción típica
+                _carbon_operacion    = int(f["consumo_real"] * 0.25)  # kg CO2/año operación
+                _fig_c = go.Figure(go.Bar(
+                    x=["Construcción (total)", "Operación (año 1)", "Operación (año 10)", "Operación (año 25)"],
+                    y=[_carbon_construccion, _carbon_operacion,
+                       _carbon_operacion*10, _carbon_operacion*25],
+                    marker_color=["#DC2626","#F59E0B","#10B981","#059669"],
+                    text=[f"{v:,} kg" for v in [_carbon_construccion, _carbon_operacion,
+                                                  _carbon_operacion*10, _carbon_operacion*25]],
+                    textposition="outside"))
+                _fig_c.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                                     font_color="#F8FAFC", height=300, yaxis_title="kg CO₂",
+                                     margin=dict(t=20,b=40))
+                st.plotly_chart(_fig_c, use_container_width=True)
+                st.caption(f"CO₂ evitado vs casa convencional: **{f['co2_evitado']} t/año** gracias a tus sistemas energéticos")
+
+            with tab_whatif:
+                st.markdown("#### ¿Qué pasa si añado más superficie?")
+                _extra = st.slider("m² adicionales", 0, 100, 20, 5, key="whatif_extra_m2_s4")
+                _new_area  = total_area + _extra
+                _new_cost  = int(_new_area * 1100) + int(_new_area * 180) + int(_new_area * 150) + int(_new_area * 1280 * 0.08)
+                _new_kwh   = int(_new_area * 120 * (1 - f["energy_score"] * 0.009))
+                _c1, _c2, _c3 = st.columns(3)
+                _c1.metric("Nueva superficie", f"{_new_area:.0f} m²", delta=f"+{_extra} m²")
+                _c2.metric("Coste estimado",   f"€{_new_cost:,}",      delta=f"+€{_new_cost-total_cost:,}")
+                _c3.metric("Consumo",          f"{_new_kwh:,} kWh/año")
+        except ImportError:
+            st.info("Instala plotly para ver los gráficos del Gemelo Digital: `pip install plotly`")
+        except Exception as _eg:
+            st.warning(f"Gemelo Digital no disponible: {_eg}")
+
+    # ── Botones de navegación ────────────────────────────────────────────────
+    st.markdown("---")
+    _c_back, _c_next = st.columns(2)
+    with _c_back:
+        if st.button("← Volver al Editor 3D", use_container_width=True, key="s4_back"):
+            st.session_state["ai_house_step"] = 3
+            st.rerun()
+    with _c_next:
+        if st.button("Continuar → Documentación y Servicios", type="primary",
+                     use_container_width=True, key="s4_next"):
+            st.session_state["ai_house_step"] = 5
+            st.rerun()
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PASO 5 — DOCUMENTACIÓN + SERVICIOS
+# ══════════════════════════════════════════════════════════════════════════════
+
+def render_step5_docs():
+    """Paso 5: Partidas + plano de planta + constructores + selección de servicios."""
+
+    f = _get_financials()
+    req, total_area, total_cost = f["req"], f["total_area"], f["total_cost"]
+    partidas, subsidy_total = f["partidas"], f["subsidy_total"]
+    energy_label, style = f["energy_label"], f["style"]
+
+    if not req.get("ai_room_proposal"):
+        st.warning("Primero completa los pasos anteriores.")
+        if st.button("← Inicio"):
+            st.session_state["ai_house_step"] = 1
+            st.rerun()
+        return
+
+    st.markdown("## 📋 Documentación Técnica y Servicios")
+    st.caption("Revisa el presupuesto detallado, el plano de planta y selecciona los servicios que necesitas.")
+
+    # ── Presupuesto desglosado ───────────────────────────────────────────────
+    st.markdown("### 💰 Presupuesto por Partidas")
+    for partida_name, coste, pct, desc in partidas:
+        c1, c2, c3 = st.columns([3, 1, 1])
+        c1.markdown(f"**{partida_name}** · *{desc}*")
+        c2.markdown(f"€{coste:,}")
+        c3.markdown(pct)
+    st.markdown("---")
+    _tc1, _tc2, _tc3 = st.columns(3)
+    _tc1.metric("Total ejecución material", f"€{total_cost:,}")
+    _tc2.metric("Subvenciones estimadas",   f"-€{subsidy_total:,}")
+    _tc3.metric("Coste neto",               f"€{total_cost-subsidy_total:,}")
+    st.markdown("---")
+
+    # ── Plano de planta SVG ──────────────────────────────────────────────────
+    try:
+        from modules.ai_house_designer.ifc_export import rooms_to_svg as _r2svg
+        _rooms_src = (
+            f["design_data"].get("rooms") or
+            [{"name": k, "area": float(v)}
+             for k, v in req.get("ai_room_proposal", {}).items()
+             if isinstance(v, (int, float))]
+        )
+        if _rooms_src:
+            st.markdown("### 🗺️ Plano de Planta")
+            _svg_data = _r2svg(_rooms_src)
+            st.image(_svg_data, use_container_width=True,
+                     caption="Distribución orientativa generada automáticamente (CTE)")
+    except Exception:
+        pass
+
+    # ── Constructores ─────────────────────────────────────────────────────────
+    try:
+        st.markdown("### 🏗️ Constructores Recomendados")
+        _province = (req.get("province") or
+                     st.session_state.get("design_plot_data", {}).get("province") or "")
+        from modules.marketplace.service_providers import get_builders_for_province as _gbp
+        _builders = _gbp(province=_province, style=style, max_results=3)
+        if _builders:
+            for _b in _builders:
+                with st.container():
+                    _bc1, _bc2 = st.columns([3, 1])
+                    with _bc1:
+                        st.markdown(f"**{_b.get('name', 'Constructor')}** — {_b.get('province', _province)}")
+                        st.caption(f"{_b.get('specialty', '')} · {_b.get('rating', '⭐⭐⭐⭐')} · {_b.get('projects_done', '')} proyectos")
+                    with _bc2:
+                        st.button("Contactar", key=f"contact_{_b.get('id', _b.get('name', ''))}_s5",
+                                  use_container_width=True)
+        else:
+            st.info(f"Constructores para {_province or 'tu zona'} disponibles tras registro.")
+    except Exception:
+        pass
+
+    # ── Servicios adicionales ─────────────────────────────────────────────────
+    st.markdown("### 🛠️ ¿Qué servicios necesitas?")
+    _srv_key = "selected_services_s5"
+    if _srv_key not in st.session_state:
+        st.session_state[_srv_key] = []
+
+    _SERVICES = [
+        ("📐 Proyecto de Arquitectura completo",    "proyecto_arquitectura",  990),
+        ("🏗️ Dirección de Obra",                   "direccion_obra",         790),
+        ("📊 Informe de Eficiencia Energética",      "eficiencia_energetica",  290),
+        ("🔒 Certificación BIM/IFC Notarial",        "bim_notarial",           490),
+        ("🌿 Estudio de Impacto Ambiental",          "impacto_ambiental",      390),
+        ("💧 Proyecto Fontanería y Saneamiento",     "fontaneria",             350),
+        ("⚡ Proyecto Instalación Eléctrica",        "electrica",              350),
+    ]
+
+    _selected = []
+    _sv_cols = st.columns(2)
+    for _i, (_label, _code, _price) in enumerate(_SERVICES):
+        with _sv_cols[_i % 2]:
+            _checked = st.checkbox(f"{_label} — €{_price:,}",
+                                   key=f"svc_{_code}_s5",
+                                   value=_code in st.session_state[_srv_key])
+            if _checked:
+                _selected.append((_code, _label, _price))
+
+    st.session_state[_srv_key] = [c for c, _, __ in _selected]
+    _svc_total = sum(p for _, __, p in _selected)
+    if _selected:
+        st.success(f"✅ Servicios seleccionados: {len(_selected)} · Subtotal: €{_svc_total:,}")
+
+    # ── Botones de navegación ─────────────────────────────────────────────────
+    st.markdown("---")
+    _c_back5, _c_next5 = st.columns(2)
+    with _c_back5:
+        if st.button("← Volver al Resumen", use_container_width=True, key="s5_back"):
+            st.session_state["ai_house_step"] = 4
+            st.rerun()
+    with _c_next5:
+        if st.button("Continuar → Pago y Descarga", type="primary",
+                     use_container_width=True, key="s5_next"):
+            st.session_state["ai_house_step"] = 6
+            st.rerun()
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PASO 6 — PAGO + DESCARGA
+# ══════════════════════════════════════════════════════════════════════════════
+
+def render_step6_pago():
+    """Paso 6: Pago, descarga ZIP, IFC/BIM y publicación en Tablón de Obras."""
+
+    f = _get_financials()
+    req, total_area, total_cost = f["req"], f["total_area"], f["total_cost"]
+    partidas, subsidy_total = f["partidas"], f["subsidy_total"]
+    energy_label, style = f["energy_label"], f["style"]
+
+    if not req.get("ai_room_proposal"):
+        st.warning("Primero completa los pasos anteriores.")
+        if st.button("← Inicio"):
+            st.session_state["ai_house_step"] = 1
+            st.rerun()
+        return
+
+    st.markdown("## 🛒 Descarga tu Proyecto")
+    st.caption("Todo listo. Descarga la documentación completa o contrata los servicios seleccionados.")
+
+    # ── Resumen de lo que se descarga ─────────────────────────────────────────
+    st.markdown("""
+<div style="background:rgba(37,99,235,0.12);border:1px solid rgba(37,99,235,0.35);
+            border-radius:12px;padding:16px 20px;margin-bottom:16px;">
+  <div style="font-weight:800;color:#F8FAFC;font-size:15px;margin-bottom:8px;">
+    📦 Contenido del ZIP del Proyecto
+  </div>
+  <ul style="color:#CBD5E1;font-size:13px;margin:0;padding-left:20px;line-height:1.9;">
+    <li>📄 Memoria descriptiva del proyecto (PDF)</li>
+    <li>📊 Mediciones y presupuesto (Excel)</li>
+    <li>🗺️ Plano de planta (SVG)</li>
+    <li>🏗️ Archivo BIM/IFC (IFC2x3)</li>
+    <li>📸 Vistas 3D (si se capturaron)</li>
+    <li>📋 Informe de eficiencia energética</li>
+    <li>🌿 Estimación huella de carbono</li>
+  </ul>
+</div>""", unsafe_allow_html=True)
+
+    # ── Botón de descarga ZIP ─────────────────────────────────────────────────
+    try:
+        _plot_data = st.session_state.get("design_plot_data", {})
+        _design_d  = f["design_data"]
+        _zip_bytes = generar_zip_proyecto(
+            req=req,
+            design_data=_design_d,
+            plot_data=_plot_data,
+            partidas=[(p[0], p[1], p[2], p[3]) for p in partidas],
+            subsidy_total=subsidy_total,
+            energy_label=energy_label,
+        )
+        _pname_zip = (req.get("nombre_proyecto") or "ArchiRapid_Proyecto").replace(" ", "_")
+        st.download_button(
+            label="📦 Descargar Proyecto Completo (ZIP)",
+            data=_zip_bytes,
+            file_name=f"{_pname_zip}.zip",
+            mime="application/zip",
+            type="primary",
+            use_container_width=True,
+        )
+    except Exception as _ez:
+        st.error(f"Error generando ZIP: {_ez}")
+
+    # ── IFC / Gemelo Digital ──────────────────────────────────────────────────
+    try:
+        from modules.ai_house_designer.ifc_export import generate_ifc
+        _rooms_ifc = (
+            f["design_data"].get("rooms") or
+            [{"name": k, "area": float(v)}
+             for k, v in req.get("ai_room_proposal", {}).items()
+             if isinstance(v, (int, float))]
+        )
+        if _rooms_ifc:
+            _pname_ifc = (req.get("nombre_proyecto") or "ArchiRapid_Proyecto").replace(" ", "_")
+            _ifc_bytes = generate_ifc(_rooms_ifc, project_name=_pname_ifc)
+            st.markdown("---")
+            st.markdown("""
+<div style="background:linear-gradient(135deg,rgba(30,58,95,0.6),rgba(13,27,42,0.8));
+            border:1px solid rgba(245,158,11,0.35);border-radius:12px;
+            padding:16px 20px;margin-bottom:12px;">
+  <div style="font-size:15px;font-weight:800;color:#F8FAFC;margin-bottom:4px;">
+    🏗️ Gemelo Digital BIM/IFC
+  </div>
+  <div style="font-size:12px;color:#94A3B8;">
+    Formato IFC2x3 · FreeCAD · Archicad · Revit · Navisworks · BIMvision
+  </div>
+  <div style="margin-top:8px;font-size:11px;color:#64748B;">
+    ✅ Subvencionable UE (BIM Mandate) · Cada habitación = objeto IFC certificado
+  </div>
+</div>""", unsafe_allow_html=True)
+            st.download_button(
+                label="📐 Descargar Gemelo Digital (.ifc)",
+                data=_ifc_bytes,
+                file_name=f"{_pname_ifc}.ifc",
+                mime="application/x-step",
+                use_container_width=True,
+            )
+    except Exception:
+        pass
+
+    # ── Tablón de Obras ───────────────────────────────────────────────────────
+    try:
+        st.markdown("---")
+        st.markdown("### 🏗️ ¿Quieres recibir ofertas de constructores?")
+        _tab_key = f"tablon_published_s6_{req.get('nombre_proyecto','')}"
+        if st.session_state.get(_tab_key):
+            st.success("✅ Publicado en el Tablón. Los constructores de tu zona ya pueden enviarte ofertas.")
+            st.info("Consulta las ofertas en tu **Panel de Cliente → Ofertas de Construcción**.")
+        else:
+            st.markdown("""
+<div style="background:rgba(34,197,94,0.07);border:1px solid rgba(34,197,94,0.25);
+            border-radius:10px;padding:14px 18px;margin-bottom:12px;">
+  <div style="font-weight:700;color:#F8FAFC;font-size:14px;">🏗️ Red de constructores ArchiRapid</div>
+  <div style="color:#94A3B8;font-size:12px;margin-top:4px;">
+    Publicamos tu proyecto (anónimo). Los constructores de tu provincia te envían
+    ofertas con precio, plazo y garantía. Tú comparas. Sin compromiso.
+  </div>
+</div>""", unsafe_allow_html=True)
+            _prov_t  = (req.get("province") or
+                        st.session_state.get("design_plot_data", {}).get("province") or "")
+            _cmail   = (st.session_state.get("user_email") or
+                        st.session_state.get("client_email") or "")
+            _cname   = (st.session_state.get("user_name") or
+                        st.session_state.get("client_name") or "Cliente")
+            _pname_t = req.get("nombre_proyecto") or "Mi proyecto ArchiRapid"
+            if st.button("🏗️ Publicar en Tablón de Obras — Recibir ofertas",
+                         type="primary", use_container_width=True, key="btn_tablon_s6"):
+                try:
+                    from modules.marketplace.service_providers import publish_to_tablon
+                    _tid = publish_to_tablon(
+                        client_email=_cmail, client_name=_cname,
+                        project_name=_pname_t, province=_prov_t, style=style,
+                        total_area=float(total_area), total_cost=float(total_cost),
+                        partidas_list=[(p[0], p[1], p[2], p[3]) for p in partidas],
+                    )
+                    st.session_state[_tab_key] = True
+                    try:
+                        from modules.marketplace.email_notify import _send
+                        _send(f"🏗️ Nuevo Tablón\nID:{_tid}\n{_cname} ({_cmail})\n"
+                              f"{_pname_t} · {total_area:.0f}m² · €{total_cost:,}")
+                    except Exception:
+                        pass
+                    st.success("✅ Publicado. Los constructores ya pueden enviarte ofertas.")
+                    st.rerun()
+                except Exception as _etab:
+                    st.error(f"Error publicando: {_etab}")
+    except Exception:
+        pass
+
+    # ── Servicios seleccionados en paso 5 ─────────────────────────────────────
+    _selected_svc = st.session_state.get("selected_services_s5", [])
+    if _selected_svc:
+        st.markdown("---")
+        st.markdown("### 🛠️ Servicios contratados")
+        _SVC_LABELS = {
+            "proyecto_arquitectura":  ("📐 Proyecto de Arquitectura completo",  990),
+            "direccion_obra":         ("🏗️ Dirección de Obra",                  790),
+            "eficiencia_energetica":  ("📊 Informe Eficiencia Energética",       290),
+            "bim_notarial":           ("🔒 Certificación BIM/IFC Notarial",      490),
+            "impacto_ambiental":      ("🌿 Estudio Impacto Ambiental",           390),
+            "fontaneria":             ("💧 Proyecto Fontanería y Saneamiento",   350),
+            "electrica":              ("⚡ Proyecto Instalación Eléctrica",      350),
+        }
+        _svc_subtotal = 0
+        for _code in _selected_svc:
+            if _code in _SVC_LABELS:
+                _lbl, _prc = _SVC_LABELS[_code]
+                st.markdown(f"- {_lbl} — **€{_prc:,}**")
+                _svc_subtotal += _prc
+        st.metric("Total servicios", f"€{_svc_subtotal:,}")
+        st.button("💳 Pagar servicios seleccionados", type="primary",
+                  use_container_width=True, key="btn_pagar_svc_s6",
+                  help="Integración de pago disponible próximamente")
+
+    st.markdown("---")
+    _cb6, _ = st.columns(2)
+    with _cb6:
+        if st.button("← Volver a Documentación", use_container_width=True, key="s6_back"):
+            st.session_state["ai_house_step"] = 5
+            st.rerun()
+    st.info("📬 Proyecto guardado en tu **Panel de Cliente**. El equipo ArchiRapid recibirá notificación inmediata.")
