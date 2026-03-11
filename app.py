@@ -2139,18 +2139,21 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
     st.stop()  # Detener ejecución para Home
 
 elif st.session_state.get('selected_page') == "🏠 Propietarios":
+    st.components.v1.html("<script>window.parent.document.querySelector('section.main').scrollTo(0,0);</script>", height=0)
     with st.container():
         # Propietarios suben fincas al marketplace inmobiliario
         from modules.marketplace import owners
         owners.main()
 
 elif st.session_state.get('selected_page') == "Propietario (Gemelo Digital)":
+    st.components.v1.html("<script>window.parent.document.querySelector('section.main').scrollTo(0,0);</script>", height=0)
     with st.container():
         # Flujo principal: Propietario sube finca → IA genera plan
         from modules.marketplace import gemelo_digital
         gemelo_digital.main()
 
 elif st.session_state.get('selected_page') == "Diseñador de Vivienda":
+    st.components.v1.html("<script>window.parent.document.querySelector('section.main').scrollTo(0,0);</script>", height=0)
     with st.container():
         # Flujo secundario: Cliente diseña vivienda personalizada
         from modules.marketplace import disenador_vivienda
@@ -2159,18 +2162,21 @@ elif st.session_state.get('selected_page') == "Diseñador de Vivienda":
 # "Inmobiliaria (Mapa)" route removed — Home now uses `marketplace.main()` directly.
 
 elif st.session_state.get('selected_page') == "Arquitectos (Marketplace)":
+    st.components.v1.html("<script>window.parent.document.querySelector('section.main').scrollTo(0,0);</script>", height=0)
     with st.container():
         # Simple acceso al marketplace de arquitectos (formulario de login/registro)
         from modules.marketplace import marketplace_upload
         marketplace_upload.main()
 
 elif st.session_state.get('selected_page') == "Intranet":
+    st.components.v1.html("<script>window.parent.document.querySelector('section.main').scrollTo(0,0);</script>", height=0)
     st.write("Cargando Panel de Control...")
     with st.container():
         from modules.marketplace import intranet
         intranet.main()
 
 elif st.session_state.get('selected_page') == "👤 Panel de Cliente":
+    st.components.v1.html("<script>window.parent.document.querySelector('section.main').scrollTo(0,0);</script>", height=0)
     # escape owners que intenten ir al panel de cliente
     if st.session_state.get('role') == 'owner':
         from modules.marketplace import owners
@@ -2179,28 +2185,33 @@ elif st.session_state.get('selected_page') == "👤 Panel de Cliente":
     route_main_panel()
 
 elif st.session_state.get('selected_page') == "👤 Panel de Proveedor":
+    st.components.v1.html("<script>window.parent.document.querySelector('section.main').scrollTo(0,0);</script>", height=0)
     with st.container():
         from modules.marketplace import service_providers
         service_providers.show_service_provider_panel()
 
 elif st.session_state.get('selected_page') == "📝 Registro de Proveedor de Servicios":
+    st.components.v1.html("<script>window.parent.document.querySelector('section.main').scrollTo(0,0);</script>", height=0)
     with st.container():
         from modules.marketplace import service_providers
         service_providers.show_service_provider_registration()
 
 elif st.session_state.get('selected_page') == "Iniciar Sesión":
+    st.components.v1.html("<script>window.parent.document.querySelector('section.main').scrollTo(0,0);</script>", height=0)
     with st.container():
         from modules.marketplace import auth
         auth.show_login()
         st.stop()
 
 elif st.session_state.get('selected_page') == "Registro de Usuario":
+    st.components.v1.html("<script>window.parent.document.querySelector('section.main').scrollTo(0,0);</script>", height=0)
     with st.container():
         from modules.marketplace import auth
         auth.show_registration()
         st.stop()
 
 elif st.session_state.get('selected_page') == "💬 Lola":
+    st.components.v1.html("<script>window.parent.document.querySelector('section.main').scrollTo(0,0);</script>", height=0)
     with st.container():
         from modules.marketplace import virtual_assistant
         virtual_assistant.main()
