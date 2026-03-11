@@ -524,9 +524,19 @@ def show_selected_project_panel(client_email, project_id):
                         st.error(f"Error extrayendo texto del PDF: {e}")
                         texto = ""
                 else:
-                    st.error("No hay datos técnicos disponibles para el análisis")
                     texto = ""
-            
+
+            if not texto:
+                # Fallback: sintetizar desde metadatos del proyecto (igual que Dossier)
+                texto = (
+                    f"Proyecto: {project.get('title', '')}. "
+                    f"Descripción: {project.get('description', '')}. "
+                    f"Estilo: {project.get('style', '')}. "
+                    f"Características: {project.get('features', '')}. "
+                    f"Precio: {project.get('price', '')}€. "
+                    f"Ubicación: {project.get('location', '')}, {project.get('province', '')}."
+                )
+
             if texto:  # Solo proceder si tenemos texto
                 with st.spinner("Analizando con IA avanzada..."):
                     analisis = ai.generate_text(f"Analiza técnicamente este proyecto arquitectónico: fortalezas, debilidades, viabilidad constructiva, eficiencia energética y recomendaciones de mejora: {texto[:3000]}")
@@ -547,10 +557,18 @@ def show_selected_project_panel(client_email, project_id):
                     st.warning(f"No se pudo extraer texto del PDF: {e}")
             
             if not texto:
-                st.error("No hay memoria técnica disponible")
-            else:
+                # Fallback: sintetizar desde metadatos del proyecto (igual que Dossier)
+                texto = (
+                    f"Proyecto: {project.get('title', '')}. "
+                    f"Descripción: {project.get('description', '')}. "
+                    f"Estilo: {project.get('style', '')}. "
+                    f"Características: {project.get('features', '')}. "
+                    f"Precio: {project.get('price', '')}€. "
+                    f"Ubicación: {project.get('location', '')}, {project.get('province', '')}."
+                )
+            if texto:
                 with st.spinner("Generando memoria técnica..."):
-                    memoria = ai.generate_text(f"Genera una memoria técnica completa para este proyecto basándote en la información disponible: {texto[:3000]}")
+                    memoria = ai.generate_text(f"Genera una memoria técnica completa y profesional para este proyecto arquitectónico basándote en la información disponible: {texto[:3000]}")
                     st.success("📄 MEMORIA GENERADA")
                     st.write(memoria)
 
