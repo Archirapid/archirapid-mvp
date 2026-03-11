@@ -3937,6 +3937,52 @@ def render_step5_docs():
 
     st.markdown("---")
 
+    # ── Capturas 3D del Editor Babylon ───────────────────────────────────────
+    st.markdown("### 📸 Vistas 3D de tu Diseño")
+    if st.session_state.get("babylon_captures"):
+        _caps5 = st.session_state["babylon_captures"]
+        st.success(f"✅ {len(_caps5)} vistas 3D vinculadas — se incluirán en el ZIP del proyecto")
+        _cap_labels5 = {
+            "sur_fachada_principal": "Fachada Sur",
+            "norte":                 "Vista Norte",
+            "este":                  "Vista Este",
+            "oeste":                 "Vista Oeste",
+            "planta_cenital":        "Planta Cenital",
+        }
+        _ccols = st.columns(min(len(_caps5), 5))
+        for _ci, (_ck, _cdurl) in enumerate(_caps5.items()):
+            with _ccols[_ci % 5]:
+                st.image(_cdurl, caption=_cap_labels5.get(_ck, _ck), use_container_width=True)
+    else:
+        st.info("💡 Si capturaste vistas en el Editor 3D, súbelas aquí para incluirlas en la documentación. "
+                "En el editor: pulsa 📸 **Capturar Vistas** → se descargan automáticamente como ZIP.")
+        _uploaded_caps5 = st.file_uploader(
+            "Sube el ZIP de capturas (Vistas_3D_ArchiRapid.zip) o imágenes PNG sueltas",
+            type=["zip", "png"],
+            accept_multiple_files=True,
+            key="captures_doc_uploader_s5"
+        )
+        if _uploaded_caps5:
+            import zipfile as _zf5, io as _io5c, base64 as _b64c
+            _vl5  = ["sur_fachada_principal", "norte", "este", "oeste", "planta_cenital"]
+            _caps_new = {}
+            for _uf in _uploaded_caps5:
+                if _uf.name.lower().endswith(".zip"):
+                    with _zf5.ZipFile(_io5c.BytesIO(_uf.read())) as _z5:
+                        _pngs = sorted(n for n in _z5.namelist() if n.lower().endswith(".png"))
+                        for _pi, _pn in enumerate(_pngs):
+                            _k5 = _vl5[_pi] if _pi < len(_vl5) else f"vista_{_pi+1}"
+                            _caps_new[_k5] = "data:image/png;base64," + _b64c.b64encode(_z5.read(_pn)).decode()
+                elif _uf.name.lower().endswith(".png"):
+                    _ki = len(_caps_new)
+                    _k5 = _vl5[_ki] if _ki < len(_vl5) else f"vista_{_ki+1}"
+                    _caps_new[_k5] = "data:image/png;base64," + _b64c.b64encode(_uf.read()).decode()
+            if _caps_new:
+                st.session_state["babylon_captures"] = _caps_new
+                st.rerun()
+
+    st.markdown("---")
+
     # ── Excel descargable con partidas presupuestarias ────────────────────────
     try:
         import io as _io5, openpyxl as _ox5
@@ -4072,6 +4118,16 @@ def render_step5_docs():
     st.session_state["selected_services_s5"] = list(_seleccionados_s5.keys())
     st.session_state["coste_doc_s5"]         = _coste_doc
     st.session_state["coste_servicios_s5"]   = _coste_servicios
+    # Guardar detalles completos (label + precio) para paso 6
+    _doc_detail = []
+    if _pdf_copias > 0:
+        _doc_detail.append({"label": f"📄 Documentación PDF ×{_pdf_copias} copia(s)", "precio": _pdf_copias * 1800})
+    if _cad_copias > 0:
+        _doc_detail.append({"label": f"📐 Documentación CAD ×{_cad_copias} copia(s)", "precio": _cad_copias * 2500})
+    _svc_detail = [{"label": _SERVICIOS_S5[k]["label"], "precio": _SERVICIOS_S5[k]["precio"]}
+                   for k in _seleccionados_s5]
+    st.session_state["doc_detail_s5"] = _doc_detail
+    st.session_state["svc_detail_s5"] = _svc_detail
 
     _total_s5 = _coste_doc + _coste_servicios
     st.markdown("---")
@@ -4121,46 +4177,165 @@ def render_step6_pago():
 
     st.markdown("## 🛒 Pago y Descarga")
 
-    # ── Resumen de lo seleccionado en paso 5 ─────────────────────────────────
-    _coste_doc_6    = st.session_state.get("coste_doc_s5", 0)
-    _coste_svc_6    = st.session_state.get("coste_servicios_s5", 0)
-    _total_pago     = _coste_doc_6 + _coste_svc_6
-    _svc_sel_6      = st.session_state.get("selected_services_s5", [])
+    # ── Resumen detallado ANTES del pago ────────────────────────────────────
+    _doc_detail_6 = st.session_state.get("doc_detail_s5", [])
+    _svc_detail_6 = st.session_state.get("svc_detail_s5", [])
+    _coste_doc_6  = st.session_state.get("coste_doc_s5", 0)
+    _coste_svc_6  = st.session_state.get("coste_servicios_s5", 0)
+    _subtotal_6   = _coste_doc_6 + _coste_svc_6
+    _iva_6        = int(_subtotal_6 * 0.21)
+    _total_iva_6  = _subtotal_6 + _iva_6
 
-    st.markdown(f"""
-<div style='background:linear-gradient(135deg,#1a1a2e,#2C3E50);
-            padding:20px;border-radius:12px;color:white;text-align:center;
-            border:2px solid #27AE60;margin-bottom:16px;'>
-  <h3 style='margin:0;color:#27AE60;'>TOTAL A PAGAR</h3>
-  <h1 style='margin:10px 0;color:white;'>€{_total_pago:,}</h1>
-  <p style='margin:0;font-size:13px;color:#aaa;'>
-    Documentación: €{_coste_doc_6:,} | Servicios técnicos: €{_coste_svc_6:,}
-  </p>
-</div>""", unsafe_allow_html=True)
+    # Tabla resumen
+    st.markdown("### 📋 Resumen de tu pedido")
+    _all_items_6 = _doc_detail_6 + _svc_detail_6
+    if _all_items_6:
+        _rows_html = "".join(
+            f"<tr><td style='padding:6px 12px;color:#CBD5E1;'>{it['label']}</td>"
+            f"<td style='padding:6px 12px;text-align:right;color:#F8FAFC;font-weight:600;'>€{it['precio']:,}</td></tr>"
+            for it in _all_items_6
+        )
+        st.markdown(f"""
+<table style='width:100%;border-collapse:collapse;background:rgba(30,58,95,0.3);border-radius:10px;overflow:hidden;'>
+  <thead>
+    <tr style='background:rgba(37,99,235,0.4);'>
+      <th style='padding:10px 12px;text-align:left;color:#F8FAFC;'>Concepto</th>
+      <th style='padding:10px 12px;text-align:right;color:#F8FAFC;'>Importe</th>
+    </tr>
+  </thead>
+  <tbody>
+    {_rows_html}
+    <tr style='background:rgba(0,0,0,0.2);border-top:1px solid rgba(255,255,255,0.1);'>
+      <td style='padding:8px 12px;color:#94A3B8;'>Subtotal (sin IVA)</td>
+      <td style='padding:8px 12px;text-align:right;color:#94A3B8;'>€{_subtotal_6:,}</td>
+    </tr>
+    <tr style='background:rgba(0,0,0,0.2);'>
+      <td style='padding:8px 12px;color:#94A3B8;'>IVA 21%</td>
+      <td style='padding:8px 12px;text-align:right;color:#94A3B8;'>€{_iva_6:,}</td>
+    </tr>
+    <tr style='background:rgba(39,174,96,0.2);border-top:2px solid #27AE60;'>
+      <td style='padding:12px;color:#F8FAFC;font-weight:800;font-size:15px;'>TOTAL CON IVA</td>
+      <td style='padding:12px;text-align:right;color:#27AE60;font-weight:800;font-size:18px;'>€{_total_iva_6:,}</td>
+    </tr>
+  </tbody>
+</table>""", unsafe_allow_html=True)
+    else:
+        st.info("No has seleccionado documentación ni servicios en el paso anterior. Vuelve a Servicios para seleccionarlos.")
 
+    st.caption("⚠️ Aviso MVP: Los importes mostrados son orientativos. El IVA real puede variar. "
+               "Este documento no tiene validez fiscal.")
+
+    # Proforma descargable antes de pagar
+    try:
+        import io as _io6p
+        from reportlab.lib.pagesizes import A4 as _A4p
+        from reportlab.platypus import SimpleDocTemplate as _SDp, Paragraph as _Pp, Spacer as _Sp, Table as _Tp, TableStyle as _TSp
+        from reportlab.lib.styles import getSampleStyleSheet as _GSS
+        from reportlab.lib.colors import HexColor as _HC
+        from reportlab.lib.units import cm as _cmp
+        import datetime as _dtp
+
+        _pf_buf = _io6p.BytesIO()
+        _pf_doc = _SDp(_pf_buf, pagesize=_A4p, topMargin=2*_cmp, bottomMargin=2*_cmp,
+                       leftMargin=2*_cmp, rightMargin=2*_cmp)
+        _pf_ss  = _GSS()
+        _pf_story = []
+        _pf_story.append(_Pp("<b>ARCHIRAPID — PRESUPUESTO PREVIO (PROFORMA)</b>", _pf_ss["Title"]))
+        _pf_story.append(_Sp(0.3*_cmp))
+        _pf_story.append(_Pp(f"Fecha: {_dtp.date.today().strftime('%d/%m/%Y')} · "
+                             f"Ref: AR-{req.get('nombre_proyecto','PRJ').replace(' ','')[:8].upper()}-{_dtp.date.today().strftime('%Y%m%d')}",
+                             _pf_ss["Normal"]))
+        _pf_story.append(_Pp(f"Proyecto: {req.get('nombre_proyecto', 'Proyecto ArchiRapid')} · "
+                             f"{total_area:.0f} m² · Estilo {style}", _pf_ss["Normal"]))
+        _pf_story.append(_Sp(0.5*_cmp))
+        _pf_data = [["Concepto", "Importe (€)"]] + \
+                   [[it["label"].replace("📄","").replace("📐","").replace("🏦","").replace("📋","").replace("🔍","")
+                                .replace("🏛️","").replace("👷","").replace("🚿","").replace("⚡","").replace("☀️","")
+                                .replace("🔬","").replace("📏","").replace("🦺","").replace("🥽","").strip(),
+                     f"{it['precio']:,}"] for it in _all_items_6] + \
+                   [["Subtotal sin IVA", f"{_subtotal_6:,}"],
+                    ["IVA 21%",          f"{_iva_6:,}"],
+                    ["TOTAL CON IVA",    f"{_total_iva_6:,}"]]
+        _pf_tbl = _Tp(_pf_data, colWidths=[13*_cmp, 4*_cmp])
+        _pf_tbl.setStyle(_TSp([
+            ("BACKGROUND", (0,0), (-1,0), _HC("#1E3A5F")),
+            ("TEXTCOLOR",  (0,0), (-1,0), _HC("#FFFFFF")),
+            ("FONTNAME",   (0,0), (-1,0), "Helvetica-Bold"),
+            ("BACKGROUND", (0,-3), (-1,-1), _HC("#EBF5FB")),
+            ("FONTNAME",   (0,-1), (-1,-1), "Helvetica-Bold"),
+            ("ROWBACKGROUNDS", (0,1), (-1,-4), [_HC("#FFFFFF"), _HC("#F8F9FA")]),
+            ("GRID", (0,0), (-1,-1), 0.5, _HC("#CCCCCC")),
+            ("PADDING", (0,0), (-1,-1), 6),
+        ]))
+        _pf_story.append(_pf_tbl)
+        _pf_story.append(_Sp(0.8*_cmp))
+        _pf_story.append(_Pp("<i>AVISO LEGAL: Este documento es una estimación orientativa generada "
+                             "automáticamente por ArchiRapid MVP. No tiene validez fiscal ni contractual. "
+                             "Los precios finales pueden variar. IVA referencial 21%. "
+                             "Para presupuesto oficial contacta con hola@archirapid.com</i>",
+                             _pf_ss["Normal"]))
+        _pf_doc.build(_pf_story)
+        st.download_button(
+            label="📄 Descargar Presupuesto Previo (PDF)",
+            data=_pf_buf.getvalue(),
+            file_name=f"Presupuesto_ArchiRapid_{_dtp.date.today().strftime('%Y%m%d')}.pdf",
+            mime="application/pdf",
+            use_container_width=True,
+        )
+    except Exception:
+        pass  # sin PDF proforma no bloquea el flujo
+
+    st.markdown("---")
     _cp1, _cp2 = st.columns(2)
     with _cp1:
-        if st.button("💳 Pagar con Tarjeta (Simulado)", type="primary",
+        if st.button("💳 Confirmar y Pagar (Simulado)", type="primary",
                      use_container_width=True, key="btn_pagar_s6"):
             st.session_state["pago_completado"] = True
-            st.session_state["total_pagado"]    = _total_pago
+            st.session_state["total_pagado"]    = _total_iva_6
             st.rerun()
     with _cp2:
         if st.button("📞 Hablar con un Arquitecto", use_container_width=True, key="btn_arq_s6"):
-            st.info("📧 hola@archirapid.com | ☎️ Solicita llamada en el chat →")
+            st.info("📧 hola@archirapid.com · Solicita llamada en el chat →")
 
     # ── Bloque post-pago ──────────────────────────────────────────────────────
     if st.session_state.get("pago_completado"):
         st.balloons()
-        st.success(f"✅ Pago de €{st.session_state.get('total_pagado', 0):,} procesado. ¡Tu proyecto está listo!")
+        st.success(f"✅ Pago de €{st.session_state.get('total_pagado', 0):,} (IVA incluido) procesado. ¡Tu proyecto está listo!")
+
+        # Guardar en panel de cliente
+        try:
+            import sqlite3 as _sq6, json as _js6, datetime as _dt6
+            from modules.utils import DB_PATH as _DBP6
+            _conn6 = _sq6.connect(_DBP6, timeout=15)
+            _conn6.execute("PRAGMA journal_mode=WAL")
+            _conn6.execute("""
+                CREATE TABLE IF NOT EXISTS ai_projects (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    client_email TEXT, project_name TEXT, total_area REAL,
+                    total_cost REAL, services_json TEXT, style TEXT,
+                    energy_label TEXT, created_at TEXT, status TEXT
+                )""")
+            _conn6.execute("""
+                INSERT OR REPLACE INTO ai_projects
+                (client_email, project_name, total_area, total_cost, services_json, style, energy_label, created_at, status)
+                VALUES (?,?,?,?,?,?,?,?,?)""",
+                (st.session_state.get("client_email",""),
+                 req.get("nombre_proyecto","Proyecto ArchiRapid"),
+                 float(total_area), float(total_cost),
+                 _js6.dumps({"doc": _doc_detail_6, "svc": _svc_detail_6, "total_iva": _total_iva_6}),
+                 style, energy_label,
+                 _dt6.datetime.now().isoformat(), "pagado"))
+            _conn6.commit(); _conn6.close()
+        except Exception:
+            pass  # nunca interrumpe el flujo
 
         # Calculadora de hipoteca
         try:
             from modules.marketplace.hipoteca import render_calculadora as _rc_hip
-            _plot_h  = st.session_state.get("design_plot_data", {})
-            _precio_t = float(_plot_h.get("price") or 0)
-            _style_h  = style.lower()
-            _coste_m2h = 1800 if "premium" in _style_h or "lujo" in _style_h else (1200 if "eco" in _style_h or "madera" in _style_h else 1400)
+            _plot_h       = st.session_state.get("design_plot_data", {})
+            _precio_t     = float(_plot_h.get("price") or 0)
+            _coste_m2h    = 1800 if "premium" in style.lower() or "lujo" in style.lower() \
+                            else (1200 if "eco" in style.lower() or "madera" in style.lower() else 1400)
             _coste_obra_h = total_area * _coste_m2h
             with st.expander("🏦 Calculadora de Financiación — ¿Cuánto pagarías al mes?", expanded=True):
                 _rc_hip(precio_terreno=_precio_t, coste_construccion=_coste_obra_h, key_prefix="s6_hip")
@@ -4310,35 +4485,10 @@ def render_step6_pago():
     except Exception:
         pass
 
-    # ── Servicios seleccionados en paso 5 ─────────────────────────────────────
-    _selected_svc = st.session_state.get("selected_services_s5", [])
-    if _selected_svc:
-        st.markdown("---")
-        st.markdown("### 🛠️ Servicios contratados")
-        _SVC_LABELS = {
-            "proyecto_arquitectura":  ("📐 Proyecto de Arquitectura completo",  990),
-            "direccion_obra":         ("🏗️ Dirección de Obra",                  790),
-            "eficiencia_energetica":  ("📊 Informe Eficiencia Energética",       290),
-            "bim_notarial":           ("🔒 Certificación BIM/IFC Notarial",      490),
-            "impacto_ambiental":      ("🌿 Estudio Impacto Ambiental",           390),
-            "fontaneria":             ("💧 Proyecto Fontanería y Saneamiento",   350),
-            "electrica":              ("⚡ Proyecto Instalación Eléctrica",      350),
-        }
-        _svc_subtotal = 0
-        for _code in _selected_svc:
-            if _code in _SVC_LABELS:
-                _lbl, _prc = _SVC_LABELS[_code]
-                st.markdown(f"- {_lbl} — **€{_prc:,}**")
-                _svc_subtotal += _prc
-        st.metric("Total servicios", f"€{_svc_subtotal:,}")
-        st.button("💳 Pagar servicios seleccionados", type="primary",
-                  use_container_width=True, key="btn_pagar_svc_s6",
-                  help="Integración de pago disponible próximamente")
-
     st.markdown("---")
     _cb6, _ = st.columns(2)
     with _cb6:
-        if st.button("← Volver a Documentación", use_container_width=True, key="s6_back"):
+        if st.button("← Volver a Servicios", use_container_width=True, key="s6_back"):
             st.session_state["ai_house_step"] = 5
             st.rerun()
-    st.info("📬 Proyecto guardado en tu **Panel de Cliente**. El equipo ArchiRapid recibirá notificación inmediata.")
+    st.info("📬 Proyecto guardado en tu **Panel de Cliente**. Accede desde el menú para consultarlo, modificarlo o contactar con nosotros.")

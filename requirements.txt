@@ -21,6 +21,7 @@ opencv-python-headless>=4.8.0
 
 # PDF processing
 PyMuPDF>=1.23.0
+reportlab>=4.0.0
 
 # Visualization
 matplotlib>=3.8.0
