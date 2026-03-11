@@ -791,7 +791,7 @@ def main():
     st.title("🏠 Diseñador de Vivienda con IA (MVP) v2.1 🔧")
     
     # Barra de progreso visual
-    _step_labels = ["", "Requisitos", "Habitaciones", "Editor 3D", "Resumen", "Servicios", "Pago"]
+    _step_labels = ["", "Requisitos", "Ajustes", "Editor 3D", "Resumen", "Servicios", "Pago"]
     _prog_cols = st.columns(6)
     for _si, _slabel in enumerate(_step_labels[1:], 1):
         with _prog_cols[_si - 1]:
@@ -3812,12 +3812,15 @@ def render_step5_docs():
     # ── Plano de planta SVG ──────────────────────────────────────────────────
     try:
         from modules.ai_house_designer.ifc_export import rooms_to_svg as _r2svg
-        _rooms_src = (
-            f["design_data"].get("rooms") or
-            [{"name": k, "area": float(v)}
-             for k, v in req.get("ai_room_proposal", {}).items()
-             if isinstance(v, (int, float))]
-        )
+        _raw_rooms = f["design_data"].get("rooms") or []
+        # rooms_to_svg necesita clave "area", get_current_design_data() devuelve "area_m2"
+        _rooms_src = [{"name": r.get("name", r.get("code", "?")),
+                       "area": float(r.get("area", r.get("area_m2", 12.0)))}
+                      for r in _raw_rooms] if _raw_rooms else [
+            {"name": k, "area": float(v)}
+            for k, v in req.get("ai_room_proposal", {}).items()
+            if isinstance(v, (int, float))
+        ]
         if _rooms_src:
             st.markdown("### 🗺️ Plano de Planta")
             _svg_data = _r2svg(_rooms_src)
@@ -3937,7 +3940,7 @@ def render_step6_pago():
     try:
         _plot_data = st.session_state.get("design_plot_data", {})
         _design_d  = f["design_data"]
-        _zip_bytes = generar_zip_proyecto(
+        _zip_bytes, _zip_filename = generar_zip_proyecto(
             req=req,
             design_data=_design_d,
             plot_data=_plot_data,
@@ -3945,11 +3948,10 @@ def render_step6_pago():
             subsidy_total=subsidy_total,
             energy_label=energy_label,
         )
-        _pname_zip = (req.get("nombre_proyecto") or "ArchiRapid_Proyecto").replace(" ", "_")
         st.download_button(
             label="📦 Descargar Proyecto Completo (ZIP)",
             data=_zip_bytes,
-            file_name=f"{_pname_zip}.zip",
+            file_name=_zip_filename,
             mime="application/zip",
             type="primary",
             use_container_width=True,
