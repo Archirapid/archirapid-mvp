@@ -592,9 +592,15 @@ def show_selected_project_panel(client_email, project_id):
                         st.success("📐 PLANO VISUAL GENERADO")
                         st.image(output_path, caption=f"Plano Arquitectónico - {project.get('title', 'Proyecto')}", width='stretch')
 
-                        # Limpiar archivo temporal después de mostrar
-                        import time
-                        time.sleep(1)  # Dar tiempo a que se renderice
+                        # Guardar bytes en session_state para descarga posterior
+                        with open(output_path, "rb") as _f:
+                            _plano_bytes = _f.read()
+                        st.session_state[f"plano_generado_{project['id']}"] = _plano_bytes
+
+                        st.download_button("📥 Descargar Plano PNG", data=_plano_bytes,
+                            file_name=f"plano_{project.get('title','proyecto')[:30]}.png",
+                            mime="image/png", use_container_width=True)
+
                         try:
                             os.unlink(output_path)
                         except:
@@ -681,14 +687,19 @@ def show_selected_project_panel(client_email, project_id):
                               help="Archivo no disponible")
             with col2:
                 planos_path = (project.get('planos_pdf') or '').replace('\\', '/')
+                plano_bytes = st.session_state.get(f"plano_generado_{project['id']}")
                 if planos_path and os.path.exists(planos_path):
                     with open(planos_path, "rb") as f:
                         st.download_button("🖥️ Descargar Planos", data=f,
                             file_name=os.path.basename(planos_path),
                             mime="application/pdf", use_container_width=True)
+                elif plano_bytes:
+                    st.download_button("📐 Descargar Plano PNG", data=plano_bytes,
+                        file_name=f"plano_{project.get('title','proyecto')[:30]}.png",
+                        mime="image/png", use_container_width=True)
                 else:
                     st.button("🖥️ Planos CAD", disabled=True, use_container_width=True,
-                              help="Archivo no disponible")
+                              help="Genera el plano en la pestaña Planos")
             with col3:
                 modelo_path = (project.get('modelo_3d_glb') or '').replace('\\', '/')
                 if modelo_path and os.path.exists(modelo_path):
