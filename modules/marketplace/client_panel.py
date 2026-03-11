@@ -17,26 +17,35 @@ from modules.marketplace.compatibilidad import get_proyectos_compatibles
 from modules.ai_house_designer import flow as ai_house_flow
 
 
+_JSDELIVR = "https://cdn.jsdelivr.net/gh/Archirapid/archirapid-mvp@main"
+
+
 def _get_glb_url(db_path: str) -> str | None:
     """Construye una URL válida para un GLB en cualquier entorno.
 
-    - static/*  → Streamlit static serving (Cloud y localhost)
-    - uploads/* → base64 data URL embebido (upload fresco en sesión)
-    - no existe → None
+    - static/* en Cloud  → jsDelivr CDN (CORS *, MIME correcto, sin iframe issues)
+    - static/* localhost → Streamlit static serving local
+    - uploads/* frescos  → base64 data URL embebido
+    - no existe          → None
     """
     rel = str(db_path).replace("\\", "/").lstrip("/")
 
-    # Caso 1: archivo en static/ → usar static serving de Streamlit
+    # Caso 1: archivo en static/
     if rel.startswith("static/"):
-        rel_no_static = rel[len("static/"):]
+        # Detectar si estamos en Cloud (no localhost)
         try:
             host = st.context.headers.get("host", "localhost:8501")
         except Exception:
             host = "localhost:8501"
-        protocol = "https" if ("." in host and "localhost" not in host) else "http"
-        return f"{protocol}://{host}/app/static/{rel_no_static}"
+        is_cloud = "." in host and "localhost" not in host
+        if is_cloud:
+            # jsDelivr sirve desde GitHub con CORS * — funciona en iframes srcdoc
+            return f"{_JSDELIVR}/{rel}"
+        else:
+            # Localhost: Streamlit static serving normal
+            return f"http://localhost:8501/app/static/{rel[len('static/'):]}"
 
-    # Caso 2: archivo en disco (upload fresco) → base64
+    # Caso 2: archivo en disco (upload fresco en sesión) → base64
     if os.path.isfile(rel):
         with open(rel, "rb") as fh:
             b64data = _b64.b64encode(fh.read()).decode()
@@ -46,7 +55,8 @@ def _get_glb_url(db_path: str) -> str | None:
 
 
 def _get_vr_url(db_path: str) -> str | None:
-    """Construye la URL del visor VR estático con el modelo incrustado."""
+    """URL del visor VR con el modelo como parámetro."""
+    import urllib.parse
     glb_url = _get_glb_url(db_path)
     if not glb_url:
         return None
@@ -54,9 +64,9 @@ def _get_vr_url(db_path: str) -> str | None:
         host = st.context.headers.get("host", "localhost:8501")
     except Exception:
         host = "localhost:8501"
-    protocol = "https" if ("." in host and "localhost" not in host) else "http"
-    import urllib.parse
-    return f"{protocol}://{host}/app/static/vr_viewer.html?model={urllib.parse.quote(glb_url, safe='')}"
+    is_cloud = "." in host and "localhost" not in host
+    base = f"https://{host}/app/static/vr_viewer.html" if is_cloud else "http://localhost:8501/app/static/vr_viewer.html"
+    return f"{base}?model={urllib.parse.quote(glb_url, safe='')}"
 
 
 def generate_3d_viewer_html(model_url: str, fmt: str = "glb") -> str:
