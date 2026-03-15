@@ -601,6 +601,39 @@ TELEGRAM_CHAT_ID   = "5712417665"
 
             st.markdown("---")
 
+            # ── 💳 Stripe Revenue Dashboard ───────────────────────────────────
+            st.subheader("💳 Stripe — Revenue en tiempo real (modo test)")
+            try:
+                from modules.stripe_utils import list_recent_sessions as _lrs
+                import pandas as _pd_stripe
+                _stripe_sessions = _lrs(limit=50)
+                _stripe_rows = []
+                for _ss in _stripe_sessions.data:
+                    if _ss.payment_status == "paid":
+                        _meta = _ss.metadata or {}
+                        _stripe_rows.append({
+                            "Fecha": _pd_stripe.to_datetime(_ss.created, unit="s").strftime("%d/%m/%Y %H:%M"),
+                            "Email": _ss.customer_email or _meta.get("client_email", "—"),
+                            "Productos": _meta.get("products", "—"),
+                            "Proyecto ID": _meta.get("project_id", "—"),
+                            "Importe (€)": (_ss.amount_total or 0) / 100,
+                            "Estado": "✅ Pagado",
+                        })
+                if _stripe_rows:
+                    _df_stripe = _pd_stripe.DataFrame(_stripe_rows)
+                    _total_stripe = _df_stripe["Importe (€)"].sum()
+                    _sc1, _sc2, _sc3 = st.columns(3)
+                    _sc1.metric("💶 Revenue Stripe (test)", f"€{_total_stripe:,.0f}")
+                    _sc2.metric("🧾 Pagos completados", len(_stripe_rows))
+                    _sc3.metric("📊 Ticket medio", f"€{_total_stripe/len(_stripe_rows):,.0f}" if _stripe_rows else "—")
+                    st.dataframe(_df_stripe, use_container_width=True, hide_index=True)
+                else:
+                    st.info("Aún no hay pagos completados en Stripe (modo test). Realiza una compra de prueba con la tarjeta 4242 4242 4242 4242.")
+            except Exception as _stripe_err:
+                st.warning(f"Stripe no disponible: {_stripe_err}")
+
+            st.markdown("---")
+
             # ── Funnel de conversión ──────────────────────────────────────────
             st.subheader("🔽 Funnel de conversión")
             _funnel_data = {

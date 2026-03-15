@@ -1327,6 +1327,45 @@ if st.query_params.get("page") == "recuperar_contrasena":
         st.error(f"Error en recuperación de contraseña: {_fe}")
     st.stop()
 
+# === STRIPE: verificar pago al volver de Checkout ===
+if st.query_params.get("stripe_session") and st.query_params.get("payment") == "success":
+    _ss_id = st.query_params["stripe_session"]
+    if not st.session_state.get(f"stripe_verified_{_ss_id}"):
+        try:
+            from modules.stripe_utils import verify_session as _stripe_verify
+            import sqlite3 as _sq3
+            _sess = _stripe_verify(_ss_id)
+            if _sess.payment_status == "paid":
+                _meta = _sess.metadata or {}
+                _proj_id  = _meta.get("project_id", "")
+                _cli_mail = _meta.get("client_email", "") or (_sess.customer_email or "")
+                _prods    = _meta.get("products", "")
+                _amount   = (_sess.amount_total or 0) / 100
+                _con3 = _sq3.connect("database.db", timeout=15)
+                _con3.execute("PRAGMA journal_mode=WAL")
+                _exists3 = _con3.execute(
+                    "SELECT id FROM ventas_proyectos WHERE stripe_session_id = ?", (_ss_id,)
+                ).fetchone()
+                if not _exists3:
+                    _con3.execute("""
+                        INSERT INTO ventas_proyectos
+                        (proyecto_id, cliente_email, nombre_cliente, productos_comprados,
+                         total_pagado, metodo_pago, fecha_compra, stripe_session_id)
+                        VALUES (?, ?, ?, ?, ?, 'Stripe', datetime('now'), ?)
+                    """, (_proj_id, _cli_mail, _cli_mail, _prods, _amount, _ss_id))
+                    _con3.commit()
+                _con3.close()
+                st.session_state[f"stripe_verified_{_ss_id}"] = True
+                st.toast("🎉 Pago completado. Ya puedes descargar tus archivos.", icon="✅")
+        except Exception as _se:
+            st.toast(f"Error verificando pago Stripe: {_se}", icon="⚠️")
+    # Limpiar params de Stripe sin perder el proyecto
+    try:
+        del st.query_params["stripe_session"]
+        del st.query_params["payment"]
+    except Exception:
+        pass
+
 # === NUEVAS RUTAS V2 (BORRÓN Y CUENTA NUEVA) ===
 page_from_query = False  # Variable para controlar si la página viene de query params
 if "selected_prefab" in st.query_params and not page_from_query:

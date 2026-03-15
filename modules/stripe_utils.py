@@ -1,0 +1,83 @@
+"""
+ARCHIRAPID — Stripe utilities (modo test)
+Helper centralizado para crear sesiones de Checkout y verificar pagos.
+"""
+import os
+import stripe as _stripe
+
+# Catálogo de productos ArchiRapid (importe en céntimos de euro)
+PRODUCTS = {
+    "pdf_proyecto":       {"name": "Memoria PDF del Proyecto",      "amount": 180000},  # €1.800
+    "planos_cad":         {"name": "Planos CAD editables",          "amount": 250000},  # €2.500
+    "proyecto_completo":  {"name": "Proyecto Completo (PDF + CAD)", "amount": 400000},  # €4.000
+    "bim_ifc":            {"name": "Modelo BIM/IFC",                "amount": 14900},   # €149
+    "blockchain_cert":    {"name": "Certificado Blockchain",        "amount":  9900},   # €99
+    # Servicios adicionales
+    "visado_proyecto":    {"name": "Visado del Proyecto",           "amount": 50000},   # €500
+    "direccion_obra":     {"name": "Dirección de Obra",             "amount": 80000},   # €800
+    "construccion":       {"name": "Construcción Completa",         "amount": 150000},  # €1.500
+    "supervision":        {"name": "Supervisión Técnica",           "amount": 30000},   # €300
+    "copia_adicional":    {"name": "Copia Adicional",               "amount": 20000},   # €200
+}
+
+
+def _get_key():
+    key = os.getenv("STRIPE_SECRET_KEY", "")
+    if not key:
+        try:
+            import streamlit as st
+            key = st.secrets.get("STRIPE_SECRET_KEY", "")
+        except Exception:
+            pass
+    return key
+
+
+def create_checkout_session(product_keys: list, project_id: str, client_email: str,
+                             success_url: str, cancel_url: str,
+                             extra_quantities: dict = None) -> tuple:
+    """
+    Crea una sesión de Stripe Checkout.
+    Devuelve (checkout_url, session_id).
+    extra_quantities: {product_key: quantity} para copias adicionales, etc.
+    """
+    _stripe.api_key = _get_key()
+    line_items = []
+    for pk in product_keys:
+        if pk not in PRODUCTS:
+            continue
+        qty = (extra_quantities or {}).get(pk, 1)
+        line_items.append({
+            "price_data": {
+                "currency": "eur",
+                "product_data": {"name": PRODUCTS[pk]["name"]},
+                "unit_amount": PRODUCTS[pk]["amount"],
+            },
+            "quantity": qty,
+        })
+
+    session = _stripe.checkout.Session.create(
+        payment_method_types=["card"],
+        line_items=line_items,
+        mode="payment",
+        customer_email=client_email or None,
+        success_url=success_url,
+        cancel_url=cancel_url,
+        metadata={
+            "project_id": str(project_id),
+            "client_email": str(client_email),
+            "products": ",".join(product_keys),
+        },
+    )
+    return session.url, session.id
+
+
+def verify_session(session_id: str):
+    """Recupera y devuelve la sesión de Stripe (incluye payment_status y metadata)."""
+    _stripe.api_key = _get_key()
+    return _stripe.checkout.Session.retrieve(session_id)
+
+
+def list_recent_sessions(limit: int = 50):
+    """Devuelve las últimas sesiones de Checkout para el dashboard de intranet."""
+    _stripe.api_key = _get_key()
+    return _stripe.checkout.Session.list(limit=limit)

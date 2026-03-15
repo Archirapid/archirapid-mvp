@@ -664,6 +664,16 @@ def show_selected_project_panel(client_email, project_id):
     with tab6:
         st.header("🛒 ADQUIRIR PROYECTO")
 
+        # ── Redirección pendiente a Stripe Checkout ──────────────────────────
+        _redir_key = f"stripe_checkout_url_{project_id}"
+        if st.session_state.get(_redir_key):
+            _checkout_url = st.session_state.pop(_redir_key)
+            st.info("🔄 Redirigiendo a Stripe para procesar el pago de forma segura...")
+            st.components.v1.html(
+                f'<script>window.top.location.href="{_checkout_url}";</script>', height=0
+            )
+            st.stop()
+
         # Verificar si ya compró este proyecto
         conn = db_conn()
         cursor = conn.cursor()
@@ -746,116 +756,65 @@ def show_selected_project_panel(client_email, project_id):
             if precio_total_adicional > 0:
                 st.info(f"💰 Costo adicional total: €{precio_total_adicional}")
 
+            # ── Helper: construir lista de productos según selección ─────────
+            def _build_products_and_qty(base_keys):
+                keys = list(base_keys)
+                qty  = {}
+                if visado_proyecto: keys.append("visado_proyecto")
+                if direccion_obra:  keys.append("direccion_obra")
+                if construccion:    keys.append("construccion")
+                if supervision:     keys.append("supervision")
+                if num_copias > 0:
+                    keys.append("copia_adicional")
+                    qty["copia_adicional"] = num_copias
+                return keys, qty
+
+            _base_url    = "https://archirapid.streamlit.app"
+            _success_url = (f"{_base_url}/?selected_project_v2={project_id}"
+                            f"&payment=success&stripe_session={{CHECKOUT_SESSION_ID}}")
+            _cancel_url  = f"{_base_url}/?selected_project_v2={project_id}"
+
             col1, col2 = st.columns(2)
             with col1:
                 precio_pdf_final = 1800 + precio_total_adicional
-                if st.button(f"📄 Memoria PDF - €{precio_pdf_final}", use_container_width=True, type="primary"):
-                    # Registrar compra de PDF
-                    with st.spinner("Procesando compra..."):
-                        import time
-                        time.sleep(1)
-                    
-                    # Determinar productos comprados
-                    productos = ["PDF"]
-                    if visado_proyecto:
-                        productos.append("Visado del Proyecto")
-                    if direccion_obra:
-                        productos.append("Dirección de Obra")
-                    if construccion:
-                        productos.append("Construcción Completa")
-                    if supervision:
-                        productos.append("Supervisión Técnica")
-                    if num_copias > 0:
-                        productos.append(f"{num_copias} Copias Adicionales")
-                    
-                    productos_str = ", ".join(productos)
-                    
-                    # Registrar en base de datos
-                    conn_buy = db_conn()
-                    cursor_buy = conn_buy.cursor()
-                    cursor_buy.execute("""
-                        INSERT INTO ventas_proyectos
-                        (proyecto_id, cliente_email, nombre_cliente, productos_comprados, total_pagado, metodo_pago, fecha_compra)
-                        VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
-                    """, (project_id, client_email, "Compra desde panel cliente", productos_str, precio_pdf_final, "Simulado"))
-                    conn_buy.commit()
-                    conn_buy.close()
-                    
-                    st.success("🎉 PDF adquirido! Recibirás el enlace por email")
-                    st.rerun()
-                    
+                if st.button(f"💳 Pagar con Stripe — Memoria PDF €{precio_pdf_final:,}",
+                             use_container_width=True, type="primary"):
+                    try:
+                        from modules.stripe_utils import create_checkout_session as _ccs
+                        _keys, _qty = _build_products_and_qty(["pdf_proyecto"])
+                        _url, _ = _ccs(_keys, project_id, client_email, _success_url, _cancel_url, _qty)
+                        st.session_state[_redir_key] = _url
+                        st.rerun()
+                    except Exception as _e:
+                        st.error(f"Error iniciando pago: {_e}")
+
             with col2:
                 precio_cad_final = 2500 + precio_total_adicional
-                if st.button(f"🖥️ Planos CAD - €{precio_cad_final}", use_container_width=True, type="primary"):
-                    # Registrar compra de CAD
-                    with st.spinner("Procesando compra..."):
-                        import time
-                        time.sleep(1)
-                    
-                    # Determinar productos comprados
-                    productos = ["CAD"]
-                    if visado_proyecto:
-                        productos.append("Visado del Proyecto")
-                    if direccion_obra:
-                        productos.append("Dirección de Obra")
-                    if construccion:
-                        productos.append("Construcción Completa")
-                    if supervision:
-                        productos.append("Supervisión Técnica")
-                    if num_copias > 0:
-                        productos.append(f"{num_copias} Copias Adicionales")
-                    
-                    productos_str = ", ".join(productos)
-                    
-                    # Registrar en base de datos
-                    conn_buy = db_conn()
-                    cursor_buy = conn_buy.cursor()
-                    cursor_buy.execute("""
-                        INSERT INTO ventas_proyectos
-                        (proyecto_id, cliente_email, nombre_cliente, productos_comprados, total_pagado, metodo_pago, fecha_compra)
-                        VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
-                    """, (project_id, client_email, "Compra desde panel cliente", productos_str, precio_cad_final, "Simulado"))
-                    conn_buy.commit()
-                    conn_buy.close()
-                    
-                    st.success("🎉 CAD adquirido! Recibirás el enlace por email")
-                    st.rerun()
+                if st.button(f"💳 Pagar con Stripe — Planos CAD €{precio_cad_final:,}",
+                             use_container_width=True, type="primary"):
+                    try:
+                        from modules.stripe_utils import create_checkout_session as _ccs
+                        _keys, _qty = _build_products_and_qty(["planos_cad"])
+                        _url, _ = _ccs(_keys, project_id, client_email, _success_url, _cancel_url, _qty)
+                        st.session_state[_redir_key] = _url
+                        st.rerun()
+                    except Exception as _e:
+                        st.error(f"Error iniciando pago: {_e}")
 
+            st.markdown("---")
             precio_completo_final = 4000 + precio_total_adicional
-            if st.button(f"🛒 Comprar Proyecto Completo - €{precio_completo_final}", use_container_width=True, type="primary"):
-                # Registrar compra completa
-                with st.spinner("Procesando compra..."):
-                    import time
-                    time.sleep(1)
-                
-                # Determinar productos comprados
-                productos = ["PDF", "CAD", "Proyecto Completo"]
-                if visado_proyecto:
-                    productos.append("Visado del Proyecto")
-                if direccion_obra:
-                    productos.append("Dirección de Obra")
-                if construccion:
-                    productos.append("Construcción Completa")
-                if supervision:
-                    productos.append("Supervisión Técnica")
-                if num_copias > 0:
-                    productos.append(f"{num_copias} Copias Adicionales")
-                
-                productos_str = ", ".join(productos)
-                
-                # Registrar en base de datos
-                conn_buy = db_conn()
-                cursor_buy = conn_buy.cursor()
-                cursor_buy.execute("""
-                    INSERT INTO ventas_proyectos
-                    (proyecto_id, cliente_email, nombre_cliente, productos_comprados, total_pagado, metodo_pago, fecha_compra)
-                    VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
-                """, (project_id, client_email, "Compra desde panel cliente", productos_str, precio_completo_final, "Simulado"))
-                conn_buy.commit()
-                conn_buy.close()
-                
-                st.success("🎉 Proyecto completo adquirido! Recibirás todos los archivos por email")
-                st.rerun()
+            if st.button(f"🛒 Comprar Proyecto Completo — €{precio_completo_final:,}",
+                         use_container_width=True, type="primary"):
+                try:
+                    from modules.stripe_utils import create_checkout_session as _ccs
+                    _keys, _qty = _build_products_and_qty(["proyecto_completo"])
+                    _url, _ = _ccs(_keys, project_id, client_email, _success_url, _cancel_url, _qty)
+                    st.session_state[_redir_key] = _url
+                    st.rerun()
+                except Exception as _e:
+                    st.error(f"Error iniciando pago: {_e}")
+
+            st.caption("🔒 Pago seguro procesado por Stripe · Tarjeta test: 4242 4242 4242 4242 · Cualquier fecha futura · CVC: 123")
 
     # 🔍 BUSCADOR INTEGRADO DE PROYECTOS SIMILARES (solo para usuarios logueados)
     st.header("🔍 Buscar Proyectos Similares")
