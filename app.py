@@ -1878,7 +1878,7 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
     <div style="font-size:1em;font-weight:800;color:#F8FAFC;line-height:1.2;">
       Acceso gratuito para los primeros {_MAX} usuarios
       <span style="font-size:0.75em;font-weight:400;color:#94A3B8;margin-left:10px;">
-        ⚠️ Modo demo — datos reales, sin validez jurídica
+        ⚖️ Información orientativa basada en datos catastrales públicos. No sustituye el asesoramiento técnico, jurídico o urbanístico de un profesional colegiado.
       </span>
     </div>
   </div>
@@ -2129,7 +2129,10 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
                 </span>
             </div>
         </div>
-        <div style="border-top:1px solid rgba(255,255,255,0.07);padding-top:10px;display:flex;justify-content:space-between;flex-wrap:wrap;">
+        <div style="border-top:1px solid rgba(255,255,255,0.07);padding-top:10px;margin-bottom:8px;">
+            <span style="color:#64748B;font-size:0.72em;">⚖️ <em>ArchiRapid proporciona información orientativa basada en datos catastrales públicos. Esta información no sustituye el asesoramiento técnico, jurídico o urbanístico de un profesional colegiado.</em></span>
+        </div>
+        <div style="display:flex;justify-content:space-between;flex-wrap:wrap;">
             <span style="color:#475569;font-size:0.74em;">© 2026 ARCHIRAPID — All rights reserved. Proyecto ARCHIRAPID S.L. (en constitución)</span>
             <span style="color:#475569;font-size:0.74em;">Built with AI · Madrid, Spain 🇪🇸</span>
         </div>
