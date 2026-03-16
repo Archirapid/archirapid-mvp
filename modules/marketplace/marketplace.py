@@ -639,7 +639,26 @@ def main():
         
         st.success(f"👋 ¡Hola, {user_name}! | [Ir a Mi {panel_name}](?page={panel_name.replace(' ', '%20')})")
 
-    # CSS del sistema de diseño
+    # 4. Marketplace de proyectos (siempre visible debajo)
+    st.markdown("---")
+
+    # Configurar filtros del sidebar
+    min_surface, max_surface, search_query = setup_filters()
+
+    # Obtener fincas filtradas
+    plots = get_filtered_plots(min_surface, max_surface, search_query)
+
+    # Layout principal: mapa ocupa todo el ancho
+    render_map(plots)
+
+    # Sección de fincas destacadas debajo del mapa
+    render_featured_plots(plots)
+
+    # Sección de proyectos adicionales
+    render_projects_section()
+
+    # CSS/JS de estilos — al final para no generar espacio fantasma antes del mapa
+    # MutationObserver + setTimeout garantizan que pinta los botones aunque se inyecte tarde
     st.markdown("""
     <style>
     .ar-card {
@@ -689,24 +708,6 @@ def main():
     })();
     </script>
     """, unsafe_allow_html=True)
-
-    # 4. Marketplace de proyectos (siempre visible debajo)
-    st.markdown("---")
-
-    # Configurar filtros del sidebar
-    min_surface, max_surface, search_query = setup_filters()
-
-    # Obtener fincas filtradas
-    plots = get_filtered_plots(min_surface, max_surface, search_query)
-
-    # Layout principal: mapa ocupa todo el ancho
-    render_map(plots)
-
-    # Sección de fincas destacadas debajo del mapa
-    render_featured_plots(plots)
-
-    # Sección de proyectos adicionales
-    render_projects_section()
 
     # Limpiar caché para asegurar sincronización
     st.cache_data.clear()

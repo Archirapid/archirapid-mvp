@@ -2037,8 +2037,6 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
                 st.session_state['selected_page'] = "📝 Registro de Proveedor de Servicios"
                 st.rerun()
 
-        st.markdown("---")
-
         # PASO 1: Renderizar MARKETPLACE (mapa, fincas y proyectos)
         try:
             from modules.marketplace import marketplace
