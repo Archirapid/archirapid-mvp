@@ -20,6 +20,11 @@ PRODUCTS = {
     "copia_adicional":    {"name": "Copia Adicional",               "amount": 20000},   # €200
     # Modo Estudio (arquitectos)
     "estudio_download":   {"name": "Descarga Proyecto Modo Estudio", "amount":  1900},   # €19
+    # Suscripciones de arquitectos (pago mensual recurrente — modo payment para MVP)
+    "sub_basic":          {"name": "Suscripción ArchiRapid BASIC",   "amount":  2900},   # €29/mes
+    "sub_pro":            {"name": "Suscripción ArchiRapid PRO",     "amount":  9900},   # €99/mes
+    "sub_pro_anual":      {"name": "Suscripción ArchiRapid PRO Anual","amount": 89000},  # €890/año
+    "sub_enterprise":     {"name": "Suscripción ArchiRapid ENTERPRISE","amount":29900},  # €299/mes
 }
 
 

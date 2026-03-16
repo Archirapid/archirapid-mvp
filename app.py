@@ -1417,6 +1417,14 @@ if st.query_params.get("page") == "Diseñador de Vivienda":
     except Exception as e:
         st.error(f"Error mostrando diseñador de vivienda: {e}")
 
+if st.query_params.get("page") == "Arquitectos (Marketplace)":
+    try:
+        from modules.marketplace import architects as _arch_mod
+        _arch_mod.main()
+        st.stop()
+    except Exception as e:
+        st.error(f"Error mostrando portal arquitectos: {e}")
+
 
 # Page configuration and navigation - SIMPLIFIED VERSION
 PAGES = {
@@ -2205,9 +2213,9 @@ elif st.session_state.get('selected_page') == "Diseñador de Vivienda":
 elif st.session_state.get('selected_page') == "Arquitectos (Marketplace)":
     st.components.v1.html("<script>window.parent.document.querySelector('section.main').scrollTo(0,0);</script>", height=0)
     with st.container():
-        # Simple acceso al marketplace de arquitectos (formulario de login/registro)
-        from modules.marketplace import marketplace_upload
-        marketplace_upload.main()
+        # Portal completo del arquitecto (con Modo Estudio, IA, planes, etc.)
+        from modules.marketplace import architects
+        architects.main()
 
 elif st.session_state.get('selected_page') == "Intranet":
     st.components.v1.html("<script>window.parent.document.querySelector('section.main').scrollTo(0,0);</script>", height=0)

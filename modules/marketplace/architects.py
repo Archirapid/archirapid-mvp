@@ -21,8 +21,83 @@ def check_subscription(arch_id):
     finally:
         conn.close()
 
+def _get_base_url():
+    """Devuelve la URL base de la app para construir success/cancel URLs de Stripe."""
+    try:
+        import streamlit as st
+        # En Streamlit Cloud el host viene en headers; fallback a producción
+        headers = st.context.headers if hasattr(st, "context") else {}
+        host = headers.get("host", "archirapid.streamlit.app")
+        proto = "https" if "streamlit.app" in host or "localhost" not in host else "http"
+        return f"{proto}://{host}"
+    except Exception:
+        return "https://archirapid.streamlit.app"
+
+
+def _activate_subscription_after_payment(arch_id, plan_key, session_id):
+    """Activa suscripción en BD tras verificar pago Stripe. Idempotente."""
+    _PLAN_META = {
+        "sub_basic":     {"name": "BASIC",      "price": 29,  "limit": 1,   "fee": 10, "days": 30},
+        "sub_pro":       {"name": "PRO",         "price": 99,  "limit": 5,   "fee": 8,  "days": 30},
+        "sub_pro_anual": {"name": "PRO_ANUAL",   "price": 890, "limit": 999, "fee": 8,  "days": 365},
+        "sub_enterprise":{"name": "ENTERPRISE",  "price": 299, "limit": 999, "fee": 5,  "days": 30},
+    }
+    meta = _PLAN_META.get(plan_key)
+    if not meta:
+        return False
+    try:
+        from modules.stripe_utils import verify_session
+        sess = verify_session(session_id)
+        if sess.payment_status != "paid":
+            return False
+    except Exception:
+        return False  # Sin clave Stripe real, no activar
+    try:
+        conn = db_conn()
+        c = conn.cursor()
+        # Idempotente: no duplicar si ya existe
+        c.execute("SELECT id FROM subscriptions WHERE architect_id=? AND status='active' AND plan_type=?",
+                  (arch_id, meta["name"]))
+        if c.fetchone():
+            conn.close()
+            return True
+        sub_id = uuid.uuid4().hex
+        start = datetime.now()
+        end = start + timedelta(days=meta["days"])
+        c.execute("""INSERT INTO subscriptions (id, architect_id, plan_type, price,
+                     monthly_proposals_limit, commission_rate, status, start_date, end_date, created_at)
+                     VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?, ?)""",
+                  (sub_id, arch_id, meta["name"], meta["price"], meta["limit"],
+                   meta["fee"], start.isoformat(), end.isoformat(), datetime.now().isoformat()))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception:
+        return False
+
+
 def main():
     st.header("🏗️ Portal para Arquitectos")
+
+    # --- 0. RETORNO DESDE STRIPE (pago de suscripción) ---
+    _qp = st.query_params
+    _sub_session = _qp.get("sub_session", "")
+    _sub_plan    = _qp.get("sub_plan", "")
+    if _sub_session and _sub_plan and st.session_state.get("arch_id"):
+        if not st.session_state.get(f"sub_activated_{_sub_session}"):
+            ok = _activate_subscription_after_payment(
+                st.session_state["arch_id"], _sub_plan, _sub_session)
+            st.session_state[f"sub_activated_{_sub_session}"] = True
+            if ok:
+                st.success("¡Suscripción activada correctamente! Ya tienes acceso completo.")
+            else:
+                st.warning("El pago no pudo verificarse. Contacta a soporte si ya fue cobrado.")
+        # Limpiar params de la URL
+        try:
+            del st.query_params["sub_session"]
+            del st.query_params["sub_plan"]
+        except Exception:
+            pass
 
     # --- 1. LOGIN / IDENTIFICACIÓN ---
     if "arch_id" not in st.session_state:
@@ -251,34 +326,59 @@ def main():
         col1, col2, col3 = st.columns(3)
         
         plans = [
-            {"name": "BASIC", "price": 29, "limit": 1, "fee": 10},
-            {"name": "PRO", "price": 99, "limit": 5, "fee": 8},
-            {"name": "ENTERPRISE", "price": 299, "limit": 999, "fee": 5}
+            {"name": "BASIC",      "price": "29€/mes",  "limit": 1,   "fee": 10, "stripe_key": "sub_basic",     "label": "Contratar BASIC",      "days": 30},
+            {"name": "PRO",        "price": "99€/mes",  "limit": 5,   "fee": 8,  "stripe_key": "sub_pro",        "label": "Contratar PRO",         "days": 30},
+            {"name": "ENTERPRISE", "price": "299€/mes", "limit": 999, "fee": 5,  "stripe_key": "sub_enterprise", "label": "Contratar ENTERPRISE",  "days": 30},
         ]
-        
+
+        # Fila extra: PRO Anual (ahorro)
+        st.markdown("---")
+        with st.container(border=True):
+            ca1, ca2 = st.columns([3, 1])
+            with ca1:
+                st.markdown("### PRO Anual — **890€/año** *(ahorra 3 meses)*")
+                st.write("- Modo Estudio ilimitado · 999 proyectos activos · 8% comisión · Badge verificado")
+            with ca2:
+                if st.button("Contratar PRO Anual", key="plan_pro_anual", type="primary"):
+                    try:
+                        from modules.stripe_utils import create_checkout_session
+                        base = _get_base_url()
+                        success_url = f"{base}/?page=Arquitectos (Marketplace)&sub_session={{CHECKOUT_SESSION_ID}}&sub_plan=sub_pro_anual"
+                        cancel_url  = f"{base}/?page=Arquitectos (Marketplace)"
+                        url, sid = create_checkout_session(
+                            ["sub_pro_anual"], "sub_pro_anual",
+                            st.session_state.get("arch_email", ""),
+                            success_url, cancel_url)
+                        st.session_state["sub_stripe_url_pro_anual"] = url
+                    except Exception as e:
+                        st.error(f"Error al crear sesión de pago: {e}")
+            if st.session_state.get("sub_stripe_url_pro_anual"):
+                st.link_button("💳 Ir a pago PRO Anual", st.session_state["sub_stripe_url_pro_anual"], type="primary")
+        st.markdown("---")
+
         for p in plans:
             with col1 if p['name']=="BASIC" else col2 if p['name']=="PRO" else col3:
                 with st.container(border=True):
                     st.markdown(f"### {p['name']}")
-                    st.markdown(f"**{p['price']}€ / mes**")
+                    st.markdown(f"**{p['price']}**")
                     st.write(f"- {p['limit']} Proyectos activos")
                     st.write(f"- {p['fee']}% Comisión plataforma")
-                    if st.button(f"Contratar {p['name']}", key=f"plan_{p['name']}"):
-                        # Crear suscripcion
+                    _url_key = f"sub_stripe_url_{p['stripe_key']}"
+                    if st.button(p['label'], key=f"plan_{p['name']}"):
                         try:
-                            with db.transaction() as c:
-                                sub_id = uuid.uuid4().hex
-                                start = datetime.now()
-                                end = start + timedelta(days=30)
-                                c.execute("""
-                                    INSERT INTO subscriptions (id, architect_id, plan_type, price, monthly_proposals_limit, commission_rate, status, start_date, end_date, created_at)
-                                    VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?, ?)
-                                """, (sub_id, st.session_state["arch_id"], p['name'], p['price'], p['limit'], p['fee'], start.isoformat(), end.isoformat(), datetime.now().isoformat()))
-                            st.success(f"¡Suscripción {p['name']} activada!")
-                            sleep(1.5)
-                            st.rerun()
+                            from modules.stripe_utils import create_checkout_session
+                            base = _get_base_url()
+                            success_url = f"{base}/?page=Arquitectos (Marketplace)&sub_session={{CHECKOUT_SESSION_ID}}&sub_plan={p['stripe_key']}"
+                            cancel_url  = f"{base}/?page=Arquitectos (Marketplace)"
+                            url, sid = create_checkout_session(
+                                [p['stripe_key']], p['stripe_key'],
+                                st.session_state.get("arch_email", ""),
+                                success_url, cancel_url)
+                            st.session_state[_url_key] = url
                         except Exception as e:
-                            st.error(f"Error: {e}")
+                            st.error(f"Error al crear sesión de pago: {e}")
+                    if st.session_state.get(_url_key):
+                        st.link_button(f"💳 Ir a pago {p['name']}", st.session_state[_url_key])
 
     with tab_subir:
         if not sub_status["active"]:
