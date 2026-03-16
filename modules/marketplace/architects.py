@@ -81,21 +81,33 @@ def main():
 
     # --- 0. RETORNO DESDE STRIPE (pago de suscripción) ---
     _qp = st.query_params
-    _sub_session = _qp.get("sub_session", "")
-    _sub_plan    = _qp.get("sub_plan", "")
+    _sub_session  = _qp.get("sub_session", "")
+    _sub_plan     = _qp.get("sub_plan", "")
+    _ret_arch_id  = _qp.get("arch_id", "")
+    _ret_arch_email = _qp.get("arch_email", "")
+    _ret_arch_name  = _qp.get("arch_name", "")
+
+    # Restaurar sesión si Stripe volvió y la sesión de Streamlit se perdió
+    if _ret_arch_id and not st.session_state.get("arch_id"):
+        st.session_state["arch_id"]    = _ret_arch_id
+        st.session_state["arch_email"] = _ret_arch_email
+        st.session_state["arch_name"]  = _ret_arch_name or _ret_arch_email
+
     if _sub_session and _sub_plan and st.session_state.get("arch_id"):
         if not st.session_state.get(f"sub_activated_{_sub_session}"):
             ok = _activate_subscription_after_payment(
                 st.session_state["arch_id"], _sub_plan, _sub_session)
             st.session_state[f"sub_activated_{_sub_session}"] = True
             if ok:
-                st.success("¡Suscripción activada correctamente! Ya tienes acceso completo.")
+                st.success("✅ ¡Suscripción activada! Ya tienes acceso completo al plan.")
             else:
-                st.warning("El pago no pudo verificarse. Contacta a soporte si ya fue cobrado.")
-        # Limpiar params de la URL
+                st.warning("El pago no pudo verificarse automáticamente. Si ya fue cobrado, escríbenos a hola@archirapid.com.")
         try:
             del st.query_params["sub_session"]
             del st.query_params["sub_plan"]
+            if "arch_id"    in st.query_params: del st.query_params["arch_id"]
+            if "arch_email" in st.query_params: del st.query_params["arch_email"]
+            if "arch_name"  in st.query_params: del st.query_params["arch_name"]
         except Exception:
             pass
 
@@ -119,22 +131,16 @@ def main():
         with c_login:
             st.subheader("Acceso profesional")
             with st.form("login_arch"):
-                st.markdown("**Datos de contacto**")
-                r1c1, r1c2 = st.columns(2)
-                with r1c1:
-                    email = st.text_input("Email profesional *", placeholder="tu@estudio.com")
-                with r1c2:
-                    phone = st.text_input("Teléfono *", placeholder="+34 600 000 000")
+                email = st.text_input("Email profesional *", placeholder="tu@estudio.com")
+                name  = st.text_input("Nombre del Estudio / Arquitecto *", placeholder="Estudio García Arquitectos")
+                phone = st.text_input("Teléfono *", placeholder="+34 600 000 000")
 
-                name = st.text_input("Nombre del Estudio / Arquitecto *", placeholder="Estudio García Arquitectos")
-
-                st.markdown("**Ubicación del estudio**")
-                r2c1, r2c2, r2c3 = st.columns([3, 2, 2])
+                st.markdown("**Ubicación**")
+                r2c1, r2c2 = st.columns(2)
                 with r2c1:
-                    address = st.text_input("Dirección", placeholder="Calle Gran Vía 1, 3º")
+                    city    = st.text_input("Ciudad", placeholder="Madrid")
+                    address = st.text_input("Dirección del estudio", placeholder="Calle Gran Vía 1, 3º")
                 with r2c2:
-                    city = st.text_input("Ciudad", placeholder="Madrid")
-                with r2c3:
                     province = st.selectbox("Provincia", [
                         "", "Madrid", "Barcelona", "Valencia", "Sevilla", "Zaragoza",
                         "Málaga", "Murcia", "Palma", "Las Palmas", "Bilbao",
@@ -149,24 +155,20 @@ def main():
                     ])
 
                 st.markdown("**Perfil profesional**")
-                r3c1, r3c2 = st.columns(2)
-                with r3c1:
-                    specialty = st.multiselect(
-                        "Especialidades",
-                        ["Vivienda unifamiliar", "Vivienda plurifamiliar", "Reforma interior",
-                         "Arquitectura sostenible", "Arquitectura industrial", "Urbanismo",
-                         "Interiorismo", "Rehabilitación", "Obra nueva", "BIM/IFC"],
-                        default=[]
-                    )
-                with r3c2:
-                    avg_price = st.number_input(
-                        "Precio medio de tus proyectos (€)",
-                        min_value=0, max_value=5000000, value=150000, step=10000,
-                        help="Precio medio de construcción de los proyectos que publicas. Orientativo para los clientes."
-                    )
+                specialty = st.multiselect(
+                    "Especialidades (selecciona todas las que apliquen)",
+                    ["Vivienda unifamiliar", "Vivienda plurifamiliar", "Reforma interior",
+                     "Arquitectura sostenible", "Arquitectura industrial", "Urbanismo",
+                     "Interiorismo", "Rehabilitación", "Obra nueva", "BIM/IFC"],
+                    default=[]
+                )
+                avg_price = st.number_input(
+                    "Precio medio de construcción de tus proyectos (€)",
+                    min_value=0, max_value=5000000, value=150000, step=10000,
+                    help="Orientativo para los clientes que visiten tu perfil."
+                )
 
-                st.markdown("---")
-                st.info("💰 **Comisión ArchiRapid: 20%** sobre cada venta cerrada a través de la plataforma. Sin comisión si no vendes.")
+                st.info("💰 **Comisión ArchiRapid: 20%** sobre cada venta cerrada. Sin comisión si no vendes.")
 
                 submitted = st.form_submit_button("Entrar / Registrarme", type="primary", use_container_width=True)
 
@@ -378,10 +380,13 @@ def main():
 
         def _make_stripe_btn(stripe_key, plan_label, col_container):
             """Helper: genera sesión Stripe y muestra botón de pago."""
+            import urllib.parse
             _url_key = f"sub_stripe_url_{stripe_key}"
+            _arch_id    = st.session_state.get("arch_id", "")
+            _arch_email = urllib.parse.quote(st.session_state.get("arch_email", ""))
+            _arch_name  = urllib.parse.quote(st.session_state.get("arch_name", ""))
             with col_container:
                 if st.session_state.get(_url_key):
-                    # Ya tenemos la URL — mostrar botón de pago directo
                     st.link_button(f"💳 Ir al pago — {plan_label}", st.session_state[_url_key],
                                    type="primary", use_container_width=True)
                     if st.button("← Cancelar", key=f"cancel_{stripe_key}", use_container_width=True):
@@ -393,9 +398,12 @@ def main():
                         try:
                             from modules.stripe_utils import create_checkout_session
                             base = _get_base_url()
-                            success_url = (f"{base}/?page=Arquitectos (Marketplace)"
-                                           f"&sub_session={{CHECKOUT_SESSION_ID}}&sub_plan={stripe_key}")
-                            cancel_url  = f"{base}/?page=Arquitectos (Marketplace)"
+                            success_url = (
+                                f"{base}/?page=Arquitectos (Marketplace)"
+                                f"&sub_session={{CHECKOUT_SESSION_ID}}&sub_plan={stripe_key}"
+                                f"&arch_id={_arch_id}&arch_email={_arch_email}&arch_name={_arch_name}"
+                            )
+                            cancel_url = f"{base}/?page=Arquitectos (Marketplace)&arch_id={_arch_id}&arch_email={_arch_email}&arch_name={_arch_name}"
                             url, _sid = create_checkout_session(
                                 [stripe_key], stripe_key,
                                 st.session_state.get("arch_email", ""),
