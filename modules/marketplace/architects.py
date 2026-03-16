@@ -113,95 +113,142 @@ def main():
 
     # --- 1. LOGIN / REGISTRO ---
     if "arch_id" not in st.session_state:
+        from werkzeug.security import generate_password_hash, check_password_hash
+
+        # Modo: "login" o "register"
+        if "arch_auth_mode" not in st.session_state:
+            st.session_state["arch_auth_mode"] = "login"
+
         c_login, c_info = st.columns([3, 2])
 
         with c_info:
             st.markdown("""
 ### ¿Por qué ArchiRapid?
 - 🏠 **Modo Estudio** — genera proyectos completos con IA para cualquier solar
-- 📤 **Publica proyectos** en el marketplace y llega a propietarios de fincas
-- 🎯 **Matching automático** — tus proyectos se emparejan con solares compatibles
-- 💰 **Comisión del 20%** solo cuando cierras una venta. Sin cuota fija si no vendes.
-- 💎 Planes desde **€29/mes** para mayor visibilidad
-
----
-*Si ya tienes cuenta, introduce tu email y pulsa Entrar.*
+- 📤 **Publica proyectos** y llega a propietarios de fincas
+- 🎯 **Matching automático** con solares compatibles
+- 💰 **Comisión 20%** solo si vendes. Sin cuota si no vendes.
+- 💎 Planes desde **€29/mes**
 """)
 
         with c_login:
-            st.subheader("Acceso profesional")
-            with st.form("login_arch"):
-                email = st.text_input("Email profesional *", placeholder="tu@estudio.com")
-                name  = st.text_input("Nombre del Estudio / Arquitecto *", placeholder="Estudio García Arquitectos")
-                phone = st.text_input("Teléfono *", placeholder="+34 600 000 000")
+            # Selector login / registro
+            mode = st.radio("", ["Iniciar sesión", "Crear cuenta nueva"],
+                            index=0 if st.session_state["arch_auth_mode"] == "login" else 1,
+                            horizontal=True, label_visibility="collapsed")
+            st.session_state["arch_auth_mode"] = "login" if mode == "Iniciar sesión" else "register"
 
-                st.markdown("**Ubicación**")
-                r2c1, r2c2 = st.columns(2)
-                with r2c1:
-                    city    = st.text_input("Ciudad", placeholder="Madrid")
-                    address = st.text_input("Dirección del estudio", placeholder="Calle Gran Vía 1, 3º")
-                with r2c2:
-                    province = st.selectbox("Provincia", [
-                        "", "Madrid", "Barcelona", "Valencia", "Sevilla", "Zaragoza",
-                        "Málaga", "Murcia", "Palma", "Las Palmas", "Bilbao",
-                        "Alicante", "Córdoba", "Valladolid", "Vigo", "Gijón",
-                        "Granada", "Elche", "Oviedo", "Badalona", "Cartagena",
-                        "Terrassa", "Jerez", "Sabadell", "Santa Cruz de Tenerife",
-                        "Pamplona", "Almería", "Fuenlabrada", "Hospitalet",
-                        "San Sebastián", "Burgos", "Castellón", "Albacete",
-                        "Santander", "Logroño", "Salamanca", "Huelva", "Badajoz",
-                        "Lleida", "Tarragona", "León", "Cádiz", "Marbella",
-                        "Otra"
-                    ])
+            if st.session_state["arch_auth_mode"] == "login":
+                # ── FORMULARIO LOGIN ──────────────────────────────────────────
+                with st.form("login_arch"):
+                    st.subheader("Iniciar sesión")
+                    email    = st.text_input("Email profesional", placeholder="tu@estudio.com")
+                    password = st.text_input("Contraseña", type="password")
+                    submitted = st.form_submit_button("Entrar", type="primary", use_container_width=True)
 
-                st.markdown("**Perfil profesional**")
-                specialty = st.multiselect(
-                    "Especialidades (selecciona todas las que apliquen)",
-                    ["Vivienda unifamiliar", "Vivienda plurifamiliar", "Reforma interior",
-                     "Arquitectura sostenible", "Arquitectura industrial", "Urbanismo",
-                     "Interiorismo", "Rehabilitación", "Obra nueva", "BIM/IFC"],
-                    default=[]
-                )
-                avg_price = st.number_input(
-                    "Precio medio de construcción de tus proyectos (€)",
-                    min_value=0, max_value=5000000, value=150000, step=10000,
-                    help="Orientativo para los clientes que visiten tu perfil."
-                )
-
-                st.info("💰 **Comisión ArchiRapid: 20%** sobre cada venta cerrada. Sin comisión si no vendes.")
-
-                submitted = st.form_submit_button("Entrar / Registrarme", type="primary", use_container_width=True)
-
-                if submitted:
-                    if not email or not name or not phone:
-                        st.error("Email, nombre y teléfono son obligatorios.")
-                    else:
-                        specialty_str = ", ".join(specialty) if specialty else ""
-                        user_data = get_user_by_email(email)
-                        if user_data:
-                            # Login existente — actualizar datos si los rellena
-                            insert_user({"id": user_data["id"], "name": name, "email": email,
-                                         "role": "architect", "company": name, "phone": phone,
-                                         "specialty": specialty_str, "address": address,
-                                         "city": city, "province": province,
-                                         "avg_project_price": avg_price if avg_price > 0 else None})
-                            st.session_state["arch_id"]    = user_data["id"]
-                            st.session_state["arch_name"]  = user_data["name"]
-                            st.session_state["arch_email"] = user_data["email"]
-                            st.success(f"¡Bienvenido de nuevo, {user_data['name']}!")
+                    if submitted:
+                        if not email or not password:
+                            st.error("Email y contraseña obligatorios.")
                         else:
-                            new_id = uuid.uuid4().hex
-                            insert_user({"id": new_id, "name": name, "email": email,
-                                         "role": "architect", "company": name, "phone": phone,
-                                         "specialty": specialty_str, "address": address,
-                                         "city": city, "province": province,
-                                         "avg_project_price": avg_price if avg_price > 0 else None})
-                            st.session_state["arch_id"]    = new_id
-                            st.session_state["arch_name"]  = name
-                            st.session_state["arch_email"] = email
-                            st.success(f"¡Cuenta creada! Bienvenido, {name}.")
-                        sleep(0.8)
-                        st.rerun()
+                            conn = db_conn(); c = conn.cursor()
+                            c.execute("SELECT id, name, email, password_hash FROM architects WHERE email=?", (email,))
+                            row = c.fetchone(); conn.close()
+                            if not row:
+                                st.error("No existe cuenta con ese email. ¿Quieres crear una?")
+                            elif not row[3]:
+                                # Cuenta sin password (registro antiguo) — asignar
+                                conn2 = db_conn(); c2 = conn2.cursor()
+                                c2.execute("UPDATE architects SET password_hash=? WHERE email=?",
+                                           (generate_password_hash(password), email))
+                                conn2.commit(); conn2.close()
+                                st.session_state["arch_id"]    = row[0]
+                                st.session_state["arch_name"]  = row[1]
+                                st.session_state["arch_email"] = row[2]
+                                st.success(f"Contraseña guardada. ¡Bienvenido, {row[1]}!")
+                                sleep(0.5); st.rerun()
+                            elif check_password_hash(row[3], password):
+                                st.session_state["arch_id"]    = row[0]
+                                st.session_state["arch_name"]  = row[1]
+                                st.session_state["arch_email"] = row[2]
+                                st.success(f"¡Bienvenido, {row[1]}!")
+                                sleep(0.5); st.rerun()
+                            else:
+                                st.error("Contraseña incorrecta.")
+
+            else:
+                # ── FORMULARIO REGISTRO ───────────────────────────────────────
+                with st.form("register_arch"):
+                    st.subheader("Crear cuenta")
+                    st.markdown("**Acceso**")
+                    r0c1, r0c2 = st.columns(2)
+                    with r0c1:
+                        email    = st.text_input("Email profesional *", placeholder="tu@estudio.com")
+                        password = st.text_input("Contraseña *", type="password", placeholder="Mínimo 8 caracteres")
+                    with r0c2:
+                        name     = st.text_input("Nombre del Estudio / Arquitecto *", placeholder="Estudio García")
+                        password2 = st.text_input("Repite la contraseña *", type="password")
+
+                    st.markdown("**Contacto y ubicación**")
+                    r1c1, r1c2 = st.columns(2)
+                    with r1c1:
+                        phone   = st.text_input("Teléfono *", placeholder="+34 600 000 000")
+                        city    = st.text_input("Ciudad", placeholder="Madrid")
+                    with r1c2:
+                        address = st.text_input("Dirección del estudio", placeholder="Calle Gran Vía 1, 3º")
+                        province = st.selectbox("Provincia", [
+                            "", "Madrid", "Barcelona", "Valencia", "Sevilla", "Zaragoza",
+                            "Málaga", "Murcia", "Palma", "Las Palmas", "Bilbao",
+                            "Alicante", "Córdoba", "Valladolid", "Vigo", "Gijón",
+                            "Granada", "Elche", "Oviedo", "Badalona", "Cartagena",
+                            "Terrassa", "Jerez", "Sabadell", "Santa Cruz de Tenerife",
+                            "Pamplona", "Almería", "Fuenlabrada", "Hospitalet",
+                            "San Sebastián", "Burgos", "Castellón", "Albacete",
+                            "Santander", "Logroño", "Salamanca", "Huelva", "Badajoz",
+                            "Lleida", "Tarragona", "León", "Cádiz", "Marbella", "Otra"
+                        ])
+
+                    st.markdown("**Perfil profesional**")
+                    specialty = st.multiselect(
+                        "Especialidades",
+                        ["Vivienda unifamiliar", "Vivienda plurifamiliar", "Reforma interior",
+                         "Arquitectura sostenible", "Arquitectura industrial", "Urbanismo",
+                         "Interiorismo", "Rehabilitación", "Obra nueva", "BIM/IFC"],
+                    )
+                    avg_price = st.number_input(
+                        "Precio medio de tus proyectos (€)", min_value=0,
+                        max_value=5000000, value=150000, step=10000,
+                        help="Orientativo para clientes. Puedes cambiarlo después."
+                    )
+
+                    st.info("💰 **Comisión ArchiRapid: 20%** por venta cerrada. Sin comisión si no vendes.")
+                    submitted = st.form_submit_button("Crear cuenta", type="primary", use_container_width=True)
+
+                    if submitted:
+                        if not email or not name or not phone or not password:
+                            st.error("Email, nombre, teléfono y contraseña son obligatorios.")
+                        elif password != password2:
+                            st.error("Las contraseñas no coinciden.")
+                        elif len(password) < 8:
+                            st.error("La contraseña debe tener al menos 8 caracteres.")
+                        else:
+                            existing = get_user_by_email(email)
+                            if existing:
+                                st.error("Ya existe una cuenta con ese email. Usa 'Iniciar sesión'.")
+                            else:
+                                new_id = uuid.uuid4().hex
+                                insert_user({
+                                    "id": new_id, "name": name, "email": email,
+                                    "role": "architect", "company": name, "phone": phone,
+                                    "specialty": ", ".join(specialty),
+                                    "address": address, "city": city, "province": province,
+                                    "avg_project_price": avg_price if avg_price > 0 else None,
+                                    "password_hash": generate_password_hash(password),
+                                })
+                                st.session_state["arch_id"]    = new_id
+                                st.session_state["arch_name"]  = name
+                                st.session_state["arch_email"] = email
+                                st.success(f"¡Cuenta creada! Bienvenido, {name}.")
+                                sleep(0.5); st.rerun()
         return
 
     # --- 2. DASHBOARD ---

@@ -35,8 +35,9 @@ def insert_user(user):
         c.execute("SELECT id FROM architects WHERE email=?", (user['email'],))
         if not c.fetchone():
             c.execute("""INSERT INTO architects
-                         (id,name,email,company,phone,nif,specialty,address,city,province,avg_project_price,origen_registro,created_at)
-                         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                         (id,name,email,company,phone,nif,specialty,address,city,province,
+                          avg_project_price,origen_registro,password_hash,created_at)
+                         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                       (user["id"], user["name"], user["email"],
                        user.get("company", user.get("name", "")),
                        user.get("phone", ""),
@@ -47,20 +48,27 @@ def insert_user(user):
                        user.get("province", ""),
                        user.get("avg_project_price", None),
                        user.get("origen_registro", None),
+                       user.get("password_hash", None),
                        datetime.utcnow().isoformat()))
         else:
-            # Actualizar campos si el arquitecto ya existe y vuelve a rellenar el formulario
-            c.execute("""UPDATE architects SET phone=COALESCE(NULLIF(?,''),phone),
-                         specialty=COALESCE(NULLIF(?,''),specialty),
-                         address=COALESCE(NULLIF(?,''),address),
-                         city=COALESCE(NULLIF(?,''),city),
-                         province=COALESCE(NULLIF(?,''),province),
-                         avg_project_price=COALESCE(?,avg_project_price)
-                         WHERE email=?""",
-                      (user.get("phone",""), user.get("specialty",""),
-                       user.get("address",""), user.get("city",""),
-                       user.get("province",""), user.get("avg_project_price"),
-                       user["email"]))
+            # Actualizar campos si el arquitecto ya existe
+            update_fields = [
+                "phone=COALESCE(NULLIF(?,''),phone)",
+                "specialty=COALESCE(NULLIF(?,''),specialty)",
+                "address=COALESCE(NULLIF(?,''),address)",
+                "city=COALESCE(NULLIF(?,''),city)",
+                "province=COALESCE(NULLIF(?,''),province)",
+                "avg_project_price=COALESCE(?,avg_project_price)",
+            ]
+            params = [user.get("phone",""), user.get("specialty",""),
+                      user.get("address",""), user.get("city",""),
+                      user.get("province",""), user.get("avg_project_price")]
+            # Solo actualizar password si se proporciona uno nuevo
+            if user.get("password_hash"):
+                update_fields.append("password_hash=?")
+                params.append(user["password_hash"])
+            params.append(user["email"])
+            c.execute(f"UPDATE architects SET {', '.join(update_fields)} WHERE email=?", params)
     elif user.get("role") == "owner":
         c.execute("SELECT id FROM owners WHERE email=?", (user['email'],))
         if not c.fetchone():

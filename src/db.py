@@ -218,6 +218,7 @@ def ensure_tables():
             "ALTER TABLE architects ADD COLUMN province TEXT",
             "ALTER TABLE architects ADD COLUMN avg_project_price REAL",
             "ALTER TABLE architects ADD COLUMN origen_registro TEXT",
+            "ALTER TABLE architects ADD COLUMN password_hash TEXT",
             "ALTER TABLE plots ADD COLUMN tour_360_b64 TEXT",
             "ALTER TABLE plots ADD COLUMN buildable_m2 REAL",
             "ALTER TABLE plots ADD COLUMN ai_verification_cache TEXT",
