@@ -1910,22 +1910,6 @@ def render_step2():
                 if not keep:
                     preview_remove.append(i)
         
-        # Diccionario de costes por m² según tipo
-        ROOM_COSTS = {
-            'salon': 1200, 'cocina': 1200, 'dormitorio': 1400,
-            'bano': 900, 'garaje': 900, 'porche': 700,
-            'bodega': 600, 'pasillo': 800, 'paneles': 3000,
-            'piscina': 2500, 'huerto': 150, 'despacho': 1100,
-            'caseta': 800, 'office': 1100, 'lavadero': 700,
-        }
-        
-        def get_cost_per_m2(room_code: str) -> int:
-            code_lower = room_code.lower()
-            for key, cost in ROOM_COSTS.items():
-                if key in code_lower:
-                    return cost
-            return 1000  # coste por defecto
-        
         # Aviso antes de los sliders
         st.warning("""
         ⚠️ **DISEÑO PRELIMINAR**
@@ -1945,7 +1929,7 @@ def render_step2():
             if i in preview_remove:
                 continue  # No mostrar slider si va a ser eliminado
             
-            cost_per_m2 = get_cost_per_m2(room.room_type.code)
+            cost_per_m2 = room.room_type.base_cost_per_m2
             
             # Leer valor previo desde session_state si existe
             slider_key = f"step2_slider_{i}"
@@ -2214,7 +2198,7 @@ def render_step2():
 
         if 'current_floor_plan' in st.session_state:
             _saved_sig = st.session_state.get('floor_plan_signature', '')
-            if _saved_sig and _saved_sig != _cur_sig:
+            if _saved_sig != _cur_sig:
                 st.warning("⚠️ Has modificado habitaciones o superficies. Pulsa **Generar Plano 2D** para actualizar el plano.")
             st.image(
                 st.session_state['current_floor_plan'],

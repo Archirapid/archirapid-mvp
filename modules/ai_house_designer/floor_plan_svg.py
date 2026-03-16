@@ -5,6 +5,11 @@ Distribución real con paredes conectadas, pasillos y medidas
 import math
 from typing import List, Dict, Tuple, Optional
 import io
+
+# Forzar backend sin pantalla ANTES de cualquier import de pyplot
+import matplotlib
+matplotlib.use('Agg')
+
 from .architect_layout import ArchitectLayout, ZONE_DAY, ZONE_NIGHT, ZONE_WET, ZONE_CIRCULATION, ZONE_SERVICE, ZONE_EXTERIOR, ZONE_GARDEN
 
 class FloorPlanSVG:
@@ -189,9 +194,6 @@ class FloorPlanSVG:
     def generate(self) -> bytes:
         """Genera plano cenital profesional tipo arquitectónico"""
         import matplotlib.pyplot as plt
-        import matplotlib.patches as mpatches
-        from matplotlib.patches import FancyBboxPatch
-        import matplotlib.patheffects as pe
         import numpy as np
         import io
 
