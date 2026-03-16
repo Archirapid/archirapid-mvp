@@ -99,35 +99,48 @@ def main():
         except Exception:
             pass
 
-    # --- 1. LOGIN / IDENTIFICACIÓN ---
+    # --- 1. LOGIN / REGISTRO ---
     if "arch_id" not in st.session_state:
-        st.info("Accede a tu cuenta profesional.")
-        with st.form("login_arch"):
-            email = st.text_input("Email profesional")
-            name = st.text_input("Nombre del Estudio / Arquitecto")
-            submitted = st.form_submit_button("Entrar / Registrarse")
-            
-            if submitted:
-                if not email or not name:
-                    st.error("Campos requeridos.")
-                else:
-                    # Lookup real DB
-                    user_data = get_user_by_email(email)
-                    
-                    if user_data:
-                        st.session_state["arch_id"] = user_data["id"]
-                        st.session_state["arch_name"] = user_data["name"]
-                        st.session_state["arch_email"] = user_data["email"]
-                        st.success(f"Bienvenido, {user_data['name']}")
+        st.info("Accede con tu email profesional o regístrate gratis.")
+        c_login, c_info = st.columns([2, 1])
+        with c_login:
+            with st.form("login_arch"):
+                email = st.text_input("Email profesional *", placeholder="tu@estudio.com")
+                name  = st.text_input("Nombre del Estudio / Arquitecto *", placeholder="Estudio García Arquitectos")
+                phone = st.text_input("Teléfono de contacto", placeholder="+34 600 000 000")
+                st.caption("Si ya tienes cuenta, introduce el mismo email para acceder.")
+                submitted = st.form_submit_button("Entrar / Registrarse", type="primary", use_container_width=True)
+
+                if submitted:
+                    if not email or not name:
+                        st.error("Email y nombre son obligatorios.")
                     else:
-                        new_id = uuid.uuid4().hex
-                        insert_user({"id": new_id, "name": name, "email": email, "role": "architect", "company": name})
-                        st.session_state["arch_id"] = new_id
-                        st.session_state["arch_name"] = name
-                        st.session_state["arch_email"] = email
-                        st.success("Cuenta creada. Bienvenido.")
-                    sleep(1)
-                    st.rerun()
+                        user_data = get_user_by_email(email)
+                        if user_data:
+                            st.session_state["arch_id"]    = user_data["id"]
+                            st.session_state["arch_name"]  = user_data["name"]
+                            st.session_state["arch_email"] = user_data["email"]
+                            st.session_state["arch_phone"] = user_data.get("phone", phone)
+                            st.success(f"¡Bienvenido de nuevo, {user_data['name']}!")
+                        else:
+                            new_id = uuid.uuid4().hex
+                            insert_user({"id": new_id, "name": name, "email": email,
+                                         "role": "architect", "company": name, "phone": phone})
+                            st.session_state["arch_id"]    = new_id
+                            st.session_state["arch_name"]  = name
+                            st.session_state["arch_email"] = email
+                            st.session_state["arch_phone"] = phone
+                            st.success(f"¡Cuenta creada! Bienvenido, {name}.")
+                        sleep(0.8)
+                        st.rerun()
+        with c_info:
+            st.markdown("""
+**¿Qué incluye el acceso?**
+- 🏠 Modo Estudio — diseña con IA
+- 📤 Publica proyectos en el marketplace
+- 🎯 Matching automático con solares
+- 💎 Planes desde €29/mes
+""")
         return
 
     # --- 2. DASHBOARD ---
@@ -181,34 +194,13 @@ def main():
 
     with tab_estudio:
         st.subheader("🏠 Modo Estudio — Diseño IA para Cualquier Solar")
-        st.write("Genera proyectos completos con IA para cualquier parcela, sin necesidad de que esté en el marketplace.")
+        st.write("Genera un proyecto completo con IA para cualquier parcela, sin necesidad de que esté en el marketplace.")
 
-        # Pricing cards
-        _ep1, _ep2, _ep3 = st.columns(3)
-        with _ep1:
-            with st.container(border=True):
-                st.markdown("### Por Uso")
-                st.markdown("**€19 / proyecto**")
-                st.write("- 1 descarga ZIP")
-                st.write("- Memoria PDF + Excel")
-                st.write("- BIM/IFC incluido")
-                st.caption("Pago único por descarga")
-        with _ep2:
-            with st.container(border=True):
-                st.markdown("### PRO Mensual")
-                st.markdown("**€99 / mes**")
-                st.write("- Descargas ilimitadas")
-                st.write("- Proyectos activos en marketplace")
-                st.write("- Prioridad en matching")
-                st.caption("Cancela cuando quieras")
-        with _ep3:
-            with st.container(border=True):
-                st.markdown("### PRO Anual")
-                st.markdown("**€890 / año**")
-                st.write("- Todo lo de PRO Mensual")
-                st.write("- **Ahorra 3 meses** vs mensual")
-                st.write("- Soporte prioritario")
-                st.caption("€99 × 12 = €1.188 → ahorras €298")
+        # Nota de precio contextual (no pricing cards duplicadas)
+        if sub_status["active"] and sub_status.get("plan") in ("PRO", "PRO_ANUAL", "ENTERPRISE"):
+            st.success("✅ Plan PRO activo — descarga de proyectos incluida sin coste adicional.")
+        else:
+            st.info("💡 Descarga €19/proyecto (pago único) · Plan PRO: descargas ilimitadas → [ver Planes](javascript:void(0))")
 
         st.markdown("---")
 
@@ -315,70 +307,75 @@ def main():
             _estudio_flow.main()
 
     with tab_planes:
-        st.subheader("Elige tu nivel de visibilidad")
+        st.subheader("💎 Elige tu plan")
 
-        # Modo Estudio pricing reminder
-        with st.expander("💡 Modo Estudio — Descarga de proyectos", expanded=False):
-            st.write("Descarga proyectos generados en Modo Estudio:")
-            st.write("- **Por uso**: €19 por proyecto (plan Free)")
-            st.write("- **PRO Mensual / Anual**: descargas ilimitadas (activar abajo)")
+        # Banner plan activo
+        if sub_status["active"]:
+            st.success(f"✅ Plan activo: **{sub_status['plan']}** — vence el {sub_status['end_date']}")
+        else:
+            st.warning("⚠️ Sin plan activo. Suscríbete para publicar proyectos y acceder al Modo Estudio ilimitado.")
 
-        col1, col2, col3 = st.columns(3)
-        
-        plans = [
-            {"name": "BASIC",      "price": "29€/mes",  "limit": 1,   "fee": 10, "stripe_key": "sub_basic",     "label": "Contratar BASIC",      "days": 30},
-            {"name": "PRO",        "price": "99€/mes",  "limit": 5,   "fee": 8,  "stripe_key": "sub_pro",        "label": "Contratar PRO",         "days": 30},
-            {"name": "ENTERPRISE", "price": "299€/mes", "limit": 999, "fee": 5,  "stripe_key": "sub_enterprise", "label": "Contratar ENTERPRISE",  "days": 30},
-        ]
-
-        # Fila extra: PRO Anual (ahorro)
-        st.markdown("---")
-        with st.container(border=True):
-            ca1, ca2 = st.columns([3, 1])
-            with ca1:
-                st.markdown("### PRO Anual — **890€/año** *(ahorra 3 meses)*")
-                st.write("- Modo Estudio ilimitado · 999 proyectos activos · 8% comisión · Badge verificado")
-            with ca2:
-                if st.button("Contratar PRO Anual", key="plan_pro_anual", type="primary"):
-                    try:
-                        from modules.stripe_utils import create_checkout_session
-                        base = _get_base_url()
-                        success_url = f"{base}/?page=Arquitectos (Marketplace)&sub_session={{CHECKOUT_SESSION_ID}}&sub_plan=sub_pro_anual"
-                        cancel_url  = f"{base}/?page=Arquitectos (Marketplace)"
-                        url, sid = create_checkout_session(
-                            ["sub_pro_anual"], "sub_pro_anual",
-                            st.session_state.get("arch_email", ""),
-                            success_url, cancel_url)
-                        st.session_state["sub_stripe_url_pro_anual"] = url
-                    except Exception as e:
-                        st.error(f"Error al crear sesión de pago: {e}")
-            if st.session_state.get("sub_stripe_url_pro_anual"):
-                st.link_button("💳 Ir a pago PRO Anual", st.session_state["sub_stripe_url_pro_anual"], type="primary")
         st.markdown("---")
 
-        for p in plans:
-            with col1 if p['name']=="BASIC" else col2 if p['name']=="PRO" else col3:
-                with st.container(border=True):
-                    st.markdown(f"### {p['name']}")
-                    st.markdown(f"**{p['price']}**")
-                    st.write(f"- {p['limit']} Proyectos activos")
-                    st.write(f"- {p['fee']}% Comisión plataforma")
-                    _url_key = f"sub_stripe_url_{p['stripe_key']}"
-                    if st.button(p['label'], key=f"plan_{p['name']}"):
+        def _make_stripe_btn(stripe_key, plan_label, col_container):
+            """Helper: genera sesión Stripe y muestra botón de pago."""
+            _url_key = f"sub_stripe_url_{stripe_key}"
+            with col_container:
+                if st.session_state.get(_url_key):
+                    # Ya tenemos la URL — mostrar botón de pago directo
+                    st.link_button(f"💳 Ir al pago — {plan_label}", st.session_state[_url_key],
+                                   type="primary", use_container_width=True)
+                    if st.button("← Cancelar", key=f"cancel_{stripe_key}", use_container_width=True):
+                        del st.session_state[_url_key]
+                        st.rerun()
+                else:
+                    if st.button(f"Contratar {plan_label}", key=f"plan_{stripe_key}",
+                                 type="primary", use_container_width=True):
                         try:
                             from modules.stripe_utils import create_checkout_session
                             base = _get_base_url()
-                            success_url = f"{base}/?page=Arquitectos (Marketplace)&sub_session={{CHECKOUT_SESSION_ID}}&sub_plan={p['stripe_key']}"
+                            success_url = (f"{base}/?page=Arquitectos (Marketplace)"
+                                           f"&sub_session={{CHECKOUT_SESSION_ID}}&sub_plan={stripe_key}")
                             cancel_url  = f"{base}/?page=Arquitectos (Marketplace)"
-                            url, sid = create_checkout_session(
-                                [p['stripe_key']], p['stripe_key'],
+                            url, _sid = create_checkout_session(
+                                [stripe_key], stripe_key,
                                 st.session_state.get("arch_email", ""),
                                 success_url, cancel_url)
                             st.session_state[_url_key] = url
+                            st.rerun()
                         except Exception as e:
-                            st.error(f"Error al crear sesión de pago: {e}")
-                    if st.session_state.get(_url_key):
-                        st.link_button(f"💳 Ir a pago {p['name']}", st.session_state[_url_key])
+                            st.error(f"Error Stripe: {e}")
+
+        # Fila 1: BASIC / PRO / ENTERPRISE
+        c1, c2, c3 = st.columns(3)
+        plans_info = [
+            {"name": "BASIC",      "price": "29€/mes",  "features": ["1 proyecto activo", "Modo Estudio €19/proyecto", "10% comisión"],              "key": "sub_basic",     "col": c1},
+            {"name": "PRO",        "price": "99€/mes",  "features": ["5 proyectos activos", "Modo Estudio ilimitado", "8% comisión", "Badge verificado"], "key": "sub_pro",    "col": c2},
+            {"name": "ENTERPRISE", "price": "299€/mes", "features": ["Proyectos ilimitados", "Modo Estudio ilimitado", "5% comisión", "Soporte prioritario"], "key": "sub_enterprise", "col": c3},
+        ]
+        for p in plans_info:
+            with p["col"]:
+                with st.container(border=True):
+                    st.markdown(f"### {p['name']}")
+                    st.markdown(f"#### {p['price']}")
+                    for feat in p["features"]:
+                        st.write(f"✓ {feat}")
+                    st.markdown("")
+            _make_stripe_btn(p["key"], p["name"], p["col"])
+
+        st.markdown("---")
+
+        # Fila 2: PRO Anual destacado
+        with st.container(border=True):
+            ca1, ca2 = st.columns([3, 1])
+            with ca1:
+                st.markdown("### ⭐ PRO Anual — **890€/año** *(ahorras €298 vs mensual)*")
+                st.write("✓ Modo Estudio ilimitado  ·  ✓ 999 proyectos activos  ·  ✓ 8% comisión  ·  ✓ Badge verificado")
+                st.caption("Equivale a €74/mes — 3 meses gratis respecto al plan mensual")
+            _make_stripe_btn("sub_pro_anual", "PRO Anual", ca2)
+
+        st.markdown("---")
+        st.caption("💡 Los pagos se procesan de forma segura con Stripe. Recibirás un email de confirmación tras el pago.")
 
     with tab_subir:
         if not sub_status["active"]:
