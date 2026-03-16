@@ -544,7 +544,6 @@ def ensure_tables():
             )
 
 def insert_plot(data: Dict):
-    print("DEBUG insert_plot data:", data)
     ensure_tables()
     from datetime import datetime
     with transaction() as c:
@@ -565,6 +564,14 @@ def insert_plot(data: Dict):
         # Si image_path sigue vacío pero viene en data, respetarlo
         if not image_path:
             image_path = data.get("image_path")
+
+        # Aceptar tanto claves en español (FincaMVP) como en inglés (create_plot_record)
+        _title    = data.get("titulo")    or data.get("title")
+        _address  = data.get("direccion") or data.get("address")
+        _province = data.get("provincia") or data.get("province")
+        _price    = data.get("precio")    or data.get("price")
+        _m2       = data.get("superficie_parcela") or data.get("m2")
+        _cat_ref  = data.get("referencia_catastral") or data.get("catastral_ref")
 
         c.execute("""
             INSERT OR REPLACE INTO plots (
@@ -591,18 +598,18 @@ def insert_plot(data: Dict):
             ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (
             data.get("id"),
-            data.get("titulo"),
-            data.get("direccion"),
-            data.get("provincia"),
-            data.get("provincia"),
-            data.get("precio"),
-            data.get("superficie_parcela"),
-            data.get("superficie_parcela"),
+            _title,
+            _address,
+            _province,
+            _province,
+            _price,
+            _m2,
+            _m2,
             data.get("superficie_edificable"),
             data.get("lat"),
             data.get("lon"),
             json.dumps(data.get("solar_virtual")) if data.get("solar_virtual") else None,
-            data.get("referencia_catastral"),
+            _cat_ref,
             data.get("plano_catastral_path"),
             (data.get("propietario_nombre") or data.get("owner_name")),
             (data.get("propietario_email") or data.get("owner_email")),
@@ -685,8 +692,6 @@ def get_plots_by_owner(email: str):
         df = pd.read_sql_query('SELECT * FROM plots WHERE owner_email = ?', conn, params=(email,))
     finally:
         conn.close()
-    return df
-
     return df
 
 

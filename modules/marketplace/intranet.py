@@ -12,7 +12,12 @@ def main():
     else:
         # SOLO ACCESO CON CONTRASEÑA DE ADMIN
         password = st.text_input("Contraseña de Acceso Administrativo", type="password")
-        if password != "admin123":  # Contraseña de admin
+        _admin_pw = None
+        try:
+            _admin_pw = st.secrets.get("ADMIN_PASSWORD", "admin123")
+        except Exception:
+            _admin_pw = "admin123"
+        if password != _admin_pw:
             st.warning("🔒 Acceso restringido. Solo personal autorizado de ARCHIRAPID.")
             st.info("Si eres cliente o profesional, utiliza los botones de la página principal.")
             return
@@ -128,7 +133,7 @@ def main():
 
         # ── KPIs de ingresos ──────────────────────────────────────────────────
         try:
-            _db3 = _sq3.connect("database.db", timeout=10)
+            _db3 = db_conn()
 
             _rev_fincas = float(_db3.execute("SELECT COALESCE(SUM(amount),0) FROM reservations").fetchone()[0])
             _n_res3     = _db3.execute("SELECT COUNT(*) FROM reservations").fetchone()[0]
@@ -168,7 +173,7 @@ def main():
         # ── 1. Reservas y compras de fincas ──────────────────────────────────
         st.subheader("🏡 Reservas y Compras de Fincas")
         try:
-            _db3b = _sq3.connect("database.db", timeout=10)
+            _db3b = db_conn()
             _df_res3 = _pd3.read_sql_query(
                 """SELECT r.id, r.buyer_name, r.buyer_email, p.title as finca,
                           r.amount, r.kind, r.created_at
@@ -198,14 +203,16 @@ def main():
         # ── 2. Suscripciones de Arquitectos ──────────────────────────────────
         st.subheader("💎 Suscripciones de Arquitectos (Planes BASIC / PRO / ENTERPRISE)")
         try:
-            _db3c = _sq3.connect("database.db", timeout=10)
+            _db3c = db_conn()
             _df_subs = _pd3.read_sql_query(
-                """SELECT s.id, u.name as arquitecto, u.email,
+                """SELECT s.id, COALESCE(a.name, u.name) as arquitecto,
+                          COALESCE(a.email, u.email) as email,
                           s.plan_type as plan, s.price as precio_mes,
                           s.monthly_proposals_limit as limite,
                           s.commission_rate as comision,
                           s.status, s.start_date, s.end_date
                    FROM subscriptions s
+                   LEFT JOIN architects a ON s.architect_id = a.id
                    LEFT JOIN users u ON s.architect_id = u.id
                    ORDER BY s.created_at DESC""",
                 _db3c
@@ -223,7 +230,6 @@ def main():
                     }),
                     use_container_width=True, hide_index=True
                 )
-                _mrr_total = _df_subs[_df_subs["Estado"] == "active"]["Precio"].count()
             else:
                 st.info("Sin suscripciones activas todavía.")
         except Exception as _es3:
@@ -234,7 +240,7 @@ def main():
         # ── 3. Proyectos AI Designer pagados ─────────────────────────────────
         st.subheader("🏠 Proyectos AI Designer — Pagos Realizados")
         try:
-            _db3d = _sq3.connect("database.db", timeout=10)
+            _db3d = db_conn()
             _df_ai = _pd3.read_sql_query(
                 """SELECT client_email, project_name, total_area, total_cost,
                           style, energy_label, status, created_at
@@ -264,12 +270,15 @@ def main():
         # ── 4. Proyectos Modo Estudio ─────────────────────────────────────────
         st.subheader("🎨 Proyectos Modo Estudio — Arquitectos")
         try:
-            _db3e = _sq3.connect("database.db", timeout=10)
+            _db3e = db_conn()
             _df_est = _pd3.read_sql_query(
-                """SELECT ep.architect_id, u.name as arquitecto, u.email,
+                """SELECT ep.architect_id,
+                          COALESCE(a.name, u.name) as arquitecto,
+                          COALESCE(a.email, u.email) as email,
                           ep.address, ep.surface_m2, ep.style, ep.budget,
                           ep.total_cost, ep.paid, ep.created_at
                    FROM estudio_projects ep
+                   LEFT JOIN architects a ON ep.architect_id = a.id
                    LEFT JOIN users u ON ep.architect_id = u.id
                    ORDER BY ep.created_at DESC""",
                 _db3e
@@ -432,7 +441,7 @@ def main():
                 conn = sqlite3.connect(str(DB_PATH))
                 cur = conn.cursor()
                 cur.execute("DELETE FROM reservations")
-                cur.execute("UPDATE plots SET status = 'disponible', buyer_email = NULL, reserved_by = NULL")
+                cur.execute("UPDATE plots SET status = 'disponible'")
                 conn.commit()
                 conn.close()
                 st.cache_data.clear()
@@ -609,7 +618,7 @@ def main():
         st.header("Lista de Espera (Waitlist)")
         try:
             import sqlite3 as _sq3w, pandas as _pdw
-            _cw = _sq3w.connect("database.db")
+            _cw = db_conn()
             _dfw = _pdw.read_sql_query(
                 "SELECT name, email, profile, created_at, approved FROM waitlist ORDER BY created_at DESC",
                 _cw
@@ -639,8 +648,9 @@ def main():
             else:
                 st.info("Aun no hay solicitudes en la lista de espera.")
         except Exception as _ew:
+            import traceback as _tb7
             st.error(f"Error cargando waitlist: {_ew}")
-            st.code(traceback.format_exc())
+            st.code(_tb7.format_exc())
 
     with tab8:
         st.header("📬 Actividad Reciente")
@@ -657,9 +667,10 @@ def main():
                     st.markdown("""
 En Streamlit Cloud → Settings → Secrets, añade:
 ```
-TELEGRAM_BOT_TOKEN = "8611167436:AAGohKZ9nKIhv_YbDNMqzcgkHZeIvr1V6j0"
-TELEGRAM_CHAT_ID   = "5712417665"
+TELEGRAM_BOT_TOKEN = "tu_token_del_bot"
+TELEGRAM_CHAT_ID   = "tu_chat_id"
 ```
+Obtén el token creando un bot con @BotFather en Telegram.
 """)
         except Exception:
             pass
@@ -668,7 +679,7 @@ TELEGRAM_CHAT_ID   = "5712417665"
         import sqlite3 as _sq3a
         import pandas as _pda
 
-        _ca = _sq3a.connect("database.db", timeout=10)
+        _ca = db_conn()
 
         # Últimos registros
         st.subheader("👤 Últimos registros de usuarios")
@@ -745,7 +756,7 @@ TELEGRAM_CHAT_ID   = "5712417665"
         import datetime as _dt9
 
         try:
-            _db9 = _sq9.connect("database.db", timeout=10)
+            _db9 = db_conn()
 
             # ── KPIs principales ──────────────────────────────────────────────
             st.subheader("Métricas globales")

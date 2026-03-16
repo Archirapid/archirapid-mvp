@@ -67,34 +67,33 @@ def main():
     tab_planes, tab_subir, tab_proyectos, tab_matching, tab_ia, tab_estudio = st.tabs(["💎 Planes", "📤 Subir Proyecto", "📂 Mis Proyectos", "🎯 Oportunidades", "🤖 Asistente IA", "🏠 Modo Estudio"])
 
     with tab_ia:
-        st.subheader("Boceto Generativo con IA (Gemini Flash)")
+        st.subheader("Boceto Generativo con IA (Groq)")
         st.info("Genera distribuciones preliminares para tus solares o proyectos.")
-        
+        from modules.marketplace import ai_engine as _ai_eng_tab
+
         c_ia_1, c_ia_2 = st.columns(2)
         with c_ia_1:
             ia_m2 = st.number_input("Superficie Finca (m²)", 200, 5000, 1000)
             ia_habs = st.slider("Habitaciones", 1, 6, 3)
-            if st.button("✨ Generar Distribución"):
-                with st.spinner("Gemini está dibujando..."):
-                    from modules.marketplace import ai_engine
-                    plan = ai_engine.plan_vivienda(ia_m2, ia_habs)
+            if st.button("✨ Generar Distribución", key="btn_gen_dist"):
+                with st.spinner("Generando distribución con IA..."):
+                    plan = _ai_eng_tab.plan_vivienda(ia_m2, ia_habs)
                     if "error" in plan:
                         st.error(plan["error"])
                     else:
                         st.session_state["ia_plan"] = plan
                         st.success("Distribución calculada.")
-        
+
         with c_ia_2:
             if "ia_plan" in st.session_state:
                 p = st.session_state["ia_plan"]
                 st.write(p.get("descripcion", ""))
                 st.dataframe(p.get("habitaciones", []))
-                
+
                 # SVG Generation
-                if st.button("🎨 Renderizar Boceto"):
-                    from modules.marketplace import ai_engine
+                if st.button("🎨 Renderizar Boceto", key="btn_render_boceto"):
                     total = p.get("total_m2", ia_m2*0.33)
-                    svg = ai_engine.generate_sketch_svg(p.get("habitaciones", []), total)
+                    svg = _ai_eng_tab.generate_sketch_svg(p.get("habitaciones", []), total)
                     
                     # Render SVG
                     import base64
@@ -317,10 +316,10 @@ def main():
                             "area_m2": area,
                             "price": price,
                             "architect_name": st.session_state["arch_name"],
-                            "m2_parcela_minima": min_plot, # Guardamos el requisito
+                            "m2_parcela_minima": min_plot,
                             "style": style,
                             "plantas": floors,
-                            "files_json": json.dumps({"pdf": pdf_path} if pdf_path else {}),
+                            "planos_pdf": pdf_path,
                             "foto_principal": img_path
                         }
                         
@@ -354,6 +353,7 @@ def main():
         if not sub_status["active"]:
              st.warning("Suscríbete para ver oportunidades y contactar clientes.")
         else:
+            from modules.marketplace import ai_engine as _ai_eng_match
             # 1. Traer mis proyectos
             try:
                 conn = db.get_conn()
@@ -394,10 +394,9 @@ def main():
                                     # AI Analysis
                                     with st.expander("🤖 Análisis de Viabilidad IA"):
                                         if st.button("Analizar Compatibilidad", key=f"ai_{plot['id']}"):
-                                            with st.spinner("Gemini analizando normativa y encaje..."):
-                                                from modules.marketplace import ai_engine
+                                            with st.spinner("IA analizando normativa y encaje..."):
                                                 prompt = f"Analiza la viabilidad preliminar de construir un proyecto residencial en un solar de {plot['m2']} m2 en {plot['province']}. Descripción del terreno: {plot['description']}. Precio suelo: {plot['price']}€. Dame 3 pros y 1 contra."
-                                                analysis = ai_engine.generate_text(prompt)
+                                                analysis = _ai_eng_match.generate_text(prompt)
                                                 st.write(analysis)
                                 
                                 with c2:

@@ -792,3 +792,91 @@ def generate_text(prompt: str, model_name: str = 'llama-3.3-70b-versatile') -> s
             return "Error: Error de conexión a internet."
         else:
             return f"Error al procesar la solicitud: {str(e)}"
+
+
+# ── Tab IA: plan_vivienda y generate_sketch_svg ──────────────────────────────
+
+def plan_vivienda(superficie_m2: float, num_habitaciones: int) -> dict:
+    """
+    Genera una distribucion de vivienda simple usando Groq.
+    Devuelve dict con 'descripcion', 'habitaciones' (lista de dicts), 'total_m2'.
+    """
+    edificable = round(superficie_m2 * 0.33, 1)
+    prompt = (
+        f"Genera una distribucion de vivienda unifamiliar para una parcela de {superficie_m2} m2 "
+        f"(edificable {edificable} m2) con {num_habitaciones} dormitorios. "
+        "Responde SOLO con JSON con esta estructura exacta, sin texto adicional:\n"
+        '{"descripcion":"texto breve","total_m2":number,"habitaciones":['
+        '{"nombre":"string","m2":number,"planta":0}]}'
+    )
+    try:
+        raw = generate_text(prompt)
+        import json as _j, re as _re
+        match = _re.search(r'\{.*\}', raw, _re.DOTALL)
+        if match:
+            data = _j.loads(match.group())
+            habs = data.get("habitaciones", [])
+            habs = [{"nombre": h.get("nombre") or h.get("name", "Estancia"),
+                     "m2": h.get("m2") or h.get("area", 10),
+                     "planta": h.get("planta", 0)} for h in habs]
+            return {
+                "descripcion": data.get("descripcion", ""),
+                "habitaciones": habs,
+                "total_m2": data.get("total_m2", edificable),
+            }
+    except Exception:
+        pass
+    # Fallback determinista si Groq falla
+    m2_hab = round(edificable / (num_habitaciones + 3), 1)
+    habs_fallback = [{"nombre": f"Dormitorio {i+1}", "m2": m2_hab, "planta": 1}
+                     for i in range(num_habitaciones)]
+    habs_fallback += [
+        {"nombre": "Salon-Comedor", "m2": round(m2_hab * 2, 1), "planta": 0},
+        {"nombre": "Cocina",        "m2": m2_hab,                "planta": 0},
+        {"nombre": "Bano",          "m2": round(m2_hab * 0.6, 1),"planta": 0},
+    ]
+    return {
+        "descripcion": f"Vivienda de {num_habitaciones} dormitorios en {edificable} m2 edificables.",
+        "habitaciones": habs_fallback,
+        "total_m2": edificable,
+    }
+
+
+def generate_sketch_svg(habitaciones: list, total_m2: float) -> str:
+    """Genera un SVG simple de boceto de planta a partir de la lista de habitaciones."""
+    if not habitaciones:
+        return '<svg width="400" height="100"><text x="10" y="50" font-size="14">Sin habitaciones</text></svg>'
+
+    cols = 3
+    cell_w, cell_h, pad = 120, 80, 8
+    rows = (len(habitaciones) + cols - 1) // cols
+    svg_w = cols * (cell_w + pad) + pad
+    svg_h = rows * (cell_h + pad) + pad + 30
+
+    colors = ["#DBEAFE", "#D1FAE5", "#FEF3C7", "#FCE7F3", "#EDE9FE", "#FFEDD5"]
+    rects = []
+    for i, h in enumerate(habitaciones):
+        col = i % cols
+        row = i // cols
+        x = pad + col * (cell_w + pad)
+        y = 30 + pad + row * (cell_h + pad)
+        color = colors[i % len(colors)]
+        nombre = str(h.get("nombre", ""))[:18]
+        m2_val = h.get("m2", 0)
+        rects.append(
+            f'<rect x="{x}" y="{y}" width="{cell_w}" height="{cell_h}" '
+            f'fill="{color}" stroke="#374151" stroke-width="1.5" rx="4"/>'
+            f'<text x="{x+cell_w//2}" y="{y+cell_h//2-6}" font-size="11" '
+            f'text-anchor="middle" fill="#1F2937" font-weight="600">{nombre}</text>'
+            f'<text x="{x+cell_w//2}" y="{y+cell_h//2+12}" font-size="10" '
+            f'text-anchor="middle" fill="#6B7280">{m2_val} m2</text>'
+        )
+
+    return (
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{svg_w}" height="{svg_h}" '
+        f'style="background:#F9FAFB;border-radius:8px;">'
+        f'<text x="{svg_w//2}" y="20" font-size="13" text-anchor="middle" '
+        f'fill="#374151" font-weight="700">Boceto: {total_m2:.0f} m2 edificables</text>'
+        + "".join(rects) +
+        "</svg>"
+    )
