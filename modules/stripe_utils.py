@@ -71,6 +71,38 @@ def create_checkout_session(product_keys: list, project_id: str, client_email: s
     return session.url, session.id
 
 
+def create_custom_session(line_items: list, client_email: str,
+                           success_url: str, cancel_url: str,
+                           metadata: dict = None) -> tuple:
+    """
+    Crea sesión Stripe con line_items personalizados (para el diseñador IA).
+    line_items: [{"name": str, "amount_cents": int, "quantity": int}]
+    Devuelve (checkout_url, session_id).
+    """
+    _stripe.api_key = _get_key()
+    stripe_items = [
+        {
+            "price_data": {
+                "currency": "eur",
+                "product_data": {"name": item["name"][:80]},
+                "unit_amount": max(item["amount_cents"], 50),
+            },
+            "quantity": item.get("quantity", 1),
+        }
+        for item in line_items
+    ]
+    session = _stripe.checkout.Session.create(
+        payment_method_types=["card"],
+        line_items=stripe_items,
+        mode="payment",
+        customer_email=client_email or None,
+        success_url=success_url,
+        cancel_url=cancel_url,
+        metadata=metadata or {},
+    )
+    return session.url, session.id
+
+
 def verify_session(session_id: str):
     """Recupera y devuelve la sesión de Stripe (incluye payment_status y metadata)."""
     _stripe.api_key = _get_key()

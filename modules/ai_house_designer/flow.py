@@ -4370,16 +4370,93 @@ def render_step6_pago():
 
     st.markdown("---")
     if not st.session_state.get("pago_completado"):
+        # ── Stripe Checkout ───────────────────────────────────────────────────
+        _client_email_6 = (st.session_state.get("user_email") or
+                           st.session_state.get("client_email") or "")
+        _stripe_key_ok  = bool(os.getenv("STRIPE_SECRET_KEY", ""))
+        try:
+            import streamlit as _stk6
+            if not _stripe_key_ok:
+                _stripe_key_ok = bool(_stk6.secrets.get("STRIPE_SECRET_KEY", ""))
+        except Exception:
+            pass
+
+        # Crear sesión Stripe sólo una vez (almacenada en session_state)
+        if _stripe_key_ok and _all_items_6 and not st.session_state.get("stripe_session_id_s6"):
+            try:
+                from modules.stripe_utils import create_custom_session as _ccs6
+                _stripe_items_6 = [
+                    {"name": it["label"][:80], "amount_cents": int(it["precio"] * 100), "quantity": 1}
+                    for it in _all_items_6
+                ]
+                _s6_url, _s6_sid = _ccs6(
+                    line_items=_stripe_items_6,
+                    client_email=_client_email_6,
+                    success_url="https://archirapid.streamlit.app/?pago=ok",
+                    cancel_url="https://archirapid.streamlit.app/?pago=cancel",
+                    metadata={
+                        "project": req.get("nombre_proyecto", "ArchiRapid Project"),
+                        "total_eur": str(_total_iva_6),
+                        "style": str(style),
+                    },
+                )
+                st.session_state["stripe_session_id_s6"] = _s6_sid
+                st.session_state["stripe_checkout_url_s6"] = _s6_url
+            except Exception as _e6:
+                st.session_state["stripe_session_id_s6"] = None
+                st.session_state["stripe_checkout_url_s6"] = None
+
+        _stripe_url_6 = st.session_state.get("stripe_checkout_url_s6")
+        _stripe_sid_6 = st.session_state.get("stripe_session_id_s6")
+
         _cp1, _cp2 = st.columns(2)
         with _cp1:
-            if st.button("💳 Confirmar y Pagar (Simulado)", type="primary",
-                         use_container_width=True, key="btn_pagar_s6"):
-                st.session_state["pago_completado"] = True
-                st.session_state["total_pagado"]    = _total_iva_6
-                st.rerun()
+            if _stripe_url_6:
+                # Abre Stripe en nueva pestaña — preserva session_state
+                import streamlit.components.v1 as _cv1_s6
+                _cv1_s6.html(
+                    f"""<a href="{_stripe_url_6}" target="_blank"
+                        style="display:block;text-align:center;background:#1E3A5F;color:#fff;
+                               padding:12px 20px;border-radius:8px;font-weight:700;font-size:15px;
+                               text-decoration:none;">
+                        💳 Pagar con Tarjeta — €{_total_iva_6:,} (IVA incl.)
+                    </a>
+                    <p style="color:#94A3B8;font-size:12px;text-align:center;margin-top:6px;">
+                        Pago seguro con Stripe · Tarjeta de prueba: 4242 4242 4242 4242
+                    </p>""",
+                    height=80,
+                )
+            else:
+                # Fallback simulado si Stripe no está configurado
+                if st.button("💳 Confirmar y Pagar", type="primary",
+                             use_container_width=True, key="btn_pagar_s6"):
+                    st.session_state["pago_completado"] = True
+                    st.session_state["total_pagado"]    = _total_iva_6
+                    st.rerun()
         with _cp2:
             if st.button("📞 Hablar con un Arquitecto", use_container_width=True, key="btn_arq_s6"):
                 st.info("📧 hola@archirapid.com · Solicita llamada en el chat →")
+
+        # Botón de verificación de pago (después de volver de Stripe)
+        if _stripe_sid_6:
+            st.markdown("<br>", unsafe_allow_html=True)
+            _vp1, _vp2, _vp3 = st.columns([1, 2, 1])
+            with _vp2:
+                if st.button("✅ Ya he pagado — Verificar pago", use_container_width=True,
+                             key="btn_verify_s6"):
+                    try:
+                        from modules.stripe_utils import verify_session as _vs6
+                        _sess6 = _vs6(_stripe_sid_6)
+                        if _sess6.payment_status == "paid":
+                            st.session_state["pago_completado"] = True
+                            st.session_state["total_pagado"]    = _total_iva_6
+                            st.session_state.pop("stripe_session_id_s6", None)
+                            st.session_state.pop("stripe_checkout_url_s6", None)
+                            st.rerun()
+                        else:
+                            st.warning("⏳ Pago no confirmado todavía. Completa el pago en Stripe y vuelve a verificar.")
+                    except Exception as _ve6:
+                        st.error(f"Error al verificar: {_ve6}")
         return  # ← nada más se renderiza hasta que se pague
 
     # ── Bloque post-pago ──────────────────────────────────────────────────────
