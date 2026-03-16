@@ -160,7 +160,7 @@ Devuelve solo JSON: {"referencia_catastral":"codigo","superficie_grafica_m2":num
             text = text.strip()
 
             if not text:
-                return {"error": f"Respuesta vacía del modelo {nombre_modelo}"}
+                return {"error": "Respuesta vacía del modelo gemini-1.5-flash"}
 
             # Convertir a diccionario Python
             try:
@@ -169,15 +169,15 @@ Devuelve solo JSON: {"referencia_catastral":"codigo","superficie_grafica_m2":num
                 # Verificar que tenemos los campos esperados
                 campos_requeridos = ['referencia_catastral', 'superficie_grafica_m2', 'municipio']
                 if not all(campo in resultado for campo in campos_requeridos):
-                    return {"error": f"Respuesta incompleta del modelo {nombre_modelo}: faltan campos requeridos"}
+                    return {"error": "Respuesta incompleta del modelo: faltan campos requeridos"}
 
                 return resultado
 
             except json.JSONDecodeError as json_error:
-                return {"error": f"JSON inválido del modelo {nombre_modelo}: {str(json_error)}"}
+                return {"error": f"JSON inválido del modelo: {str(json_error)}"}
 
         except Exception as model_error:
-            return {"error": f"Error con modelo {nombre_modelo}: {str(model_error)}"}
+            return {"error": f"Error con modelo gemini-1.5-flash: {str(model_error)}"}
 
     except Exception as e:
         error_msg = str(e).lower()

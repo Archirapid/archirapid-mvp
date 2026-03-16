@@ -21,7 +21,7 @@ def save_upload(uploaded_file, prefix="file"):
     except Exception:
         # werkzeug or other
         uploaded_file.save(str(dest))
-    return fname  # devolver solo el nombre del archivo, no path completo
+    return str(Path("uploads") / fname)  # ruta relativa para uso en st.image y DB
 
 def db_conn():
     conn = sqlite3.connect(DB_PATH, timeout=15)
@@ -166,9 +166,9 @@ def list_published_plots():
     conn = db_conn(); c=conn.cursor()
     # Traer todas las filas de plots con coordenadas (lat/lon son críticos para el mapa)
     # Usar m2 como alias de surface_m2 para compatibilidad
-    c.execute("SELECT id,title,m2 as surface_m2,price,lat,lon,registry_note_path FROM plots WHERE lat IS NOT NULL AND lon IS NOT NULL")
+    c.execute("SELECT id,title,m2 as surface_m2,price,lat,lon,registry_note_path,status,tour_360_b64 FROM plots WHERE lat IS NOT NULL AND lon IS NOT NULL")
     rows = c.fetchall(); conn.close()
-    cols = ["id","title","surface_m2","price","lat","lon","registry_note_path"]
+    cols = ["id","title","surface_m2","price","lat","lon","registry_note_path","status","tour_360_b64"]
     result = []
     for r in rows:
         plot_dict = dict(zip(cols, r))
@@ -209,7 +209,7 @@ def create_client_user_if_not_exists(email, name, transaction_id=None):
 
     if existing_user:
         conn.close()
-        return False  # Usuario ya existe
+        return False, None  # Usuario ya existe — consistente con (True, pwd)
 
     # Crear usuario nuevo
     import uuid

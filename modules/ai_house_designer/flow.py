@@ -737,7 +737,7 @@ def main():
                     'title': plot_row[1],
                     'catastral_ref': plot_row[2],
                     'total_m2': plot_row[3] or 0,
-                    'buildable_m2': (plot_row[3] * 0.33) if plot_row[3] else 0,
+                    'buildable_m2': plot_row[4] if plot_row[4] else ((plot_row[3] * 0.33) if plot_row[3] else 0),
                     'lat': plot_row[5],
                     'lon': plot_row[6],
                     'owner_email': plot_row[7]
@@ -4615,7 +4615,7 @@ def render_step6_pago():
         # Guardar en panel de cliente
         try:
             import sqlite3 as _sq6, json as _js6, datetime as _dt6
-            from modules.utils import DB_PATH as _DBP6
+            from modules.marketplace.utils import DB_PATH as _DBP6
             _conn6 = _sq6.connect(_DBP6, timeout=15)
             _conn6.execute("PRAGMA journal_mode=WAL")
             _conn6.execute("""

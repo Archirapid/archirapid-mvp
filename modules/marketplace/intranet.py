@@ -18,10 +18,13 @@ def main():
         except Exception:
             _admin_pw = "admin123"
         if password != _admin_pw:
-            st.warning("🔒 Acceso restringido. Solo personal autorizado de ARCHIRAPID.")
-            st.info("Si eres cliente o profesional, utiliza los botones de la página principal.")
+            if password:  # solo mostrar warning si ya escribió algo
+                st.warning("🔒 Contraseña incorrecta.")
+            else:
+                st.info("🔒 Acceso restringido. Solo personal autorizado de ARCHIRAPID.")
             return
-        st.success("✅ Acceso autorizado a Intranet")
+        st.session_state["rol"] = "admin"
+        st.rerun()
 
     # PANEL DE GESTIÓN INTERNA
     tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs(["📋 Gestión de Fincas", "🏗️ Gestión de Proyectos", "💰 Ventas y Transacciones", "📞 Consultas", "🛠️ Profesionales", "⚙️ Admin", "🎯 Waitlist", "📬 Actividad", "📊 Analytics"])

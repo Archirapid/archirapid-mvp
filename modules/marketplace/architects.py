@@ -176,7 +176,7 @@ def main():
                     st.session_state["ai_house_requirements"] = {
                         "target_area_m2":       min(120.0, _max_build),
                         "max_buildable_m2":     _max_build,
-                        "budget_limit":         float(_e_budget),
+                        "budget":               float(_e_budget),
                         "bedrooms":             _e_rooms,
                         "bathrooms":            max(1, _e_rooms - 1),
                         "wants_pool":           False,
@@ -184,7 +184,7 @@ def main():
                         "wants_garage":         False,
                         "wants_outhouse":       False,
                         "max_floors":           1,
-                        "style":                _e_style.lower(),
+                        "style":                _e_style,
                         "materials":            ["hormigón"],
                         "notes":                "",
                         "orientation":          "Sur",
@@ -208,9 +208,12 @@ def main():
                     for _k in ["ai_house_step", "ai_house_rooms", "floor_plan_svg",
                                "floor_plan_signature", "ai_room_proposal", "babylon_html",
                                "babylon_editor_used", "babylon_modified_layout",
+                               "current_floor_plan", "final_floor_plan", "selected_style_key",
+                               "babylon_captures", "babylon_captures_thumb",
                                "pago_completado", "total_pagado", "estudio_pago_completado",
                                "stripe_session_id_estudio", "stripe_checkout_url_estudio",
-                               "stripe_session_id_s6", "stripe_checkout_url_s6"]:
+                               "stripe_session_id_s6", "stripe_checkout_url_s6",
+                               "doc_detail_s5", "svc_detail_s5", "coste_doc_s5", "coste_servicios_s5"]:
                         st.session_state.pop(_k, None)
 
                     st.rerun()
@@ -223,9 +226,13 @@ def main():
                                "ai_house_step", "ai_house_rooms", "floor_plan_svg",
                                "floor_plan_signature", "ai_room_proposal", "babylon_html",
                                "babylon_editor_used", "babylon_modified_layout",
+                               "current_floor_plan", "final_floor_plan", "selected_style_key",
+                               "babylon_captures", "babylon_captures_thumb",
                                "ai_house_requirements", "pago_completado", "total_pagado",
                                "estudio_pago_completado", "stripe_session_id_estudio",
-                               "stripe_checkout_url_estudio"]:
+                               "stripe_checkout_url_estudio", "stripe_session_id_s6",
+                               "stripe_checkout_url_s6", "doc_detail_s5", "svc_detail_s5",
+                               "coste_doc_s5", "coste_servicios_s5"]:
                         st.session_state.pop(_k, None)
                     st.rerun()
 
