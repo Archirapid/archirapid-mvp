@@ -285,7 +285,7 @@ Máximo 1800 palabras. Profesional, técnico, directo."""
                 ('ROWBACKGROUNDS',(0,1),(-1,-4),[white,C_ROW]),
             ]))
             story.append(tp)
-            story.append(Paragraph('[MVP: presupuesto estimativo a €1.500/m². El definitivo requiere mediciones detalladas por aparejador colegiado]', s_mvp))
+            story.append(Paragraph('[Presupuesto orientativo a €1.200–1.800/m² según estilo y calidad (mercado España 2025). El definitivo requiere mediciones detalladas por arquitecto y aparejador colegiado]', s_mvp))
             story.append(PageBreak())
 
             # ── EFICIENCIA ENERGÉTICA
@@ -473,7 +473,7 @@ sistema y servir de base de trabajo para el arquitecto que desarrolle el proyect
             ws.cell(row=ri, column=3, value=round(r['area_m2'],1))
             ws.cell(row=ri, column=4, value=round(r.get('width',0),2))
             ws.cell(row=ri, column=5, value=round(r.get('depth',0),2))
-            ws.cell(row=ri, column=6, value=1500)
+            ws.cell(row=ri, column=6, value=design_data.get('cost_per_m2', 1500))
 
         rt = len(rooms)+6
         ws.cell(row=rt, column=1, value="TOTAL").font = Font(bold=True, color="FFFFFF")
@@ -629,8 +629,14 @@ def get_current_design_data():
     1. babylon_modified_layout (si existe) - diseño editado en 3D
     2. ai_room_proposal - diseño inicial de la IA
     """
-    COST_PER_M2 = 1500
-    
+    _req_gcd = st.session_state.get("ai_house_requirements", {})
+    _style_gcd = _req_gcd.get("style", "Moderno")
+    _COST_BY_STYLE = {
+        "Moderno": 1500, "Mediterráneo": 1500, "Contemporáneo": 1550,
+        "Ecológico": 1600, "Rural": 1650, "Montaña": 1750, "Clásico": 1800,
+    }
+    COST_PER_M2 = _COST_BY_STYLE.get(_style_gcd, 1500)
+
     # 1. Intentar cargar desde Babylon (prioridad)
     babylon_data = st.session_state.get("babylon_modified_layout")
     
@@ -909,9 +915,14 @@ def get_final_design():
         }
     """
     import streamlit as st
-    
-    COST_PER_M2 = 1500
-    
+    _req_gfd = st.session_state.get("ai_house_requirements", {})
+    _style_gfd = _req_gfd.get("style", "Moderno")
+    _COST_BY_STYLE_GFD = {
+        "Moderno": 1500, "Mediterráneo": 1500, "Contemporáneo": 1550,
+        "Ecológico": 1600, "Rural": 1650, "Montaña": 1750, "Clásico": 1800,
+    }
+    COST_PER_M2 = _COST_BY_STYLE_GFD.get(_style_gfd, 1500)
+
     # PRIORIDAD 1: Babylon (diseño modificado en 3D)
     babylon_data = st.session_state.get("babylon_modified_layout")
     if babylon_data:
@@ -1771,22 +1782,22 @@ def render_step2():
     from .data_model import HouseDesign, Plot, RoomType, RoomInstance
     
     room_types = {
-        "salon_cocina": RoomType(code="salon_cocina", name="Salón-Cocina", min_m2=20, max_m2=50, base_cost_per_m2=1200),
-        "salon": RoomType(code="salon", name="Salón", min_m2=15, max_m2=40, base_cost_per_m2=1100),
-        "cocina": RoomType(code="cocina", name="Cocina", min_m2=8, max_m2=20, base_cost_per_m2=1300),
-        "dormitorio_principal": RoomType(code="dormitorio_principal", name="Dormitorio Principal", min_m2=12, max_m2=25, base_cost_per_m2=1400),
-        "dormitorio": RoomType(code="dormitorio", name="Dormitorio", min_m2=8, max_m2=15, base_cost_per_m2=1100),
-        "bano": RoomType(code="bano", name="Baño", min_m2=4, max_m2=8, base_cost_per_m2=900),
-        "bodega": RoomType(code="bodega", name="Bodega", min_m2=6, max_m2=20, base_cost_per_m2=600),
-        "piscina": RoomType(code="piscina", name="Piscina", min_m2=20, max_m2=60, base_cost_per_m2=2500),
-        "paneles_solares": RoomType(code="paneles_solares", name="Paneles Solares", min_m2=3, max_m2=15, base_cost_per_m2=3000),
-        "garaje": RoomType(code="garaje", name="Garaje", min_m2=15, max_m2=40, base_cost_per_m2=900),
+        "salon_cocina": RoomType(code="salon_cocina", name="Salón-Cocina", min_m2=20, max_m2=50, base_cost_per_m2=1500),
+        "salon": RoomType(code="salon", name="Salón", min_m2=15, max_m2=40, base_cost_per_m2=1500),
+        "cocina": RoomType(code="cocina", name="Cocina", min_m2=8, max_m2=20, base_cost_per_m2=1600),
+        "dormitorio_principal": RoomType(code="dormitorio_principal", name="Dormitorio Principal", min_m2=12, max_m2=25, base_cost_per_m2=1600),
+        "dormitorio": RoomType(code="dormitorio", name="Dormitorio", min_m2=8, max_m2=15, base_cost_per_m2=1400),
+        "bano": RoomType(code="bano", name="Baño", min_m2=4, max_m2=8, base_cost_per_m2=1500),
+        "bodega": RoomType(code="bodega", name="Bodega", min_m2=6, max_m2=20, base_cost_per_m2=1000),
+        "piscina": RoomType(code="piscina", name="Piscina", min_m2=20, max_m2=60, base_cost_per_m2=1200),
+        "paneles_solares": RoomType(code="paneles_solares", name="Paneles Solares", min_m2=3, max_m2=15, base_cost_per_m2=350),
+        "garaje": RoomType(code="garaje", name="Garaje", min_m2=15, max_m2=40, base_cost_per_m2=1000),
         "porche": RoomType(code="porche", name="Porche/Terraza", min_m2=8, max_m2=40, base_cost_per_m2=700),
-        "bomba_agua": RoomType(code="bomba_agua", name="Instalaciones", min_m2=2, max_m2=8, base_cost_per_m2=2000),
-        "accesibilidad": RoomType(code="accesibilidad", name="Zona Accesible", min_m2=0, max_m2=10, base_cost_per_m2=2000),
-        "pasillo": RoomType(code="pasillo", name="Pasillo/Distribuidor", min_m2=5, max_m2=20, base_cost_per_m2=800),
-        "huerto": RoomType(code="huerto", name="Huerto", min_m2=10, max_m2=100, base_cost_per_m2=150),
-        "despacho": RoomType(code="despacho", name="Despacho", min_m2=8, max_m2=20, base_cost_per_m2=1100),
+        "bomba_agua": RoomType(code="bomba_agua", name="Instalaciones", min_m2=2, max_m2=8, base_cost_per_m2=1500),
+        "accesibilidad": RoomType(code="accesibilidad", name="Zona Accesible", min_m2=0, max_m2=10, base_cost_per_m2=1500),
+        "pasillo": RoomType(code="pasillo", name="Pasillo/Distribuidor", min_m2=5, max_m2=20, base_cost_per_m2=1200),
+        "huerto": RoomType(code="huerto", name="Huerto", min_m2=10, max_m2=100, base_cost_per_m2=40),
+        "despacho": RoomType(code="despacho", name="Despacho", min_m2=8, max_m2=20, base_cost_per_m2=1400),
     }
     
     # ============================================
@@ -2663,15 +2674,29 @@ def render_step3():
         st.success("🏗️ **Diseño desde Editor 3D** - Versión personalizada")
     else:
         st.info("🤖 **Diseño generado por IA** - Propuesta original")
-    # Costes por partidas
-    construction_cost = int(total_area * 1100)
-    foundation_cost = int(total_area * 180)
-    installation_cost = int(total_area * 150)
-    architecture_cost = int((construction_cost + foundation_cost) * 0.08)
-    # Coste extra por estilo arquitectónico (chimenea)
+    # ── Costes reales mercado 2025 (sincronizado con _get_financials) ──────────
+    _BASE_M2_S3 = {
+        "Moderno": 1500, "Mediterráneo": 1500, "Contemporáneo": 1550,
+        "Ecológico": 1600, "Rural": 1650, "Montaña": 1750, "Clásico": 1800,
+    }
+    _FLOOR_FACTOR_S3 = {
+        "1 Planta": 1.00, "2 Plantas": 1.05,
+        "Planta Baja + Semisótano": 1.18, "2 Plantas + Semisótano": 1.22,
+    }
+    _floors_s3    = req.get("floors", "1 Planta")
+    _base_m2_s3   = _BASE_M2_S3.get(req.get('style', 'Moderno'), 1500)
+    _floor_fac_s3 = _FLOOR_FACTOR_S3.get(_floors_s3, 1.00)
+    PEM_s3        = int(total_area * _base_m2_s3 * _floor_fac_s3)
+    _honorarios_s3 = int(PEM_s3 * 0.09)
+    _licencias_s3  = int(PEM_s3 * 0.04)
     _STYLE_CHIMNEY = {'Montaña': 4500, 'Rural': 4500, 'Clásico': 3500}
-    chimney_cost = _STYLE_CHIMNEY.get(req.get('style', ''), 0)
-    total_cost = construction_cost + foundation_cost + installation_cost + architecture_cost + chimney_cost
+    chimney_cost  = _STYLE_CHIMNEY.get(req.get('style', ''), 0)
+    # Variables de compatibilidad
+    construction_cost = PEM_s3
+    foundation_cost   = int(PEM_s3 * 0.10)
+    installation_cost = int(PEM_s3 * 0.13)
+    architecture_cost = _honorarios_s3 + _licencias_s3
+    total_cost = int(PEM_s3 * 1.13) + 1200 + chimney_cost
     
     # Calcular subvenciones
     subsidy = 0
@@ -2891,32 +2916,28 @@ def render_step3():
         
         import pandas as pd
         
+        _style_s3 = req.get('style', 'Moderno')
         partidas = [
-            ("1. Cimentación", f"€{foundation_cost:,}", 
-             f"{int(foundation_cost/total_cost*100)}%",
-             "Zapatas/losa según estudio geotécnico"),
-            ("2. Estructura y cubierta", f"€{int(construction_cost*0.35):,}",
-             "32%", "Estructura + tejado + cerramientos ext."),
-            ("3. Cerramientos y tabiquería", f"€{int(construction_cost*0.20):,}",
-             "18%", "Fachada, ventanas, puertas, tabiques int."),
-            ("4. Instalaciones", f"€{installation_cost:,}",
-             f"{int(installation_cost/total_cost*100)}%",
-             "Elec., fontanería, climatización, domótica"),
-            ("5. Acabados", f"€{int(construction_cost*0.25):,}",
-             "23%", "Pavimentos, pintura, cocina, baños"),
-            ("6. Sistemas sostenibles", f"€{st.session_state.get('energy_cost_total', int(construction_cost*0.10)):,}",
-             f"{int(st.session_state.get('energy_cost_total', construction_cost*0.10)/max(total_cost,1)*100)}%",
-             "Paneles, aerotermia, geotermia, domótica, agua lluvia"),
-            ("7. Honorarios técnicos", f"€{architecture_cost:,}",
-             "8%", "Arquitecto, aparejador, licencias"),
+            ("1. Geotécnico y topografía",  f"€1.200",              "0%",  "Estudio del terreno previo a proyecto"),
+            ("2. Movimiento de tierras",     f"€{int(PEM_s3*0.03):,}", "3%", "Excavación, nivelación y transporte"),
+            ("3. Cimentación",              f"€{int(PEM_s3*0.10):,}", "10%", "Zapatas / losa según geotécnico"),
+            ("4. Estructura y forjados",     f"€{int(PEM_s3*0.20):,}", "20%", "Hormigón armado, pilares, forjado"),
+            ("5. Cerramientos y fachada",    f"€{int(PEM_s3*0.12):,}", "12%", f"Fachada estilo {_style_s3}"),
+            ("6. Cubierta",                 f"€{int(PEM_s3*0.07):,}", "7%",  f"Cubierta {req.get('roof_type','inclinada')}"),
+            ("7. Carpintería exterior",      f"€{int(PEM_s3*0.06):,}", "6%",  "Ventanas, puertas acceso, persianas"),
+            ("8. Particiones interiores",    f"€{int(PEM_s3*0.05):,}", "5%",  "Tabiquería, trasdosados, pladur"),
+            ("9. Instalaciones",            f"€{int(PEM_s3*0.13):,}", "13%", "Eléctrica, fontanería, climatización"),
+            ("10. Acabados interiores",      f"€{int(PEM_s3*0.12):,}", "12%", "Suelos, techos, pintura interior"),
+            ("11. Baños y cocina",           f"€{int(PEM_s3*0.05):,}", "5%",  "Sanitarios, grifería, equip. básico cocina"),
+            ("12. Urbanización parcela",     f"€{int(PEM_s3*0.03):,}", "3%",  "Acceso, cerramiento, jardinería básica"),
+            ("— Honorarios técnicos",       f"€{_honorarios_s3:,}",   "9%",  "Arquitecto, aparejador, coord. seguridad"),
+            ("— Licencias y tasas",         f"€{_licencias_s3:,}",    "4%",  "Licencia de obras e ICIO municipal"),
         ]
-        # Partida extra chimenea si el estilo la incluye
         if chimney_cost > 0:
             partidas.append((
-                "8. Chimenea / Hogar",
-                f"€{chimney_cost:,}",
-                f"{int(chimney_cost/total_cost*100)}%",
-                f"Chimenea de leña/biomasa — Estilo {req.get('style','')}"
+                "★ Chimenea / hogar",
+                f"€{chimney_cost:,}", "—",
+                f"Chimenea de leña/biomasa — estilo {_style_s3}"
             ))
         
         df = pd.DataFrame(partidas, 
@@ -3519,24 +3540,59 @@ def _get_financials() -> dict:
     energy      = req.get("energy", {})
     budget      = req.get("budget", 150000)
 
-    # Partidas de coste
-    construction_cost  = int(total_area * 1100)
-    foundation_cost    = int(total_area * 180)
-    installation_cost  = int(total_area * 150)
-    architecture_cost  = int((construction_cost + foundation_cost) * 0.08)
-    _STYLE_CHIMNEY     = {"Montaña": 4500, "Rural": 4500, "Clásico": 3500}
-    chimney_cost       = _STYLE_CHIMNEY.get(style, 0)
-    total_cost = (construction_cost + foundation_cost + installation_cost
-                  + architecture_cost + chimney_cost)
+    # ── Costes reales mercado 2025 (base_costes_construccion_espana.md) ──────
+    _BASE_M2 = {
+        "Moderno": 1500, "Mediterráneo": 1500, "Contemporáneo": 1550,
+        "Ecológico": 1600, "Rural": 1650, "Montaña": 1750, "Clásico": 1800,
+    }
+    _FLOOR_FACTOR = {
+        "1 Planta": 1.00, "2 Plantas": 1.05,
+        "Planta Baja + Semisótano": 1.18, "2 Plantas + Semisótano": 1.22,
+    }
+    floors_str   = req.get("floors", "1 Planta")
+    base_m2      = _BASE_M2.get(style, 1500)
+    floor_factor = _FLOOR_FACTOR.get(floors_str, 1.00)
+    PEM          = int(total_area * base_m2 * floor_factor)
+    honorarios   = int(PEM * 0.09)
+    licencias    = int(PEM * 0.04)
+    # Extras reales (precio fijo de mercado)
+    extras_req   = req.get("extras", {})
+    extra_pool   = 25000 if extras_req.get("pool") else 0
+    extra_solar  = 8000  if energy.get("solar") else 0
+    extra_dom    = int(total_area * 80) if energy.get("domotic") else 0
+    _STYLE_CHIMNEY = {"Montaña": 4500, "Rural": 4500, "Clásico": 3500}
+    chimney_cost = _STYLE_CHIMNEY.get(style, 0)
+    total_cost   = int(PEM * 1.13) + 1200 + extra_pool + extra_solar + extra_dom + chimney_cost
+    # Variables de compatibilidad (usadas en retorno y subvenciones)
+    construction_cost = PEM
+    foundation_cost   = int(PEM * 0.10)
+    installation_cost = int(PEM * 0.13)
+    architecture_cost = honorarios + licencias
 
     partidas = [
-        ("Obra civil / estructura",  construction_cost,  f"{construction_cost/max(total_cost,1)*100:.0f}%",  "Cimientos + estructura"),
-        ("Cimentación",              foundation_cost,    f"{foundation_cost/max(total_cost,1)*100:.0f}%",    "Hormigón armado"),
-        ("Instalaciones",            installation_cost,  f"{installation_cost/max(total_cost,1)*100:.0f}%",  "Eléctrica·fontanería·calefacción"),
-        ("Honorarios arquitecto",    architecture_cost,  f"{architecture_cost/max(total_cost,1)*100:.0f}%",  "Proyecto + dirección de obra"),
+        ("1. Geotécnico y topografía",   1200,               "0%",  "Estudio del terreno previo a proyecto"),
+        ("2. Movimiento de tierras",      int(PEM*0.03),      "3%",  "Excavación, nivelación y transporte"),
+        ("3. Cimentación",               int(PEM*0.10),      "10%", "Zapatas / losa según geotécnico"),
+        ("4. Estructura y forjados",      int(PEM*0.20),      "20%", "Hormigón armado, pilares, forjado"),
+        ("5. Cerramientos y fachada",     int(PEM*0.12),      "12%", f"Fachada estilo {style}"),
+        ("6. Cubierta",                  int(PEM*0.07),      "7%",  f"Cubierta {req.get('roof_type','inclinada')}"),
+        ("7. Carpintería exterior",       int(PEM*0.06),      "6%",  "Ventanas, puertas acceso, persianas"),
+        ("8. Particiones interiores",     int(PEM*0.05),      "5%",  "Tabiquería, trasdosados, pladur"),
+        ("9. Instalaciones",             int(PEM*0.13),      "13%", "Eléctrica, fontanería, climatización"),
+        ("10. Acabados interiores",       int(PEM*0.12),      "12%", "Suelos, techos, pintura interior"),
+        ("11. Baños y cocina",            int(PEM*0.05),      "5%",  "Sanitarios, grifería, equip. básico cocina"),
+        ("12. Urbanización parcela",      int(PEM*0.03),      "3%",  "Acceso vehículos, cerramiento, jardinería"),
+        ("— Honorarios técnicos",        honorarios,         "9%",  "Arquitecto, aparejador, coord. seguridad"),
+        ("— Licencias y tasas",          licencias,          "4%",  "Licencia de obras e ICIO municipal"),
     ]
     if chimney_cost:
-        partidas.append(("Chimenea / extras estilo", chimney_cost, f"{chimney_cost/max(total_cost,1)*100:.0f}%", style))
+        partidas.append(("★ Chimenea / hogar", chimney_cost, "—", f"Chimenea de leña/biomasa — estilo {style}"))
+    if extra_pool:
+        partidas.append(("★ Piscina",          extra_pool,   "—", "Piscina hormigón 8×4 m (precio medio)"))
+    if extra_solar:
+        partidas.append(("★ Inst. fotovoltaica 5 kW", extra_solar, "—", "Paneles + inversor + gestor energía"))
+    if extra_dom:
+        partidas.append(("★ Domótica",         extra_dom,    "—", "Sistema domótico medio (€80/m²)"))
 
     # Subvenciones
     subsidy = 0
@@ -3567,6 +3623,10 @@ def _get_financials() -> dict:
     consumo_real  = int(consumo_base * (1 - ahorro_pct / 100))
     ahorro_euros  = int((consumo_base - consumo_real) * 0.18)
     co2_evitado   = round((consumo_base - consumo_real) * 0.25 / 1000, 1)
+
+    # Sincronizar design_data con el total calculado (consistencia ZIP/PDF)
+    design_data["total_cost"] = total_cost
+    design_data["cost_per_m2"] = base_m2
 
     return {
         "req": req, "design_data": design_data, "total_area": total_area,

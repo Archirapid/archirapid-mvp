@@ -373,7 +373,7 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
         }};
         const styleConf = STYLE_3D_CONFIG[houseStyle] || STYLE_3D_CONFIG['Moderno'];
 
-        const COST_PER_M2 = 1500;
+        const COST_PER_M2 = 1600; // €/m² medio mercado España 2025
 
         // Mínimos CTE por tipo de habitación (m²)
         const CTE_MIN = {{
