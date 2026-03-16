@@ -18,6 +18,8 @@ PRODUCTS = {
     "construccion":       {"name": "Construcción Completa",         "amount": 150000},  # €1.500
     "supervision":        {"name": "Supervisión Técnica",           "amount": 30000},   # €300
     "copia_adicional":    {"name": "Copia Adicional",               "amount": 20000},   # €200
+    # Modo Estudio (arquitectos)
+    "estudio_download":   {"name": "Descarga Proyecto Modo Estudio", "amount":  1900},   # €19
 }
 
 

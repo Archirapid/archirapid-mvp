@@ -2349,6 +2349,22 @@ def render_step3_editor():
         st.session_state["babylon_editor_used"] = True
         st.rerun()
 
+    # Modo Estudio: botón para abrir Babylon en nueva pestaña (preserva contexto del portal)
+    if st.session_state.get("estudio_mode") and st.session_state.get("babylon_html"):
+        if st.button("🔗 Abrir Editor 3D en Nueva Pestaña", key="open_babylon_newtab", use_container_width=True):
+            import base64 as _b64mod
+            import streamlit.components.v1 as _cv1_bt
+            _b64html = _b64mod.b64encode(st.session_state["babylon_html"].encode("utf-8")).decode("utf-8")
+            _cv1_bt.html(
+                f"""<script>
+                var html = atob('{_b64html}');
+                var blob = new Blob([html], {{type:'text/html'}});
+                var url = URL.createObjectURL(blob);
+                window.open(url, '_blank');
+                </script>""",
+                height=0,
+            )
+
     # Renderizar editor embebido
     if st.session_state.get("babylon_html"):
         import streamlit.components.v1 as components
@@ -4224,11 +4240,159 @@ def render_step5_docs():
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# MODO ESTUDIO — DESCARGA PARA ARQUITECTOS
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _show_estudio_zip_button(f):
+    """Genera y muestra el botón de descarga ZIP para Modo Estudio."""
+    try:
+        req        = f["req"]
+        plot_data  = st.session_state.get("design_plot_data", {})
+        zip_bytes, zip_filename = generar_zip_proyecto(
+            req=req,
+            design_data=f["design_data"],
+            plot_data=plot_data,
+            partidas=[(p[0], p[1], p[2], p[3]) for p in f["partidas"]],
+            subsidy_total=f["subsidy_total"],
+            energy_label=f["energy_label"],
+        )
+        st.download_button(
+            label="📦 DESCARGAR PROYECTO COMPLETO (ZIP)",
+            data=zip_bytes,
+            file_name=zip_filename,
+            mime="application/zip",
+            type="primary",
+            use_container_width=True,
+            key="btn_dl_estudio",
+        )
+        st.caption("Incluye: Memoria PDF · Mediciones Excel · Plano 2D · BIM/IFC")
+    except Exception as _ez:
+        st.error(f"Error generando ZIP: {_ez}")
+
+
+def _render_estudio_download():
+    """Descarga del proyecto en Modo Estudio (gratis para PRO, €19 para Free)."""
+    from modules.marketplace.architects import check_subscription as _check_sub
+    arch_id = st.session_state.get("arch_id", "")
+    sub     = _check_sub(arch_id) if arch_id else {"active": False}
+    is_pro  = sub.get("active") and sub.get("plan") in ("PRO", "ENTERPRISE")
+
+    f   = _get_financials()
+    req = f["req"]
+
+    if not req.get("ai_room_proposal"):
+        st.warning("Completa primero los pasos anteriores.")
+        if st.button("← Inicio", key="est_back_s6"):
+            st.session_state["ai_house_step"] = 1
+            st.rerun()
+        return
+
+    arch_name = st.session_state.get("estudio_arch_name", "Arquitecto")
+    st.markdown("## 📦 Descarga del Proyecto (Modo Estudio)")
+    st.info(f"Proyecto diseñado por **{arch_name}**")
+
+    st.markdown("""
+<div style="background:rgba(37,99,235,0.12);border:1px solid rgba(37,99,235,0.35);
+            border-radius:12px;padding:16px 20px;margin-bottom:16px;">
+  <div style="font-weight:800;color:#F8FAFC;font-size:15px;margin-bottom:8px;">
+    📦 Contenido del ZIP del Proyecto
+  </div>
+  <ul style="color:#CBD5E1;font-size:13px;margin:0;padding-left:20px;line-height:1.9;">
+    <li>📄 Memoria descriptiva (PDF)</li>
+    <li>📊 Mediciones y presupuesto (Excel)</li>
+    <li>🗺️ Plano de planta (PNG)</li>
+    <li>🏗️ Archivo BIM/IFC (IFC2x3)</li>
+    <li>📋 Informe eficiencia energética</li>
+  </ul>
+</div>""", unsafe_allow_html=True)
+
+    if is_pro:
+        st.success("✅ Plan PRO activo — Descarga gratuita incluida")
+        _show_estudio_zip_button(f)
+        return
+
+    # ── Plan Free: cobrar €19 ──────────────────────────────────────────────
+    st.info("💡 **Plan Free**: Descarga por **€19** (pago único por proyecto)  |  Actualiza a PRO para descargas ilimitadas.")
+
+    _stripe_ok = bool(os.getenv("STRIPE_SECRET_KEY", ""))
+    try:
+        if not _stripe_ok:
+            _stripe_ok = bool(st.secrets.get("STRIPE_SECRET_KEY", ""))
+    except Exception:
+        pass
+
+    if _stripe_ok and not st.session_state.get("stripe_session_id_estudio"):
+        try:
+            from modules.stripe_utils import create_custom_session as _ccs_est
+            _url_est, _sid_est = _ccs_est(
+                line_items=[{"name": "Descarga Proyecto Modo Estudio", "amount_cents": 1900, "quantity": 1}],
+                client_email=st.session_state.get("arch_email", ""),
+                success_url="https://archirapid.streamlit.app/?estudio_pago=ok",
+                cancel_url="https://archirapid.streamlit.app/?estudio_pago=cancel",
+                metadata={"arch_id": arch_id, "mode": "estudio"},
+            )
+            st.session_state["stripe_session_id_estudio"] = _sid_est
+            st.session_state["stripe_checkout_url_estudio"] = _url_est
+        except Exception:
+            pass
+
+    _url_s = st.session_state.get("stripe_checkout_url_estudio")
+    _sid_s = st.session_state.get("stripe_session_id_estudio")
+
+    _ec1, _ec2 = st.columns(2)
+    with _ec1:
+        if _url_s:
+            import streamlit.components.v1 as _cv1_est
+            _cv1_est.html(
+                f"""<a href="{_url_s}" target="_blank"
+                    style="display:block;text-align:center;background:#1E3A5F;color:#fff;
+                           padding:12px 20px;border-radius:8px;font-weight:700;font-size:15px;
+                           text-decoration:none;">
+                    💳 Pagar €19 — Descargar Proyecto
+                </a>
+                <p style="color:#94A3B8;font-size:12px;text-align:center;margin-top:6px;">
+                    Pago seguro con Stripe · Test: 4242 4242 4242 4242
+                </p>""",
+                height=80,
+            )
+        else:
+            st.warning("Stripe no configurado. Contacta con soporte.")
+    with _ec2:
+        if st.button("🔑 Activar Plan PRO", key="btn_upgrade_estudio"):
+            st.info("Ve a la pestaña 💎 Planes para activar Plan PRO con descargas ilimitadas.")
+
+    if _sid_s:
+        st.markdown("<br>", unsafe_allow_html=True)
+        _ev1, _ev2, _ev3 = st.columns([1, 2, 1])
+        with _ev2:
+            if st.button("✅ Ya pagué — Verificar y Descargar", use_container_width=True, key="btn_verify_estudio"):
+                try:
+                    from modules.stripe_utils import verify_session as _vs_est
+                    _sess_est = _vs_est(_sid_s)
+                    if _sess_est.payment_status == "paid":
+                        st.session_state["estudio_pago_completado"] = True
+                        st.session_state.pop("stripe_session_id_estudio", None)
+                        st.session_state.pop("stripe_checkout_url_estudio", None)
+                        st.rerun()
+                    else:
+                        st.warning("⏳ Pago no confirmado. Completa el pago en Stripe y vuelve a verificar.")
+                except Exception as _ve_est:
+                    st.error(f"Error al verificar: {_ve_est}")
+
+    if st.session_state.get("estudio_pago_completado"):
+        _show_estudio_zip_button(f)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # PASO 6 — PAGO + DESCARGA
 # ══════════════════════════════════════════════════════════════════════════════
 
 def render_step6_pago():
     """Paso 6: Pago, descarga ZIP, IFC/BIM y publicación en Tablón de Obras."""
+
+    if st.session_state.get("estudio_mode"):
+        _render_estudio_download()
+        return
 
     f = _get_financials()
     req, total_area, total_cost = f["req"], f["total_area"], f["total_cost"]

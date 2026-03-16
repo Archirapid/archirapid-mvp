@@ -64,7 +64,7 @@ def main():
     else:
         st.warning("⚠️ No tienes una suscripción activa. Tu visibilidad es limitada.")
 
-    tab_planes, tab_subir, tab_proyectos, tab_matching, tab_ia = st.tabs(["💎 Planes", "📤 Subir Proyecto", "📂 Mis Proyectos", "🎯 Oportunidades", "🤖 Asistente IA"])
+    tab_planes, tab_subir, tab_proyectos, tab_matching, tab_ia, tab_estudio = st.tabs(["💎 Planes", "📤 Subir Proyecto", "📂 Mis Proyectos", "🎯 Oportunidades", "🤖 Asistente IA", "🏠 Modo Estudio"])
 
     with tab_ia:
         st.subheader("Boceto Generativo con IA (Gemini Flash)")
@@ -105,8 +105,143 @@ def main():
                     with st.expander("Ver Código SVG"):
                         st.code(svg, language="xml")
 
+    with tab_estudio:
+        st.subheader("🏠 Modo Estudio — Diseño IA para Cualquier Solar")
+        st.write("Genera proyectos completos con IA para cualquier parcela, sin necesidad de que esté en el marketplace.")
+
+        # Pricing cards
+        _ep1, _ep2, _ep3 = st.columns(3)
+        with _ep1:
+            with st.container(border=True):
+                st.markdown("### Por Uso")
+                st.markdown("**€19 / proyecto**")
+                st.write("- 1 descarga ZIP")
+                st.write("- Memoria PDF + Excel")
+                st.write("- BIM/IFC incluido")
+                st.caption("Pago único por descarga")
+        with _ep2:
+            with st.container(border=True):
+                st.markdown("### PRO Mensual")
+                st.markdown("**€99 / mes**")
+                st.write("- Descargas ilimitadas")
+                st.write("- Proyectos activos en marketplace")
+                st.write("- Prioridad en matching")
+                st.caption("Cancela cuando quieras")
+        with _ep3:
+            with st.container(border=True):
+                st.markdown("### PRO Anual")
+                st.markdown("**€890 / año**")
+                st.write("- Todo lo de PRO Mensual")
+                st.write("- **Ahorra 3 meses** vs mensual")
+                st.write("- Soporte prioritario")
+                st.caption("€99 × 12 = €1.188 → ahorras €298")
+
+        st.markdown("---")
+
+        if not st.session_state.get("estudio_mode"):
+            st.subheader("Nuevo Diseño")
+            with st.form("estudio_form"):
+                _fc1, _fc2 = st.columns(2)
+                with _fc1:
+                    _e_ref     = st.text_input("Referencia Catastral (opcional)", "")
+                    _e_address = st.text_input("Dirección del Solar", "")
+                    _e_m2      = st.number_input("Superficie Finca (m²)", min_value=50, max_value=20000, value=500)
+                    _e_rooms   = st.slider("Habitaciones deseadas", 1, 8, 3)
+                with _fc2:
+                    _e_style   = st.selectbox("Estilo Arquitectónico", ["Moderno", "Mediterráneo", "Industrial", "Minimalista", "Rústico", "Montaña"])
+                    _e_budget  = st.number_input("Presupuesto estimado (€)", min_value=50000, max_value=5000000, value=200000, step=10000)
+                    _e_client  = st.text_input("Nombre del cliente (para el PDF)", "")
+
+                if st.form_submit_button("🚀 Iniciar Diseño con IA", type="primary"):
+                    _arch_name = st.session_state.get("arch_name", "Arquitecto")
+                    _max_build = round(_e_m2 * 0.33, 1)
+
+                    # Synthetic plot data
+                    st.session_state["design_plot_data"] = {
+                        "id":              f"estudio_{uuid.uuid4().hex[:8]}",
+                        "title":           _e_address or "Solar Modo Estudio",
+                        "catastral_ref":   _e_ref,
+                        "address":         _e_address,
+                        "total_m2":        float(_e_m2),
+                        "buildable_m2":    _max_build,
+                        "m2":              float(_e_m2),
+                        "surface_m2":      float(_e_m2),
+                        "province":        "",
+                        "lat":             None,
+                        "lon":             None,
+                        "owner_email":     st.session_state.get("arch_email", ""),
+                        "description":     f"Solar diseñado en Modo Estudio por {_arch_name}",
+                    }
+
+                    # Pre-filled requirements
+                    st.session_state["ai_house_requirements"] = {
+                        "target_area_m2":       min(120.0, _max_build),
+                        "max_buildable_m2":     _max_build,
+                        "budget_limit":         float(_e_budget),
+                        "bedrooms":             _e_rooms,
+                        "bathrooms":            max(1, _e_rooms - 1),
+                        "wants_pool":           False,
+                        "wants_porch":          True,
+                        "wants_garage":         False,
+                        "wants_outhouse":       False,
+                        "max_floors":           1,
+                        "style":                _e_style.lower(),
+                        "materials":            ["hormigón"],
+                        "notes":                "",
+                        "orientation":          "Sur",
+                        "roof_type":            "A dos aguas",
+                        "energy_rating":        "B",
+                        "accessibility":        False,
+                        "sustainable_materials": [],
+                        "nombre_proyecto":      _e_address or "Proyecto Modo Estudio",
+                        "cliente":              _e_client,
+                        "arquitecto":           _arch_name,
+                    }
+
+                    st.session_state["estudio_mode"]      = True
+                    st.session_state["estudio_arch_name"] = _arch_name
+                    st.session_state["estudio_client_name"] = _e_client
+
+                    # Clear design_plot_id so flow.main() uses design_plot_data directly
+                    st.session_state.pop("design_plot_id", None)
+
+                    # Clear any stale flow keys
+                    for _k in ["ai_house_step", "ai_house_rooms", "floor_plan_svg",
+                               "floor_plan_signature", "ai_room_proposal", "babylon_html",
+                               "babylon_editor_used", "babylon_modified_layout",
+                               "pago_completado", "total_pagado", "estudio_pago_completado",
+                               "stripe_session_id_estudio", "stripe_checkout_url_estudio",
+                               "stripe_session_id_s6", "stripe_checkout_url_s6"]:
+                        st.session_state.pop(_k, None)
+
+                    st.rerun()
+        else:
+            _col_rst, _ = st.columns([1, 3])
+            with _col_rst:
+                if st.button("← Nuevo Diseño", key="estudio_reset"):
+                    for _k in ["estudio_mode", "estudio_arch_name", "estudio_client_name",
+                               "design_plot_data", "design_plot_id",
+                               "ai_house_step", "ai_house_rooms", "floor_plan_svg",
+                               "floor_plan_signature", "ai_room_proposal", "babylon_html",
+                               "babylon_editor_used", "babylon_modified_layout",
+                               "ai_house_requirements", "pago_completado", "total_pagado",
+                               "estudio_pago_completado", "stripe_session_id_estudio",
+                               "stripe_checkout_url_estudio"]:
+                        st.session_state.pop(_k, None)
+                    st.rerun()
+
+            from modules.ai_house_designer import flow as _estudio_flow
+            _estudio_flow.main()
+
     with tab_planes:
         st.subheader("Elige tu nivel de visibilidad")
+
+        # Modo Estudio pricing reminder
+        with st.expander("💡 Modo Estudio — Descarga de proyectos", expanded=False):
+            st.write("Descarga proyectos generados en Modo Estudio:")
+            st.write("- **Por uso**: €19 por proyecto (plan Free)")
+            st.write("- **PRO Mensual / Anual**: descargas ilimitadas (activar abajo)")
+
         col1, col2, col3 = st.columns(3)
         
         plans = [
