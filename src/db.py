@@ -209,7 +209,29 @@ def ensure_tables():
             name TEXT, email TEXT UNIQUE, phone TEXT, company TEXT, nif TEXT,
             created_at TEXT
         )""")
-        
+        # Migración: añadir proyectos_estudio_count si no existe (sin romper instalaciones previas)
+        try:
+            c.execute("ALTER TABLE architects ADD COLUMN proyectos_estudio_count INTEGER DEFAULT 0")
+        except Exception:
+            pass  # columna ya existe
+
+        # Tabla estudio_projects (proyectos generados en Modo Estudio por arquitectos)
+        c.execute("""CREATE TABLE IF NOT EXISTS estudio_projects (
+            id TEXT PRIMARY KEY,
+            architect_id TEXT NOT NULL,
+            catastral_ref TEXT,
+            address TEXT,
+            surface_m2 REAL,
+            style TEXT,
+            rooms INTEGER,
+            budget REAL,
+            total_cost REAL,
+            zip_filename TEXT,
+            stripe_session_id TEXT,
+            paid INTEGER DEFAULT 0,
+            created_at TEXT
+        )""")
+
         # Tabla subscriptions (suscripciones de arquitectos)
         c.execute("""CREATE TABLE IF NOT EXISTS subscriptions (
             id TEXT PRIMARY KEY,
