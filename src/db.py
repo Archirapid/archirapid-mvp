@@ -215,6 +215,20 @@ def ensure_tables():
         except Exception:
             pass  # columna ya existe
 
+        # Tabla ai_projects (proyectos del AI Designer pagados por clientes)
+        c.execute("""CREATE TABLE IF NOT EXISTS ai_projects (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            client_email TEXT,
+            project_name TEXT,
+            total_area REAL,
+            total_cost REAL,
+            services_json TEXT,
+            style TEXT,
+            energy_label TEXT,
+            created_at TEXT,
+            status TEXT
+        )""")
+
         # Tabla estudio_projects (proyectos generados en Modo Estudio por arquitectos)
         c.execute("""CREATE TABLE IF NOT EXISTS estudio_projects (
             id TEXT PRIMARY KEY,

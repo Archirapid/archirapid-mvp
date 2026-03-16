@@ -123,22 +123,206 @@ def main():
             st.error(f"Error en Gestión de Proyectos: {e}")
 
     with tab3:
+        st.header("💰 Ventas y Transacciones — Todos los flujos")
+        import sqlite3 as _sq3, pandas as _pd3
+
+        # ── KPIs de ingresos ──────────────────────────────────────────────────
         try:
-            st.header("Ventas y Transacciones")
-            st.info("📊 Módulo de analítica en preparación. Próximamente verás aquí el flujo de caja.")
-            conn = db_conn(); c = conn.cursor()
-            c.execute("SELECT * FROM reservations ORDER BY created_at DESC")
-            reservations = c.fetchall()
-            conn.close()
-            if reservations:
-                for r in reservations:
-                    st.write(f"**Reserva ID:** {r[0]} | **Finca:** {r[1]} | **Comprador:** {r[2]} | **Monto:** €{r[4]} | **Tipo:** {r[5]}")
-                    if st.button(f"Confirmar {r[0]}", key=f"confirm_{r[0]}"):
-                        st.success("Reserva confirmada (Admin)")
+            _db3 = _sq3.connect("database.db", timeout=10)
+
+            _rev_fincas = float(_db3.execute("SELECT COALESCE(SUM(amount),0) FROM reservations").fetchone()[0])
+            _n_res3     = _db3.execute("SELECT COUNT(*) FROM reservations").fetchone()[0]
+
+            _n_subs, _mrr = 0, 0.0
+            try:
+                _subs_row = _db3.execute(
+                    "SELECT COUNT(*), COALESCE(SUM(price),0) FROM subscriptions WHERE status='active'"
+                ).fetchone()
+                _n_subs, _mrr = int(_subs_row[0]), float(_subs_row[1])
+            except Exception:
+                pass
+
+            _n_ai_proj = 0
+            try:
+                _n_ai_proj = _db3.execute("SELECT COUNT(*) FROM ai_projects").fetchone()[0]
+            except Exception:
+                pass
+
+            _n_estudio = 0
+            try:
+                _n_estudio = _db3.execute("SELECT COUNT(*) FROM estudio_projects").fetchone()[0]
+            except Exception:
+                pass
+
+            _k1, _k2, _k3, _k4 = st.columns(4)
+            _k1.metric("🏡 Ingresos fincas", f"€{_rev_fincas:,.0f}", delta=f"{_n_res3} operaciones")
+            _k2.metric("💎 Suscripciones activas", _n_subs, delta=f"MRR €{_mrr:,.0f}")
+            _k3.metric("🏠 Proyectos AI pagados", _n_ai_proj)
+            _k4.metric("🎨 Proyectos Modo Estudio", _n_estudio)
+            _db3.close()
+        except Exception as _ek3:
+            st.warning(f"Error KPIs: {_ek3}")
+
+        st.markdown("---")
+
+        # ── 1. Reservas y compras de fincas ──────────────────────────────────
+        st.subheader("🏡 Reservas y Compras de Fincas")
+        try:
+            _db3b = _sq3.connect("database.db", timeout=10)
+            _df_res3 = _pd3.read_sql_query(
+                """SELECT r.id, r.buyer_name, r.buyer_email, p.title as finca,
+                          r.amount, r.kind, r.created_at
+                   FROM reservations r LEFT JOIN plots p ON r.plot_id=p.id
+                   ORDER BY r.created_at DESC""",
+                _db3b
+            )
+            _db3b.close()
+            if not _df_res3.empty:
+                _df_res3["kind"] = _df_res3["kind"].map(
+                    {"purchase": "Compra", "reservation": "Reserva"}
+                ).fillna(_df_res3["kind"])
+                st.dataframe(
+                    _df_res3.rename(columns={
+                        "id": "ID", "buyer_name": "Comprador", "buyer_email": "Email",
+                        "finca": "Finca", "amount": "Importe (€)", "kind": "Tipo", "created_at": "Fecha"
+                    }),
+                    use_container_width=True, hide_index=True
+                )
             else:
-                st.info("Próximamente. No hay reservas.")
-        except Exception as e:
-            st.error(f"Error en Ventas y Transacciones: {e}")
+                st.info("Sin reservas ni compras todavía.")
+        except Exception as _er3:
+            st.error(f"Error reservas: {_er3}")
+
+        st.markdown("---")
+
+        # ── 2. Suscripciones de Arquitectos ──────────────────────────────────
+        st.subheader("💎 Suscripciones de Arquitectos (Planes BASIC / PRO / ENTERPRISE)")
+        try:
+            _db3c = _sq3.connect("database.db", timeout=10)
+            _df_subs = _pd3.read_sql_query(
+                """SELECT s.id, u.name as arquitecto, u.email,
+                          s.plan_type as plan, s.price as precio_mes,
+                          s.monthly_proposals_limit as limite,
+                          s.commission_rate as comision,
+                          s.status, s.start_date, s.end_date
+                   FROM subscriptions s
+                   LEFT JOIN users u ON s.architect_id = u.id
+                   ORDER BY s.created_at DESC""",
+                _db3c
+            )
+            _db3c.close()
+            if not _df_subs.empty:
+                _df_subs["precio_mes"] = _df_subs["precio_mes"].apply(lambda x: f"€{x:,.0f}/mes")
+                _df_subs["comision"]   = _df_subs["comision"].apply(lambda x: f"{x}%")
+                st.dataframe(
+                    _df_subs.rename(columns={
+                        "id": "Sub ID", "arquitecto": "Arquitecto", "email": "Email",
+                        "plan": "Plan", "precio_mes": "Precio", "limite": "Proyectos",
+                        "comision": "Comisión", "status": "Estado",
+                        "start_date": "Inicio", "end_date": "Vencimiento"
+                    }),
+                    use_container_width=True, hide_index=True
+                )
+                _mrr_total = _df_subs[_df_subs["Estado"] == "active"]["Precio"].count()
+            else:
+                st.info("Sin suscripciones activas todavía.")
+        except Exception as _es3:
+            st.error(f"Error suscripciones: {_es3}")
+
+        st.markdown("---")
+
+        # ── 3. Proyectos AI Designer pagados ─────────────────────────────────
+        st.subheader("🏠 Proyectos AI Designer — Pagos Realizados")
+        try:
+            _db3d = _sq3.connect("database.db", timeout=10)
+            _df_ai = _pd3.read_sql_query(
+                """SELECT client_email, project_name, total_area, total_cost,
+                          style, energy_label, status, created_at
+                   FROM ai_projects ORDER BY created_at DESC""",
+                _db3d
+            )
+            _db3d.close()
+            if not _df_ai.empty:
+                _df_ai["total_cost"] = _df_ai["total_cost"].apply(lambda x: f"€{x:,.0f}")
+                _df_ai["total_area"] = _df_ai["total_area"].apply(lambda x: f"{x:.0f} m²")
+                st.dataframe(
+                    _df_ai.rename(columns={
+                        "client_email": "Email cliente", "project_name": "Proyecto",
+                        "total_area": "Superficie", "total_cost": "Coste total",
+                        "style": "Estilo", "energy_label": "Energía",
+                        "status": "Estado", "created_at": "Fecha"
+                    }),
+                    use_container_width=True, hide_index=True
+                )
+            else:
+                st.info("Sin proyectos AI Designer pagados todavía.")
+        except Exception as _eai3:
+            st.error(f"Error proyectos AI: {_eai3}")
+
+        st.markdown("---")
+
+        # ── 4. Proyectos Modo Estudio ─────────────────────────────────────────
+        st.subheader("🎨 Proyectos Modo Estudio — Arquitectos")
+        try:
+            _db3e = _sq3.connect("database.db", timeout=10)
+            _df_est = _pd3.read_sql_query(
+                """SELECT ep.architect_id, u.name as arquitecto, u.email,
+                          ep.address, ep.surface_m2, ep.style, ep.budget,
+                          ep.total_cost, ep.paid, ep.created_at
+                   FROM estudio_projects ep
+                   LEFT JOIN users u ON ep.architect_id = u.id
+                   ORDER BY ep.created_at DESC""",
+                _db3e
+            )
+            _db3e.close()
+            if not _df_est.empty:
+                _df_est["paid"]       = _df_est["paid"].map({1: "✅ Pagado", 0: "⏳ Pendiente"})
+                _df_est["budget"]     = _df_est["budget"].apply(lambda x: f"€{x:,.0f}" if x else "—")
+                _df_est["total_cost"] = _df_est["total_cost"].apply(lambda x: f"€{x:,.0f}" if x else "—")
+                _df_est["surface_m2"] = _df_est["surface_m2"].apply(lambda x: f"{x:.0f} m²" if x else "—")
+                st.dataframe(
+                    _df_est.rename(columns={
+                        "arquitecto": "Arquitecto", "email": "Email",
+                        "address": "Dirección", "surface_m2": "Superficie",
+                        "style": "Estilo", "budget": "Presupuesto",
+                        "total_cost": "Coste generado", "paid": "Pago", "created_at": "Fecha"
+                    }).drop(columns=["architect_id"], errors="ignore"),
+                    use_container_width=True, hide_index=True
+                )
+            else:
+                st.info("Sin proyectos Modo Estudio todavía.")
+        except Exception as _ee3:
+            st.error(f"Error proyectos estudio: {_ee3}")
+
+        st.markdown("---")
+
+        # ── 5. Stripe — Todos los pagos ───────────────────────────────────────
+        st.subheader("💳 Stripe — Todos los pagos (tiempo real)")
+        try:
+            from modules.stripe_utils import list_recent_sessions as _lrs3
+            _stripe_all = _lrs3(limit=100)
+            _rows3 = []
+            for _ss3 in _stripe_all.data:
+                _meta3 = _ss3.metadata or {}
+                _rows3.append({
+                    "Fecha":      _pd3.to_datetime(_ss3.created, unit="s").strftime("%d/%m/%Y %H:%M"),
+                    "Email":      _ss3.customer_email or _meta3.get("client_email", "—"),
+                    "Concepto":   _meta3.get("products", _meta3.get("mode", _meta3.get("project", "—"))),
+                    "Importe (€)": (_ss3.amount_total or 0) / 100,
+                    "Estado":     "✅ Pagado" if _ss3.payment_status == "paid" else "⏳ Pendiente",
+                    "Session ID": _ss3.id[-20:],
+                })
+            if _rows3:
+                _df_st3 = _pd3.DataFrame(_rows3)
+                _paid3  = _df_st3[_df_st3["Estado"] == "✅ Pagado"]["Importe (€)"].sum()
+                _sc1, _sc2 = st.columns(2)
+                _sc1.metric("💶 Total cobrado (Stripe)", f"€{_paid3:,.2f}")
+                _sc2.metric("🧾 Sesiones totales", len(_rows3))
+                st.dataframe(_df_st3, use_container_width=True, hide_index=True)
+            else:
+                st.info("Sin sesiones Stripe todavía. Usa tarjeta 4242 4242 4242 4242 para test.")
+        except Exception as _est3:
+            st.warning(f"Stripe no disponible: {_est3}")
 
     with tab4:
         try:
@@ -596,8 +780,27 @@ TELEGRAM_CHAT_ID   = "5712417665"
             k8.metric("📐 Conversión reserva→compra",
                       f"{(_n_purchase/_n_res*100):.1f}%" if _n_res else "—")
 
-            k9, k10, _, __ = st.columns(4)
+            _n_subs9, _mrr9, _n_estudio9 = 0, 0.0, 0
+            try:
+                _sr9 = _db9.execute("SELECT COUNT(*), COALESCE(SUM(price),0) FROM subscriptions WHERE status='active'").fetchone()
+                _n_subs9, _mrr9 = int(_sr9[0]), float(_sr9[1])
+            except Exception:
+                pass
+            try:
+                _n_estudio9 = _db9.execute("SELECT COUNT(*) FROM estudio_projects").fetchone()[0]
+            except Exception:
+                pass
+
+            k9, k10, k11, k12 = st.columns(4)
             k9.metric("🔔 Alertas activas", _n_alerts)
+            k10.metric("💎 Suscripciones activas", _n_subs9, delta=f"MRR €{_mrr9:,.0f}")
+            k11.metric("🎨 Proyectos Modo Estudio", _n_estudio9)
+            _n_ai9 = 0
+            try:
+                _n_ai9 = _db9.execute("SELECT COUNT(*) FROM ai_projects").fetchone()[0]
+            except Exception:
+                pass
+            k12.metric("🏠 Proyectos AI pagados", _n_ai9)
 
             st.markdown("---")
 

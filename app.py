@@ -47,6 +47,7 @@ from modules.ai_house_designer import flow as ai_house_flow
 
 # Inicializar base de datos
 init_db()
+_db.ensure_tables()  # crea tablas src/db (incluyendo estudio_projects, architects, etc.)
 
 # Configurar página con layout amplio
 import streamlit as st
