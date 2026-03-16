@@ -1859,11 +1859,24 @@ def render_step2():
                 base_cost_per_m2=1000
             )
         
-        design.rooms.append(RoomInstance(
-            room_type=room_type,
-            area_m2=float(area)
-        ))
-    
+        # Deduplicar: tipos que solo pueden aparecer una vez (evita dobles despacho/garaje/etc.)
+        _SINGLE_TYPES = {
+            'despacho', 'garaje', 'bodega', 'piscina', 'paneles_solares',
+            'salon', 'cocina', 'salon_cocina', 'pasillo', 'porche',
+            'huerto', 'bomba_agua', 'accesibilidad',
+        }
+        _existing_codes = [r.room_type.code for r in design.rooms]
+        if room_type.code in _SINGLE_TYPES and room_type.code in _existing_codes:
+            # Ya existe — mantener el de mayor área
+            _idx = _existing_codes.index(room_type.code)
+            if float(area) > design.rooms[_idx].area_m2:
+                design.rooms[_idx].area_m2 = float(area)
+        else:
+            design.rooms.append(RoomInstance(
+                room_type=room_type,
+                area_m2=float(area)
+            ))
+
     # ============================================
     # LAYOUT 2 COLUMNAS PRINCIPALES
     # ============================================
@@ -1885,8 +1898,8 @@ def render_step2():
         st.markdown("#### Ajustar Habitaciones")
         
         # Primero identificar qué extras están marcados para eliminar
-        optional_codes = ['piscina', 'garaje', 'porche', 'bodega', 
-                         'huerto', 'paneles', 'bomba', 'accesib']
+        optional_codes = ['piscina', 'garaje', 'porche', 'bodega',
+                         'huerto', 'paneles', 'bomba', 'accesib', 'despacho', 'office']
         
         # Pre-calcular qué rooms se van a eliminar
         preview_remove = []
@@ -1983,8 +1996,8 @@ def render_step2():
         # ELIMINAR EXTRAS
         st.markdown("#### Eliminar Extras (Ahorrar)")
         
-        optional_codes = ['piscina', 'garaje', 'porche', 'bodega', 
-                         'huerto', 'paneles', 'bomba', 'accesib']
+        optional_codes = ['piscina', 'garaje', 'porche', 'bodega',
+                         'huerto', 'paneles', 'bomba', 'accesib', 'despacho', 'office']
         
         rooms_to_remove = []
         # Construir lista unificada: habitaciones opcionales + sistemas energéticos
@@ -2174,9 +2187,15 @@ def render_step2():
         st.dataframe(df, use_container_width=True, hide_index=True)
         
         st.markdown("---")
-        
+
         # Plano 2D preliminar (sin pestañas)
         st.subheader("📐 Plano 2D Preliminar")
+
+        # Firma del diseño actual — detecta si el plano está desactualizado
+        _cur_sig = "|".join(
+            f"{r.room_type.code}:{r.area_m2:.1f}"
+            for r in sorted(design.rooms, key=lambda x: x.room_type.code)
+        )
 
         if st.button("Generar Plano 2D", type="primary", use_container_width=True):
             try:
@@ -2185,6 +2204,7 @@ def render_step2():
                 img_bytes = planner.generate()
                 st.session_state['current_floor_plan'] = img_bytes
                 st.session_state['current_design'] = design
+                st.session_state['floor_plan_signature'] = _cur_sig
                 st.success("Plano generado correctamente")
                 st.rerun()
             except Exception as e:
@@ -2193,6 +2213,9 @@ def render_step2():
                 st.code(traceback.format_exc())
 
         if 'current_floor_plan' in st.session_state:
+            _saved_sig = st.session_state.get('floor_plan_signature', '')
+            if _saved_sig and _saved_sig != _cur_sig:
+                st.warning("⚠️ Has modificado habitaciones o superficies. Pulsa **Generar Plano 2D** para actualizar el plano.")
             st.image(
                 st.session_state['current_floor_plan'],
                 caption="Plano profesional con medidas reales",
