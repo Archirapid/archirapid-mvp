@@ -212,6 +212,12 @@ def ensure_tables():
         # Migraciones seguras: añadir columnas nuevas sin romper instalaciones previas
         for _mig_sql in [
             "ALTER TABLE architects ADD COLUMN proyectos_estudio_count INTEGER DEFAULT 0",
+            "ALTER TABLE architects ADD COLUMN specialty TEXT",
+            "ALTER TABLE architects ADD COLUMN address TEXT",
+            "ALTER TABLE architects ADD COLUMN city TEXT",
+            "ALTER TABLE architects ADD COLUMN province TEXT",
+            "ALTER TABLE architects ADD COLUMN avg_project_price REAL",
+            "ALTER TABLE architects ADD COLUMN origen_registro TEXT",
             "ALTER TABLE plots ADD COLUMN tour_360_b64 TEXT",
             "ALTER TABLE plots ADD COLUMN buildable_m2 REAL",
             "ALTER TABLE plots ADD COLUMN ai_verification_cache TEXT",

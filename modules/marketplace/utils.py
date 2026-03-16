@@ -34,8 +34,33 @@ def insert_user(user):
     if user.get("role") == "architect":
         c.execute("SELECT id FROM architects WHERE email=?", (user['email'],))
         if not c.fetchone():
-            c.execute("INSERT INTO architects (id,name,email,company,created_at) VALUES (?,?,?,?,?)",
-                      (user["id"], user["name"], user["email"], user.get("company",""), datetime.utcnow().isoformat()))
+            c.execute("""INSERT INTO architects
+                         (id,name,email,company,phone,nif,specialty,address,city,province,avg_project_price,origen_registro,created_at)
+                         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                      (user["id"], user["name"], user["email"],
+                       user.get("company", user.get("name", "")),
+                       user.get("phone", ""),
+                       user.get("nif", ""),
+                       user.get("specialty", ""),
+                       user.get("address", ""),
+                       user.get("city", ""),
+                       user.get("province", ""),
+                       user.get("avg_project_price", None),
+                       user.get("origen_registro", None),
+                       datetime.utcnow().isoformat()))
+        else:
+            # Actualizar campos si el arquitecto ya existe y vuelve a rellenar el formulario
+            c.execute("""UPDATE architects SET phone=COALESCE(NULLIF(?,''),phone),
+                         specialty=COALESCE(NULLIF(?,''),specialty),
+                         address=COALESCE(NULLIF(?,''),address),
+                         city=COALESCE(NULLIF(?,''),city),
+                         province=COALESCE(NULLIF(?,''),province),
+                         avg_project_price=COALESCE(?,avg_project_price)
+                         WHERE email=?""",
+                      (user.get("phone",""), user.get("specialty",""),
+                       user.get("address",""), user.get("city",""),
+                       user.get("province",""), user.get("avg_project_price"),
+                       user["email"]))
     elif user.get("role") == "owner":
         c.execute("SELECT id FROM owners WHERE email=?", (user['email'],))
         if not c.fetchone():

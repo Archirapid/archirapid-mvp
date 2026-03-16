@@ -101,46 +101,105 @@ def main():
 
     # --- 1. LOGIN / REGISTRO ---
     if "arch_id" not in st.session_state:
-        st.info("Accede con tu email profesional o regístrate gratis.")
-        c_login, c_info = st.columns([2, 1])
+        c_login, c_info = st.columns([3, 2])
+
+        with c_info:
+            st.markdown("""
+### ¿Por qué ArchiRapid?
+- 🏠 **Modo Estudio** — genera proyectos completos con IA para cualquier solar
+- 📤 **Publica proyectos** en el marketplace y llega a propietarios de fincas
+- 🎯 **Matching automático** — tus proyectos se emparejan con solares compatibles
+- 💰 **Comisión del 20%** solo cuando cierras una venta. Sin cuota fija si no vendes.
+- 💎 Planes desde **€29/mes** para mayor visibilidad
+
+---
+*Si ya tienes cuenta, introduce tu email y pulsa Entrar.*
+""")
+
         with c_login:
+            st.subheader("Acceso profesional")
             with st.form("login_arch"):
-                email = st.text_input("Email profesional *", placeholder="tu@estudio.com")
-                name  = st.text_input("Nombre del Estudio / Arquitecto *", placeholder="Estudio García Arquitectos")
-                phone = st.text_input("Teléfono de contacto", placeholder="+34 600 000 000")
-                st.caption("Si ya tienes cuenta, introduce el mismo email para acceder.")
-                submitted = st.form_submit_button("Entrar / Registrarse", type="primary", use_container_width=True)
+                st.markdown("**Datos de contacto**")
+                r1c1, r1c2 = st.columns(2)
+                with r1c1:
+                    email = st.text_input("Email profesional *", placeholder="tu@estudio.com")
+                with r1c2:
+                    phone = st.text_input("Teléfono *", placeholder="+34 600 000 000")
+
+                name = st.text_input("Nombre del Estudio / Arquitecto *", placeholder="Estudio García Arquitectos")
+
+                st.markdown("**Ubicación del estudio**")
+                r2c1, r2c2, r2c3 = st.columns([3, 2, 2])
+                with r2c1:
+                    address = st.text_input("Dirección", placeholder="Calle Gran Vía 1, 3º")
+                with r2c2:
+                    city = st.text_input("Ciudad", placeholder="Madrid")
+                with r2c3:
+                    province = st.selectbox("Provincia", [
+                        "", "Madrid", "Barcelona", "Valencia", "Sevilla", "Zaragoza",
+                        "Málaga", "Murcia", "Palma", "Las Palmas", "Bilbao",
+                        "Alicante", "Córdoba", "Valladolid", "Vigo", "Gijón",
+                        "Granada", "Elche", "Oviedo", "Badalona", "Cartagena",
+                        "Terrassa", "Jerez", "Sabadell", "Santa Cruz de Tenerife",
+                        "Pamplona", "Almería", "Fuenlabrada", "Hospitalet",
+                        "San Sebastián", "Burgos", "Castellón", "Albacete",
+                        "Santander", "Logroño", "Salamanca", "Huelva", "Badajoz",
+                        "Lleida", "Tarragona", "León", "Cádiz", "Marbella",
+                        "Otra"
+                    ])
+
+                st.markdown("**Perfil profesional**")
+                r3c1, r3c2 = st.columns(2)
+                with r3c1:
+                    specialty = st.multiselect(
+                        "Especialidades",
+                        ["Vivienda unifamiliar", "Vivienda plurifamiliar", "Reforma interior",
+                         "Arquitectura sostenible", "Arquitectura industrial", "Urbanismo",
+                         "Interiorismo", "Rehabilitación", "Obra nueva", "BIM/IFC"],
+                        default=[]
+                    )
+                with r3c2:
+                    avg_price = st.number_input(
+                        "Precio medio de tus proyectos (€)",
+                        min_value=0, max_value=5000000, value=150000, step=10000,
+                        help="Precio medio de construcción de los proyectos que publicas. Orientativo para los clientes."
+                    )
+
+                st.markdown("---")
+                st.info("💰 **Comisión ArchiRapid: 20%** sobre cada venta cerrada a través de la plataforma. Sin comisión si no vendes.")
+
+                submitted = st.form_submit_button("Entrar / Registrarme", type="primary", use_container_width=True)
 
                 if submitted:
-                    if not email or not name:
-                        st.error("Email y nombre son obligatorios.")
+                    if not email or not name or not phone:
+                        st.error("Email, nombre y teléfono son obligatorios.")
                     else:
+                        specialty_str = ", ".join(specialty) if specialty else ""
                         user_data = get_user_by_email(email)
                         if user_data:
+                            # Login existente — actualizar datos si los rellena
+                            insert_user({"id": user_data["id"], "name": name, "email": email,
+                                         "role": "architect", "company": name, "phone": phone,
+                                         "specialty": specialty_str, "address": address,
+                                         "city": city, "province": province,
+                                         "avg_project_price": avg_price if avg_price > 0 else None})
                             st.session_state["arch_id"]    = user_data["id"]
                             st.session_state["arch_name"]  = user_data["name"]
                             st.session_state["arch_email"] = user_data["email"]
-                            st.session_state["arch_phone"] = user_data.get("phone", phone)
                             st.success(f"¡Bienvenido de nuevo, {user_data['name']}!")
                         else:
                             new_id = uuid.uuid4().hex
                             insert_user({"id": new_id, "name": name, "email": email,
-                                         "role": "architect", "company": name, "phone": phone})
+                                         "role": "architect", "company": name, "phone": phone,
+                                         "specialty": specialty_str, "address": address,
+                                         "city": city, "province": province,
+                                         "avg_project_price": avg_price if avg_price > 0 else None})
                             st.session_state["arch_id"]    = new_id
                             st.session_state["arch_name"]  = name
                             st.session_state["arch_email"] = email
-                            st.session_state["arch_phone"] = phone
                             st.success(f"¡Cuenta creada! Bienvenido, {name}.")
                         sleep(0.8)
                         st.rerun()
-        with c_info:
-            st.markdown("""
-**¿Qué incluye el acceso?**
-- 🏠 Modo Estudio — diseña con IA
-- 📤 Publica proyectos en el marketplace
-- 🎯 Matching automático con solares
-- 💎 Planes desde €29/mes
-""")
         return
 
     # --- 2. DASHBOARD ---
