@@ -273,6 +273,17 @@ def ensure_tables():
             created_at TEXT
         )""")
         
+        # Tabla visitas_demo (tracking de deep links y demos)
+        c.execute("""CREATE TABLE IF NOT EXISTS visitas_demo (
+            id TEXT PRIMARY KEY,
+            timestamp TEXT,
+            origen TEXT,
+            nombre_usuario TEXT,
+            accion_realizada TEXT,
+            convirtio_a_registro INTEGER DEFAULT 0,
+            session_id TEXT
+        )""")
+
         # Tabla proposals (propuestas de arquitectos a propietarios)
         # Versión nueva simplificada (mantener compatibilidad con esquema anterior extenso)
         c.execute("""CREATE TABLE IF NOT EXISTS proposals (

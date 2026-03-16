@@ -1292,6 +1292,63 @@ if st.session_state.get('_nav_route') != _nav_route:
         height=0
     )
 
+# ═══════════════════════════════════════════════════════════════════════
+# DEEP LINKS — tracking de origen y modo demo
+# Soporta: ?seccion=arquitecto  ?from=linkedin  ?user=javier  ?demo=true
+# ═══════════════════════════════════════════════════════════════════════
+def _registrar_visita_demo(origen, nombre, accion):
+    """Guarda una visita en visitas_demo. Silencioso si falla."""
+    try:
+        import uuid as _uuid
+        from datetime import datetime as _dt
+        from modules.marketplace.utils import db_conn as _dbc
+        _conn = _dbc(); _c = _conn.cursor()
+        _c.execute("""INSERT OR IGNORE INTO visitas_demo
+                      (id,timestamp,origen,nombre_usuario,accion_realizada,session_id)
+                      VALUES (?,?,?,?,?,?)""",
+                   (_uuid.uuid4().hex, _dt.utcnow().isoformat(),
+                    origen, nombre, accion,
+                    st.session_state.get("_demo_session_id", "")))
+        _conn.commit(); _conn.close()
+    except Exception:
+        pass
+
+_qp_seccion = st.query_params.get("seccion", "")
+_qp_from    = st.query_params.get("from", "")
+_qp_user    = st.query_params.get("user", "")
+_qp_demo    = st.query_params.get("demo", "")
+_qp_modo    = st.query_params.get("modo", "")
+
+# Generar session_id único para esta visita (solo una vez por sesión)
+if "_demo_session_id" not in st.session_state:
+    import uuid as _uuid_mod
+    st.session_state["_demo_session_id"] = _uuid_mod.uuid4().hex
+
+# Registrar origen una sola vez por sesión
+if _qp_from and not st.session_state.get("_origen_registrado"):
+    _registrar_visita_demo(_qp_from, _qp_user or "anónimo", f"visita:{_qp_seccion or 'home'}")
+    st.session_state["_origen_registrado"] = True
+    st.session_state["_visit_from"] = _qp_from
+
+# Mensaje de bienvenida personalizado
+if _qp_user and not st.session_state.get("_welcome_shown"):
+    _nombre_display = _qp_user.capitalize()
+    st.toast(f"Bienvenido, {_nombre_display}. Prueba ArchiRapid en directo.", icon="👋")
+    st.session_state["_welcome_shown"] = True
+
+# Activar sandbox si ?demo=true
+if _qp_demo == "true" and not st.session_state.get("sandbox_mode"):
+    st.session_state["sandbox_mode"] = True
+    st.session_state["sandbox_user"] = _qp_user.capitalize() if _qp_user else "Visitante"
+
+# Navegar directo al portal del arquitecto si ?seccion=arquitecto
+if _qp_seccion == "arquitecto" and not st.session_state.get("_deep_link_routed"):
+    st.session_state["selected_page"] = "Arquitectos (Marketplace)"
+    st.session_state["_deep_link_routed"] = True
+    # Si sandbox + modo estudio, marcar para abrir esa pestaña al entrar
+    if _qp_modo == "estudio" or _qp_demo == "true":
+        st.session_state["_open_estudio_tab"] = True
+
 # === RUTA PÚBLICA: ?page=stats (sin login) ===
 if st.query_params.get("page") == "stats":
     try:

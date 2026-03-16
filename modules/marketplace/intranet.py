@@ -952,6 +952,50 @@ Obtén el token creando un bot con @BotFather en Telegram.
             except Exception as _et:
                 st.warning(f"Top fincas: {_et}")
 
+            # ── TRACKING DEEP LINKS Y DEMOS ────────────────────────────────
+            st.markdown("---")
+            st.subheader("🔗 Tracking de Deep Links y Demos")
+            try:
+                import pandas as _pd9b
+                _db9b = db_conn()
+                _df_vis = _pd9b.read_sql_query(
+                    """SELECT origen as Origen,
+                              COUNT(*) as Visitas,
+                              SUM(convirtio_a_registro) as Registros,
+                              ROUND(SUM(convirtio_a_registro)*100.0/COUNT(*),1) as 'Conv%'
+                       FROM visitas_demo
+                       GROUP BY origen ORDER BY Visitas DESC""",
+                    _db9b
+                )
+                _db9b.close()
+                if not _df_vis.empty:
+                    _kv1, _kv2, _kv3 = st.columns(3)
+                    _kv1.metric("Total visitas demo", int(_df_vis["Visitas"].sum()))
+                    _kv2.metric("Registros generados", int(_df_vis["Registros"].sum()))
+                    _total_vis = int(_df_vis["Visitas"].sum())
+                    _total_reg = int(_df_vis["Registros"].sum())
+                    _conv_global = round(_total_reg * 100.0 / _total_vis, 1) if _total_vis > 0 else 0
+                    _kv3.metric("Conversion global", f"{_conv_global}%")
+                    st.dataframe(_df_vis, use_container_width=True, hide_index=True)
+
+                    # Detalle de visitas recientes
+                    _db9c = db_conn()
+                    _df_det = _pd9b.read_sql_query(
+                        """SELECT timestamp as Fecha, origen as Origen, nombre_usuario as Usuario,
+                                  accion_realizada as Accion,
+                                  CASE convirtio_a_registro WHEN 1 THEN 'Si' ELSE 'No' END as Registro
+                           FROM visitas_demo ORDER BY timestamp DESC LIMIT 50""",
+                        _db9c
+                    )
+                    _db9c.close()
+                    st.caption("Ultimas 50 visitas:")
+                    st.dataframe(_df_det, use_container_width=True, hide_index=True)
+                else:
+                    st.info("Sin visitas registradas todavia. Comparte el enlace demo para empezar a trackear.")
+                    st.code("https://archirapid.streamlit.app/?seccion=arquitecto&demo=true&from=linkedin&user=nombre")
+            except Exception as _ev:
+                st.error(f"Error tracking: {_ev}")
+
             _db9.close()
 
         except Exception as _e9:

@@ -111,6 +111,42 @@ def main():
         except Exception:
             pass
 
+    # --- SANDBOX MODE: auto-login + datos demo precargados ---
+    if st.session_state.get("sandbox_mode") and "arch_id" not in st.session_state:
+        conn_sb = db_conn(); c_sb = conn_sb.cursor()
+        c_sb.execute("SELECT id, name, email FROM architects WHERE email='demo@archirapid.com'")
+        row_sb = c_sb.fetchone(); conn_sb.close()
+        if row_sb:
+            st.session_state["arch_id"]    = row_sb[0]
+            st.session_state["arch_name"]  = row_sb[1]
+            st.session_state["arch_email"] = row_sb[2]
+            _dm2 = 450.0
+            st.session_state["design_plot_data"] = {
+                "id": "demo_solar_001", "title": "Calle Mayor 12, Madrid",
+                "address": "Calle Mayor 12, Madrid", "catastral_ref": "DEMO-0001",
+                "total_m2": _dm2, "buildable_m2": round(_dm2 * 0.33, 1),
+                "m2": _dm2, "surface_m2": _dm2, "province": "Madrid",
+                "lat": 40.4153, "lon": -3.7074, "owner_email": "demo@archirapid.com",
+                "description": "Solar de demo ArchiRapid",
+            }
+            st.session_state["ai_house_requirements"] = {
+                "target_area_m2": 148.0, "max_buildable_m2": 148.5,
+                "budget": 220000.0, "bedrooms": 4, "bathrooms": 3,
+                "wants_pool": False, "wants_porch": True, "wants_garage": True,
+                "wants_outhouse": False, "max_floors": 2,
+                "style": "Moderno", "materials": ["hormigon"],
+                "notes": "Proyecto de demostracion ArchiRapid",
+                "orientation": "Sur", "roof_type": "Plana", "energy_rating": "A",
+                "accessibility": False, "sustainable_materials": [],
+                "nombre_proyecto": "Casa Demo Calle Mayor 12 Madrid",
+                "cliente": st.session_state.get("sandbox_user", "Visitante"),
+                "arquitecto": "Demo Estudio ArchiRapid",
+            }
+            st.session_state["estudio_mode"] = True
+            st.session_state["estudio_arch_name"] = "Demo Estudio ArchiRapid"
+            st.session_state["estudio_client_name"] = st.session_state.get("sandbox_user", "Visitante")
+        st.rerun()
+
     # --- 1. LOGIN / REGISTRO ---
     if "arch_id" not in st.session_state:
         from werkzeug.security import generate_password_hash, check_password_hash
@@ -252,13 +288,19 @@ def main():
         return
 
     # --- 2. DASHBOARD ---
+
+    # Banner sandbox
+    _sandbox = st.session_state.get("sandbox_mode", False)
+    if _sandbox:
+        _suser = st.session_state.get("sandbox_user", "Visitante")
+        st.info(f"**Modo Demo activo** — Bienvenido, {_suser}. Todo funciona, ningún dato se guarda. "
+                f"Al finalizar puedes crear tu cuenta real.")
+
     st.write(f"Conectado como: **{st.session_state.arch_name}**")
-    
+
     sub_status = check_subscription(st.session_state["arch_id"])
     if sub_status["active"]:
-        st.caption(f"✅ Suscripción Activa: **Plan {sub_status['plan']}** (Renueva: {sub_status['end_date']})")
-    else:
-        st.warning("⚠️ No tienes una suscripción activa. Tu visibilidad es limitada.")
+        st.caption(f"Suscripcion Activa: **Plan {sub_status['plan']}** (Renueva: {sub_status['end_date']})")
 
     tab_planes, tab_subir, tab_proyectos, tab_matching, tab_ia, tab_estudio = st.tabs(["💎 Planes", "📤 Subir Proyecto", "📂 Mis Proyectos", "🎯 Oportunidades", "🤖 Asistente IA", "🏠 Modo Estudio"])
 
@@ -414,14 +456,50 @@ def main():
             from modules.ai_house_designer import flow as _estudio_flow
             _estudio_flow.main()
 
+            # --- BANNER CONVERSION (solo en sandbox) ---
+            if st.session_state.get("sandbox_mode"):
+                st.markdown("---")
+                with st.container(border=True):
+                    st.markdown("### ¿Te ha gustado lo que has visto?")
+                    st.write("Has usado el motor de IA completo, el editor 3D y la generación de presupuesto. "
+                             "Crea tu cuenta y descarga tu primer proyecto real.")
+                    _bc1, _bc2, _bc3 = st.columns(3)
+                    with _bc1:
+                        if st.button("Crear cuenta gratis", key="sandbox_cta_register",
+                                     type="primary", use_container_width=True):
+                            st.session_state.pop("sandbox_mode", None)
+                            st.session_state.pop("arch_id", None)
+                            st.session_state["arch_auth_mode"] = "register"
+                            # Registrar conversion
+                            try:
+                                from modules.marketplace.utils import db_conn as _dbc2
+                                _c2 = _dbc2(); _cc = _c2.cursor()
+                                _cc.execute("UPDATE visitas_demo SET convirtio_a_registro=1 WHERE session_id=?",
+                                            (st.session_state.get("_demo_session_id",""),))
+                                _c2.commit(); _c2.close()
+                            except Exception:
+                                pass
+                            st.rerun()
+                    with _bc2:
+                        if st.button("Ver planes y precios", key="sandbox_cta_planes",
+                                     use_container_width=True):
+                            st.session_state["_go_to_planes"] = True
+                            st.rerun()
+                    with _bc3:
+                        st.markdown("[hola@archirapid.com](mailto:hola@archirapid.com)")
+
     with tab_planes:
         st.subheader("💎 Elige tu plan")
 
         # Banner plan activo
         if sub_status["active"]:
-            st.success(f"✅ Plan activo: **{sub_status['plan']}** — vence el {sub_status['end_date']}")
+            st.success(f"Plan activo: **{sub_status['plan']}** — vence el {sub_status['end_date']}")
         else:
-            st.warning("⚠️ Sin plan activo. Suscríbete para publicar proyectos y acceder al Modo Estudio ilimitado.")
+            st.warning("Sin plan activo. Suscribete para publicar proyectos y acceder al Modo Estudio ilimitado.")
+
+        # Aviso tarjeta de prueba Stripe (entorno test)
+        st.info("**Entorno de pruebas Stripe** — Usa la tarjeta: `4242 4242 4242 4242` "
+                "· Fecha: cualquier fecha futura (ej. 12/26) · CVC: cualquier 3 digitos")
 
         st.markdown("---")
 
