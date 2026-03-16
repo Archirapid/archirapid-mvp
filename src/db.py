@@ -209,11 +209,17 @@ def ensure_tables():
             name TEXT, email TEXT UNIQUE, phone TEXT, company TEXT, nif TEXT,
             created_at TEXT
         )""")
-        # Migración: añadir proyectos_estudio_count si no existe (sin romper instalaciones previas)
-        try:
-            c.execute("ALTER TABLE architects ADD COLUMN proyectos_estudio_count INTEGER DEFAULT 0")
-        except Exception:
-            pass  # columna ya existe
+        # Migraciones seguras: añadir columnas nuevas sin romper instalaciones previas
+        for _mig_sql in [
+            "ALTER TABLE architects ADD COLUMN proyectos_estudio_count INTEGER DEFAULT 0",
+            "ALTER TABLE plots ADD COLUMN tour_360_b64 TEXT",
+            "ALTER TABLE plots ADD COLUMN buildable_m2 REAL",
+            "ALTER TABLE plots ADD COLUMN ai_verification_cache TEXT",
+        ]:
+            try:
+                c.execute(_mig_sql)
+            except Exception:
+                pass  # columna ya existe
 
         # Tabla ai_projects (proyectos del AI Designer pagados por clientes)
         c.execute("""CREATE TABLE IF NOT EXISTS ai_projects (

@@ -376,7 +376,7 @@ if __name__ == '__main__':
               f"{i['x']:>6.1f} {i['z']:>6.1f} "
               f"{i['width']:>4.1f}m {i['depth']:>4.1f}m")
     print()
-    print("ESQUEMA ESPERADO:")
+    print("ESQUEMA ESPERADO:")La reparac
     print("z pequeño = norte (jardín/piscina)")
     print("z grande  = sur   (porche/entrada)")
     print()
