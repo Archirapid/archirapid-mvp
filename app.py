@@ -1328,11 +1328,13 @@ if "_demo_session_id" not in st.session_state:
     import uuid as _uuid_mod
     st.session_state["_demo_session_id"] = _uuid_mod.uuid4().hex
 
-# Registrar origen una sola vez por sesión
-if _qp_origen and not st.session_state.get("_origen_registrado"):
-    _registrar_visita_demo(_qp_origen, _qp_user or "anonimo", f"visita:{_qp_seccion or 'home'}")
+# Registrar origen una sola vez por sesión (demo=true o seccion=arquitecto)
+_es_visita_demo = _qp_demo == "true" or _qp_seccion == "arquitecto"
+if _es_visita_demo and not st.session_state.get("_origen_registrado"):
+    _origen_final = _qp_origen or "directo"
+    _registrar_visita_demo(_origen_final, _qp_user or "anonimo", f"visita:{_qp_seccion or 'home'}")
     st.session_state["_origen_registrado"] = True
-    st.session_state["_visit_from"] = _qp_origen
+    st.session_state["_visit_from"] = _origen_final
 
 # Mensaje de bienvenida personalizado
 if _qp_user and not st.session_state.get("_welcome_shown"):
