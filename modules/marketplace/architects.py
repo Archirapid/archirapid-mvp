@@ -100,6 +100,7 @@ def main():
             st.session_state[f"sub_activated_{_sub_session}"] = True
             if ok:
                 st.success("✅ ¡Suscripción activada! Ya tienes acceso completo al plan.")
+                st.session_state["_open_estudio_tab"] = True
             else:
                 st.warning("El pago no pudo verificarse automáticamente. Si ya fue cobrado, escríbenos a hola@archirapid.com.")
         try:
@@ -302,7 +303,12 @@ def main():
     if sub_status["active"]:
         st.caption(f"Suscripcion Activa: **Plan {sub_status['plan']}** (Renueva: {sub_status['end_date']})")
 
-    tab_planes, tab_subir, tab_proyectos, tab_matching, tab_ia, tab_estudio = st.tabs(["💎 Planes", "📤 Subir Proyecto", "📂 Mis Proyectos", "🎯 Oportunidades", "🤖 Asistente IA", "🏠 Modo Estudio"])
+    if st.session_state.pop("_open_estudio_tab", False):
+        tab_estudio, tab_planes, tab_subir, tab_proyectos, tab_matching, tab_ia = st.tabs([
+            "🏠 Modo Estudio", "💎 Planes", "📤 Subir Proyecto", "📂 Mis Proyectos", "🎯 Oportunidades", "🤖 Asistente IA"])
+    else:
+        tab_planes, tab_subir, tab_proyectos, tab_matching, tab_ia, tab_estudio = st.tabs([
+            "💎 Planes", "📤 Subir Proyecto", "📂 Mis Proyectos", "🎯 Oportunidades", "🤖 Asistente IA", "🏠 Modo Estudio"])
 
     with tab_ia:
         st.subheader("Boceto Generativo con IA (Groq)")
