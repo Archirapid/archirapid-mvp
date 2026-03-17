@@ -1315,9 +1315,13 @@ def _registrar_visita_demo(origen, nombre, accion):
 
 _qp_seccion = st.query_params.get("seccion", "")
 _qp_from    = st.query_params.get("from", "")
+_qp_ref     = st.query_params.get("ref", "")   # alias de ?from — para links de campaña
 _qp_user    = st.query_params.get("user", "")
 _qp_demo    = st.query_params.get("demo", "")
 _qp_modo    = st.query_params.get("modo", "")
+
+# ref y from son equivalentes; ref tiene prioridad si ambos presentes
+_qp_origen = _qp_ref or _qp_from
 
 # Generar session_id único para esta visita (solo una vez por sesión)
 if "_demo_session_id" not in st.session_state:
@@ -1325,10 +1329,10 @@ if "_demo_session_id" not in st.session_state:
     st.session_state["_demo_session_id"] = _uuid_mod.uuid4().hex
 
 # Registrar origen una sola vez por sesión
-if _qp_from and not st.session_state.get("_origen_registrado"):
-    _registrar_visita_demo(_qp_from, _qp_user or "anónimo", f"visita:{_qp_seccion or 'home'}")
+if _qp_origen and not st.session_state.get("_origen_registrado"):
+    _registrar_visita_demo(_qp_origen, _qp_user or "anonimo", f"visita:{_qp_seccion or 'home'}")
     st.session_state["_origen_registrado"] = True
-    st.session_state["_visit_from"] = _qp_from
+    st.session_state["_visit_from"] = _qp_origen
 
 # Mensaje de bienvenida personalizado
 if _qp_user and not st.session_state.get("_welcome_shown"):
