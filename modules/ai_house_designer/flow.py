@@ -4275,7 +4275,7 @@ def _render_estudio_download():
     from modules.marketplace.architects import check_subscription as _check_sub
     arch_id = st.session_state.get("arch_id", "")
     sub     = _check_sub(arch_id) if arch_id else {"active": False}
-    is_pro  = sub.get("active") and sub.get("plan") in ("PRO", "ENTERPRISE")
+    is_pro  = sub.get("active") and sub.get("plan") in ("PRO", "PRO_ANUAL", "ENTERPRISE")
 
     f   = _get_financials()
     req = f["req"]

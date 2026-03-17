@@ -112,41 +112,60 @@ def main():
         except Exception:
             pass
 
-    # --- SANDBOX MODE: auto-login + datos demo precargados ---
+    # --- SANDBOX MODE: pantalla de acceso demo (pago test con 4242) ---
     if st.session_state.get("sandbox_mode") and "arch_id" not in st.session_state:
         conn_sb = db_conn(); c_sb = conn_sb.cursor()
         c_sb.execute("SELECT id, name, email FROM architects WHERE email='demo@archirapid.com'")
         row_sb = c_sb.fetchone(); conn_sb.close()
+
+        st.markdown("## Modo Demo ArchiRapid")
+        st.info(
+            "**Estas en la demo de ArchiRapid** — acceso completo al portal del arquitecto.\n\n"
+            "Para acceder, contrata el **Plan PRO Anual** con la tarjeta de prueba Stripe:\n\n"
+            "- Numero: `4242 4242 4242 4242`\n"
+            "- Fecha: cualquier fecha futura (ej. `12/28`)\n"
+            "- CVC: cualquier 3 digitos (ej. `123`)\n\n"
+            "Es una simulacion — ningun cargo real."
+        )
+
         if row_sb:
-            st.session_state["arch_id"]    = row_sb[0]
-            st.session_state["arch_name"]  = row_sb[1]
-            st.session_state["arch_email"] = row_sb[2]
-            _dm2 = 450.0
-            st.session_state["design_plot_data"] = {
-                "id": "demo_solar_001", "title": "Calle Mayor 12, Madrid",
-                "address": "Calle Mayor 12, Madrid", "catastral_ref": "DEMO-0001",
-                "total_m2": _dm2, "buildable_m2": round(_dm2 * 0.33, 1),
-                "m2": _dm2, "surface_m2": _dm2, "province": "Madrid",
-                "lat": 40.4153, "lon": -3.7074, "owner_email": "demo@archirapid.com",
-                "description": "Solar de demo ArchiRapid",
-            }
-            st.session_state["ai_house_requirements"] = {
-                "target_area_m2": 148.0, "max_buildable_m2": 148.5,
-                "budget": 220000.0, "bedrooms": 4, "bathrooms": 3,
-                "wants_pool": False, "wants_porch": True, "wants_garage": True,
-                "wants_outhouse": False, "max_floors": 2,
-                "style": "Moderno", "materials": ["hormigon"],
-                "notes": "Proyecto de demostracion ArchiRapid",
-                "orientation": "Sur", "roof_type": "Plana", "energy_rating": "A",
-                "accessibility": False, "sustainable_materials": [],
-                "nombre_proyecto": "Casa Demo Calle Mayor 12 Madrid",
-                "cliente": st.session_state.get("sandbox_user", "Visitante"),
-                "arquitecto": "Demo Estudio ArchiRapid",
-            }
-            st.session_state["estudio_mode"] = True
-            st.session_state["estudio_arch_name"] = "Demo Estudio ArchiRapid"
-            st.session_state["estudio_client_name"] = st.session_state.get("sandbox_user", "Visitante")
-        st.rerun()
+            import urllib.parse as _ulp
+            _demo_id    = row_sb[0]
+            _demo_email = _ulp.quote(row_sb[2])
+            _demo_name  = _ulp.quote(row_sb[1])
+            _base_demo  = _get_base_url()
+            _success_demo = (
+                f"{_base_demo}/?page=Arquitectos (Marketplace)"
+                f"&sub_session={{CHECKOUT_SESSION_ID}}&sub_plan=sub_pro_anual"
+                f"&arch_id={_demo_id}&arch_email={_demo_email}&arch_name={_demo_name}"
+            )
+            _cancel_demo = f"{_base_demo}/?seccion=arquitecto&demo=true"
+            _url_key_demo = "demo_landing_stripe_url"
+
+            if st.session_state.get(_url_key_demo):
+                st.link_button(
+                    "Ir al pago — PRO Anual (DEMO)",
+                    st.session_state[_url_key_demo],
+                    type="primary", use_container_width=False
+                )
+                if st.button("Cancelar", key="demo_landing_cancel"):
+                    del st.session_state[_url_key_demo]
+                    st.rerun()
+            else:
+                if st.button("Acceder a la Demo — Contratar PRO Anual", type="primary"):
+                    try:
+                        from modules.stripe_utils import create_checkout_session as _ccs_demo
+                        _url_d, _ = _ccs_demo(
+                            ["sub_pro_anual"], "sub_pro_anual",
+                            row_sb[2], _success_demo, _cancel_demo
+                        )
+                        st.session_state[_url_key_demo] = _url_d
+                        st.rerun()
+                    except Exception as _e_demo:
+                        st.error(f"Error Stripe: {_e_demo}")
+        else:
+            st.error("Error cargando demo. Contacta hola@archirapid.com")
+        return
 
     # --- 1. LOGIN / REGISTRO ---
     if "arch_id" not in st.session_state:
@@ -303,14 +322,20 @@ def main():
     if sub_status["active"]:
         st.caption(f"Suscripcion Activa: **Plan {sub_status['plan']}** (Renueva: {sub_status['end_date']})")
 
-    if st.session_state.pop("_open_estudio_tab", False):
+    _open_estudio = st.session_state.pop("_open_estudio_tab", False)
+    if _sandbox:
+        # DEMO: solo 2 pestanas visibles
+        tab_estudio, tab_subir = st.tabs(["🏠 Modo Estudio", "📤 Subir Proyecto"])
+        tab_planes = tab_proyectos = tab_matching = tab_ia = None
+    elif _open_estudio:
         tab_estudio, tab_planes, tab_subir, tab_proyectos, tab_matching, tab_ia = st.tabs([
             "🏠 Modo Estudio", "💎 Planes", "📤 Subir Proyecto", "📂 Mis Proyectos", "🎯 Oportunidades", "🤖 Asistente IA"])
     else:
         tab_planes, tab_subir, tab_proyectos, tab_matching, tab_ia, tab_estudio = st.tabs([
             "💎 Planes", "📤 Subir Proyecto", "📂 Mis Proyectos", "🎯 Oportunidades", "🤖 Asistente IA", "🏠 Modo Estudio"])
 
-    with tab_ia:
+    if tab_ia is not None:
+     with tab_ia:
         st.subheader("Boceto Generativo con IA (Groq)")
         st.info("Genera distribuciones preliminares para tus solares o proyectos.")
         from modules.marketplace import ai_engine as _ai_eng_tab
@@ -494,7 +519,8 @@ def main():
                     with _bc3:
                         st.markdown("[hola@archirapid.com](mailto:hola@archirapid.com)")
 
-    with tab_planes:
+    if tab_planes is not None:
+     with tab_planes:
         st.subheader("💎 Elige tu plan")
 
         # Banner plan activo
@@ -634,7 +660,8 @@ def main():
                         except Exception as e:
                             st.error(f"Error guardando: {e}")
 
-    with tab_proyectos:
+    if tab_proyectos is not None:
+     with tab_proyectos:
         st.subheader("Tu Catálogo")
         # Query simple manual
         conn = db.get_conn()
@@ -650,7 +677,8 @@ def main():
         finally:
             conn.close()
 
-    with tab_matching:
+    if tab_matching is not None:
+     with tab_matching:
         st.subheader("🎯 Oportunidades (Solares Compatibles)")
         if not sub_status["active"]:
              st.warning("Suscríbete para ver oportunidades y contactar clientes.")
