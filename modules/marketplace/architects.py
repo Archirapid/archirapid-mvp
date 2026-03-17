@@ -138,6 +138,7 @@ def main():
                 f"{_base_demo}/?page=Arquitectos (Marketplace)"
                 f"&sub_session={{CHECKOUT_SESSION_ID}}&sub_plan=sub_pro_anual"
                 f"&arch_id={_demo_id}&arch_email={_demo_email}&arch_name={_demo_name}"
+                f"&demo=true"
             )
             _cancel_demo = f"{_base_demo}/?seccion=arquitecto&demo=true"
             _url_key_demo = "demo_landing_stripe_url"
