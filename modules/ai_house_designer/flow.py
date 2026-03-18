@@ -3581,8 +3581,12 @@ def _get_financials() -> dict:
         base_m2 = int(_custom_m2)
     floor_factor = _FLOOR_FACTOR.get(floors_str, 1.00)
     PEM          = int(total_area * base_m2 * floor_factor)
-    honorarios   = int(PEM * 0.09)
-    licencias    = int(PEM * 0.04)
+    # Tarifas configurables por el arquitecto (con fallback a valores de mercado)
+    fee_pct  = float(st.session_state.get("arch_fee_pct",      8.0))
+    exp_pct  = float(st.session_state.get("arch_expenses_pct", 5.0))
+    iva_pct  = float(st.session_state.get("arch_iva_pct",     10.0))
+    honorarios   = int(PEM * fee_pct / 100)
+    licencias    = int(PEM * exp_pct / 100)
     # Extras reales (precio fijo de mercado)
     extras_req   = req.get("extras", {})
     extra_pool   = 25000 if extras_req.get("pool") else 0
@@ -3590,7 +3594,9 @@ def _get_financials() -> dict:
     extra_dom    = int(total_area * 80) if energy.get("domotic") else 0
     _STYLE_CHIMNEY = {"Montaña": 4500, "Rural": 4500, "Clásico": 3500}
     chimney_cost = _STYLE_CHIMNEY.get(style, 0)
-    total_cost   = int(PEM * 1.13) + 1200 + extra_pool + extra_solar + extra_dom + chimney_cost
+    total_cost   = int(PEM * (1 + fee_pct/100 + exp_pct/100)) + 1200 + extra_pool + extra_solar + extra_dom + chimney_cost
+    iva_amount   = int(total_cost * iva_pct / 100)
+    total_con_iva = total_cost + iva_amount
     # Variables de compatibilidad (usadas en retorno y subvenciones)
     construction_cost = PEM
     foundation_cost   = int(PEM * 0.10)
@@ -3610,8 +3616,8 @@ def _get_financials() -> dict:
         ("10. Acabados interiores",       int(PEM*0.12),      "12%", "Suelos, techos, pintura interior"),
         ("11. Baños y cocina",            int(PEM*0.05),      "5%",  "Sanitarios, grifería, equip. básico cocina"),
         ("12. Urbanización parcela",      int(PEM*0.03),      "3%",  "Acceso vehículos, cerramiento, jardinería"),
-        ("— Honorarios técnicos",        honorarios,         "9%",  "Arquitecto, aparejador, coord. seguridad"),
-        ("— Licencias y tasas",          licencias,          "4%",  "Licencia de obras e ICIO municipal"),
+        ("— Honorarios técnicos",        honorarios,         f"{fee_pct:.0f}%",  "Arquitecto, aparejador, coord. seguridad"),
+        ("— Licencias y tasas",          licencias,          f"{exp_pct:.0f}%",  "Licencia de obras e ICIO municipal"),
     ]
     if chimney_cost:
         partidas.append(("★ Chimenea / hogar", chimney_cost, "—", f"Chimenea de leña/biomasa — estilo {style}"))
@@ -3662,6 +3668,7 @@ def _get_financials() -> dict:
         "construction_cost": construction_cost, "foundation_cost": foundation_cost,
         "installation_cost": installation_cost, "architecture_cost": architecture_cost,
         "chimney_cost": chimney_cost, "total_cost": total_cost,
+        "iva_pct": iva_pct, "iva_amount": iva_amount, "total_con_iva": total_con_iva,
         "partidas": partidas, "subsidy_total": subsidy_total,
         "energy_score": energy_score, "energy_label": energy_label,
         "energy_color": energy_color, "consumo_real": consumo_real,

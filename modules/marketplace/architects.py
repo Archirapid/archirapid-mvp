@@ -386,39 +386,87 @@ def main():
 
         st.markdown("---")
 
-        # ── MIS TARIFAS — precio €/m² del arquitecto ──────────────────────────
+        # ── MIS TARIFAS — precio €/m², honorarios, gastos e IVA ──────────────
         # Cargar desde BD si no está en session_state
         if "arch_cost_per_m2" not in st.session_state:
             try:
                 _tc = db_conn(); _cr = _tc.cursor()
-                _cr.execute("SELECT avg_project_price FROM architects WHERE id=?",
-                            (st.session_state["arch_id"],))
+                _cr.execute(
+                    "SELECT avg_project_price, fee_pct, expenses_pct, iva_pct FROM architects WHERE id=?",
+                    (st.session_state["arch_id"],))
                 _pr = _cr.fetchone(); _tc.close()
-                if _pr and _pr[0]:
-                    st.session_state["arch_cost_per_m2"] = int(_pr[0])
+                if _pr:
+                    if _pr[0]: st.session_state["arch_cost_per_m2"]  = int(_pr[0])
+                    if _pr[1] is not None: st.session_state["arch_fee_pct"]      = float(_pr[1])
+                    if _pr[2] is not None: st.session_state["arch_expenses_pct"] = float(_pr[2])
+                    if _pr[3] is not None: st.session_state["arch_iva_pct"]      = float(_pr[3])
             except Exception:
                 pass
 
-        with st.expander("⚙️ Mis Tarifas — Precio €/m²", expanded=False):
-            _cur_price = st.session_state.get("arch_cost_per_m2", 1600)
-            _new_price = st.number_input(
-                "Coste de construcción €/m² (base para cálculo de presupuestos)",
-                min_value=800, max_value=5000, value=int(_cur_price), step=50,
-                help="Este valor ajusta automáticamente el presupuesto en el editor 3D y en el resumen del proyecto."
+        _IVA_OPTIONS = {"10% (obra nueva)": 10.0, "21% (reforma)": 21.0, "Exento (0%)": 0.0}
+        _iva_pct_cur = st.session_state.get("arch_iva_pct", 10.0)
+        _iva_label_cur = next((k for k, v in _IVA_OPTIONS.items() if v == _iva_pct_cur), "10% (obra nueva)")
+
+        with st.expander("⚙️ Mis Tarifas — Precio, Honorarios e IVA", expanded=False):
+            _tc1, _tc2_col = st.columns(2)
+            with _tc1:
+                _new_price = st.number_input(
+                    "Coste construcción €/m²",
+                    min_value=800, max_value=5000,
+                    value=int(st.session_state.get("arch_cost_per_m2", 1600)), step=50,
+                    help="Base para cálculo de presupuestos en el editor 3D y resumen del proyecto."
+                )
+                _new_fee = st.number_input(
+                    "Honorarios arquitecto (%)",
+                    min_value=0.0, max_value=20.0,
+                    value=float(st.session_state.get("arch_fee_pct", 8.0)), step=0.5,
+                    help="% sobre el coste de construcción. Típico: 6–12%."
+                )
+            with _tc2_col:
+                _new_exp = st.number_input(
+                    "Gastos adicionales (%)",
+                    min_value=0.0, max_value=15.0,
+                    value=float(st.session_state.get("arch_expenses_pct", 5.0)), step=0.5,
+                    help="% para licencias, tasas municipales, proyecto técnico. Típico: 3–8%."
+                )
+                _new_iva_label = st.selectbox(
+                    "IVA aplicable",
+                    list(_IVA_OPTIONS.keys()),
+                    index=list(_IVA_OPTIONS.keys()).index(_iva_label_cur),
+                    help="10% obra nueva · 21% reforma · Exento para casos especiales."
+                )
+            _new_iva = _IVA_OPTIONS[_new_iva_label]
+
+            # Preview en tiempo real
+            _prev_m2 = 100
+            _prev_pem = _new_price * _prev_m2
+            _prev_hon = int(_prev_pem * _new_fee / 100)
+            _prev_exp = int(_prev_pem * _new_exp / 100)
+            _prev_sub = _prev_pem + _prev_hon + _prev_exp
+            _prev_iva = int(_prev_sub * _new_iva / 100)
+            st.caption(
+                f"**Vista previa (100 m²):** "
+                f"Construcción €{_prev_pem:,} + Honorarios €{_prev_hon:,} + "
+                f"Gastos €{_prev_exp:,} + IVA €{_prev_iva:,} = **€{_prev_sub + _prev_iva:,} total**"
             )
-            if st.button("Guardar tarifa", key="btn_save_tarifa"):
-                st.session_state["arch_cost_per_m2"] = _new_price
+
+            if st.button("Guardar tarifas", key="btn_save_tarifa"):
+                st.session_state["arch_cost_per_m2"]  = _new_price
+                st.session_state["arch_fee_pct"]      = _new_fee
+                st.session_state["arch_expenses_pct"] = _new_exp
+                st.session_state["arch_iva_pct"]      = _new_iva
                 if not _sandbox:
                     try:
                         _tc2 = db_conn(); _cr2 = _tc2.cursor()
-                        _cr2.execute("UPDATE architects SET avg_project_price=? WHERE id=?",
-                                     (_new_price, st.session_state["arch_id"]))
+                        _cr2.execute(
+                            "UPDATE architects SET avg_project_price=?, fee_pct=?, expenses_pct=?, iva_pct=? WHERE id=?",
+                            (_new_price, _new_fee, _new_exp, _new_iva, st.session_state["arch_id"]))
                         _tc2.commit(); _tc2.close()
-                        st.success(f"Tarifa guardada: €{_new_price}/m²")
+                        st.success(f"Tarifas guardadas: €{_new_price}/m² · Honorarios {_new_fee}% · Gastos {_new_exp}% · IVA {_new_iva}%")
                     except Exception as _te:
-                        st.error(f"Error guardando tarifa: {_te}")
+                        st.error(f"Error guardando tarifas: {_te}")
                 else:
-                    st.info(f"Tarifa aplicada: €{_new_price}/m² (modo demo, no se persiste)")
+                    st.info(f"Tarifas aplicadas (modo demo, no se persisten): €{_new_price}/m² · Hon. {_new_fee}% · Gastos {_new_exp}% · IVA {_new_iva}%")
 
         st.markdown("---")
 
