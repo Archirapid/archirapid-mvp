@@ -532,6 +532,7 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             // Paredes solo en zonas habitables
             if (zone !== 'garden' && zone !== 'exterior') {{
                 _buildWalls(i, rx, rz, rw, rd);
+                _buildWindows(i, rx, rz, rw, rd);
             }}
 
             // Etiqueta
@@ -632,10 +633,83 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                     if (m) {{ m.material && m.material.dispose(); m.dispose(); }}
                 }});
             }});
+            // Ventanas
+            ['back','front','left','right'].forEach(side => {{
+                const m = scene.getMeshByName(`win_${{i}}_${{side}}`);
+                if (m) {{ m.material && m.material.dispose(); m.dispose(); }}
+            }});
             // Materiales
-            ['wMat_','fwMat_','doorMat_','portMat_'].forEach(pre => {{
+            ['wMat_','fwMat_','doorMat_','portMat_','winMat_'].forEach(pre => {{
                 const mat = scene.getMaterialByName(pre + i);
                 if (mat) mat.dispose();
+            }});
+        }}
+
+        // ================================================
+        // VENTANAS — detección de pared exterior + cristal semitransparente
+        // ================================================
+        function _isExteriorWall(i, side) {{
+            const r = roomsData[i];
+            for (let j = 0; j < roomsData.length; j++) {{
+                if (i === j) continue;
+                const n = roomsData[j];
+                const nZone = (n.zone || '').toLowerCase();
+                // Zonas abiertas no bloquean ventanas
+                if (nZone === 'garden' || nZone === 'exterior') continue;
+                if (side === 'back') {{
+                    if (Math.abs((n.z + n.depth) - r.z) < 0.35 &&
+                        n.x < r.x + r.width - 0.1 && n.x + n.width > r.x + 0.1) return false;
+                }} else if (side === 'front') {{
+                    if (Math.abs(n.z - (r.z + r.depth)) < 0.35 &&
+                        n.x < r.x + r.width - 0.1 && n.x + n.width > r.x + 0.1) return false;
+                }} else if (side === 'left') {{
+                    if (Math.abs((n.x + n.width) - r.x) < 0.35 &&
+                        n.z < r.z + r.depth - 0.1 && n.z + n.depth > r.z + 0.1) return false;
+                }} else if (side === 'right') {{
+                    if (Math.abs(n.x - (r.x + r.width)) < 0.35 &&
+                        n.z < r.z + r.depth - 0.1 && n.z + n.depth > r.z + 0.1) return false;
+                }}
+            }}
+            return true;
+        }}
+
+        function _buildWindows(i, rx, rz, rw, rd) {{
+            const zone = (roomsData[i].zone || '').toLowerCase();
+            if (!['day','night','wet','service','circ'].includes(zone)) return;
+            const isWet   = (zone === 'wet');
+            const WIN_D   = 0.07;
+            const WIN_SILL = 0.9;
+            const WIN_H   = isWet ? 0.55 : 1.15;
+            const WIN_W_H = isWet ? Math.min(rw * 0.35, 0.7) : Math.min(rw * 0.50, 1.40);
+            const WIN_W_V = isWet ? Math.min(rd * 0.35, 0.7) : Math.min(rd * 0.50, 1.40);
+            const winY    = WIN_SILL + WIN_H / 2;
+
+            // Material base (plantilla)
+            const winMat = new BABYLON.StandardMaterial(`winMat_${{i}}`, scene);
+            winMat.diffuseColor  = new BABYLON.Color3(0.55, 0.82, 0.98);
+            winMat.emissiveColor = new BABYLON.Color3(0.08, 0.25, 0.45);
+            winMat.alpha = 0.52;
+            winMat.backFaceCulling = false;
+
+            ['back','front','left','right'].forEach(side => {{
+                if (!_isExteriorWall(i, side)) return;
+                const wallLen = (side === 'back' || side === 'front') ? rw : rd;
+                if (wallLen < 1.2) return;
+                let bx, bz, bw, bd;
+                if (side === 'back') {{
+                    bw = WIN_W_H; bd = WIN_D; bx = rx + rw/2; bz = rz;
+                }} else if (side === 'front') {{
+                    bw = WIN_W_H; bd = WIN_D; bx = rx + rw/2; bz = rz + rd;
+                }} else if (side === 'left') {{
+                    bw = WIN_D; bd = WIN_W_V; bx = rx; bz = rz + rd/2;
+                }} else {{
+                    bw = WIN_D; bd = WIN_W_V; bx = rx + rw; bz = rz + rd/2;
+                }}
+                const win = BABYLON.MeshBuilder.CreateBox(
+                    `win_${{i}}_${{side}}`, {{width: bw, height: WIN_H, depth: bd}}, scene);
+                win.position.set(bx, winY, bz);
+                win.material = winMat.clone(`winMat_${{i}}_${{side}}`);
+                win.isPickable = false;
             }});
         }}
 
@@ -846,6 +920,7 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             const zoneS = (roomsData[i].zone || '').toLowerCase();
             if (zoneS !== 'garden' && zoneS !== 'exterior') {{
                 _buildWalls(i, rx, rz, rw, rd);
+                _buildWindows(i, rx, rz, rw, rd);
             }}
             _buildLabel(i, rx, rz, rw, rd);
         }}
@@ -934,12 +1009,10 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
         function rebuildScene(newLayout) {{
             // Eliminar todos los meshes de habitaciones
             roomsData.forEach((_,i) => {{
-                // Suelo y label
-                ['floor','label'].forEach(prefix => {{
-                    const m = scene.getMeshByName(`${{prefix}}_${{i}}`);
-                    if (m) m.dispose();
-                }});
-                // Paredes y puertas — usar _disposeWalls que conoce todos los sufijos
+                // Suelo (con su material)
+                const floorM = scene.getMeshByName(`floor_${{i}}`);
+                if (floorM) {{ if (floorM.material) floorM.material.dispose(); floorM.dispose(); }}
+                // Paredes, puertas y ventanas
                 _disposeWalls(i);
             }});
             hlLayer.removeAllMeshes();
