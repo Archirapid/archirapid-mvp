@@ -386,6 +386,42 @@ def main():
 
         st.markdown("---")
 
+        # ── MIS TARIFAS — precio €/m² del arquitecto ──────────────────────────
+        # Cargar desde BD si no está en session_state
+        if "arch_cost_per_m2" not in st.session_state:
+            try:
+                _tc = db_conn(); _cr = _tc.cursor()
+                _cr.execute("SELECT avg_project_price FROM architects WHERE id=?",
+                            (st.session_state["arch_id"],))
+                _pr = _cr.fetchone(); _tc.close()
+                if _pr and _pr[0]:
+                    st.session_state["arch_cost_per_m2"] = int(_pr[0])
+            except Exception:
+                pass
+
+        with st.expander("⚙️ Mis Tarifas — Precio €/m²", expanded=False):
+            _cur_price = st.session_state.get("arch_cost_per_m2", 1600)
+            _new_price = st.number_input(
+                "Coste de construcción €/m² (base para cálculo de presupuestos)",
+                min_value=800, max_value=5000, value=int(_cur_price), step=50,
+                help="Este valor ajusta automáticamente el presupuesto en el editor 3D y en el resumen del proyecto."
+            )
+            if st.button("Guardar tarifa", key="btn_save_tarifa"):
+                st.session_state["arch_cost_per_m2"] = _new_price
+                if not _sandbox:
+                    try:
+                        _tc2 = db_conn(); _cr2 = _tc2.cursor()
+                        _cr2.execute("UPDATE architects SET avg_project_price=? WHERE id=?",
+                                     (_new_price, st.session_state["arch_id"]))
+                        _tc2.commit(); _tc2.close()
+                        st.success(f"Tarifa guardada: €{_new_price}/m²")
+                    except Exception as _te:
+                        st.error(f"Error guardando tarifa: {_te}")
+                else:
+                    st.info(f"Tarifa aplicada: €{_new_price}/m² (modo demo, no se persiste)")
+
+        st.markdown("---")
+
         if not st.session_state.get("estudio_mode"):
             st.subheader("Nuevo Diseño")
             with st.form("estudio_form"):

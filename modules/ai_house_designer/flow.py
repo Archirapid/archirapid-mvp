@@ -2342,7 +2342,8 @@ def render_step3_editor():
         req_data = st.session_state.get("ai_house_requirements", {})
         foundation_type = req_data.get("foundation_type", "Losa de hormigón (suelos blandos)")
         house_style = req_data.get("style", "Moderno")
-        html_editor = generate_babylon_html(layout_result, total_width, total_depth, roof_type, plot_area_m2, foundation_type, house_style)
+        _arch_cost_m2 = int(st.session_state.get("arch_cost_per_m2", 1600))
+        html_editor = generate_babylon_html(layout_result, total_width, total_depth, roof_type, plot_area_m2, foundation_type, house_style, cost_per_m2=_arch_cost_m2)
         
         # Guardar HTML en session_state para renderizar embebido
         st.session_state["babylon_html"] = html_editor
@@ -3574,6 +3575,10 @@ def _get_financials() -> dict:
     }
     floors_str   = req.get("floors", "1 Planta")
     base_m2      = _BASE_M2.get(style, 1500)
+    # Override con precio configurado por el arquitecto (si existe)
+    _custom_m2 = st.session_state.get("arch_cost_per_m2")
+    if _custom_m2 and isinstance(_custom_m2, (int, float)) and _custom_m2 > 0:
+        base_m2 = int(_custom_m2)
     floor_factor = _FLOOR_FACTOR.get(floors_str, 1.00)
     PEM          = int(total_area * base_m2 * floor_factor)
     honorarios   = int(PEM * 0.09)

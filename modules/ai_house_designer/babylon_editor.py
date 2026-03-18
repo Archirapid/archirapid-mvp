@@ -3,7 +3,7 @@ Editor 3D avanzado usando Babylon.js
 v3.0 - Panel numérico + paredes sincronizadas + CTE + GLB
 """
 
-def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos aguas (clásico, eficiente)", plot_area_m2=0, foundation_type="Losa de hormigón (suelos blandos)", house_style="Moderno"):
+def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos aguas (clásico, eficiente)", plot_area_m2=0, foundation_type="Losa de hormigón (suelos blandos)", house_style="Moderno", cost_per_m2=1600):
     """
     Genera HTML con Babylon.js editor
 
@@ -373,7 +373,7 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
         }};
         const styleConf = STYLE_3D_CONFIG[houseStyle] || STYLE_3D_CONFIG['Moderno'];
 
-        const COST_PER_M2 = 1600; // €/m² medio mercado España 2025
+        const COST_PER_M2 = {cost_per_m2}; // €/m² configurado por el arquitecto
 
         // Mínimos CTE por tipo de habitación (m²)
         const CTE_MIN = {{
