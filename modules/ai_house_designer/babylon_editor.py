@@ -677,7 +677,7 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             const zone = (roomsData[i].zone || '').toLowerCase();
             if (!['day','night','wet','service','circ'].includes(zone)) return;
             const isWet   = (zone === 'wet');
-            const WIN_D   = 0.07;
+            const WIN_D   = 0.20;  // > WALL_T(0.15) para que sobresalga y sea visible
             const WIN_SILL = 0.9;
             const WIN_H   = isWet ? 0.55 : 1.15;
             const WIN_W_H = isWet ? Math.min(rw * 0.35, 0.7) : Math.min(rw * 0.50, 1.40);
