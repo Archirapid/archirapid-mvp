@@ -2380,3 +2380,14 @@ elif st.session_state.get('selected_page') == "💬 Lola":
         from modules.marketplace import virtual_assistant
         virtual_assistant.main()
         st.stop()
+
+elif st.session_state.get('selected_page') == "🏢 Inmobiliarias MLS":
+    st.components.v1.html(
+        "<script>window.parent.document"
+        ".querySelector('section.main')"
+        ".scrollTo(0,0);</script>",
+        height=0
+    )
+    with st.container():
+        from modules.mls import mls_portal
+        mls_portal.main()
