@@ -18,7 +18,7 @@ from modules.mls import mls_notificaciones
 
 # ── Constantes ────────────────────────────────────────────────────────────────
 
-_CIF_RE = re.compile(r"^[ABCDEFGHJKLMNPQRSTUVW]\d{7}[0-9A-J]$")
+_CIF_RE = re.compile(r"^[ABCDEFGHJKLMNPQRSTUVW]\d{8}$")
 _SESSION_KEY = "mls_inmo"          # st.session_state key — sin colisión con otros portales
 
 _PLANES = {
@@ -302,7 +302,7 @@ def ui_login_registro() -> None:
             if not nombre_comercial.strip():
                 errores.append("Nombre comercial obligatorio.")
             if not _CIF_RE.match(cif):
-                errores.append("CIF no válido (letra + 7 dígitos + dígito/letra de control).")
+                errores.append("CIF no válido (formato: letra + 8 dígitos, ej. A08663619).")
             if not email_corp.strip() or "@" not in email_corp:
                 errores.append("Email corporativo no válido.")
             if not telefono_1.strip():
