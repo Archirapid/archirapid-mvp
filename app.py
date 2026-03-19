@@ -1320,6 +1320,40 @@ _qp_user    = st.query_params.get("user", "")
 _qp_demo    = st.query_params.get("demo", "")
 _qp_modo    = st.query_params.get("modo", "")
 
+# ── Handlers retorno Stripe MLS y deep links MLS ─────────────────────────────
+_qp_mls_pago    = st.query_params.get("mls_pago", "")
+_qp_mls_reserva = st.query_params.get("mls_reserva_ok", "")
+_qp_mls_ficha   = st.query_params.get("mls_ficha", "")
+_qp_mls_reservar = st.query_params.get("mls_reservar", "")
+_qp_mls_contacto = st.query_params.get("mls_contacto", "")
+
+if _qp_mls_pago == "ok":
+    st.session_state["selected_page"] = "🏢 Inmobiliarias MLS"
+    st.session_state["mls_verificar_pago"] = True
+
+if _qp_mls_reserva == "1":
+    st.session_state["selected_page"] = "🏢 Inmobiliarias MLS"
+    st.session_state["mls_reserva_ok_params"] = {
+        "finca_id": st.query_params.get("finca_id", ""),
+        "inmo_id":  st.query_params.get("inmo_id", ""),
+        "tipo":     st.query_params.get("tipo", ""),
+        "nombre":   st.query_params.get("nombre", ""),
+        "email":    st.query_params.get("email", ""),
+    }
+
+if _qp_mls_ficha:
+    st.session_state["selected_page"] = "🏢 Inmobiliarias MLS"
+    st.session_state["mls_ficha_id"] = _qp_mls_ficha
+
+if _qp_mls_reservar:
+    st.session_state["selected_page"] = "🏢 Inmobiliarias MLS"
+    st.session_state["mls_reservar_id"] = _qp_mls_reservar
+
+if _qp_mls_contacto:
+    st.session_state["selected_page"] = "🏢 Inmobiliarias MLS"
+    st.session_state["mls_contacto_id"] = _qp_mls_contacto
+# ─────────────────────────────────────────────────────────────────────────────
+
 # ref y from son equivalentes; ref tiene prioridad si ambos presentes
 _qp_origen = _qp_ref or _qp_from
 
@@ -1493,6 +1527,7 @@ if st.query_params.get("page") == "Arquitectos (Marketplace)":
 PAGES = {
     "🏠 Inicio / Marketplace": ("modules.marketplace.marketplace", "main"),
     "🏠 Propietarios": ("modules.marketplace.owners", "main"),
+    "🏢 Inmobiliarias MLS": ("modules.mls.mls_portal", "main"),
     "🔍 Detalle de Finca": ("modules.marketplace.plot_detail", "show_plot_detail_page"),
     "Intranet": ("modules.marketplace.intranet", "main"),
     "👤 Panel de Proveedor": ("modules.marketplace.service_providers", "show_service_provider_panel"),
@@ -2049,8 +2084,8 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
                 _wname_saved = st.session_state.get("waitlist_name", "")
                 st.success(f"✅ Plaza reservada{', ' + _wname_saved if _wname_saved else ''}.")
 
-        # ── 3 tarjetas de acceso en columnas iguales ─────────────────────────
-        _hc1, _hc2, _hc3 = st.columns(3, gap="small")
+        # ── 4 tarjetas de acceso en columnas iguales ─────────────────────────
+        _hc1, _hc2, _hc3, _hc4 = st.columns(4, gap="small")
 
         with _hc1:
             st.markdown("""
@@ -2107,6 +2142,23 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
 </div>""", unsafe_allow_html=True)
             if st.button("Registrarme como Profesional →", key="hp_btn_pro", use_container_width=True):
                 st.session_state['selected_page'] = "📝 Registro de Proveedor de Servicios"
+                st.rerun()
+
+        with _hc4:
+            st.markdown("""
+<div style="background:white;border-radius:10px;padding:14px 16px;
+            border-top:3px solid #1B2A6B;box-shadow:0 2px 8px rgba(0,0,0,0.07);
+            margin-bottom:4px;">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
+    <span style="font-size:22px;">🏢</span>
+    <div>
+      <div style="font-weight:800;color:#0D1B2A;font-size:0.95em;">¿Eres Inmobiliaria?</div>
+      <div style="color:#64748B;font-size:0.78em;">Bolsa MLS colaborativa. Comparte fincas, multiplica ventas.</div>
+    </div>
+  </div>
+</div>""", unsafe_allow_html=True)
+            if st.button("Acceder a ArchiRapid MLS →", key="hp_btn_mls", use_container_width=True):
+                st.session_state["selected_page"] = "🏢 Inmobiliarias MLS"
                 st.rerun()
 
         # PASO 1: Renderizar MARKETPLACE (mapa, fincas y proyectos)

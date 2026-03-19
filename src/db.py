@@ -570,6 +570,155 @@ def ensure_tables():
                 prefab_samples
             )
 
+        # ══════════════════════════════════════════════════════════════════════
+        # ARCHIRAPID MLS — Tablas nuevas (nunca tocan tablas existentes)
+        # Todas usan CREATE TABLE IF NOT EXISTS: idempotentes y seguras.
+        # ══════════════════════════════════════════════════════════════════════
+
+        # Tabla inmobiliarias (registro de agencias MLS)
+        c.execute("""CREATE TABLE IF NOT EXISTS inmobiliarias (
+            id               TEXT PRIMARY KEY,
+            nombre           TEXT NOT NULL,
+            cif              TEXT UNIQUE NOT NULL,
+            email            TEXT UNIQUE NOT NULL,
+            password_hash    TEXT NOT NULL,
+            telefono         TEXT,
+            web              TEXT,
+            plan             TEXT DEFAULT 'starter',
+            plan_activo      INTEGER DEFAULT 0,
+            stripe_session_id TEXT,
+            firma_hash       TEXT,
+            firma_timestamp  TEXT,
+            activa           INTEGER DEFAULT 0,
+            ip_registro      TEXT,
+            created_at       TEXT
+        )""")
+
+        # Migraciones MLS: columnas extendidas de inmobiliarias (add-only, idempotentes)
+        for _mls_col in [
+            "ALTER TABLE inmobiliarias ADD COLUMN nombre_sociedad TEXT",
+            "ALTER TABLE inmobiliarias ADD COLUMN nombre_comercial TEXT",
+            "ALTER TABLE inmobiliarias ADD COLUMN telefono_secundario TEXT",
+            "ALTER TABLE inmobiliarias ADD COLUMN telegram_contacto TEXT",
+            "ALTER TABLE inmobiliarias ADD COLUMN direccion TEXT",
+            "ALTER TABLE inmobiliarias ADD COLUMN localidad TEXT",
+            "ALTER TABLE inmobiliarias ADD COLUMN provincia TEXT",
+            "ALTER TABLE inmobiliarias ADD COLUMN codigo_postal TEXT",
+            "ALTER TABLE inmobiliarias ADD COLUMN pais TEXT DEFAULT 'España'",
+            "ALTER TABLE inmobiliarias ADD COLUMN contacto_nombre TEXT",
+            "ALTER TABLE inmobiliarias ADD COLUMN contacto_cargo TEXT",
+            "ALTER TABLE inmobiliarias ADD COLUMN contacto_email TEXT",
+            "ALTER TABLE inmobiliarias ADD COLUMN contacto_telefono TEXT",
+            "ALTER TABLE inmobiliarias ADD COLUMN contacto_telegram TEXT",
+            "ALTER TABLE inmobiliarias ADD COLUMN factura_razon_social TEXT",
+            "ALTER TABLE inmobiliarias ADD COLUMN factura_cif TEXT",
+            "ALTER TABLE inmobiliarias ADD COLUMN factura_direccion TEXT",
+            "ALTER TABLE inmobiliarias ADD COLUMN factura_email TEXT",
+            "ALTER TABLE inmobiliarias ADD COLUMN iban TEXT",
+            "ALTER TABLE inmobiliarias ADD COLUMN banco_nombre TEXT",
+            "ALTER TABLE inmobiliarias ADD COLUMN banco_titular TEXT",
+            "ALTER TABLE inmobiliarias ADD COLUMN email_login TEXT",
+        ]:
+            try:
+                c.execute(_mls_col)
+            except Exception:
+                pass  # columna ya existe — SQLite ignora silenciosamente
+
+        # Tabla fincas_mls (fincas aportadas por inmobiliarias listantes)
+        c.execute("""CREATE TABLE IF NOT EXISTS fincas_mls (
+            id                        TEXT PRIMARY KEY,
+            inmo_id                   TEXT NOT NULL,
+            secuencial                INTEGER,
+            ref_codigo                TEXT UNIQUE,
+            catastro_ref              TEXT NOT NULL,
+            catastro_validada         INTEGER DEFAULT 0,
+            catastro_lat              REAL,
+            catastro_lon              REAL,
+            titulo                    TEXT,
+            descripcion_publica       TEXT,
+            notas_privadas            TEXT,
+            precio                    REAL,
+            superficie_m2             REAL,
+            comision_total_pct        REAL,
+            comision_archirapid_pct   REAL DEFAULT 1.0,
+            comision_colaboradora_pct REAL,
+            comision_listante_pct     REAL,
+            split_aceptado            INTEGER DEFAULT 0,
+            estado                    TEXT DEFAULT 'pendiente_validacion',
+            image_paths               TEXT,
+            precio_historial          TEXT,
+            dias_en_mercado_inicio    TEXT,
+            periodo_privado_expira    TEXT,
+            created_at                TEXT,
+            updated_at                TEXT
+        )""")
+
+        # Tabla reservas_mls (reservas 72h de colaboradoras sobre fincas MLS)
+        c.execute("""CREATE TABLE IF NOT EXISTS reservas_mls (
+            id                   TEXT PRIMARY KEY,
+            finca_id             TEXT NOT NULL,
+            inmo_colaboradora_id TEXT NOT NULL,
+            stripe_session_id    TEXT,
+            importe_reserva      REAL DEFAULT 200.0,
+            estado               TEXT DEFAULT 'activa',
+            timestamp_reserva    TEXT,
+            timestamp_expira_72h TEXT,
+            notas                TEXT
+        )""")
+
+        # Tabla firmas_colaboracion (firma digital eIDAS del acuerdo MLS)
+        c.execute("""CREATE TABLE IF NOT EXISTS firmas_colaboracion (
+            id                INTEGER PRIMARY KEY AUTOINCREMENT,
+            inmo_id           TEXT NOT NULL,
+            documento_version TEXT DEFAULT '1.0',
+            documento_hash    TEXT NOT NULL,
+            firma_hash        TEXT NOT NULL,
+            timestamp         TEXT NOT NULL,
+            ip                TEXT,
+            cif               TEXT
+        )""")
+
+        # Tabla notificaciones_mls (log de eventos para admin y portales)
+        c.execute("""CREATE TABLE IF NOT EXISTS notificaciones_mls (
+            id                INTEGER PRIMARY KEY AUTOINCREMENT,
+            destinatario_tipo TEXT,
+            destinatario_id   TEXT,
+            tipo_evento       TEXT,
+            payload           TEXT,
+            timestamp         TEXT,
+            leida             INTEGER DEFAULT 0
+        )""")
+
+        # Índices MLS (mejoran rendimiento sin afectar tablas existentes)
+        try:
+            c.execute("CREATE INDEX IF NOT EXISTS idx_inmobiliarias_email ON inmobiliarias(email)")
+        except Exception:
+            pass
+        try:
+            c.execute("CREATE INDEX IF NOT EXISTS idx_inmobiliarias_cif ON inmobiliarias(cif)")
+        except Exception:
+            pass
+        try:
+            c.execute("CREATE INDEX IF NOT EXISTS idx_fincas_mls_estado ON fincas_mls(estado)")
+        except Exception:
+            pass
+        try:
+            c.execute("CREATE INDEX IF NOT EXISTS idx_fincas_mls_inmo ON fincas_mls(inmo_id)")
+        except Exception:
+            pass
+        try:
+            c.execute("CREATE INDEX IF NOT EXISTS idx_reservas_mls_finca ON reservas_mls(finca_id)")
+        except Exception:
+            pass
+        try:
+            c.execute("CREATE INDEX IF NOT EXISTS idx_reservas_mls_estado ON reservas_mls(estado)")
+        except Exception:
+            pass
+        try:
+            c.execute("CREATE INDEX IF NOT EXISTS idx_firmas_inmo ON firmas_colaboracion(inmo_id)")
+        except Exception:
+            pass
+
 def insert_plot(data: Dict):
     ensure_tables()
     from datetime import datetime

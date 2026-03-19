@@ -472,6 +472,17 @@ def render_map(plots):
                                tooltip=plot['title'])
         marker.add_to(m)
 
+    # ── ArchiRapid MLS: pins naranjas ─────────────────────────────────────────
+    try:
+        from modules.mls.mls_mapa import (
+            get_fincas_mls_para_mapa,
+            add_mls_markers_to_map,
+        )
+        add_mls_markers_to_map(m, get_fincas_mls_para_mapa())
+    except Exception:
+        pass  # MLS nunca interrumpe el mapa azul
+    # ──────────────────────────────────────────────────────────────────────────
+
     # Renderizar mapa (srcdoc iframe: URLs relativas resuelven contra el dominio padre)
     try:
         st.components.v1.html(m._repr_html_(), height=600)

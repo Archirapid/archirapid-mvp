@@ -27,7 +27,7 @@ def main():
         st.rerun()
 
     # PANEL DE GESTIÓN INTERNA
-    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs(["📋 Gestión de Fincas", "🏗️ Gestión de Proyectos", "💰 Ventas y Transacciones", "📞 Consultas", "🛠️ Profesionales", "⚙️ Admin", "🎯 Waitlist", "📬 Actividad", "📊 Analytics"])
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10 = st.tabs(["📋 Gestión de Fincas", "🏗️ Gestión de Proyectos", "💰 Ventas y Transacciones", "📞 Consultas", "🛠️ Profesionales", "⚙️ Admin", "🎯 Waitlist", "📬 Actividad", "📊 Analytics", "🏢 MLS — Inmobiliarias"])
 
     with tab1:
         try:
@@ -1000,3 +1000,585 @@ Obtén el token creando un bot con @BotFather en Telegram.
 
         except Exception as _e9:
             st.error(f"Error en Analytics: {_e9}")
+
+    # ── TAB 10: MLS — INMOBILIARIAS ───────────────────────────────────────────
+    with tab10:
+        st.header("🏢 ArchiRapid MLS — Panel de Administración")
+
+        # Imports locales — sin afectar el resto de la Intranet
+        try:
+            from modules.mls import mls_db as _mls
+            from modules.mls import mls_notificaciones as _mls_notif
+        except Exception as _imp_err:
+            st.error(f"No se pudo cargar el módulo MLS: {_imp_err}")
+            st.stop()
+
+        def _mask_iban(iban: str) -> str:
+            """Muestra solo los últimos 4 dígitos del IBAN en listados."""
+            if not iban or len(iban) < 4:
+                return iban or "—"
+            return "****…****" + iban[-4:]
+
+        # ══ SECCIÓN F: KPIs MLS ══════════════════════════════════════════════
+        st.subheader("📊 KPIs MLS")
+        try:
+            _mls_conn = db_conn()
+            _n_inmo_total  = _mls_conn.execute("SELECT COUNT(*) FROM inmobiliarias").fetchone()[0]
+            _n_inmo_act    = _mls_conn.execute("SELECT COUNT(*) FROM inmobiliarias WHERE activa=1").fetchone()[0]
+            _n_fincas_pub  = _mls_conn.execute("SELECT COUNT(*) FROM fincas_mls WHERE estado='publicada'").fetchone()[0]
+            _n_reservas_a  = _mls_conn.execute("SELECT COUNT(*) FROM reservas_mls WHERE estado='activa'").fetchone()[0]
+            _mls_conn.close()
+
+            _mls_conn2 = db_conn()
+            _n_pend_inmo   = _mls_conn2.execute("SELECT COUNT(*) FROM inmobiliarias WHERE activa=0").fetchone()[0]
+            _n_pend_finca  = _mls_conn2.execute("SELECT COUNT(*) FROM fincas_mls WHERE estado='validada_pendiente_aprobacion'").fetchone()[0]
+            _n_res_cli     = _mls_conn2.execute("SELECT COUNT(*) FROM reservas_mls WHERE estado='pendiente_confirmacion_48h'").fetchone()[0]
+            # Ingresos estimados: sum de pagos Stripe con mls en productos
+            _ingresos_mls  = 0.0
+            try:
+                from modules.stripe_utils import list_recent_sessions as _lrs_mls
+                _sess_mls = _lrs_mls(limit=100)
+                import datetime as _dt_mls
+                _this_month = _dt_mls.datetime.now().replace(day=1, hour=0, minute=0, second=0)
+                for _sm in _sess_mls.data:
+                    if _sm.payment_status == "paid":
+                        _meta_m = _sm.metadata or {}
+                        _prods  = _meta_m.get("products", "")
+                        if "mls" in _prods.lower():
+                            _ts = _dt_mls.datetime.fromtimestamp(_sm.created)
+                            if _ts >= _this_month:
+                                _ingresos_mls += (_sm.amount_total or 0) / 100
+            except Exception:
+                pass
+            _mls_conn2.close()
+
+            _fk1, _fk2, _fk3, _fk4 = st.columns(4)
+            _fk1.metric("🏢 Inmos registradas", _n_inmo_total)
+            _fk2.metric("✅ Inmos activas", _n_inmo_act)
+            _fk3.metric("🏠 Fincas publicadas", _n_fincas_pub)
+            _fk4.metric("🔒 Reservas activas", _n_reservas_a)
+
+            _fk5, _fk6, _fk7, _fk8 = st.columns(4)
+            _fk5.metric("⏳ Pendientes aprobación", _n_pend_inmo,
+                        delta="⚠️ Acción requerida" if _n_pend_inmo > 0 else None,
+                        delta_color="inverse")
+            _fk6.metric("📋 Fincas pend. aprobación", _n_pend_finca,
+                        delta="⚠️ Acción requerida" if _n_pend_finca > 0 else None,
+                        delta_color="inverse")
+            _fk7.metric("⏰ Reservas cliente 48h", _n_res_cli)
+            _fk8.metric("💶 Ingresos MLS (este mes)", f"€{_ingresos_mls:,.0f}")
+        except Exception as _ef:
+            st.warning(f"Error KPIs MLS: {_ef}")
+
+        st.markdown("---")
+
+        # ══ SECCIÓN A: Inmobiliarias pendientes de aprobación ════════════════
+        st.subheader("⏳ A. Inmobiliarias pendientes de aprobación")
+        try:
+            _pendientes = _mls.get_inmos_pendientes()
+            if not _pendientes:
+                st.success("✅ Sin registros pendientes de aprobación.")
+            else:
+                st.warning(f"**{len(_pendientes)} inmobiliaria(s) esperando aprobación.**")
+                for _p in _pendientes:
+                    _pnombre = _p.get("nombre_comercial") or _p.get("nombre", "Sin nombre")
+                    with st.expander(f"📋 {_pnombre} — {_p.get('cif','?')} | {_p.get('email','?')} | {(_p.get('created_at',''))[:10]}"):
+                        _ca, _cb = st.columns([3, 1])
+                        with _ca:
+                            st.markdown("**📊 Datos de empresa**")
+                            st.markdown(f"""
+| Campo | Valor |
+|---|---|
+| Nombre legal | {_p.get('nombre_sociedad') or '—'} |
+| Nombre comercial | {_p.get('nombre_comercial') or '—'} |
+| CIF | `{_p.get('cif','—')}` |
+| Email corporativo | {_p.get('email','—')} |
+| Email login | {_p.get('email_login') or '—'} |
+| Teléfono principal | {_p.get('telefono') or '—'} |
+| Teléfono secundario | {_p.get('telefono_secundario') or '—'} |
+| Telegram | {_p.get('telegram_contacto') or '—'} |
+| Web | {_p.get('web') or '—'} |
+| IP registro | `{_p.get('ip_registro','—')}` |
+| Fecha registro | {(_p.get('created_at',''))[:19]} |
+""")
+                            st.markdown("**📍 Dirección**")
+                            st.markdown(f"""
+| Campo | Valor |
+|---|---|
+| Dirección | {_p.get('direccion') or '—'} |
+| Localidad | {_p.get('localidad') or '—'} |
+| Provincia | {_p.get('provincia') or '—'} |
+| CP | {_p.get('codigo_postal') or '—'} |
+| País | {_p.get('pais') or '—'} |
+""")
+                            st.markdown("**👤 Persona de contacto**")
+                            st.markdown(f"""
+| Campo | Valor |
+|---|---|
+| Nombre | {_p.get('contacto_nombre') or '—'} |
+| Cargo | {_p.get('contacto_cargo') or '—'} |
+| Email directo | {_p.get('contacto_email') or '—'} |
+| Teléfono | {_p.get('contacto_telefono') or '—'} |
+| Telegram | {_p.get('contacto_telegram') or '—'} |
+""")
+                            st.markdown("**🧾 Facturación**")
+                            _iban_m = _mask_iban(_p.get('iban') or '')
+                            st.markdown(f"""
+| Campo | Valor |
+|---|---|
+| Razón social | {_p.get('factura_razon_social') or '—'} |
+| CIF factura | {_p.get('factura_cif') or '—'} |
+| Dirección fiscal | {_p.get('factura_direccion') or '—'} |
+| Email facturas | {_p.get('factura_email') or '—'} |
+| IBAN | `{_iban_m}` |
+| Banco | {_p.get('banco_nombre') or '—'} |
+| Titular | {_p.get('banco_titular') or '—'} |
+""")
+                        with _cb:
+                            st.markdown("**Acciones**")
+                            if st.button("✅ Aprobar", key=f"mls_apro_{_p['id']}", type="primary",
+                                         use_container_width=True):
+                                _mls.update_inmo_activa(_p["id"], 1)
+                                try:
+                                    _mls_notif.notif_aprobacion(
+                                        nombre=_pnombre,
+                                        email=_p.get("email", ""),
+                                        aprobada=True,
+                                    )
+                                except Exception:
+                                    pass
+                                st.success(f"✅ {_pnombre} aprobada.")
+                                st.rerun()
+
+                            st.markdown("")
+                            _confirm_key = f"mls_confirm_del_{_p['id']}"
+                            if st.session_state.get(_confirm_key):
+                                st.warning("⚠️ ¿Confirmar eliminación? Esta acción no se puede deshacer.")
+                                _cc1, _cc2 = st.columns(2)
+                                with _cc1:
+                                    if st.button("Sí, eliminar", key=f"mls_del_yes_{_p['id']}",
+                                                 type="primary", use_container_width=True):
+                                        try:
+                                            _dc = db_conn()
+                                            _dc.execute("DELETE FROM inmobiliarias WHERE id=?", (_p["id"],))
+                                            _dc.commit()
+                                            _dc.close()
+                                            _mls_notif.notif_aprobacion(
+                                                nombre=_pnombre,
+                                                email=_p.get("email", ""),
+                                                aprobada=False,
+                                            )
+                                        except Exception:
+                                            pass
+                                        st.session_state.pop(_confirm_key, None)
+                                        st.rerun()
+                                with _cc2:
+                                    if st.button("Cancelar", key=f"mls_del_no_{_p['id']}",
+                                                 use_container_width=True):
+                                        st.session_state.pop(_confirm_key, None)
+                                        st.rerun()
+                            else:
+                                if st.button("❌ Rechazar y eliminar", key=f"mls_del_{_p['id']}",
+                                             use_container_width=True):
+                                    st.session_state[_confirm_key] = True
+                                    st.rerun()
+        except Exception as _ea:
+            st.warning(f"Error sección A: {_ea}")
+
+        st.markdown("---")
+
+        # ══ SECCIÓN B: Inmobiliarias activas ═════════════════════════════════
+        st.subheader("✅ B. Inmobiliarias activas")
+        try:
+            _activas = _mls.get_inmos_activas()
+            if not _activas:
+                st.info("No hay inmobiliarias activas todavía.")
+            else:
+                for _a in _activas:
+                    _anombre = _a.get("nombre_comercial") or _a.get("nombre", "?")
+                    _plan_a  = (_a.get("plan") or "ninguno").upper()
+                    _firma_a = "✅" if _a.get("firma_hash") else "⚠️ Pendiente"
+                    # Contar fincas activas
+                    _n_fincas_a = 0
+                    try:
+                        _fc = db_conn()
+                        _n_fincas_a = _fc.execute(
+                            "SELECT COUNT(*) FROM fincas_mls WHERE inmo_id=? AND estado NOT IN ('eliminada','cerrada')",
+                            (_a["id"],)
+                        ).fetchone()[0]
+                        _fc.close()
+                    except Exception:
+                        pass
+
+                    with st.expander(
+                        f"🏢 {_anombre} — Plan {_plan_a} | Firma: {_firma_a} | "
+                        f"Fincas: {_n_fincas_a} | {_a.get('email','')}"
+                    ):
+                        _ba, _bb = st.columns([3, 1])
+                        with _ba:
+                            # Tabla resumida
+                            st.markdown(f"""
+| Campo | Valor |
+|---|---|
+| Nombre comercial | {_anombre} |
+| CIF | `{_a.get('cif','—')}` |
+| Email | {_a.get('email','—')} |
+| Plan | **{_plan_a}** |
+| Plan activo | {'✅' if _a.get('plan_activo') else '❌'} |
+| Firma acuerdo | {_firma_a} |
+| Fecha firma | {(_a.get('firma_timestamp',''))[:10] or '—'} |
+| Fincas activas | {_n_fincas_a} |
+""")
+                            # Detalle completo en sub-expander
+                            with st.expander("📋 Ver detalle completo"):
+                                _iban_full = _a.get("iban") or "—"
+                                st.markdown(f"""
+**Empresa**
+- Nombre legal: {_a.get('nombre_sociedad') or '—'}
+- Teléfono: {_a.get('telefono') or '—'} / {_a.get('telefono_secundario') or '—'}
+- Web: {_a.get('web') or '—'}
+- Dirección: {_a.get('direccion') or '—'}, {_a.get('localidad') or '—'}, {_a.get('provincia') or '—'} {_a.get('codigo_postal') or ''}, {_a.get('pais') or '—'}
+
+**Contacto responsable**
+- {_a.get('contacto_nombre') or '—'} ({_a.get('contacto_cargo') or 'sin cargo'})
+- Email: {_a.get('contacto_email') or '—'}
+- Tel: {_a.get('contacto_telefono') or '—'}
+
+**Facturación**
+- Razón social: {_a.get('factura_razon_social') or '—'}
+- CIF: {_a.get('factura_cif') or '—'}
+- Dirección fiscal: {_a.get('factura_direccion') or '—'}
+- Email facturas: {_a.get('factura_email') or '—'}
+- IBAN completo: `{_iban_full}`
+- Banco: {_a.get('banco_nombre') or '—'} — Titular: {_a.get('banco_titular') or '—'}
+""")
+                        with _bb:
+                            st.markdown("**Acciones**")
+                            if st.button("⏸ Suspender", key=f"mls_susp_{_a['id']}",
+                                         use_container_width=True):
+                                _mls.update_inmo_activa(_a["id"], 0)
+                                st.warning(f"⏸ {_anombre} suspendida.")
+                                st.rerun()
+        except Exception as _eb:
+            st.warning(f"Error sección B: {_eb}")
+
+        st.markdown("---")
+
+        # ══ SECCIÓN C: Fincas MLS ════════════════════════════════════════════
+        st.subheader("🏠 C. Fincas MLS en el sistema")
+        try:
+            # Filtro por estado
+            _estados_filtro = ["Todos", "pendiente_validacion", "validada_pendiente_aprobacion",
+                               "publicada", "reservada", "reserva_pendiente_confirmacion",
+                               "cerrada", "pausada", "eliminada"]
+            _filtro_estado = st.selectbox(
+                "Filtrar por estado", _estados_filtro,
+                key="mls_filtro_estado_fincas"
+            )
+
+            _fq = db_conn()
+            _sql_fincas = """
+                SELECT f.id, f.ref_codigo, f.titulo, f.precio, f.superficie_m2,
+                       f.estado, f.created_at, f.catastro_validada,
+                       f.dias_en_mercado_inicio,
+                       COALESCE(i.nombre_comercial, i.nombre, '—') as listante,
+                       i.email as listante_email
+                FROM fincas_mls f
+                LEFT JOIN inmobiliarias i ON f.inmo_id = i.id
+            """
+            if _filtro_estado != "Todos":
+                _sql_fincas += " WHERE f.estado = ?"
+                _fincas_list = _fq.execute(_sql_fincas, (_filtro_estado,)).fetchall()
+            else:
+                _fincas_list = _fq.execute(_sql_fincas).fetchall()
+            _fq.close()
+
+            if not _fincas_list:
+                st.info("No hay fincas que coincidan con el filtro.")
+            else:
+                import pandas as _pd_mls
+                _cols_f = ["id","ref_codigo","titulo","precio","superficie_m2","estado",
+                           "created_at","catastro_validada","dias_en_mercado_inicio",
+                           "listante","listante_email"]
+                _df_fincas = _pd_mls.DataFrame([dict(zip(_cols_f, r)) for r in _fincas_list])
+
+                # Calcular días en mercado
+                import datetime as _dt_mls2
+                def _dias(ts):
+                    try:
+                        d = _dt_mls2.datetime.fromisoformat(ts)
+                        return (_dt_mls2.datetime.now(_dt_mls2.timezone.utc) - d).days
+                    except Exception:
+                        return "—"
+                _df_fincas["días"] = _df_fincas["dias_en_mercado_inicio"].apply(_dias)
+                _df_fincas["catastro"] = _df_fincas["catastro_validada"].map({1: "✅", 0: "⚠️"}).fillna("⚠️")
+
+                st.dataframe(
+                    _df_fincas[["ref_codigo","titulo","precio","estado","días","listante","catastro"]].rename(columns={
+                        "ref_codigo": "REF", "titulo": "Título",
+                        "precio": "Precio (€)", "estado": "Estado",
+                        "días": "Días", "listante": "Listante", "catastro": "Catastro"
+                    }),
+                    use_container_width=True, hide_index=True
+                )
+
+                st.markdown("**Acciones por finca:**")
+                for _, _frow in _df_fincas.iterrows():
+                    _fid    = _frow["id"]
+                    _fref   = _frow["ref_codigo"] or "sin ref"
+                    _ftit   = _frow["titulo"] or "Sin título"
+                    _festado = _frow["estado"]
+                    _femail = _frow["listante_email"]
+                    _flis   = _frow["listante"]
+
+                    with st.expander(f"[{_fref}] {_ftit} — {_festado}"):
+                        _fc1, _fc2 = st.columns([2, 1])
+                        with _fc1:
+                            st.markdown(f"**Listante:** {_flis} | **Estado:** `{_festado}` | "
+                                        f"**Precio:** €{_frow['precio']:,.0f} | "
+                                        f"**Superficie:** {_frow['superficie_m2']} m²")
+                        with _fc2:
+                            # Aprobar publicación — solo si está validada_pendiente_aprobacion
+                            if _festado == "validada_pendiente_aprobacion":
+                                if st.button("✅ Aprobar publicación", key=f"mls_apro_f_{_fid}",
+                                             type="primary", use_container_width=True):
+                                    try:
+                                        _mls.update_finca_estado(_fid, "publicada")
+                                        _mls_notif.notif_finca_publicada(
+                                            ref_codigo=_fref,
+                                            titulo=_ftit,
+                                            precio=_frow["precio"],
+                                            inmo_email=_femail or "",
+                                        )
+                                    except Exception:
+                                        pass
+                                    st.rerun()
+
+                            # Confirmación reserva cliente directo
+                            if _festado == "reserva_pendiente_confirmacion":
+                                # Buscar datos del cliente en reservas
+                                try:
+                                    _rc = db_conn()
+                                    _res_cli_row = _rc.execute(
+                                        """SELECT notas FROM reservas_mls
+                                           WHERE finca_id=? AND inmo_colaboradora_id='CLIENTE_DIRECTO'
+                                           ORDER BY timestamp_reserva DESC LIMIT 1""",
+                                        (_fid,)
+                                    ).fetchone()
+                                    _rc.close()
+                                    _notas_cli = (_res_cli_row[0] or "") if _res_cli_row else ""
+                                    # notas = "Cliente: {nombre} | {email}"
+                                    _nom_cli, _email_cli = "—", "—"
+                                    if "Cliente:" in _notas_cli and "|" in _notas_cli:
+                                        _parts = _notas_cli.split("|")
+                                        _nom_cli  = _parts[0].replace("Cliente:", "").strip()
+                                        _email_cli = _parts[1].strip() if len(_parts) > 1 else "—"
+                                except Exception:
+                                    _nom_cli, _email_cli = "—", "—"
+
+                                st.caption(f"Cliente: {_nom_cli} | {_email_cli}")
+                                _rc1, _rc2 = st.columns(2)
+                                with _rc1:
+                                    if st.button("✅ Confirmar disponible", key=f"mls_conf_{_fid}",
+                                                 type="primary", use_container_width=True):
+                                        _mls.update_finca_estado(_fid, "reservada")
+                                        try:
+                                            _mls_notif.notif_confirmacion_reserva_cliente(
+                                                email_cliente=_email_cli,
+                                                nombre_cliente=_nom_cli,
+                                                ref_codigo=_fref,
+                                                confirmada=True,
+                                            )
+                                        except Exception:
+                                            pass
+                                        st.rerun()
+                                with _rc2:
+                                    if st.button("❌ No disponible", key=f"mls_nodisp_{_fid}",
+                                                 use_container_width=True):
+                                        _mls.update_finca_estado(_fid, "publicada")
+                                        try:
+                                            _mls_notif.notif_confirmacion_reserva_cliente(
+                                                email_cliente=_email_cli,
+                                                nombre_cliente=_nom_cli,
+                                                ref_codigo=_fref,
+                                                confirmada=False,
+                                            )
+                                        except Exception:
+                                            pass
+                                        st.rerun()
+
+                            # Botones de gestión general
+                            _gb1, _gb2 = st.columns(2)
+                            with _gb1:
+                                if _festado not in ("pausada", "cerrada", "eliminada"):
+                                    if st.button("⏸ Pausar", key=f"mls_pau_{_fid}",
+                                                 use_container_width=True):
+                                        _mls.update_finca_estado(_fid, "pausada")
+                                        st.rerun()
+                                elif _festado == "pausada":
+                                    if st.button("▶️ Reactivar", key=f"mls_react_{_fid}",
+                                                 type="primary", use_container_width=True):
+                                        _mls.update_finca_estado(_fid, "publicada")
+                                        st.rerun()
+                            with _gb2:
+                                if _festado != "eliminada":
+                                    _elim_key = f"mls_elim_confirm_{_fid}"
+                                    if st.session_state.get(_elim_key):
+                                        if st.button("⚠️ Confirmar borrado lógico",
+                                                     key=f"mls_elim_yes_{_fid}",
+                                                     use_container_width=True):
+                                            _mls.update_finca_estado(_fid, "eliminada")
+                                            st.session_state.pop(_elim_key, None)
+                                            st.rerun()
+                                    else:
+                                        if st.button("🗑️ Eliminar", key=f"mls_elim_{_fid}",
+                                                     use_container_width=True):
+                                            st.session_state[_elim_key] = True
+                                            st.rerun()
+        except Exception as _ec:
+            st.warning(f"Error sección C: {_ec}")
+
+        st.markdown("---")
+
+        # ══ SECCIÓN D: Reservas activas ══════════════════════════════════════
+        st.subheader("🔒 D. Reservas activas")
+        try:
+            import datetime as _dt_res
+            _rq = db_conn()
+            _reservas_admin = _rq.execute("""
+                SELECT r.id, r.finca_id, r.inmo_colaboradora_id, r.estado,
+                       r.importe_reserva, r.timestamp_reserva, r.timestamp_expira_72h, r.notas,
+                       f.ref_codigo, f.titulo,
+                       COALESCE(il.nombre_comercial, il.nombre, '—') as listante,
+                       COALESCE(ic.nombre_comercial, ic.nombre, r.inmo_colaboradora_id) as colaboradora
+                FROM reservas_mls r
+                LEFT JOIN fincas_mls f ON r.finca_id = f.id
+                LEFT JOIN inmobiliarias il ON f.inmo_id = il.id
+                LEFT JOIN inmobiliarias ic ON r.inmo_colaboradora_id = ic.id
+                WHERE r.estado IN ('activa','pendiente_confirmacion_48h')
+                ORDER BY r.timestamp_reserva DESC
+            """).fetchall()
+            _rq.close()
+
+            if not _reservas_admin:
+                st.info("No hay reservas activas en este momento.")
+            else:
+                _cols_r = ["id","finca_id","inmo_colaboradora_id","estado","importe_reserva",
+                           "timestamp_reserva","timestamp_expira_72h","notas",
+                           "ref_codigo","titulo","listante","colaboradora"]
+                for _rv in _reservas_admin:
+                    _rd = dict(zip(_cols_r, _rv))
+                    # Calcular horas restantes
+                    _hrs_rest = "—"
+                    try:
+                        _exp_dt = _dt_res.datetime.fromisoformat(_rd["timestamp_expira_72h"])
+                        _now_dt = _dt_res.datetime.now(_dt_res.timezone.utc)
+                        if _exp_dt.tzinfo is None:
+                            _exp_dt = _exp_dt.replace(tzinfo=_dt_res.timezone.utc)
+                        _diff   = _exp_dt - _now_dt
+                        _hrs_rest = f"{max(0, int(_diff.total_seconds() // 3600))}h"
+                    except Exception:
+                        pass
+
+                    _tipo_r = "👤 Cliente directo" if _rd["inmo_colaboradora_id"] == "CLIENTE_DIRECTO" \
+                              else "🤝 Colaboradora"
+                    with st.expander(
+                        f"[{_rd['ref_codigo'] or '?'}] {_rd['titulo'] or '?'} — "
+                        f"{_tipo_r} | {_hrs_rest} restantes | €{_rd['importe_reserva']:,.0f}"
+                    ):
+                        _ra, _rb = st.columns([3, 1])
+                        with _ra:
+                            st.markdown(f"""
+| Campo | Valor |
+|---|---|
+| REF finca | `{_rd['ref_codigo'] or '—'}` |
+| Tipo | {_tipo_r} |
+| Colaboradora/Cliente | {_rd['colaboradora']} |
+| Listante | {_rd['listante']} |
+| Importe reserva | €{_rd['importe_reserva']:,.0f} |
+| Reservado el | {(_rd['timestamp_reserva'] or '')[:16]} |
+| Expira | {(_rd['timestamp_expira_72h'] or '')[:16]} |
+| Horas restantes | **{_hrs_rest}** |
+| Notas | {_rd['notas'] or '—'} |
+""")
+                        with _rb:
+                            if st.button("⏰ Forzar expiración", key=f"mls_fexp_{_rd['id']}",
+                                         use_container_width=True):
+                                try:
+                                    _ec2 = db_conn()
+                                    _ec2.execute(
+                                        "UPDATE reservas_mls SET estado='expirada' WHERE id=?",
+                                        (_rd["id"],)
+                                    )
+                                    _ec2.execute(
+                                        "UPDATE fincas_mls SET estado='publicada', updated_at=? WHERE id=?",
+                                        (_dt_res.datetime.now(_dt_res.timezone.utc).isoformat(timespec="seconds"),
+                                         _rd["finca_id"])
+                                    )
+                                    _ec2.commit()
+                                    _ec2.close()
+                                    st.success("Reserva expirada. Finca liberada.")
+                                    st.rerun()
+                                except Exception as _ef2:
+                                    st.error(f"Error: {_ef2}")
+        except Exception as _ed:
+            st.warning(f"Error sección D: {_ed}")
+
+        st.markdown("---")
+
+        # ══ SECCIÓN E: Firmas del acuerdo ════════════════════════════════════
+        st.subheader("✍️ E. Firmas del Acuerdo de Colaboración MLS")
+        try:
+            _fq2 = db_conn()
+            _firmas_admin = _fq2.execute("""
+                SELECT fc.id, COALESCE(i.nombre_comercial, i.nombre, '—') as inmo,
+                       fc.cif, fc.timestamp, fc.ip,
+                       fc.documento_hash, fc.firma_hash, fc.documento_version
+                FROM firmas_colaboracion fc
+                LEFT JOIN inmobiliarias i ON fc.inmo_id = i.id
+                ORDER BY fc.timestamp DESC
+            """).fetchall()
+            _fq2.close()
+
+            if not _firmas_admin:
+                st.info("No hay firmas registradas todavía.")
+            else:
+                import pandas as _pd_f
+                _cols_fi = ["id","inmo","cif","timestamp","ip","doc_hash","firma_hash","version"]
+                _df_fi   = _pd_f.DataFrame([dict(zip(_cols_fi, r)) for r in _firmas_admin])
+                # Truncar hashes para listado
+                _df_fi["doc_hash_s"]   = _df_fi["doc_hash"].str[:16]  + "…"
+                _df_fi["firma_hash_s"] = _df_fi["firma_hash"].str[:16] + "…"
+                st.dataframe(
+                    _df_fi[["inmo","cif","timestamp","ip","doc_hash_s","firma_hash_s","version"]].rename(columns={
+                        "inmo": "Inmobiliaria", "cif": "CIF",
+                        "timestamp": "Fecha firma", "ip": "IP",
+                        "doc_hash_s": "Doc hash (16)", "firma_hash_s": "Firma hash (16)",
+                        "version": "Versión"
+                    }),
+                    use_container_width=True, hide_index=True
+                )
+                st.caption("Firmas digitales eIDAS art.25 — SHA-256 sobre TEXTO_ACUERDO + timestamp + CIF + IP")
+
+                for _, _fir in _df_fi.iterrows():
+                    with st.expander(f"📄 Certificado completo — {_fir['inmo']} ({_fir['timestamp'][:10]})"):
+                        st.markdown(f"""
+**Inmobiliaria:** {_fir['inmo']}
+**CIF:** `{_fir['cif']}`
+**Timestamp:** `{_fir['timestamp']}`
+**IP firmante:** `{_fir['ip']}`
+**Versión documento:** `{_fir['version']}`
+
+**Documento hash (SHA-256 completo):**
+```
+{_fir['doc_hash']}
+```
+**Firma hash (SHA-256 completo):**
+```
+{_fir['firma_hash']}
+```
+*Referencia legal: eIDAS art.25 — Firma electrónica avanzada.*
+*SHA-256(TEXTO_ACUERDO_MLS + timestamp + CIF + IP)*
+""")
+        except Exception as _ee2:
+            st.warning(f"Error sección E: {_ee2}")
