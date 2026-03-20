@@ -176,18 +176,9 @@ def ui_login_registro() -> None:
     st.markdown("## 🏢 ArchiRapid MLS — Portal Inmobiliario")
     st.caption("Bolsa de colaboración entre inmobiliarias. Listantes + colaboradoras.")
 
-    # ── Pantalla de confirmación post-registro (fuera de tabs para ser visible) ─
+    # ── Mensaje post-registro (encima de los tabs — Tab Acceso queda activo) ────
     if st.session_state.pop("mls_registro_ok", False):
-        st.success("✅ Solicitud enviada correctamente.")
-        st.info(
-            "Recibirás un email de confirmación en cuanto tu cuenta sea aprobada "
-            "(24-48h hábiles). Una vez aprobada, podrás acceder con tu email y contraseña "
-            "desde la pestaña **Acceso**."
-        )
-        if st.button("← Volver al inicio de ArchiRapid", type="primary", use_container_width=True):
-            st.query_params.clear()
-            st.rerun()
-        st.stop()
+        st.success("✅ Solicitud enviada. Recibirás un email en cuanto tu cuenta sea aprobada (24-48h hábiles).")
 
     tab_login, tab_registro = st.tabs(["🔑 Acceder", "📝 Registrarse"])
 
@@ -720,9 +711,25 @@ def main() -> None:
     inmo = _get_inmo()
 
     # ── 3. Handler ?mls_pago=ok — retorno desde Stripe (suscripción) ─────────
-    if inmo and st.query_params.get("mls_pago") == "ok":
-        _handle_pago_ok(inmo)
-        inmo = _get_inmo()  # refrescar tras activación
+    if st.query_params.get("mls_pago") == "ok":
+        if inmo is None:
+            # Sesión perdida tras redirección Stripe — recuperar por stripe_session_id
+            _sid = st.query_params.get("mls_stripe_session", "")
+            if _sid:
+                try:
+                    _rc = _db.get_conn()
+                    _rrow = _rc.execute(
+                        "SELECT * FROM inmobiliarias WHERE stripe_session_id = ?", (_sid,)
+                    ).fetchone()
+                    _rc.close()
+                    if _rrow:
+                        _login_inmo(dict(_rrow))
+                        inmo = _get_inmo()
+                except Exception:
+                    pass
+        if inmo:
+            _handle_pago_ok(inmo)
+            inmo = _get_inmo()  # refrescar tras activación
 
     # ── 4. Expirar reservas vencidas (lazy) ───────────────────────────────────
     if inmo:

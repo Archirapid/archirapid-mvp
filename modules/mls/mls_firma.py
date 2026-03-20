@@ -312,9 +312,7 @@ def mostrar_ui_firma(inmo: dict) -> bool:
         )
 
         try:
-            conn = mls_db._get_conn()
             mls_db.create_firma(
-                conn=conn,
                 inmo_id=inmo["id"],
                 doc_hash=datos["doc_hash"],
                 firma_hash=datos["firma_hash"],
@@ -323,12 +321,10 @@ def mostrar_ui_firma(inmo: dict) -> bool:
                 cif=datos["cif"],
             )
             mls_db.update_inmo_firma(
-                conn=conn,
                 inmo_id=inmo["id"],
                 firma_hash=datos["firma_hash"],
                 firma_timestamp=datos["timestamp"],
             )
-            conn.close()
         except Exception as exc:
             st.error(f"Error al registrar la firma: {exc}")
             return False
