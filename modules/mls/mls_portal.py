@@ -203,6 +203,19 @@ def ui_login_registro() -> None:
 
     # ── Tab Registro ──────────────────────────────────────────────────────────
     with tab_registro:
+        # ── Pantalla de confirmación post-registro ────────────────────────────
+        if st.session_state.pop("mls_registro_ok", False):
+            st.success("✅ Solicitud enviada correctamente.")
+            st.info(
+                "Recibirás un email de confirmación en cuanto tu cuenta sea aprobada "
+                "(24-48h hábiles). Una vez aprobada, podrás acceder con tu email y contraseña "
+                "desde la pestaña **Acceso**."
+            )
+            if st.button("← Volver al inicio de ArchiRapid", type="primary", use_container_width=True):
+                st.query_params.clear()
+                st.rerun()
+            st.stop()
+
         st.markdown("### Alta de nueva inmobiliaria")
         st.info(
             "El registro requiere aprobación manual de ArchiRapid (24-48h hábiles). "
@@ -282,8 +295,8 @@ def ui_login_registro() -> None:
                     help="Este email se usará para iniciar sesión en el portal."
                 )
             with ci:
-                pwd1 = st.text_input("Contraseña * (mín. 8 caracteres)", type="password")
-                pwd2 = st.text_input("Confirmar contraseña *", type="password")
+                pwd1 = st.text_input("Contraseña * (mín. 8 caracteres)", type="password", key="mls_pwd1")
+                pwd2 = st.text_input("Confirmar contraseña *", type="password", key="mls_pwd2")
 
             st.divider()
 
@@ -336,9 +349,9 @@ def ui_login_registro() -> None:
                 errores.append("Si introduces IBAN, el titular de la cuenta es obligatorio.")
             if not email_login.strip() or "@" not in email_login:
                 errores.append("Email de acceso no válido.")
-            if len(pwd1) < 8:
+            if len(pwd1.strip()) < 8:
                 errores.append("La contraseña debe tener al menos 8 caracteres.")
-            if pwd1 != pwd2:
+            if pwd1.strip() != pwd2.strip():
                 errores.append("Las contraseñas no coinciden.")
             if not aceptar:
                 errores.append("Debes aceptar las condiciones de uso y la política de privacidad.")
@@ -355,7 +368,7 @@ def ui_login_registro() -> None:
                         "nombre_comercial":  nombre_comercial.strip(),
                         "cif":               cif,
                         "email":             email_corp.strip().lower(),
-                        "password_hash":     generate_password_hash(pwd1),
+                        "password_hash":     generate_password_hash(pwd1.strip()),
                         "telefono":          telefono_1.strip(),
                         "telefono_secundario": telefono_2.strip() or None,
                         "telegram_contacto": telegram_c.strip() or None,
@@ -392,9 +405,8 @@ def ui_login_registro() -> None:
                             )
                         except Exception:
                             pass
-                        st.success(
-                            "✅ Solicitud enviada. Recibirás un email en cuanto tu cuenta sea aprobada (24-48h hábiles)."
-                        )
+                        st.session_state["mls_registro_ok"] = True
+                        st.rerun()
                     else:
                         st.error("Error al guardar. Comprueba que el CIF y el email de acceso no estén ya registrados.")
                 except Exception as exc:
