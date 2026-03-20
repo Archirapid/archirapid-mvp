@@ -192,7 +192,8 @@ def ui_login_registro() -> None:
             else:
                 conn = _db.get_conn()
                 row = conn.execute(
-                    "SELECT * FROM inmobiliarias WHERE email = ?", (email,)
+                    "SELECT * FROM inmobiliarias WHERE email_login = ? OR email = ?",
+                    (email, email),
                 ).fetchone()
                 if row and check_password_hash(row["password_hash"], password):
                     _login_inmo(dict(row))
