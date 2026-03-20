@@ -1,4 +1,4 @@
-"""
+de"""
 BLOQUEO DOCUMENTAL - SECCIÓN "PROYECTOS DISPONIBLES"
 
 Esta sección está BLINDADA y protegida contra modificaciones no autorizadas.
@@ -1389,6 +1389,18 @@ if _qp_seccion == "arquitecto" and not st.session_state.get("_deep_link_routed")
     if _qp_modo == "estudio" or _qp_demo == "true":
         st.session_state["_open_estudio_tab"] = True
 
+# === RESTAURAR selected_page DESDE SLUG ?page=X (deep-link / refresh) ===
+_SLUG_TO_PAGE = {
+    "admin":        "Intranet",
+    "propietarios": "🏠 Propietarios",
+    "gemelo":       "Propietario (Gemelo Digital)",
+    "lola":         "💬 Lola",
+    "login":        "Iniciar Sesión",
+}
+_url_slug = st.query_params.get("page", "")
+if _url_slug in _SLUG_TO_PAGE and "selected_page" not in st.session_state:
+    st.session_state["selected_page"] = _SLUG_TO_PAGE[_url_slug]
+
 # === RUTA PÚBLICA: ?page=stats (sin login) ===
 if st.query_params.get("page") == "stats":
     try:
@@ -1723,12 +1735,27 @@ selected_page = st.sidebar.radio(
 # Sincronizamos por si el usuario cambia el radio manualmente
 st.session_state['selected_page'] = selected_page
 
-# Lógica de Redirección
-if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
+# Lógica de Redirección — sincroniza selected_page → ?page=slug en la URL
+_PAGE_TO_SLUG = {
+    "Intranet":                              "admin",
+    "🏠 Propietarios":                       "propietarios",
+    "Propietario (Gemelo Digital)":          "gemelo",
+    "💬 Lola":                               "lola",
+    "Iniciar Sesión":                        "login",
+    # slugs existentes (no cambian handlers ya presentes)
+    "Registro de Usuario":                   "Registro de Usuario",
+    "👤 Panel de Cliente":                   "👤 Panel de Cliente",
+    "Diseñador de Vivienda":                 "Diseñador de Vivienda",
+    "Arquitectos (Marketplace)":             "Arquitectos (Marketplace)",
+    "👤 Panel de Proveedor":                 "👤 Panel de Proveedor",
+    "📝 Registro de Proveedor de Servicios": "📝 Registro de Proveedor de Servicios",
+}
+_cur_page = st.session_state.get('selected_page', '')
+if _cur_page == "🏠 Inicio / Marketplace":
     if "selected_plot" not in st.query_params and "selected_project_v2" not in st.query_params and "selected_prefab" not in st.query_params:
         st.query_params.clear()
-elif st.session_state.get('selected_page') in ["👤 Panel de Proveedor", "📝 Registro de Proveedor de Servicios"]:
-    st.query_params["page"] = st.session_state.get('selected_page')
+elif _cur_page in _PAGE_TO_SLUG:
+    st.query_params["page"] = _PAGE_TO_SLUG[_cur_page]
 
 # Inicializar vista_actual si no existe (no altera comportamiento por defecto)
 if "vista_actual" not in st.session_state:
