@@ -1,4 +1,4 @@
-de"""
+"""
 BLOQUEO DOCUMENTAL - SECCIÓN "PROYECTOS DISPONIBLES"
 
 Esta sección está BLINDADA y protegida contra modificaciones no autorizadas.
@@ -1742,7 +1742,6 @@ _PAGE_TO_SLUG = {
     "Propietario (Gemelo Digital)":          "gemelo",
     "💬 Lola":                               "lola",
     "Iniciar Sesión":                        "login",
-    # slugs existentes (no cambian handlers ya presentes)
     "Registro de Usuario":                   "Registro de Usuario",
     "👤 Panel de Cliente":                   "👤 Panel de Cliente",
     "Diseñador de Vivienda":                 "Diseñador de Vivienda",
