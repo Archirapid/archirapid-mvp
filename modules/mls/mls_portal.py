@@ -617,7 +617,11 @@ def ui_portal_operativo(inmo: dict) -> None:
     with tab_fincas:
         try:
             from modules.mls import mls_fincas
-            mls_fincas.main(inmo)
+            _sf, _mf = st.tabs(["📤 Subir Finca", "🏠 Mis Fincas"])
+            with _sf:
+                mls_fincas.ui_subir_finca(inmo)
+            with _mf:
+                mls_fincas.ui_mis_fincas(inmo)
         except Exception as exc:
             st.error(f"Error en Mis Fincas: {exc}")
 
