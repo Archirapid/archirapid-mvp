@@ -1228,7 +1228,7 @@ Obtén el token creando un bot con @BotFather en Telegram.
 | Plan | **{_plan_a}** |
 | Plan activo | {'✅' if _a.get('plan_activo') else '❌'} |
 | Firma acuerdo | {_firma_a} |
-| Fecha firma | {(_a.get('firma_timestamp',''))[:10] or '—'} |
+| Fecha firma | {((_a.get('firma_timestamp') or ''))[:10] or '—'} |
 | Fincas activas | {_n_fincas_a} |
 """)
                             # Detalle completo en sub-expander
