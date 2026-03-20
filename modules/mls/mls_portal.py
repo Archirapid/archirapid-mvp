@@ -514,10 +514,16 @@ def _iniciar_checkout_plan(plan_key: str, inmo: dict) -> None:
     try:
         from modules.stripe_utils import create_checkout_session
 
-        base_url = st.query_params.get("_base_url", "")
-        # Construir URLs de retorno — Streamlit Cloud usa path /
-        success_url = "/?page=MLS&mls_pago=ok&mls_stripe_session={CHECKOUT_SESSION_ID}"
-        cancel_url = "/?page=MLS"
+        # URL base absoluta — Stripe exige URLs completas
+        try:
+            headers = st.context.headers if hasattr(st, "context") else {}
+            host = headers.get("host", "archirapid.streamlit.app")
+            proto = "https" if "localhost" not in host else "http"
+            base_url = f"{proto}://{host}"
+        except Exception:
+            base_url = "https://archirapid.streamlit.app"
+        success_url = f"{base_url}/?page=MLS&mls_pago=ok&mls_stripe_session={{CHECKOUT_SESSION_ID}}"
+        cancel_url = f"{base_url}/?page=MLS"
 
         url, session_id = create_checkout_session(
             product_keys=[plan_key],
