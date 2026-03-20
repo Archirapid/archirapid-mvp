@@ -685,8 +685,7 @@ def _ui_mi_cuenta(inmo: dict) -> None:
 
         with st.expander("🔐 Certificado de integridad SHA-256"):
             st.markdown("**Hash del documento (SHA-256):**")
-            from modules.mls import mls_db as _mls_db_inner
-            _conn_cert = _mls_db_inner.get_conn()
+            _conn_cert = _db.get_conn()
             _row_cert = _conn_cert.execute(
                 "SELECT documento_hash, ip FROM firmas_colaboracion WHERE inmo_id = ? ORDER BY id DESC LIMIT 1",
                 (inmo["id"],),
