@@ -176,8 +176,11 @@ def ui_login_registro() -> None:
     st.markdown("## 🏢 ArchiRapid MLS — Portal Inmobiliario")
     st.caption("Bolsa de colaboración entre inmobiliarias. Listantes + colaboradoras.")
 
-    # ── Mensaje post-registro (encima de los tabs — Tab Acceso queda activo) ────
-    if st.session_state.pop("mls_registro_ok", False):
+    # ── Mensaje post-registro ────────────────────────────────────────────────────
+    # Consumimos la flag ANTES de crear los tabs; guardamos el valor local para
+    # usarlo también dentro del tab "Registrarse" (Streamlit recuerda la pestaña activa).
+    _reg_ok = st.session_state.pop("mls_registro_ok", False)
+    if _reg_ok:
         st.success("✅ Solicitud enviada. Recibirás un email en cuanto tu cuenta sea aprobada (24-48h hábiles).")
 
     tab_login, tab_registro = st.tabs(["🔑 Acceder", "📝 Registrarse"])
@@ -208,6 +211,13 @@ def ui_login_registro() -> None:
 
     # ── Tab Registro ──────────────────────────────────────────────────────────
     with tab_registro:
+        # Si acabamos de registrar, Streamlit mantiene este tab activo por memoria
+        # de widgets. Mostramos confirmación en vez del formulario para evitar confusión.
+        if _reg_ok:
+            st.success("✅ Tu solicitud ha sido enviada correctamente.")
+            st.info("Cuando tu cuenta sea aprobada (24-48h hábiles) podrás iniciar sesión en la pestaña **🔑 Acceder**.")
+            st.stop()
+
         st.markdown("### Alta de nueva inmobiliaria")
         st.info(
             "El registro requiere aprobación manual de ArchiRapid (24-48h hábiles). "
