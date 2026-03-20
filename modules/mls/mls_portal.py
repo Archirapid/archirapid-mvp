@@ -176,6 +176,19 @@ def ui_login_registro() -> None:
     st.markdown("## 🏢 ArchiRapid MLS — Portal Inmobiliario")
     st.caption("Bolsa de colaboración entre inmobiliarias. Listantes + colaboradoras.")
 
+    # ── Pantalla de confirmación post-registro (fuera de tabs para ser visible) ─
+    if st.session_state.pop("mls_registro_ok", False):
+        st.success("✅ Solicitud enviada correctamente.")
+        st.info(
+            "Recibirás un email de confirmación en cuanto tu cuenta sea aprobada "
+            "(24-48h hábiles). Una vez aprobada, podrás acceder con tu email y contraseña "
+            "desde la pestaña **Acceso**."
+        )
+        if st.button("← Volver al inicio de ArchiRapid", type="primary", use_container_width=True):
+            st.query_params.clear()
+            st.rerun()
+        st.stop()
+
     tab_login, tab_registro = st.tabs(["🔑 Acceder", "📝 Registrarse"])
 
     # ── Tab Login ─────────────────────────────────────────────────────────────
@@ -204,19 +217,6 @@ def ui_login_registro() -> None:
 
     # ── Tab Registro ──────────────────────────────────────────────────────────
     with tab_registro:
-        # ── Pantalla de confirmación post-registro ────────────────────────────
-        if st.session_state.pop("mls_registro_ok", False):
-            st.success("✅ Solicitud enviada correctamente.")
-            st.info(
-                "Recibirás un email de confirmación en cuanto tu cuenta sea aprobada "
-                "(24-48h hábiles). Una vez aprobada, podrás acceder con tu email y contraseña "
-                "desde la pestaña **Acceso**."
-            )
-            if st.button("← Volver al inicio de ArchiRapid", type="primary", use_container_width=True):
-                st.query_params.clear()
-                st.rerun()
-            st.stop()
-
         st.markdown("### Alta de nueva inmobiliaria")
         st.info(
             "El registro requiere aprobación manual de ArchiRapid (24-48h hábiles). "
@@ -542,11 +542,9 @@ def _iniciar_checkout_plan(plan_key: str, inmo: dict) -> None:
         )
         conn.commit()
 
-        st.markdown(
-            f'<meta http-equiv="refresh" content="0; url={url}">',
-            unsafe_allow_html=True,
-        )
-        st.markdown(f"[Ir al pago →]({url})")
+        import streamlit.components.v1 as _stc_mls
+        _stc_mls.html(f'<script>window.top.location.href="{url}";</script>', height=0)
+        st.link_button("💳 Ir al pago →", url, type="primary", use_container_width=True)
 
     except ImportError:
         st.error("Stripe no disponible en este entorno.")

@@ -261,12 +261,7 @@ def get_inmos_activas() -> list:
     try:
         cur = conn.cursor()
         cur.execute(
-            """SELECT id, nombre, cif, email, telefono, web,
-                      plan, plan_activo, firma_hash, firma_timestamp,
-                      ip_registro, created_at
-               FROM inmobiliarias
-               WHERE activa = 1
-               ORDER BY created_at DESC"""
+            "SELECT * FROM inmobiliarias WHERE activa = 1 ORDER BY created_at DESC"
         )
         return [_row_to_dict(r) for r in cur.fetchall()]
     except Exception as e:

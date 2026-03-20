@@ -1195,6 +1195,8 @@ Obtén el token creando un bot con @BotFather en Telegram.
                 st.info("No hay inmobiliarias activas todavía.")
             else:
                 for _a in _activas:
+                    if _a is None:
+                        continue
                     _anombre = _a.get("nombre_comercial") or _a.get("nombre", "?")
                     _plan_a  = (_a.get("plan") or "ninguno").upper()
                     _firma_a = "✅" if _a.get("firma_hash") else "⚠️ Pendiente"
