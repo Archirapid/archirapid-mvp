@@ -243,6 +243,172 @@ def verificar_firma(firma_hash: str, cif: str, ip: str, timestamp: str) -> bool:
 
 
 # =============================================================================
+# SECCIÓN 2b — GENERACIÓN DE PDF CERTIFICADO (reportlab)
+# =============================================================================
+
+def generar_pdf_certificado(inmo: dict) -> bytes | None:
+    """
+    Genera el PDF del Certificado de Firma Digital eIDAS para la inmo.
+    Recupera doc_hash e ip desde firmas_colaboracion.
+    Devuelve bytes del PDF o None si falla.
+    """
+    try:
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import cm
+        from reportlab.lib import colors
+        from reportlab.platypus import (
+            SimpleDocTemplate, Paragraph, Spacer, HRFlowable, Table, TableStyle
+        )
+        import io
+        from src import db as _db_pdf
+
+        # Recuperar datos completos de firmas_colaboracion
+        conn = _db_pdf.get_conn()
+        fila = conn.execute(
+            """SELECT documento_hash, firma_hash, timestamp, ip, cif, documento_version
+               FROM firmas_colaboracion
+               WHERE inmo_id = ?
+               ORDER BY id DESC LIMIT 1""",
+            (inmo["id"],)
+        ).fetchone()
+        conn.close()
+
+        firma_hash      = inmo.get("firma_hash", "—")
+        firma_timestamp = inmo.get("firma_timestamp", "—") or "—"
+        doc_hash        = dict(fila)["documento_hash"] if fila else "—"
+        ip_firma        = dict(fila)["ip"] if fila else "—"
+        version         = dict(fila)["documento_version"] if fila else "1.0"
+
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=A4,
+            leftMargin=2.5 * cm, rightMargin=2.5 * cm,
+            topMargin=2 * cm, bottomMargin=2 * cm,
+        )
+        styles = getSampleStyleSheet()
+
+        _NAVY   = colors.HexColor("#0d2137")
+        _ORANGE = colors.HexColor("#e8601c")
+        _GRAY   = colors.HexColor("#666666")
+        _LIGHT  = colors.HexColor("#f4f6f9")
+
+        def _style(name, **kw):
+            s = ParagraphStyle(name, parent=styles["Normal"], **kw)
+            return s
+
+        title_style   = _style("T", fontSize=18, textColor=_NAVY,   spaceAfter=4,  fontName="Helvetica-Bold")
+        sub_style     = _style("S", fontSize=11, textColor=_ORANGE,  spaceAfter=2,  fontName="Helvetica-Bold")
+        body_style    = _style("B", fontSize=9,  textColor=colors.black, leading=13)
+        small_style   = _style("Sm", fontSize=7.5, textColor=_GRAY, leading=11)
+        hash_style    = _style("H", fontSize=7,  textColor=_NAVY, fontName="Courier", leading=10)
+        caption_style = _style("C", fontSize=8,  textColor=_GRAY, leading=11)
+
+        story = []
+
+        # ── Cabecera ──────────────────────────────────────────────────────────
+        story.append(Paragraph("ArchiRapid MLS", _style("Logo", fontSize=22,
+            textColor=_NAVY, fontName="Helvetica-Bold", spaceAfter=2)))
+        story.append(Paragraph("CERTIFICADO DE FIRMA DIGITAL — eIDAS art. 25",
+            _style("CT", fontSize=13, textColor=_ORANGE, fontName="Helvetica-Bold", spaceAfter=4)))
+        story.append(HRFlowable(width="100%", thickness=2, color=_ORANGE, spaceAfter=12))
+
+        # ── Datos de la inmobiliaria ──────────────────────────────────────────
+        story.append(Paragraph("DATOS DE LA INMOBILIARIA FIRMANTE", sub_style))
+        datos_inmo = [
+            ["Nombre comercial", inmo.get("nombre_comercial") or inmo.get("nombre", "—")],
+            ["Nombre legal",     inmo.get("nombre_sociedad") or "—"],
+            ["CIF",              inmo.get("cif", "—")],
+            ["Email corporativo",inmo.get("email", "—")],
+            ["Email de acceso",  inmo.get("email_login") or "—"],
+            ["Dirección",        f"{inmo.get('direccion') or '—'}, {inmo.get('localidad') or ''} {inmo.get('codigo_postal') or ''}, {inmo.get('provincia') or ''}".strip(", ")],
+        ]
+        t_inmo = Table(datos_inmo, colWidths=[4.5 * cm, 11.5 * cm])
+        t_inmo.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (0, -1), _LIGHT),
+            ("FONTNAME",   (0, 0), (0, -1), "Helvetica-Bold"),
+            ("FONTSIZE",   (0, 0), (-1, -1), 8.5),
+            ("TEXTCOLOR",  (0, 0), (0, -1), _NAVY),
+            ("ROWBACKGROUNDS", (0, 0), (-1, -1), [colors.white, _LIGHT]),
+            ("GRID",       (0, 0), (-1, -1), 0.3, _GRAY),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ]))
+        story.append(t_inmo)
+        story.append(Spacer(1, 10))
+
+        # ── Datos de la firma ─────────────────────────────────────────────────
+        story.append(Paragraph("DATOS DE LA FIRMA DIGITAL", sub_style))
+        datos_firma = [
+            ["Fecha y hora (UTC)", firma_timestamp],
+            ["IP de firma",        ip_firma],
+            ["Versión del acuerdo", version],
+        ]
+        t_firma = Table(datos_firma, colWidths=[4.5 * cm, 11.5 * cm])
+        t_firma.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (0, -1), _LIGHT),
+            ("FONTNAME",   (0, 0), (0, -1), "Helvetica-Bold"),
+            ("FONTSIZE",   (0, 0), (-1, -1), 8.5),
+            ("TEXTCOLOR",  (0, 0), (0, -1), _NAVY),
+            ("ROWBACKGROUNDS", (0, 0), (-1, -1), [colors.white, _LIGHT]),
+            ("GRID",       (0, 0), (-1, -1), 0.3, _GRAY),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ]))
+        story.append(t_firma)
+        story.append(Spacer(1, 10))
+
+        # ── Hashes SHA-256 ────────────────────────────────────────────────────
+        story.append(Paragraph("PRUEBA CRIPTOGRÁFICA DE INTEGRIDAD — SHA-256", sub_style))
+        story.append(Paragraph("Hash del documento (doc_hash):", caption_style))
+        story.append(Paragraph(doc_hash, hash_style))
+        story.append(Spacer(1, 4))
+        story.append(Paragraph("Hash de firma (firma_hash):", caption_style))
+        story.append(Paragraph(firma_hash, hash_style))
+        story.append(Spacer(1, 6))
+        story.append(Paragraph(
+            "El firma_hash es el resultado de SHA-256 sobre: texto del acuerdo + "
+            "timestamp + CIF + IP de firma. Cualquier alteración del documento "
+            "produce un hash diferente. Ambos hashes son verificables en cualquier "
+            "momento en el portal ArchiRapid MLS.",
+            small_style
+        ))
+        story.append(Spacer(1, 12))
+
+        # ── Texto completo del acuerdo ────────────────────────────────────────
+        story.append(HRFlowable(width="100%", thickness=0.5, color=_GRAY, spaceAfter=8))
+        story.append(Paragraph("TEXTO ÍNTEGRO DEL ACUERDO FIRMADO", sub_style))
+        for linea in TEXTO_ACUERDO_MLS.split("\n"):
+            linea_esc = linea.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            if linea_esc.startswith("ARTÍCULO") or linea_esc.startswith("────"):
+                story.append(Paragraph(linea_esc,
+                    _style("ArtH", fontSize=8, fontName="Helvetica-Bold",
+                           textColor=_NAVY, leading=11, spaceBefore=4)))
+            else:
+                story.append(Paragraph(linea_esc if linea_esc.strip() else "&nbsp;",
+                    _style("ArtB", fontSize=7.5, leading=11, textColor=colors.black)))
+
+        # ── Pie de validez ────────────────────────────────────────────────────
+        story.append(Spacer(1, 16))
+        story.append(HRFlowable(width="100%", thickness=1, color=_ORANGE, spaceAfter=6))
+        story.append(Paragraph(
+            "Este documento constituye una firma electrónica avanzada en virtud del "
+            "Reglamento (UE) 910/2014 (eIDAS), artículo 25. El firma_hash impreso "
+            "es la prueba de integridad y vincula al firmante con el contenido del "
+            "acuerdo en la fecha y hora indicadas. Emitido por ArchiRapid MLS — "
+            "archirapid.streamlit.app",
+            _style("F", fontSize=7, textColor=_GRAY, leading=10)
+        ))
+
+        doc.build(story)
+        return buffer.getvalue()
+
+    except Exception:
+        return None
+
+
+# =============================================================================
 # SECCIÓN 3 — UI STREAMLIT
 # =============================================================================
 

@@ -662,6 +662,43 @@ def _ui_mi_cuenta(inmo: dict) -> None:
     if inmo.get("firma_hash"):
         st.success(f"✅ Acuerdo MLS firmado — {inmo.get('firma_timestamp', '')[:10]}")
 
+        # ── Descarga PDF + verificación SHA-256 ───────────────────────────────
+        from modules.mls import mls_firma as _firma_mod
+        pdf_bytes = _firma_mod.generar_pdf_certificado(inmo)
+        if pdf_bytes:
+            st.download_button(
+                label="📄 Descargar Acuerdo Firmado (PDF)",
+                data=pdf_bytes,
+                file_name=f"acuerdo_mls_{inmo['cif']}.pdf",
+                mime="application/pdf",
+            )
+
+        with st.expander("🔐 Certificado de integridad SHA-256"):
+            st.markdown("**Hash del documento (SHA-256):**")
+            from modules.mls import mls_db as _mls_db_inner
+            _conn_cert = _mls_db_inner.get_conn()
+            _row_cert = _conn_cert.execute(
+                "SELECT documento_hash, ip FROM firmas_colaboracion WHERE inmo_id = ? ORDER BY id DESC LIMIT 1",
+                (inmo["id"],),
+            ).fetchone()
+            _doc_hash = dict(_row_cert)["documento_hash"] if _row_cert else "—"
+            _ip_cert  = dict(_row_cert)["ip"] if _row_cert else "—"
+            st.code(_doc_hash, language=None)
+            st.markdown("**Hash de la firma (SHA-256):**")
+            st.code(inmo.get("firma_hash", "—"), language=None)
+            st.markdown(f"**IP de firma:** `{_ip_cert}`")
+            if st.button("✅ Verificar integridad", key="btn_verificar_firma"):
+                resultado = _firma_mod.verificar_firma(
+                    inmo.get("firma_hash", ""),
+                    inmo.get("cif", ""),
+                    _ip_cert,
+                    inmo.get("firma_timestamp", ""),
+                )
+                if resultado:
+                    st.success("Integridad verificada: los hashes coinciden con el texto del acuerdo.")
+                else:
+                    st.error("⚠️ Los hashes no coinciden. El acuerdo puede haber sido alterado.")
+
     st.divider()
 
     # Cambio de contraseña
