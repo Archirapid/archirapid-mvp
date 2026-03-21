@@ -45,6 +45,53 @@ def _get_db_mode() -> str:
 DB_MODE = _get_db_mode()
 
 
+class _PgAdaptingCursor:
+    """
+    Cursor que adapta SQL antes de ejecutar.
+    Devuelto por _PostgresConnWrapper.cursor() para que
+    conn.cursor().execute() también pase por adapt_sql().
+    """
+    def __init__(self, cur):
+        self._cur = cur
+
+    def execute(self, sql, params=None):
+        sql = adapt_sql(sql, is_postgres=True)
+        params = adapt_params(params, True)
+        self._cur.execute(sql, params)
+        return self
+
+    def executemany(self, sql, params_list):
+        sql = adapt_sql(sql, is_postgres=True)
+        self._cur.executemany(sql, params_list)
+
+    def fetchone(self):
+        row = self._cur.fetchone()
+        return dict(row) if row else None
+
+    def fetchall(self):
+        return [dict(r) for r in self._cur.fetchall()]
+
+    def __iter__(self):
+        for row in self._cur:
+            yield dict(row)
+
+    @property
+    def rowcount(self):
+        return self._cur.rowcount
+
+    @property
+    def lastrowid(self):
+        try:
+            row = self._cur.fetchone()
+            return row.get('id') if row else None
+        except Exception:
+            return None
+
+    @property
+    def connection(self):
+        return self._cur.connection
+
+
 class _PgCursorWrapper:
     """Wrapper del cursor PostgreSQL."""
     def __init__(self, cur):
@@ -110,9 +157,10 @@ class _PostgresConnWrapper:
         self._conn.close()
 
     def cursor(self, **kwargs):
-        return self._conn.cursor(
+        raw = self._conn.cursor(
             cursor_factory=psycopg2.extras.RealDictCursor
         )
+        return _PgAdaptingCursor(raw)
 
     def __enter__(self):
         return self
