@@ -396,8 +396,8 @@ def detalles_proyecto_v2(project_id: str):
         show_project_detail_page(project_id)
 
 def panel_cliente_v2():
-    from modules.marketplace import owners
-    return owners.main()
+    from modules.marketplace import client_panel
+    return client_panel.main()
 
 
 def route_main_panel():
