@@ -62,3 +62,7 @@ toml>=0.10.2
 
 # Misc
 psutil>=5.9.0
+
+# Database (PostgreSQL/Supabase)
+psycopg2-binary>=2.9.9
+supabase>=2.3.0

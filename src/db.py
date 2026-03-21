@@ -1,4 +1,4 @@
-"""Base de datos centralizada para ArchiRapid (SQLite)."""
+"""Base de datos centralizada para ArchiRapid (SQLite/PostgreSQL)."""
 from __future__ import annotations
 import os
 import sqlite3
@@ -7,19 +7,157 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Dict, Optional, Iterator
 
+try:
+    import psycopg2
+    import psycopg2.extras
+    _PSYCOPG2_AVAILABLE = True
+except ImportError:
+    _PSYCOPG2_AVAILABLE = False
+
+from src.db_compat import adapt_sql, adapt_params
+
 BASE_PATH = Path.cwd()
 # Use a fixed absolute database path to ensure all modules use the same DB file
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "database.db")
 
-def get_conn():
-    """Devuelve conexión SQLite con row_factory habilitado para acceder por nombre de columna.
 
-    Usa `DB_PATH` absoluto para evitar confusión entre rutas relativas.
+def _get_db_mode() -> str:
     """
+    Detecta si usar PostgreSQL o SQLite.
+    Retorna 'postgres' o 'sqlite'.
+    """
+    try:
+        import streamlit as st
+        url = st.secrets.get(
+            "SUPABASE_DB_URL",
+            os.getenv("SUPABASE_DB_URL", "")
+        )
+        if url and _PSYCOPG2_AVAILABLE:
+            return 'postgres'
+    except Exception:
+        url = os.getenv("SUPABASE_DB_URL", "")
+        if url and _PSYCOPG2_AVAILABLE:
+            return 'postgres'
+    return 'sqlite'
+
+
+# Variable global del modo actual
+DB_MODE = _get_db_mode()
+
+
+class _PgCursorWrapper:
+    """Wrapper del cursor PostgreSQL."""
+    def __init__(self, cur):
+        self._cur = cur
+
+    def fetchone(self):
+        row = self._cur.fetchone()
+        return dict(row) if row else None
+
+    def fetchall(self):
+        rows = self._cur.fetchall()
+        return [dict(r) for r in rows]
+
+    def __iter__(self):
+        for row in self._cur:
+            yield dict(row)
+
+    @property
+    def lastrowid(self):
+        # PostgreSQL no tiene lastrowid
+        # Se obtiene con RETURNING id
+        try:
+            row = self._cur.fetchone()
+            return row.get('id') if row else None
+        except Exception:
+            return None
+
+
+class _PostgresConnWrapper:
+    """
+    Hace que psycopg2 se comporte como sqlite3
+    para que los 28 archivos no noten diferencia.
+    - execute() adapta SQL automáticamente
+    - fetchone/fetchall devuelven Row-like dicts
+    - commit/close funcionan igual
+    """
+    def __init__(self, conn):
+        self._conn = conn
+        self._cursor = None
+
+    def execute(self, sql, params=None):
+        sql = adapt_sql(sql, is_postgres=True)
+        params = adapt_params(params, True)
+        cur = self._conn.cursor(
+            cursor_factory=psycopg2.extras.RealDictCursor
+        )
+        cur.execute(sql, params)
+        self._cursor = cur
+        return _PgCursorWrapper(cur)
+
+    def executemany(self, sql, params_list):
+        sql = adapt_sql(sql, is_postgres=True)
+        cur = self._conn.cursor(
+            cursor_factory=psycopg2.extras.RealDictCursor
+        )
+        cur.executemany(sql, params_list)
+        self._cursor = cur
+
+    def commit(self):
+        self._conn.commit()
+
+    def close(self):
+        self._conn.close()
+
+    def cursor(self, **kwargs):
+        return self._conn.cursor(
+            cursor_factory=psycopg2.extras.RealDictCursor
+        )
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        self._conn.commit()
+        self._conn.close()
+
+
+def _get_sqlite_conn():
+    """Conexión SQLite — igual que antes."""
     conn = sqlite3.connect(str(DB_PATH), timeout=15)
     conn.execute("PRAGMA journal_mode=WAL")
     conn.row_factory = sqlite3.Row
     return conn
+
+
+def _get_postgres_conn():
+    """Conexión PostgreSQL via Supabase."""
+    try:
+        import streamlit as st
+        db_url = st.secrets.get(
+            "SUPABASE_DB_URL",
+            os.getenv("SUPABASE_DB_URL", "")
+        )
+    except Exception:
+        db_url = os.getenv("SUPABASE_DB_URL", "")
+
+    if '?' not in db_url:
+        db_url += '?sslmode=require'
+
+    conn = psycopg2.connect(db_url)
+    conn.autocommit = False
+    return _PostgresConnWrapper(conn)
+
+
+def get_conn():
+    """
+    Devuelve conexión a BD.
+    PostgreSQL si SUPABASE_DB_URL está en secrets.
+    SQLite si no — comportamiento idéntico al actual.
+    """
+    if DB_MODE == 'postgres':
+        return _get_postgres_conn()
+    return _get_sqlite_conn()
 
 @contextmanager
 def transaction() -> Iterator[sqlite3.Cursor]:
@@ -42,7 +180,20 @@ def transaction() -> Iterator[sqlite3.Cursor]:
     finally:
         conn.close()
 
+def _ensure_tables_postgres():
+    """
+    Crea tablas en PostgreSQL si no existen.
+    Mismo esquema que SQLite adaptado.
+    """
+    conn = get_conn()
+    conn.commit()
+    conn.close()
+
+
 def ensure_tables():
+    if DB_MODE == 'postgres':
+        _ensure_tables_postgres()
+        return
     with transaction() as c:
         c.execute("""CREATE TABLE IF NOT EXISTS plots (
             id TEXT PRIMARY KEY,
