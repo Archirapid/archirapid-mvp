@@ -13,7 +13,7 @@ def fetch_by_ref_catastral(ref_catastral: str) -> dict:
         "Provincia": "",
         "Municipio": "",
         "SRS": "EPSG:4326", # WGS84
-        "RC": f"{ref1}{ref2}"
+        "RC": ref1
     }
     
     try:
@@ -24,9 +24,10 @@ def fetch_by_ref_catastral(ref_catastral: str) -> dict:
             # XML Structure: <consulta_coordenadas> <coordenadas> <coord> <geo> <lat> <lon>
             
             # Simple parsing (ignoring namespaces or using wildcard)
-            lat_node = root.find(".//lat")
-            lon_node = root.find(".//lon")
-            address_node = root.find(".//ldt") # Lo-calizacion De-limitada T-exto
+            ns = {"c": "http://www.catastro.meh.es/"}
+            lat_node = root.find(".//c:ycen", ns)
+            lon_node = root.find(".//c:xcen", ns)
+            address_node = root.find(".//c:ldt", ns)
             
             if lat_node is not None and lon_node is not None:
                 return {
