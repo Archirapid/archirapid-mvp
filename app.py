@@ -1869,21 +1869,23 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
                         st.error("La contraseña debe tener al menos 6 caracteres.")
                     else:
                         try:
+                            import uuid as _uuid
                             from werkzeug.security import generate_password_hash
                             hashed_password = generate_password_hash(password)
-                            
+
                             conn = db_conn()
                             c = conn.cursor()
-                            
-                            # determinar rol en función de login_role
+
+                            # determinar rol en función de login_role (nunca admin)
                             new_role = 'client'
                             if st.session_state.get('login_role') == 'owner':
                                 new_role = 'owner'
+                            new_id = str(_uuid.uuid4())
                             c.execute("""
-                                INSERT INTO users (email, full_name, role, is_professional, password_hash, created_at)
-                                VALUES (?, ?, ?, ?, ?, datetime('now'))
+                                INSERT INTO users (id, email, full_name, role, is_professional, password_hash, created_at)
+                                VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
                             """, (
-                                email, name, new_role,
+                                new_id, email, name, new_role,
                                 0,  # is_professional
                                 hashed_password
                             ))
@@ -2015,8 +2017,9 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
         col_admin = st.columns([10, 1])[1]
         with col_admin:
             if st.button("🔐 Admin", key="admin_access"):
-                st.session_state['login_role'] = 'admin'
-                st.session_state['viewing_login'] = True
+                st.session_state['selected_page'] = "Intranet"
+                st.session_state['show_role_selector'] = False
+                st.session_state['viewing_login'] = False
                 st.rerun()
 
         # Botón para volver

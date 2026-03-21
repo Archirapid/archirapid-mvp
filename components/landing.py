@@ -293,8 +293,8 @@ def render_landing():
     with col_foot3:
         st.markdown('<div class="ar-btn-admin">', unsafe_allow_html=True)
         if st.button("🔐 Admin", type="secondary"):
-            st.session_state['login_role'] = 'admin'
-            st.session_state['viewing_login'] = True
+            st.session_state['selected_page'] = "Intranet"
             st.session_state['show_role_selector'] = False
+            st.session_state['viewing_login'] = False
             st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
