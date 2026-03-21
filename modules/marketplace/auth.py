@@ -92,12 +92,19 @@ def authenticate_user(email, password):
         row = c.fetchone()
         conn.close()
 
-        if row and check_password_hash(row[4], password):
+        # Soportar sqlite3.Row, tuple y dict (modo Postgres)
+        def _get(r, key, idx):
+            try:
+                return r[key]
+            except (KeyError, TypeError, IndexError):
+                return r[idx]
+
+        if row and check_password_hash(_get(row, 'password_hash', 4), password):
             return {
-                "id": row[0],
-                "email": row[1],
-                "name": row[2],
-                "role": row[3]
+                "id": _get(row, 'id', 0),
+                "email": _get(row, 'email', 1),
+                "name": _get(row, 'name', 2),
+                "role": _get(row, 'role', 3),
             }
     except Exception as e:
         st.error(f"Error de autenticación: {e}")

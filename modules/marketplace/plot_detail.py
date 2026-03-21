@@ -269,9 +269,15 @@ def show_plot_detail_page(plot_id: str):
                         "SELECT ai_verification_cache FROM plots WHERE id=?", (plot_id,)
                     ).fetchone()
                     _conn_cache.close()
-                    if _cached and _cached[0]:
+                    _cached_val = None
+                    if _cached:
                         try:
-                            datos_extraidos = _json.loads(_cached[0])
+                            _cached_val = _cached['ai_verification_cache']
+                        except (KeyError, TypeError):
+                            _cached_val = _cached[0] if _cached else None
+                    if _cached_val:
+                        try:
+                            datos_extraidos = _json.loads(_cached_val)
                             metodo_usado = "cache"
                         except Exception:
                             datos_extraidos = None
