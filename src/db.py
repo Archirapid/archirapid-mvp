@@ -237,39 +237,90 @@ def _get_sqlite_conn():
     return conn
 
 
-def _get_postgres_conn():
-    """Conexión PostgreSQL via Supabase."""
+def _resolve_pg_url() -> str:
+    """Obtiene y normaliza la URL de PostgreSQL desde secrets o env."""
     try:
         import streamlit as st
-        db_url = st.secrets.get(
-            "SUPABASE_DB_URL",
-            os.getenv("SUPABASE_DB_URL", "")
-        )
+        url = st.secrets.get("SUPABASE_DB_URL", os.getenv("SUPABASE_DB_URL", ""))
     except Exception:
-        db_url = os.getenv("SUPABASE_DB_URL", "")
+        url = os.getenv("SUPABASE_DB_URL", "")
+    if url and 'sslmode' not in url:
+        url += ('&' if '?' in url else '?') + 'sslmode=require'
+    return url
 
-    if not db_url:
+
+# ── Connection pool (module-level singleton) ───────────────────────────────────
+import threading as _threading
+
+_pg_pool_lock = _threading.Lock()
+_pg_pool_ref: list = [None]  # list so inner scope can mutate it
+
+
+def _get_or_create_pool():
+    """Crea el pool de conexiones PostgreSQL una sola vez (thread-safe)."""
+    with _pg_pool_lock:
+        if _pg_pool_ref[0] is None:
+            try:
+                from psycopg2 import pool as _pgpool
+                url = _resolve_pg_url()
+                if url:
+                    _pg_pool_ref[0] = _pgpool.ThreadedConnectionPool(
+                        minconn=1, maxconn=5, dsn=url, connect_timeout=15,
+                    )
+            except Exception as e:
+                print(f"[DB pool] No se pudo crear el pool: {e}")
+        return _pg_pool_ref[0]
+
+
+class _PooledPostgresConn(_PostgresConnWrapper):
+    """Conexión prestada de un pool. close() devuelve al pool en lugar de desconectar."""
+    def __init__(self, conn, pool):
+        super().__init__(conn)
+        self._pool = pool
+
+    def close(self):
+        try:
+            if not self._conn.autocommit:
+                self._conn.rollback()
+        except Exception:
+            pass
+        try:
+            self._pool.putconn(self._conn)
+        except Exception:
+            try:
+                self._conn.close()
+            except Exception:
+                pass
+
+    def __exit__(self, *args):
+        self._conn.commit()
+        self.close()
+
+
+def _get_postgres_conn():
+    """Conexión PostgreSQL — del pool si disponible, directa como fallback."""
+    pool = _get_or_create_pool()
+    if pool is not None:
+        try:
+            raw = pool.getconn()
+            raw.autocommit = False
+            return _PooledPostgresConn(raw, pool)
+        except Exception:
+            pass  # Pool agotado o error, usar conexión directa
+
+    # Fallback: conexión directa (igual que antes)
+    url = _resolve_pg_url()
+    if not url:
         raise RuntimeError("SUPABASE_DB_URL no está configurada en secrets/.env")
-
-    # Asegurar sslmode en la URL
-    if 'sslmode' not in db_url:
-        db_url += ('&' if '?' in db_url else '?') + 'sslmode=require'
-
     try:
-        conn = psycopg2.connect(
-            db_url,
-            connect_timeout=15,
-            sslmode='require',
-        )
+        conn = psycopg2.connect(url, connect_timeout=15, sslmode='require')
     except psycopg2.OperationalError as e:
-        # Lanzar sin la URL (evita redacción de Streamlit Cloud)
-        host = db_url.split('@')[-1].split('/')[0] if '@' in db_url else 'desconocido'
+        host = url.split('@')[-1].split('/')[0] if '@' in url else 'desconocido'
         raise RuntimeError(
             f"psycopg2 no pudo conectar a {host} — "
             f"verifica SUPABASE_DB_URL, puerto y SSL. "
             f"Error original: {type(e).__name__}"
         ) from None
-
     conn.autocommit = False
     return _PostgresConnWrapper(conn)
 

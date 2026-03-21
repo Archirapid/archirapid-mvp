@@ -45,9 +45,14 @@ from modules.marketplace.utils import init_db, db_conn
 from modules.marketplace.marketplace import get_project_display_image
 from modules.ai_house_designer import flow as ai_house_flow
 
-# Inicializar base de datos
-init_db()
-_db.ensure_tables()  # crea tablas src/db (incluyendo estudio_projects, architects, etc.)
+# Inicializar base de datos — solo UNA VEZ por worker (no en cada rerun)
+@_st_secrets.cache_resource(show_spinner=False)
+def _init_app_db():
+    init_db()
+    _db.ensure_tables()
+    return True
+
+_init_app_db()
 
 # Configurar página con layout amplio
 import streamlit as st
