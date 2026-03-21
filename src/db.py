@@ -180,12 +180,358 @@ def transaction() -> Iterator[sqlite3.Cursor]:
     finally:
         conn.close()
 
+# ── PostgreSQL DDL ─────────────────────────────────────────────────────────────
+# CREATE TABLE statements con TODAS las columnas consolidadas (sin ALTER TABLE).
+# Ordenadas respetando dependencias de FK.
+# adapt_sql() se aplica automáticamente en _PostgresConnWrapper.execute().
+
+_PG_DDL = [
+    """CREATE TABLE IF NOT EXISTS plots (
+        id TEXT PRIMARY KEY,
+        title TEXT, description TEXT, lat REAL, lon REAL,
+        m2 INTEGER, height REAL, price REAL, type TEXT, province TEXT,
+        locality TEXT, owner_name TEXT, owner_email TEXT,
+        image_path TEXT, registry_note_path TEXT, created_at TEXT,
+        address TEXT, owner_phone TEXT, photo_paths TEXT,
+        catastral_ref TEXT, services TEXT, status TEXT DEFAULT 'published',
+        plano_catastral_path TEXT, vertices_coordenadas TEXT,
+        numero_parcela_principal TEXT, superficie_parcela REAL,
+        superficie_edificable REAL, solar_virtual TEXT,
+        featured INTEGER DEFAULT 0, tour_360_b64 TEXT,
+        buildable_m2 REAL, ai_verification_cache TEXT
+    )""",
+    """CREATE TABLE IF NOT EXISTS projects (
+        id TEXT PRIMARY KEY,
+        title TEXT, description TEXT,
+        m2_construidos REAL, area_m2 REAL, price REAL,
+        estimated_cost REAL, architect_name TEXT, max_height REAL,
+        style TEXT, file_path TEXT, ocr_text TEXT,
+        parsed_data_json TEXT, characteristics_json TEXT,
+        architect_id TEXT,
+        m2_parcela_minima INTEGER, m2_parcela_maxima INTEGER,
+        habitaciones INTEGER, banos INTEGER, garaje INTEGER,
+        plantas INTEGER, certificacion_energetica TEXT,
+        tipo_proyecto TEXT, foto_principal TEXT, galeria_fotos TEXT,
+        modelo_3d_glb TEXT, planos_pdf TEXT, planos_dwg TEXT,
+        memoria_pdf TEXT, price_memoria REAL DEFAULT 1800,
+        price_cad REAL DEFAULT 2500,
+        property_type TEXT DEFAULT 'residencial',
+        energy_rating TEXT, vr_tour TEXT, is_active INTEGER DEFAULT 1,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )""",
+    """CREATE TABLE IF NOT EXISTS payments (
+        payment_id TEXT PRIMARY KEY,
+        amount REAL, concept TEXT, buyer_name TEXT, buyer_email TEXT,
+        buyer_phone TEXT, buyer_nif TEXT, method TEXT, status TEXT,
+        timestamp TEXT, card_last4 TEXT
+    )""",
+    """CREATE TABLE IF NOT EXISTS clients (
+        id TEXT PRIMARY KEY,
+        name TEXT, email TEXT, phone TEXT, address TEXT,
+        preferences TEXT, created_at TEXT
+    )""",
+    """CREATE TABLE IF NOT EXISTS reservations (
+        id TEXT PRIMARY KEY,
+        plot_id TEXT, buyer_name TEXT, buyer_email TEXT,
+        amount REAL, kind TEXT, created_at TEXT
+    )""",
+    """CREATE TABLE IF NOT EXISTS architects (
+        id TEXT PRIMARY KEY,
+        name TEXT, email TEXT UNIQUE, phone TEXT, company TEXT, nif TEXT,
+        created_at TEXT,
+        proyectos_estudio_count INTEGER DEFAULT 0,
+        specialty TEXT, address TEXT, city TEXT, province TEXT,
+        avg_project_price REAL, origen_registro TEXT, password_hash TEXT,
+        fee_pct REAL DEFAULT 8.0,
+        expenses_pct REAL DEFAULT 5.0,
+        iva_pct REAL DEFAULT 10.0
+    )""",
+    """CREATE TABLE IF NOT EXISTS ai_projects (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        client_email TEXT, project_name TEXT,
+        total_area REAL, total_cost REAL, services_json TEXT,
+        style TEXT, energy_label TEXT, created_at TEXT, status TEXT
+    )""",
+    """CREATE TABLE IF NOT EXISTS estudio_projects (
+        id TEXT PRIMARY KEY,
+        architect_id TEXT NOT NULL, catastral_ref TEXT,
+        address TEXT, surface_m2 REAL, style TEXT,
+        rooms INTEGER, budget REAL, total_cost REAL,
+        zip_filename TEXT, stripe_session_id TEXT,
+        paid INTEGER DEFAULT 0, created_at TEXT
+    )""",
+    """CREATE TABLE IF NOT EXISTS subscriptions (
+        id TEXT PRIMARY KEY,
+        architect_id TEXT, plan_type TEXT, price REAL,
+        monthly_proposals_limit INTEGER, commission_rate REAL,
+        status TEXT, start_date TEXT, end_date TEXT, created_at TEXT
+    )""",
+    """CREATE TABLE IF NOT EXISTS visitas_demo (
+        id TEXT PRIMARY KEY,
+        timestamp TEXT, origen TEXT, nombre_usuario TEXT,
+        accion_realizada TEXT,
+        convirtio_a_registro INTEGER DEFAULT 0, session_id TEXT
+    )""",
+    """CREATE TABLE IF NOT EXISTS proposals (
+        id TEXT PRIMARY KEY,
+        architect_id TEXT, plot_id TEXT, proposal_text TEXT,
+        estimated_budget REAL, deadline_days INTEGER,
+        sketch_image_path TEXT, status TEXT, created_at TEXT,
+        responded_at TEXT,
+        delivery_format TEXT DEFAULT 'PDF',
+        delivery_price REAL DEFAULT 1200,
+        supervision_fee REAL DEFAULT 0,
+        visa_fee REAL DEFAULT 0,
+        total_cliente REAL DEFAULT 0,
+        commission REAL DEFAULT 0,
+        project_id TEXT, message TEXT, price REAL
+    )""",
+    """CREATE TABLE IF NOT EXISTS additional_services (
+        id TEXT PRIMARY KEY,
+        proposal_id TEXT, client_id TEXT, architect_id TEXT,
+        service_type TEXT, description TEXT, price REAL,
+        commission REAL, total_cliente REAL, status TEXT,
+        created_at TEXT, quoted_at TEXT, accepted_at TEXT,
+        paid INTEGER DEFAULT 0
+    )""",
+    """CREATE TABLE IF NOT EXISTS arquitectos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nombre TEXT, email TEXT UNIQUE, telefono TEXT,
+        especialidad TEXT, plan_id INTEGER, created_at TEXT
+    )""",
+    """CREATE TABLE IF NOT EXISTS proyectos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        arquitecto_id INTEGER, titulo TEXT, estilo TEXT,
+        m2_construidos REAL, presupuesto_ejecucion REAL,
+        m2_parcela_minima REAL, alturas INTEGER,
+        pdf_path TEXT, created_at TEXT
+    )""",
+    """CREATE TABLE IF NOT EXISTS prefab_catalog (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL, m2 REAL NOT NULL,
+        rooms INTEGER NOT NULL, bathrooms INTEGER NOT NULL,
+        floors INTEGER NOT NULL, material TEXT NOT NULL,
+        price REAL NOT NULL, description TEXT, image_path TEXT,
+        active INTEGER DEFAULT 1,
+        modulos TEXT, price_label TEXT, image_paths TEXT
+    )""",
+    """CREATE TABLE IF NOT EXISTS owners (
+        id TEXT PRIMARY KEY,
+        name TEXT, email TEXT UNIQUE,
+        phone TEXT, address TEXT, created_at TEXT
+    )""",
+    """CREATE TABLE IF NOT EXISTS waitlist (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL, email TEXT NOT NULL UNIQUE,
+        profile TEXT, created_at TEXT DEFAULT (datetime('now')),
+        approved INTEGER DEFAULT 0
+    )""",
+    """CREATE TABLE IF NOT EXISTS stripe_payments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        session_id TEXT UNIQUE NOT NULL, product_key TEXT,
+        project_id TEXT, user_email TEXT, amount_eur REAL,
+        status TEXT DEFAULT 'pending',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )""",
+    """CREATE TABLE IF NOT EXISTS project_purchases (
+        id TEXT PRIMARY KEY,
+        project_id TEXT, buyer_email TEXT, product_type TEXT,
+        price REAL, status TEXT, created_at TEXT
+    )""",
+    """CREATE TABLE IF NOT EXISTS ventas_proyectos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        proyecto_id INTEGER NOT NULL, cliente_email TEXT NOT NULL,
+        nombre_cliente TEXT NOT NULL, telefono TEXT, direccion TEXT,
+        nif TEXT, productos_comprados TEXT,
+        total_pagado REAL NOT NULL, metodo_pago TEXT,
+        fecha_compra TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        stripe_session_id TEXT
+    )""",
+    """CREATE TABLE IF NOT EXISTS service_providers (
+        id TEXT PRIMARY KEY, name TEXT NOT NULL,
+        email TEXT UNIQUE NOT NULL, nif TEXT, specialty TEXT,
+        company TEXT, phone TEXT, address TEXT,
+        certifications TEXT, experience_years INTEGER,
+        service_area TEXT, created_at TEXT
+    )""",
+    """CREATE TABLE IF NOT EXISTS users (
+        id TEXT PRIMARY KEY, email TEXT UNIQUE,
+        password_hash TEXT, full_name TEXT,
+        role TEXT DEFAULT 'client',
+        is_professional INTEGER DEFAULT 0,
+        address TEXT, professional_id TEXT, plan_id TEXT,
+        bio TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        name TEXT, company TEXT, phone TEXT, specialty TEXT
+    )""",
+    """CREATE TABLE IF NOT EXISTS service_assignments (
+        id TEXT PRIMARY KEY, venta_id TEXT, proveedor_id TEXT,
+        servicio_tipo TEXT, cliente_email TEXT, proyecto_id TEXT,
+        precio_servicio REAL, estado TEXT DEFAULT 'pendiente',
+        fecha_asignacion TEXT, fecha_completado TEXT, notas TEXT
+    )""",
+    """CREATE TABLE IF NOT EXISTS plot_alerts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        email TEXT NOT NULL, name TEXT, province TEXT,
+        max_price REAL DEFAULT 0, created_at TEXT NOT NULL,
+        active INTEGER DEFAULT 1
+    )""",
+    """CREATE TABLE IF NOT EXISTS document_certs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        doc_hash TEXT NOT NULL, doc_name TEXT,
+        user_email TEXT, plot_id TEXT,
+        certified_at TEXT NOT NULL,
+        polygon_tx TEXT DEFAULT NULL,
+        polygon_net TEXT DEFAULT NULL
+    )""",
+    """CREATE TABLE IF NOT EXISTS planes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nombre_plan TEXT, precio_mensual REAL,
+        limite_proyectos INTEGER
+    )""",
+    """CREATE TABLE IF NOT EXISTS client_interests (
+        id TEXT PRIMARY KEY, email TEXT, project_id TEXT,
+        created_at TEXT
+    )""",
+    """CREATE TABLE IF NOT EXISTS inmobiliarias (
+        id TEXT PRIMARY KEY,
+        nombre TEXT NOT NULL, cif TEXT UNIQUE NOT NULL,
+        email TEXT UNIQUE NOT NULL, password_hash TEXT NOT NULL,
+        telefono TEXT, web TEXT, plan TEXT DEFAULT 'starter',
+        plan_activo INTEGER DEFAULT 0, stripe_session_id TEXT,
+        firma_hash TEXT, firma_timestamp TEXT,
+        activa INTEGER DEFAULT 0, ip_registro TEXT, created_at TEXT,
+        nombre_sociedad TEXT, nombre_comercial TEXT,
+        telefono_secundario TEXT, telegram_contacto TEXT,
+        direccion TEXT, localidad TEXT, provincia TEXT,
+        codigo_postal TEXT, pais TEXT DEFAULT 'España',
+        contacto_nombre TEXT, contacto_cargo TEXT,
+        contacto_email TEXT, contacto_telefono TEXT,
+        contacto_telegram TEXT, factura_razon_social TEXT,
+        factura_cif TEXT, factura_direccion TEXT, factura_email TEXT,
+        iban TEXT, banco_nombre TEXT, banco_titular TEXT,
+        email_login TEXT
+    )""",
+    """CREATE TABLE IF NOT EXISTS fincas_mls (
+        id TEXT PRIMARY KEY,
+        inmo_id TEXT NOT NULL, secuencial INTEGER,
+        ref_codigo TEXT UNIQUE, catastro_ref TEXT NOT NULL,
+        catastro_validada INTEGER DEFAULT 0,
+        catastro_lat REAL, catastro_lon REAL,
+        titulo TEXT, descripcion_publica TEXT,
+        notas_privadas TEXT, precio REAL, superficie_m2 REAL,
+        comision_total_pct REAL,
+        comision_archirapid_pct REAL DEFAULT 1.0,
+        comision_colaboradora_pct REAL, comision_listante_pct REAL,
+        split_aceptado INTEGER DEFAULT 0,
+        estado TEXT DEFAULT 'pendiente_validacion',
+        image_paths TEXT, precio_historial TEXT,
+        dias_en_mercado_inicio TEXT, periodo_privado_expira TEXT,
+        created_at TEXT, updated_at TEXT
+    )""",
+    """CREATE TABLE IF NOT EXISTS reservas_mls (
+        id TEXT PRIMARY KEY,
+        finca_id TEXT NOT NULL,
+        inmo_colaboradora_id TEXT NOT NULL,
+        stripe_session_id TEXT,
+        importe_reserva REAL DEFAULT 200.0,
+        estado TEXT DEFAULT 'activa',
+        timestamp_reserva TEXT, timestamp_expira_72h TEXT, notas TEXT
+    )""",
+    """CREATE TABLE IF NOT EXISTS firmas_colaboracion (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        inmo_id TEXT NOT NULL,
+        documento_version TEXT DEFAULT '1.0',
+        documento_hash TEXT NOT NULL, firma_hash TEXT NOT NULL,
+        timestamp TEXT NOT NULL, ip TEXT, cif TEXT
+    )""",
+    """CREATE TABLE IF NOT EXISTS notificaciones_mls (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        destinatario_tipo TEXT, destinatario_id TEXT,
+        tipo_evento TEXT, payload TEXT, timestamp TEXT,
+        leida INTEGER DEFAULT 0
+    )""",
+]
+
+_PG_INDEXES = [
+    "CREATE INDEX IF NOT EXISTS idx_plots_province ON plots(province)",
+    "CREATE INDEX IF NOT EXISTS idx_projects_style ON projects(style)",
+    "CREATE INDEX IF NOT EXISTS idx_projects_architect ON projects(architect_id)",
+    "CREATE INDEX IF NOT EXISTS idx_payments_status ON payments(status)",
+    "CREATE INDEX IF NOT EXISTS idx_subscriptions_architect ON subscriptions(architect_id)",
+    "CREATE INDEX IF NOT EXISTS idx_proposals_plot ON proposals(plot_id)",
+    "CREATE INDEX IF NOT EXISTS idx_proposals_architect ON proposals(architect_id)",
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_clients_email ON clients(email)",
+    "CREATE INDEX IF NOT EXISTS idx_reservations_plot ON reservations(plot_id)",
+    "CREATE INDEX IF NOT EXISTS idx_reservations_kind ON reservations(kind)",
+    "CREATE INDEX IF NOT EXISTS idx_additional_services_client ON additional_services(client_id)",
+    "CREATE INDEX IF NOT EXISTS idx_additional_services_architect ON additional_services(architect_id)",
+    "CREATE INDEX IF NOT EXISTS idx_additional_services_proposal ON additional_services(proposal_id)",
+    "CREATE INDEX IF NOT EXISTS idx_additional_services_status ON additional_services(status)",
+    "CREATE INDEX IF NOT EXISTS idx_inmobiliarias_email ON inmobiliarias(email)",
+    "CREATE INDEX IF NOT EXISTS idx_inmobiliarias_cif ON inmobiliarias(cif)",
+    "CREATE INDEX IF NOT EXISTS idx_fincas_mls_estado ON fincas_mls(estado)",
+    "CREATE INDEX IF NOT EXISTS idx_fincas_mls_inmo ON fincas_mls(inmo_id)",
+    "CREATE INDEX IF NOT EXISTS idx_reservas_mls_finca ON reservas_mls(finca_id)",
+    "CREATE INDEX IF NOT EXISTS idx_reservas_mls_estado ON reservas_mls(estado)",
+    "CREATE INDEX IF NOT EXISTS idx_firmas_inmo ON firmas_colaboracion(inmo_id)",
+]
+
+_PG_PREFAB_SEED = [
+    ("Studio Modular 45",  45,  1, 1, 1, "Modular acero",     44900,  "Vivienda compacta de acero modular, ideal para parcelas pequeñas. Certificación energética A.",   "assets/branding/logo.png"),
+    ("Eco Timber 65",      65,  2, 1, 1, "Madera",            67500,  "Casa de madera laminada con aislamiento superior. Diseño nórdico, bajo mantenimiento.",            "assets/branding/logo.png"),
+    ("Nordic Home 80",     80,  3, 1, 1, "Madera",            88000,  "3 dormitorios, salón abierto, porche cubierto. Clase energética A+.",                              "assets/branding/logo.png"),
+    ("Smart Compact 55",   55,  2, 1, 1, "Modular acero",     57500,  "Módulo doble con cocina integrada. Entrega en 90 días desde firma.",                               "assets/branding/logo.png"),
+    ("Green Container 60", 60,  2, 1, 1, "Contenedor",        51000,  "Dos contenedores HC interconectados, acabados premium, azotea transitable.",                       "assets/branding/logo.png"),
+    ("Bioclimática 95",    95,  3, 2, 1, "Mixto",            112000,  "Orientación sur, voladizos pasivos, ventilación cruzada. Sin necesidad de A/C.",                   "assets/branding/logo.png"),
+    ("Timber XL 120",     120,  4, 2, 2, "Madera",           144000,  "4 dormitorios en dos plantas, terraza superior, estructura CLT certificada.",                      "assets/branding/logo.png"),
+    ("Modular Familiar 110",110, 4, 3, 2, "Modular acero",   128000,  "4 dormitorios, 3 baños, garaje integrado. Instalación en 2 semanas.",                              "assets/branding/logo.png"),
+    ("Premium Hormigón 130",130, 4, 3, 2, "Hormigón prefab", 154000,  "Paneles de hormigón arquitectónico. Máxima durabilidad y aislamiento acústico.",                  "assets/branding/logo.png"),
+    ("Villa Modular 160",  160,  5, 3, 2, "Mixto",           194000,  "5 dormitorios, piscina opcional, domótica integrada. Villa de lujo prefabricada.",                 "assets/branding/logo.png"),
+]
+
+
+def _run_postgres_migrations(conn) -> None:
+    """Ejecuta todos los CREATE TABLE e índices en PostgreSQL."""
+    errors = []
+    for sql in _PG_DDL:
+        try:
+            conn.execute(sql)
+        except Exception as e:
+            errors.append(f"DDL error: {e} | SQL: {sql[:60]}")
+    for sql in _PG_INDEXES:
+        try:
+            conn.execute(sql)
+        except Exception as e:
+            errors.append(f"INDEX error: {e}")
+    if errors:
+        for err in errors:
+            print(f"[PG migration] {err}")
+
+
 def _ensure_tables_postgres():
     """
-    Crea tablas en PostgreSQL si no existen.
-    Mismo esquema que SQLite adaptado.
+    Crea todas las tablas en PostgreSQL si no existen.
+    Reutiliza _PG_DDL con adapt_sql() via _PostgresConnWrapper.
     """
     conn = get_conn()
+    _run_postgres_migrations(conn)
+    # Seed prefab_catalog si está vacía
+    try:
+        cur = conn.execute("SELECT COUNT(*) as n FROM prefab_catalog")
+        row = cur.fetchone()
+        count = row['n'] if row else 0
+        if count == 0:
+            conn.execute(
+                "INSERT INTO prefab_catalog (name,m2,rooms,bathrooms,floors,material,price,description,image_path) VALUES (?,?,?,?,?,?,?,?,?)",
+                _PG_PREFAB_SEED[0]
+            )
+            for seed_row in _PG_PREFAB_SEED[1:]:
+                conn.execute(
+                    "INSERT INTO prefab_catalog (name,m2,rooms,bathrooms,floors,material,price,description,image_path) VALUES (?,?,?,?,?,?,?,?,?)",
+                    seed_row
+                )
+    except Exception as e:
+        print(f"[PG seed] prefab_catalog: {e}")
     conn.commit()
     conn.close()
 
