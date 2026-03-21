@@ -45,6 +45,54 @@ def _get_db_mode() -> str:
 DB_MODE = _get_db_mode()
 
 
+class _CompatRow:
+    """
+    Fila compatible con sqlite3.Row: soporta row[0] (índice) Y row['col'] (nombre).
+    Devuelta por fetchone()/fetchall() en modo Postgres para que el código existente
+    que usa row[N] no rompa al cambiar de SQLite a PostgreSQL.
+    """
+    __slots__ = ('_data', '_cols')
+
+    def __init__(self, row_dict: dict, cols: list):
+        self._data = row_dict
+        self._cols = cols  # orden de columnas tal como devuelve description
+
+    def __getitem__(self, key):
+        if isinstance(key, int):
+            return self._data[self._cols[key]]
+        return self._data[key]
+
+    def get(self, key, default=None):
+        return self._data.get(key, default)
+
+    def keys(self):
+        return self._data.keys()
+
+    def items(self):
+        return self._data.items()
+
+    def values(self):
+        return self._data.values()
+
+    def __iter__(self):
+        return iter(self._data)
+
+    def __bool__(self):
+        return True  # nunca None; None se devuelve explícitamente
+
+    def __contains__(self, key):
+        return key in self._data
+
+    def __repr__(self):
+        return f'_CompatRow({self._data!r})'
+
+
+def _make_compat_row(raw_row, description) -> '_CompatRow':
+    """Construye un _CompatRow a partir de un RealDictRow y el description del cursor."""
+    cols = [d[0] for d in description] if description else []
+    return _CompatRow(dict(raw_row), cols)
+
+
 class _PgAdaptingCursor:
     """
     Cursor que adapta SQL antes de ejecutar.
@@ -66,14 +114,18 @@ class _PgAdaptingCursor:
 
     def fetchone(self):
         row = self._cur.fetchone()
-        return dict(row) if row else None
+        if row is None:
+            return None
+        return _make_compat_row(row, self._cur.description)
 
     def fetchall(self):
-        return [dict(r) for r in self._cur.fetchall()]
+        desc = self._cur.description
+        return [_make_compat_row(r, desc) for r in self._cur.fetchall()]
 
     def __iter__(self):
+        desc = self._cur.description
         for row in self._cur:
-            yield dict(row)
+            yield _make_compat_row(row, desc)
 
     @property
     def description(self):
@@ -97,21 +149,24 @@ class _PgAdaptingCursor:
 
 
 class _PgCursorWrapper:
-    """Wrapper del cursor PostgreSQL."""
+    """Wrapper del cursor PostgreSQL (devuelto por _PostgresConnWrapper.execute())."""
     def __init__(self, cur):
         self._cur = cur
 
     def fetchone(self):
         row = self._cur.fetchone()
-        return dict(row) if row else None
+        if row is None:
+            return None
+        return _make_compat_row(row, self._cur.description)
 
     def fetchall(self):
-        rows = self._cur.fetchall()
-        return [dict(r) for r in rows]
+        desc = self._cur.description
+        return [_make_compat_row(r, desc) for r in self._cur.fetchall()]
 
     def __iter__(self):
+        desc = self._cur.description
         for row in self._cur:
-            yield dict(row)
+            yield _make_compat_row(row, desc)
 
     @property
     def lastrowid(self):
