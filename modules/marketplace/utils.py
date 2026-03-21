@@ -24,8 +24,16 @@ def save_upload(uploaded_file, prefix="file"):
     return str(Path("uploads") / fname)  # ruta relativa para uso en st.image y DB
 
 def db_conn():
+    """Devuelve conexión a BD. En producción (Supabase) usa get_conn() de src.db."""
+    try:
+        from src.db import get_conn, DB_MODE
+        if DB_MODE == 'postgres':
+            return get_conn()
+    except Exception:
+        pass
     conn = sqlite3.connect(DB_PATH, timeout=15)
     conn.execute("PRAGMA journal_mode=WAL")
+    conn.row_factory = sqlite3.Row
     return conn
 
 def insert_user(user):
