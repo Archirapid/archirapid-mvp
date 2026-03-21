@@ -75,7 +75,7 @@ class _CompatRow:
         return self._data.values()
 
     def __iter__(self):
-        return iter(self._data)
+        return iter(self._data.values())
 
     def __bool__(self):
         return True  # nunca None; None se devuelve explícitamente
