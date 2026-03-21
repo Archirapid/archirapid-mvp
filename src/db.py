@@ -76,6 +76,10 @@ class _PgAdaptingCursor:
             yield dict(row)
 
     @property
+    def description(self):
+        return self._cur.description
+
+    @property
     def rowcount(self):
         return self._cur.rowcount
 
@@ -189,10 +193,28 @@ def _get_postgres_conn():
     except Exception:
         db_url = os.getenv("SUPABASE_DB_URL", "")
 
-    if '?' not in db_url:
-        db_url += '?sslmode=require'
+    if not db_url:
+        raise RuntimeError("SUPABASE_DB_URL no está configurada en secrets/.env")
 
-    conn = psycopg2.connect(db_url)
+    # Asegurar sslmode en la URL
+    if 'sslmode' not in db_url:
+        db_url += ('&' if '?' in db_url else '?') + 'sslmode=require'
+
+    try:
+        conn = psycopg2.connect(
+            db_url,
+            connect_timeout=15,
+            sslmode='require',
+        )
+    except psycopg2.OperationalError as e:
+        # Lanzar sin la URL (evita redacción de Streamlit Cloud)
+        host = db_url.split('@')[-1].split('/')[0] if '@' in db_url else 'desconocido'
+        raise RuntimeError(
+            f"psycopg2 no pudo conectar a {host} — "
+            f"verifica SUPABASE_DB_URL, puerto y SSL. "
+            f"Error original: {type(e).__name__}"
+        ) from None
+
     conn.autocommit = False
     return _PostgresConnWrapper(conn)
 
