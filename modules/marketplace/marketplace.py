@@ -405,53 +405,55 @@ def render_comparador(plots_all: list):
 
 def _get_mls_fincas_for_grid():
     """Fetch MLS fincas (publicadas) and normalize to plots-dict shape."""
+    import sqlite3 as _sq3
+    from modules.marketplace.utils import DB_PATH
     try:
-        from modules.marketplace.utils import db_conn
-        with db_conn() as conn:
-            conn.row_factory = sqlite3.Row
-            cur = conn.cursor()
-            cur.execute("""
-                SELECT id, titulo, descripcion_publica, precio, superficie_m2,
-                       catastro_lat, catastro_lon, created_at,
-                       image_paths,
-                       COALESCE(featured, 0) AS featured
-                FROM fincas_mls
-                WHERE estado IN ('publicada','reservada')
-            """)
-            rows = [dict(r) for r in cur.fetchall()]
-        result = []
-        for r in rows:
-            # resolve first image path
-            img_path = None
-            try:
-                imgs = json.loads(r.get("image_paths") or "[]")
-                for _p in imgs:
-                    if _p:
-                        _p = _p.replace("\\", "/")
-                        if not _p.startswith("uploads/"):
-                            _p = "uploads/" + _p
-                        if os.path.exists(_p):
-                            img_path = _p
-                            break
-            except Exception:
-                pass
-            result.append({
-                "id":          f"mls_{r['id']}",   # unique key in merged list
-                "_mls_id":     r["id"],
-                "_is_mls":     True,
-                "title":       r.get("titulo") or "Finca MLS",
-                "description": r.get("descripcion_publica") or "",
-                "m2":          r.get("superficie_m2"),
-                "price":       r.get("precio") or 0,
-                "lat":         r.get("catastro_lat"),
-                "lon":         r.get("catastro_lon"),
-                "featured":    r.get("featured") or 0,
-                "created_at":  r.get("created_at") or "",
-                "image_path":  img_path,
-            })
-        return result
+        conn = _sq3.connect(DB_PATH, timeout=15)
+        conn.row_factory = _sq3.Row
+        cur = conn.cursor()
+        # Minimal columns — no 'featured' to avoid OperationalError if missing
+        cur.execute("""
+            SELECT id, titulo, descripcion_publica, precio, superficie_m2,
+                   catastro_lat, catastro_lon, created_at, image_paths
+            FROM fincas_mls
+            WHERE estado IN ('publicada','reservada')
+            ORDER BY created_at DESC
+        """)
+        rows = [dict(r) for r in cur.fetchall()]
+        conn.close()
     except Exception:
         return []
+
+    result = []
+    for r in rows:
+        img_path = None
+        try:
+            imgs = json.loads(r.get("image_paths") or "[]")
+            for _p in imgs:
+                if _p:
+                    _p = str(_p).replace("\\", "/")
+                    if not _p.startswith("uploads/"):
+                        _p = "uploads/" + _p
+                    if os.path.exists(_p):
+                        img_path = _p
+                        break
+        except Exception:
+            pass
+        result.append({
+            "id":          f"mls_{r['id']}",
+            "_mls_id":     r["id"],
+            "_is_mls":     True,
+            "title":       r.get("titulo") or "Finca MLS",
+            "description": r.get("descripcion_publica") or "",
+            "m2":          r.get("superficie_m2"),
+            "price":       r.get("precio") or 0,
+            "lat":         r.get("catastro_lat"),
+            "lon":         r.get("catastro_lon"),
+            "featured":    0,          # MLS no usa destacadas por ahora
+            "created_at":  r.get("created_at") or "",
+            "image_path":  img_path,
+        })
+    return result
 
 
 def render_featured_plots(plots):
