@@ -1584,3 +1584,109 @@ Obtén el token creando un bot con @BotFather en Telegram.
 """)
         except Exception as _ee2:
             st.warning(f"Error sección E: {_ee2}")
+
+        st.markdown("---")
+
+        # ══ SECCIÓN F: Solicitudes de Colaboración 72h ═══════════════════════
+        st.subheader("🤝 F. Solicitudes de Colaboración 72h")
+        try:
+            import json as _json_f
+            _sq_f = db_conn()
+            _sols_admin = _sq_f.execute("""
+                SELECT id, payload, timestamp, leida
+                FROM notificaciones_mls
+                WHERE tipo_evento = 'solicitud_colaboracion_72h'
+                  AND destinatario_id = 'admin'
+                ORDER BY timestamp DESC
+                LIMIT 50
+            """).fetchall()
+            _sq_f.close()
+
+            _sols_pend = [s for s in _sols_admin if not s[3]]
+            if _sols_pend:
+                st.warning(f"**{len(_sols_pend)} solicitud(es) pendiente(s) de gestión.**")
+            elif not _sols_admin:
+                st.info("No hay solicitudes de colaboración todavía.")
+
+            for _s in _sols_admin:
+                _sid   = _s[0]
+                _ts    = (_s[2] or "")[:16].replace("T", " ")
+                _leida = bool(_s[3])
+                try:
+                    _pl = _json_f.loads(_s[1] or "{}")
+                except Exception:
+                    _pl = {}
+
+                _ref_s    = _pl.get("ref_codigo") or "—"
+                _inm_nom  = _pl.get("inmo_nombre") or "—"
+                _inm_em   = _pl.get("inmo_email")  or ""
+                _finca_id = _pl.get("finca_id")    or ""
+                _inmo_id  = _pl.get("inmo_id")     or ""
+                _notas_s  = _pl.get("notas")       or ""
+
+                _label = f"{'✅' if _leida else '🆕'} [{_ref_s}] {_inm_nom} — {_ts}"
+                with st.expander(_label, expanded=not _leida):
+                    st.markdown(
+                        f"**Inmo:** {_inm_nom}  \n"
+                        f"**Email:** {_inm_em}  \n"
+                        f"**REF finca:** `{_ref_s}`  \n"
+                        f"**Notas:** {_notas_s or '—'}"
+                    )
+                    if not _leida and _finca_id and _inmo_id:
+                        _bf1, _bf2 = st.columns(2)
+                        with _bf1:
+                            if st.button(
+                                "✅ Confirmar reserva 72h",
+                                key=f"mls_sol_ok_{_sid}",
+                                type="primary",
+                                use_container_width=True,
+                            ):
+                                try:
+                                    _mls.update_finca_estado(_finca_id, "reservada")
+                                    _mls.create_reserva(
+                                        finca_id=_finca_id,
+                                        inmo_colaboradora_id=_inmo_id,
+                                        stripe_session_id=None,
+                                        importe=0.0,
+                                    )
+                                    _mls.create_notificacion(
+                                        destinatario_tipo="inmo",
+                                        destinatario_id=_inmo_id,
+                                        tipo_evento="solicitud_colaboracion_confirmada",
+                                        payload=_json_f.dumps({
+                                            "finca_id": _finca_id,
+                                            "ref_codigo": _ref_s,
+                                            "mensaje": "Tu solicitud de colaboración ha sido confirmada. "
+                                                       "ArchiRapid se pondrá en contacto para coordinar el pago.",
+                                        }),
+                                    )
+                                    _mls.marcar_leida(_sid)
+                                    st.rerun()
+                                except Exception as _ef2:
+                                    st.error(f"Error al confirmar: {_ef2}")
+                        with _bf2:
+                            if st.button(
+                                "❌ Rechazar",
+                                key=f"mls_sol_no_{_sid}",
+                                use_container_width=True,
+                            ):
+                                try:
+                                    _mls.create_notificacion(
+                                        destinatario_tipo="inmo",
+                                        destinatario_id=_inmo_id,
+                                        tipo_evento="solicitud_colaboracion_rechazada",
+                                        payload=_json_f.dumps({
+                                            "finca_id": _finca_id,
+                                            "ref_codigo": _ref_s,
+                                            "mensaje": "Tu solicitud de colaboración no pudo ser confirmada "
+                                                       "en este momento. Contacta con ArchiRapid para más información.",
+                                        }),
+                                    )
+                                    _mls.marcar_leida(_sid)
+                                    st.rerun()
+                                except Exception as _ef3:
+                                    st.error(f"Error al rechazar: {_ef3}")
+                    elif _leida:
+                        st.caption("✅ Gestionada")
+        except Exception as _ef_sec:
+            st.warning(f"Error sección F: {_ef_sec}")

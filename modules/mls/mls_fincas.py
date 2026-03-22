@@ -600,39 +600,93 @@ def ui_solicitudes_visita(inmo: dict) -> None:
 
     if not solicitudes:
         st.info("No has recibido solicitudes de información todavía.")
-        return
+    else:
+        no_leidas = [s for s in solicitudes if not s.get("leida")]
+        if no_leidas:
+            st.caption(f"**{len(no_leidas)} sin atender**")
 
-    no_leidas = [s for s in solicitudes if not s.get("leida")]
-    if no_leidas:
-        st.caption(f"**{len(no_leidas)} sin atender**")
+        for sol in solicitudes:
+            pl       = sol.get("_payload", {})
+            finca_id = pl.get("finca_id", "—")
+            finca    = fincas_propias.get(finca_id, {})
+            ref      = finca.get("ref_codigo") or finca_id
+            titulo   = finca.get("titulo") or "—"
+            nombre   = pl.get("nombre", "Cliente anónimo")
+            mensaje  = pl.get("mensaje", "")
+            ts       = sol.get("timestamp", "")[:16].replace("T", " ")
+            leida    = bool(sol.get("leida"))
 
-    for sol in solicitudes:
-        pl       = sol.get("_payload", {})
-        finca_id = pl.get("finca_id", "—")
-        finca    = fincas_propias.get(finca_id, {})
-        ref      = finca.get("ref_codigo") or finca_id
-        titulo   = finca.get("titulo") or "—"
-        nombre   = pl.get("nombre", "Cliente anónimo")
-        mensaje  = pl.get("mensaje", "")
-        ts       = sol.get("timestamp", "")[:16].replace("T", " ")
-        leida    = bool(sol.get("leida"))
+            with st.container(border=True):
+                col_txt, col_btn = st.columns([4, 1])
+                with col_txt:
+                    st.markdown(
+                        f"**{nombre}** · `{ref}` {titulo}  \n"
+                        f"*{mensaje[:200]}*  \n"
+                        f"<small style='color:gray;'>{ts}</small>",
+                        unsafe_allow_html=True,
+                    )
+                    if leida:
+                        st.caption("✅ Atendida")
+                with col_btn:
+                    if not leida:
+                        if st.button("✅ Atendida", key=f"mls_leida_{sol['id']}"):
+                            mls_db.marcar_leida(sol["id"])
+                            st.rerun()
 
-        with st.container(border=True):
-            col_txt, col_btn = st.columns([4, 1])
-            with col_txt:
+    # ── Mis solicitudes de colaboración enviadas ──────────────────────────────
+    st.markdown("---")
+    st.subheader("🤝 Mis solicitudes de colaboración enviadas")
+    try:
+        from src import db as _db_sc
+        _conn_sc = _db_sc.get_conn()
+        _cur_sc  = _conn_sc.cursor()
+        _cur_sc.execute(
+            """SELECT id, tipo_evento, payload, timestamp
+               FROM notificaciones_mls
+               WHERE destinatario_id = ?
+                 AND tipo_evento IN (
+                     'solicitud_colaboracion_enviada',
+                     'solicitud_colaboracion_confirmada',
+                     'solicitud_colaboracion_rechazada'
+                 )
+               ORDER BY timestamp DESC
+               LIMIT 30""",
+            (inmo["id"],),
+        )
+        _sol_rows = [dict(r) for r in _cur_sc.fetchall()]
+        _conn_sc.close()
+    except Exception:
+        _sol_rows = []
+
+    if not _sol_rows:
+        st.info("No has enviado solicitudes de colaboración todavía.")
+    else:
+        for _sr in _sol_rows:
+            try:
+                _sp = json.loads(_sr.get("payload") or "{}")
+            except Exception:
+                _sp = {}
+            _sref  = _sp.get("ref_codigo") or "—"
+            _smsg  = _sp.get("mensaje") or ""
+            _sts   = (_sr.get("timestamp") or "")[:16].replace("T", " ")
+            _stipo = _sr.get("tipo_evento", "")
+            if _stipo == "solicitud_colaboracion_confirmada":
+                _badge = "✅ Confirmada"
+                _color = "#22c55e"
+            elif _stipo == "solicitud_colaboracion_rechazada":
+                _badge = "❌ Rechazada"
+                _color = "#ef4444"
+            else:
+                _badge = "⏳ Pendiente"
+                _color = "#f59e0b"
+            with st.container(border=True):
                 st.markdown(
-                    f"**{nombre}** · `{ref}` {titulo}  \n"
-                    f"*{mensaje[:200]}*  \n"
-                    f"<small style='color:gray;'>{ts}</small>",
+                    f"<span style='color:{_color};font-weight:700;'>{_badge}</span> "
+                    f"· REF `{_sref}` · <small style='color:gray;'>{_sts}</small>",
                     unsafe_allow_html=True,
                 )
-                if leida:
-                    st.caption("✅ Atendida")
-            with col_btn:
-                if not leida:
-                    if st.button("✅ Atendida", key=f"mls_leida_{sol['id']}"):
-                        mls_db.marcar_leida(sol["id"])
-                        st.rerun()
+                if _smsg:
+                    st.caption(_smsg)
 
 
 # =============================================================================
