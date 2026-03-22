@@ -129,26 +129,27 @@ def show_ficha_publica(finca_id: str) -> None:
         )
         _form_contacto(finca)
     else:
-        cta1, cta2 = st.columns(2)
+        cta1, cta2, cta3 = st.columns(3)
         with cta1:
-            if st.button(
-                "💳 Reservar esta finca (€200)",
-                type="primary",
-                key="fp_btn_reservar",
-            ):
+            if st.button("📋 Reservar / Comprar", type="primary", key="fp_btn_reservar"):
                 st.session_state["_fp_show_reservar"] = True
                 st.session_state["_fp_show_contacto"] = False
                 st.rerun()
         with cta2:
-            if st.button("✉️ Solicitar más información", key="fp_btn_contactar"):
+            if st.button("✉️ Solicitar información", key="fp_btn_contactar"):
                 st.session_state["_fp_show_contacto"] = True
                 st.session_state["_fp_show_reservar"] = False
                 st.rerun()
+        with cta3:
+            st.link_button("🤖 Diseñar con IA", "/?page=Diseñador de Vivienda")
 
         if st.session_state.get("_fp_show_reservar"):
             st.markdown("---")
-            from modules.mls.mls_reservas import ui_formulario_reserva_cliente_directo
-            ui_formulario_reserva_cliente_directo(finca)
+            st.info(
+                "Indica tus datos y ArchiRapid se pondrá en contacto contigo "
+                "para gestionar la reserva o compra de esta finca."
+            )
+            _form_contacto(finca)
         elif st.session_state.get("_fp_show_contacto"):
             st.markdown("---")
             _form_contacto(finca)
