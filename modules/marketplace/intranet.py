@@ -962,7 +962,7 @@ Obtén el token creando un bot con @BotFather en Telegram.
                     """SELECT origen as Origen,
                               COUNT(*) as Visitas,
                               SUM(convirtio_a_registro) as Registros,
-                              ROUND(SUM(convirtio_a_registro)*100.0/COUNT(*),1) as 'Conv%'
+                              ROUND(SUM(convirtio_a_registro)*100.0/COUNT(*),1) as ConvPct
                        FROM visitas_demo
                        GROUP BY origen ORDER BY Visitas DESC""",
                     _db9b
