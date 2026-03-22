@@ -758,6 +758,24 @@ Obtén el token creando un bot con @BotFather en Telegram.
         import pandas as _pd9
         import datetime as _dt9
 
+        def _read_sql9(conn, sql):
+            """pd.read_sql_query compatible con SQLite y psycopg2 wrapper."""
+            try:
+                cur = conn.execute(sql)
+                rows = cur.fetchall()
+                if not rows:
+                    return _pd9.DataFrame()
+                cols = [d[0] for d in (cur.description or [])]
+                data = []
+                for r in rows:
+                    try:
+                        data.append([r[i] for i in range(len(cols))])
+                    except Exception:
+                        data.append([r[c] for c in cols])
+                return _pd9.DataFrame(data, columns=cols)
+            except Exception as _re:
+                raise _re
+
         try:
             _db9 = db_conn()
 
@@ -920,9 +938,9 @@ Obtén el token creando un bot con @BotFather en Telegram.
             with col_a:
                 st.subheader("👥 Usuarios por rol")
                 try:
-                    _df_roles = _pd9.read_sql_query(
-                        "SELECT role as Rol, COUNT(*) as Total FROM users GROUP BY role ORDER BY Total DESC",
-                        _db9
+                    _df_roles = _read_sql9(
+                        _db9,
+                        "SELECT role as Rol, COUNT(*) as Total FROM users GROUP BY role ORDER BY Total DESC"
                     )
                     if not _df_roles.empty:
                         st.dataframe(_df_roles, use_container_width=True, hide_index=True)
@@ -935,9 +953,9 @@ Obtén el token creando un bot con @BotFather en Telegram.
             with col_b:
                 st.subheader("🗺️ Fincas por provincia")
                 try:
-                    _df_prov = _pd9.read_sql_query(
-                        "SELECT province as Provincia, COUNT(*) as Fincas FROM plots GROUP BY province ORDER BY Fincas DESC",
-                        _db9
+                    _df_prov = _read_sql9(
+                        _db9,
+                        "SELECT province as Provincia, COUNT(*) as Fincas FROM plots GROUP BY province ORDER BY Fincas DESC"
                     )
                     if not _df_prov.empty:
                         st.dataframe(_df_prov, use_container_width=True, hide_index=True)
@@ -952,9 +970,9 @@ Obtén el token creando un bot con @BotFather en Telegram.
             # ── Ingresos por tipo de operación ────────────────────────────────
             st.subheader("💰 Ingresos por tipo de operación")
             try:
-                _df_kind = _pd9.read_sql_query(
-                    "SELECT kind as Tipo, COUNT(*) as Operaciones, COALESCE(SUM(amount),0) as Importe FROM reservations GROUP BY kind",
-                    _db9
+                _df_kind = _read_sql9(
+                    _db9,
+                    "SELECT kind as Tipo, COUNT(*) as Operaciones, COALESCE(SUM(amount),0) as Importe FROM reservations GROUP BY kind"
                 )
                 if not _df_kind.empty:
                     _df_kind["Tipo"] = _df_kind["Tipo"].map(
@@ -973,13 +991,13 @@ Obtén el token creando un bot con @BotFather en Telegram.
             # ── Actividad diaria (últimos 30 días) ────────────────────────────
             st.subheader("📅 Registros de usuarios — últimos 30 días")
             try:
-                _df_daily = _pd9.read_sql_query(
+                _df_daily = _read_sql9(
+                    _db9,
                     """SELECT DATE(created_at) as Fecha, COUNT(*) as Registros
                        FROM users
                        WHERE created_at >= DATE('now', '-30 days')
                        GROUP BY DATE(created_at)
-                       ORDER BY Fecha""",
-                    _db9
+                       ORDER BY Fecha"""
                 )
                 if not _df_daily.empty:
                     st.line_chart(_df_daily.set_index("Fecha"))
@@ -993,9 +1011,9 @@ Obtén el token creando un bot con @BotFather en Telegram.
             # ── Top fincas por precio ─────────────────────────────────────────
             st.subheader("🏆 Top 10 fincas por precio")
             try:
-                _df_top = _pd9.read_sql_query(
-                    "SELECT title as Finca, province as Provincia, m2 as 'm²', price as 'Precio (€)', status as Estado FROM plots ORDER BY price DESC LIMIT 10",
-                    _db9
+                _df_top = _read_sql9(
+                    _db9,
+                    "SELECT title as Finca, province as Provincia, m2 as Superficie_m2, price as Precio_EUR, status as Estado FROM plots ORDER BY price DESC LIMIT 10"
                 )
                 if not _df_top.empty:
                     st.dataframe(_df_top, use_container_width=True, hide_index=True)
@@ -1008,18 +1026,15 @@ Obtén el token creando un bot con @BotFather en Telegram.
             st.markdown("---")
             st.subheader("🔗 Tracking de Deep Links y Demos")
             try:
-                import pandas as _pd9b
-                _db9b = db_conn()
-                _df_vis = _pd9b.read_sql_query(
+                _df_vis = _read_sql9(
+                    _db9,
                     """SELECT origen as Origen,
                               COUNT(*) as Visitas,
                               SUM(convirtio_a_registro) as Registros,
                               ROUND(SUM(convirtio_a_registro)*100.0/COUNT(*),1) as ConvPct
                        FROM visitas_demo
-                       GROUP BY origen ORDER BY Visitas DESC""",
-                    _db9b
+                       GROUP BY origen ORDER BY Visitas DESC"""
                 )
-                _db9b.close()
                 if not _df_vis.empty:
                     _kv1, _kv2, _kv3 = st.columns(3)
                     _kv1.metric("Total visitas demo", int(_df_vis["Visitas"].sum()))
@@ -1031,15 +1046,13 @@ Obtén el token creando un bot con @BotFather en Telegram.
                     st.dataframe(_df_vis, use_container_width=True, hide_index=True)
 
                     # Detalle de visitas recientes
-                    _db9c = db_conn()
-                    _df_det = _pd9b.read_sql_query(
+                    _df_det = _read_sql9(
+                        _db9,
                         """SELECT timestamp as Fecha, origen as Origen, nombre_usuario as Usuario,
                                   accion_realizada as Accion,
                                   CASE convirtio_a_registro WHEN 1 THEN 'Si' ELSE 'No' END as Registro
-                           FROM visitas_demo ORDER BY timestamp DESC LIMIT 50""",
-                        _db9c
+                           FROM visitas_demo ORDER BY timestamp DESC LIMIT 50"""
                     )
-                    _db9c.close()
                     st.caption("Ultimas 50 visitas:")
                     st.dataframe(_df_det, use_container_width=True, hide_index=True)
                 else:
@@ -1075,9 +1088,9 @@ Obtén el token creando un bot con @BotFather en Telegram.
                 with _col_mls1:
                     # Fincas MLS por estado
                     try:
-                        _df_mls_estado = _pd9.read_sql_query(
-                            "SELECT estado as Estado, COUNT(*) as Total FROM fincas_mls GROUP BY estado ORDER BY Total DESC",
-                            _mls_a_conn
+                        _df_mls_estado = _read_sql9(
+                            _mls_a_conn,
+                            "SELECT estado as Estado, COUNT(*) as Total FROM fincas_mls GROUP BY estado ORDER BY Total DESC"
                         )
                         if not _df_mls_estado.empty:
                             st.caption("Fincas MLS por estado")
@@ -1088,9 +1101,9 @@ Obtén el token creando un bot con @BotFather en Telegram.
                 with _col_mls2:
                     # Inmos por provincia
                     try:
-                        _df_mls_prov = _pd9.read_sql_query(
-                            "SELECT provincia as Provincia, COUNT(*) as Inmos FROM inmobiliarias GROUP BY provincia ORDER BY Inmos DESC LIMIT 10",
-                            _mls_a_conn
+                        _df_mls_prov = _read_sql9(
+                            _mls_a_conn,
+                            "SELECT provincia as Provincia, COUNT(*) as Inmos FROM inmobiliarias GROUP BY provincia ORDER BY Inmos DESC LIMIT 10"
                         )
                         if not _df_mls_prov.empty:
                             st.caption("Inmos MLS por provincia (top 10)")
@@ -1100,7 +1113,8 @@ Obtén el token creando un bot con @BotFather en Telegram.
 
                 # Actividad MLS últimos 30 días (registros de inmos + fincas subidas)
                 try:
-                    _df_mls_act = _pd9.read_sql_query(
+                    _df_mls_act = _read_sql9(
+                        _mls_a_conn,
                         """
                         SELECT DATE(created_at) as Fecha, 'Inmobiliarias' as Tipo, COUNT(*) as N
                         FROM inmobiliarias
@@ -1112,8 +1126,7 @@ Obtén el token creando un bot con @BotFather en Telegram.
                         WHERE created_at >= DATE('now', '-30 days')
                         GROUP BY DATE(created_at)
                         ORDER BY Fecha
-                        """,
-                        _mls_a_conn
+                        """
                     )
                     if not _df_mls_act.empty:
                         _df_mls_pivot = _df_mls_act.pivot_table(
@@ -1126,12 +1139,12 @@ Obtén el token creando un bot con @BotFather en Telegram.
 
                 # Notificaciones MLS pendientes por tipo
                 try:
-                    _df_notifs = _pd9.read_sql_query(
+                    _df_notifs = _read_sql9(
+                        _mls_a_conn,
                         """SELECT tipo_evento as Tipo, COUNT(*) as Total
                            FROM notificaciones_mls
                            WHERE leida=0
-                           GROUP BY tipo_evento ORDER BY Total DESC""",
-                        _mls_a_conn
+                           GROUP BY tipo_evento ORDER BY Total DESC"""
                     )
                     if not _df_notifs.empty:
                         st.caption("Notificaciones MLS sin leer por tipo")

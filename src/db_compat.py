@@ -26,6 +26,25 @@ def adapt_sql(sql: str, is_postgres: bool) -> str:
         lambda m: f"NOW() + INTERVAL '{m.group(1)} {m.group(2)}'",
         sql, flags=re.IGNORECASE
     )
+    # DATE('now', '-X days/months') → (CURRENT_DATE + INTERVAL '-X days')
+    sql = re.sub(
+        r"DATE\('now',\s*'([^']+)'\)",
+        lambda m: f"(CURRENT_DATE + INTERVAL '{m.group(1)}')",
+        sql, flags=re.IGNORECASE
+    )
+    # DATE('now') → CURRENT_DATE
+    sql = re.sub(
+        r"DATE\('now'\)",
+        "CURRENT_DATE",
+        sql, flags=re.IGNORECASE
+    )
+    # DATE(column_name) → (column_name)::date  — cast timestamp → date
+    # Must run after 'now' forms above so only plain identifiers remain
+    sql = re.sub(
+        r'\bDATE\((\w+)\)',
+        r'(\1)::date',
+        sql, flags=re.IGNORECASE
+    )
     # AUTOINCREMENT → eliminar (PostgreSQL usa
     # SERIAL que no necesita la palabra)
     sql = re.sub(

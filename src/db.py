@@ -147,6 +147,12 @@ class _PgAdaptingCursor:
     def connection(self):
         return self._cur.connection
 
+    def close(self):
+        try:
+            self._cur.close()
+        except Exception:
+            pass
+
 
 class _PgCursorWrapper:
     """Wrapper del cursor PostgreSQL (devuelto por _PostgresConnWrapper.execute())."""
@@ -177,6 +183,16 @@ class _PgCursorWrapper:
             return row.get('id') if row else None
         except Exception:
             return None
+
+    @property
+    def description(self):
+        return self._cur.description
+
+    def close(self):
+        try:
+            self._cur.close()
+        except Exception:
+            pass
 
 
 class _PostgresConnWrapper:
