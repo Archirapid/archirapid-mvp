@@ -163,7 +163,8 @@ def show_ficha_publica(finca_id: str) -> None:
             col_sv1, col_sv2 = st.columns([1, 2])
             with col_sv1:
                 st.markdown("**🗺️ Esquema del Solar**")
-                st.markdown(svg, unsafe_allow_html=True)
+                import streamlit.components.v1 as _stc_svg
+                _stc_svg.html(f"<html><body style='margin:0;padding:0;background:transparent'>{svg}</body></html>", height=270)
             with col_sv2:
                 st.markdown("**📐 Edificabilidad**")
                 st.markdown(
