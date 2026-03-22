@@ -503,24 +503,28 @@ def ui_hacer_reserva(finca: dict, inmo: dict) -> None:
         type="primary",
         key="mls_reserva_pagar_btn",
     ):
-        # TODO Paso 12: mls_reservas.py — implementar iniciar_reserva_colaboradora()
         try:
-            from modules.mls import mls_reservas  # noqa: F401 — disponible en Paso 12
+            from modules.mls import mls_reservas
             checkout_url = mls_reservas.iniciar_reserva_colaboradora(
                 finca_id=finca_id,
                 inmo_id=inmo["id"],
             )
             if checkout_url:
-                st.markdown(
-                    f"[💳 Completar pago en Stripe]({checkout_url})",
+                # Auto-redirect a Stripe (misma pestaña) + botón de fallback
+                st.components.v1.html(
+                    f'<script>window.top.location.href="{checkout_url}";</script>',
+                    height=0,
                 )
-        except ImportError:
-            st.error(
-                "El módulo de pagos MLS aún no está disponible. "
-                "(Paso 12 pendiente de implementación)"
-            )
+                st.link_button(
+                    "💳 Ir a Stripe para completar el pago →",
+                    checkout_url,
+                    type="primary",
+                    use_container_width=True,
+                )
+        except ValueError as exc:
+            st.error(str(exc))
         except Exception as exc:
-            st.error(f"Error al iniciar la reserva: {exc}")
+            st.error(f"Error al iniciar el pago: {exc}")
 
 
 # =============================================================================
