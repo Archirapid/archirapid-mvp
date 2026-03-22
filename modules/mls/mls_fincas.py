@@ -218,6 +218,41 @@ def ui_subir_finca(inmo: dict) -> None:
             key="mls_subir_m2",
         )
 
+    # ── BLOQUE 2b — Características del solar (mismos campos que propietarios) ─
+    st.markdown("---")
+    st.markdown("#### 🧩 Paso 2b — Características del solar")
+
+    col_tipo, col_forma = st.columns(2)
+    with col_tipo:
+        tipo_suelo = st.selectbox(
+            "Tipo de suelo *",
+            ["Urbana", "Industrial"],
+            help="Solo se admiten fincas Urbanas e Industriales.",
+            key="mls_subir_tipo_suelo",
+        )
+    with col_forma:
+        forma_solar = st.selectbox(
+            "Forma del solar",
+            ["Rectangular", "Cuadrado", "Irregular simple"],
+            help="Ayuda a la IA a generar diseños más precisos.",
+            key="mls_subir_forma_solar",
+        )
+
+    col_orient, col_serv = st.columns(2)
+    with col_orient:
+        orientacion = st.selectbox(
+            "Orientación del norte",
+            ["Norte arriba", "Norte derecha", "Norte abajo", "Norte izquierda"],
+            help="Afecta a la luz natural y al diseño arquitectónico.",
+            key="mls_subir_orientacion",
+        )
+    with col_serv:
+        servicios_sel = st.multiselect(
+            "Servicios disponibles",
+            ["Agua", "Luz", "Alcantarillado", "Gas", "Fibra Óptica"],
+            key="mls_subir_servicios",
+        )
+
     # ── BLOQUE 3 — Comisión y split ──────────────────────────────────────────
     st.markdown("---")
     st.markdown("#### 💶 Paso 3 — Comisión y reparto")
@@ -363,6 +398,10 @@ def ui_subir_finca(inmo: dict) -> None:
             "notas_privadas":           notas_privadas.strip(),
             "precio":                   float(precio),
             "superficie_m2":            float(superficie_m2),
+            "tipo_suelo":               tipo_suelo,
+            "servicios":                json.dumps(servicios_sel) if servicios_sel else None,
+            "forma_solar":              forma_solar,
+            "orientacion":              orientacion,
             "comision_total_pct":       comision_total_pct,
             "comision_colaboradora_pct": colab_pct_final,
             "comision_listante_pct":    listante_pct_final,

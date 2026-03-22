@@ -1392,6 +1392,19 @@ def ensure_tables():
         except Exception:
             pass
 
+        # ── Migraciones aditivas fincas_mls (safe ALTER TABLE) ───────────────
+        _mls_migrations = [
+            "ALTER TABLE fincas_mls ADD COLUMN tipo_suelo   TEXT DEFAULT 'Urbana'",
+            "ALTER TABLE fincas_mls ADD COLUMN servicios    TEXT",
+            "ALTER TABLE fincas_mls ADD COLUMN forma_solar  TEXT",
+            "ALTER TABLE fincas_mls ADD COLUMN orientacion  TEXT",
+        ]
+        for _sql in _mls_migrations:
+            try:
+                c.execute(_sql)
+            except Exception:
+                pass  # columna ya existe → ignorar
+
 def insert_plot(data: Dict):
     ensure_tables()
     from datetime import datetime
