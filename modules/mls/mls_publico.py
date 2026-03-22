@@ -58,12 +58,13 @@ def show_ficha_publica(finca_id: str) -> None:
         st.warning("🔒 Esta finca tiene una reserva activa en este momento.")
 
     # ── Métricas principales ──────────────────────────────────────────────────
-    col1, col2, col3 = st.columns(3)
+    col1, col2 = st.columns(2)
     if precio:
         col1.metric("Precio", f"€{precio:,.0f}")
     if superficie:
         col2.metric("Superficie", f"{superficie:,.0f} m²")
-    col3.markdown(f"**Ref. catastral**  \n`{catastro_ref}`")
+    if catastro_ref and catastro_ref != "—":
+        st.markdown(f"**Referencia catastral:** `{catastro_ref}`")
 
     # ── Descripción ───────────────────────────────────────────────────────────
     if descripcion:
@@ -135,15 +136,20 @@ def show_ficha_publica(finca_id: str) -> None:
                 type="primary",
                 key="fp_btn_reservar",
             ):
-                st.session_state["selected_page"] = "_mls_reservar_publica"
-                st.session_state["mls_reservar_id"] = finca_id
+                st.session_state["_fp_show_reservar"] = True
+                st.session_state["_fp_show_contacto"] = False
                 st.rerun()
         with cta2:
             if st.button("✉️ Solicitar más información", key="fp_btn_contactar"):
                 st.session_state["_fp_show_contacto"] = True
+                st.session_state["_fp_show_reservar"] = False
                 st.rerun()
 
-        if st.session_state.get("_fp_show_contacto"):
+        if st.session_state.get("_fp_show_reservar"):
+            st.markdown("---")
+            from modules.mls.mls_reservas import ui_formulario_reserva_cliente_directo
+            ui_formulario_reserva_cliente_directo(finca)
+        elif st.session_state.get("_fp_show_contacto"):
             st.markdown("---")
             _form_contacto(finca)
 

@@ -455,7 +455,6 @@ def ui_formulario_reserva_cliente_directo(finca: dict) -> None:
         submitted = st.form_submit_button(
             "Reservar y pagar €200 →",
             type="primary",
-            disabled=not aceptado,
         )
 
     if submitted and aceptado:
