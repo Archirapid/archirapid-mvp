@@ -150,12 +150,17 @@ def show_ficha_publica(finca_id: str) -> None:
                 buyer_phone = st.text_input("Teléfono", key=f"mls_phone_{finca_id}")
                 reservation_type = st.selectbox(
                     "Tipo de interés",
-                    ["Reserva (señal 10%)", "Compra completa (100%)"],
+                    ["Reserva (10%)", "Compra completa (100%)"],
                     key=f"mls_type_{finca_id}",
                 )
 
-            amount = precio * (0.1 if "10%" in reservation_type else 1.0)
-            st.markdown(f"**Importe orientativo:** €{amount:,.0f}")
+            if reservation_type == "Reserva (10%)":
+                amount = precio * 0.1
+                amount_text = f"€{amount:,.0f} (10% del precio total)"
+            else:
+                amount = precio
+                amount_text = f"€{amount:,.0f} (precio completo)"
+            st.markdown(f"**Importe a pagar:** {amount_text}")
 
             if st.button("✅ Confirmar y Proceder", type="primary", key=f"mls_confirm_{finca_id}"):
                 if not buyer_name or not buyer_email or not buyer_password:
