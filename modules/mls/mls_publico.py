@@ -25,6 +25,27 @@ from modules.mls import mls_db
 # SHOW FICHA PÚBLICA
 # =============================================================================
 
+def _get_mls_images(finca: dict) -> list:
+    """Resuelve rutas de imágenes de una finca MLS (con o sin prefijo uploads/)."""
+    raw = finca.get("image_paths") or "[]"
+    try:
+        paths = json.loads(raw) if isinstance(raw, str) else raw
+        if not isinstance(paths, list):
+            paths = []
+    except Exception:
+        paths = []
+    result = []
+    for p in paths:
+        norm = p.replace("\\", "/")
+        if os.path.exists(norm):
+            result.append(norm)
+        elif os.path.exists(f"uploads/{norm}"):
+            result.append(f"uploads/{norm}")
+    if not result and os.path.exists("assets/fincas/image1.jpg"):
+        result = ["assets/fincas/image1.jpg"]
+    return result
+
+
 def show_ficha_publica(finca_id: str) -> None:
     """Ficha pública de una finca MLS. Sin login. Sin identidad listante."""
     if not finca_id:
@@ -36,15 +57,17 @@ def show_ficha_publica(finca_id: str) -> None:
         st.error("Esta finca no está disponible o no existe.")
         return
 
-    estado    = finca.get("estado", "publicada")
-    reservada = estado in ("reservada", "reserva_pendiente_confirmacion")
-    titulo    = finca.get("titulo") or "Finca MLS"
-    precio    = float(finca.get("precio") or 0)
-    superficie = finca.get("superficie_m2")
-    catastro_ref = finca.get("catastro_ref") or "—"
+    estado       = finca.get("estado", "publicada")
+    reservada    = estado in ("reservada", "reserva_pendiente_confirmacion")
+    titulo       = finca.get("titulo") or "Finca MLS"
+    precio       = float(finca.get("precio") or 0)
+    sup          = float(finca.get("superficie_m2") or 0)
+    catastro_ref = finca.get("catastro_ref") or ""
     descripcion  = finca.get("descripcion_publica") or ""
-    lat = finca.get("catastro_lat")
-    lon = finca.get("catastro_lon")
+    lat          = finca.get("catastro_lat")
+    lon          = finca.get("catastro_lon")
+    tipo_suelo   = finca.get("tipo_suelo") or "Urbana"
+    servicios_raw = finca.get("servicios")
 
     # ── Cabecera ──────────────────────────────────────────────────────────────
     st.markdown(
@@ -53,105 +76,208 @@ def show_ficha_publica(finca_id: str) -> None:
         unsafe_allow_html=True,
     )
     st.title(titulo)
-
     if reservada:
         st.warning("🔒 Esta finca tiene una reserva activa en este momento.")
+    if st.button("← Volver al mapa", key="mls_back_btn"):
+        st.query_params.clear()
+        st.rerun()
 
-    # ── Métricas principales ──────────────────────────────────────────────────
-    col1, col2 = st.columns(2)
-    if precio:
-        col1.metric("Precio", f"€{precio:,.0f}")
-    if superficie:
-        col2.metric("Superficie", f"{superficie:,.0f} m²")
-    if catastro_ref and catastro_ref != "—":
-        st.markdown(f"**Referencia catastral:** `{catastro_ref}`")
+    st.markdown("---")
 
-    # ── Descripción ───────────────────────────────────────────────────────────
+    # ── Sección 1: Ficha Técnica ──────────────────────────────────────────────
+    st.header("📋 Ficha Técnica del Terreno")
+
+    # Galería de imágenes — igual que pin azul (1 grande + miniaturas)
+    img_files = _get_mls_images(finca)
+    if img_files:
+        st.subheader("📸 Galería de Imágenes")
+        col_main, col_thumb = st.columns([2, 1])
+        with col_main:
+            st.image(img_files[0], use_container_width=True, caption=titulo)
+        with col_thumb:
+            if len(img_files) > 1:
+                st.caption("Más imágenes:")
+                for img in img_files[1:4]:
+                    st.image(img, width=150)
+
+    st.markdown("---")
+
+    # Datos del terreno + mapa — 2 columnas igual que pin azul
+    col_datos, col_mapa = st.columns(2)
+
+    with col_datos:
+        st.subheader("📊 Datos del Terreno")
+        try:
+            from modules.marketplace.utils import calculate_edificability
+            max_edificable = calculate_edificability(sup, 0.33)
+        except Exception:
+            max_edificable = sup * 0.33
+
+        st.metric("💰 Precio", f"€{precio:,.0f}")
+        st.metric("📏 Superficie Total", f"{sup:,.0f} m²")
+        st.metric("🏗️ Máximo Construible (33%)", f"{max_edificable:.0f} m²")
+        st.markdown(f"**🏷️ Tipo:** {tipo_suelo}")
+        if catastro_ref:
+            st.markdown(f"**📋 Referencia Catastral:** `{catastro_ref}`")
+        if servicios_raw:
+            try:
+                servicios = json.loads(servicios_raw) if isinstance(servicios_raw, str) else servicios_raw
+                if servicios:
+                    st.markdown(f"**🔌 Servicios:** {', '.join(servicios)}")
+            except Exception:
+                pass
+
+    with col_mapa:
+        st.subheader("📍 Ubicación en Mapa")
+        if lat and lon:
+            try:
+                import folium
+                import streamlit.components.v1 as _stc
+                _m = folium.Map(
+                    location=[float(lat), float(lon)],
+                    zoom_start=15,
+                    tiles="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+                    attr="Esri",
+                )
+                folium.Marker(
+                    [float(lat), float(lon)],
+                    popup=titulo,
+                    icon=folium.Icon(color="orange", icon="home", prefix="fa", icon_color="white"),
+                    tooltip=titulo,
+                ).add_to(_m)
+                _stc.html(_m._repr_html_(), height=300)
+                st.caption("Ubicación aproximada — dirección exacta disponible tras reserva")
+            except Exception:
+                st.info("Mapa no disponible.")
+        else:
+            st.info("Coordenadas pendientes de validación catastral.")
+
+    st.markdown("---")
+
+    # Solar virtual — igual que pin azul
+    if sup > 0:
+        try:
+            from modules.marketplace.plot_detail import generar_svg_solar_validado
+            es_urbano = tipo_suelo.lower() != "industrial"
+            svg = generar_svg_solar_validado(sup, max_edificable, es_urbano=es_urbano)
+            col_sv1, col_sv2 = st.columns([1, 2])
+            with col_sv1:
+                st.markdown("**🗺️ Esquema del Solar**")
+                st.markdown(svg, unsafe_allow_html=True)
+            with col_sv2:
+                st.markdown("**📐 Edificabilidad**")
+                st.markdown(
+                    f"- **Parcela total:** {sup:,.0f} m²\n"
+                    f"- **Máx. construible (33%):** {max_edificable:.0f} m²\n"
+                    f"- **Tipo de suelo:** {tipo_suelo}"
+                )
+        except Exception:
+            pass
+
+    # Descripción
     if descripcion:
         st.markdown("---")
         st.markdown("### Descripción")
         st.markdown(descripcion)
 
-    # ── Imágenes ──────────────────────────────────────────────────────────────
-    raw_paths = finca.get("image_paths") or "[]"
-    try:
-        paths = json.loads(raw_paths) if isinstance(raw_paths, str) else raw_paths
-        if not isinstance(paths, list):
-            paths = []
-    except Exception:
-        paths = []
+    st.markdown("---")
 
-    if paths:
-        st.markdown("---")
-        st.markdown("### Imágenes")
-        img_cols = st.columns(min(len(paths), 3))
-        for i, rel_path in enumerate(paths[:6]):
-            try:
-                norm = rel_path.replace("\\", "/")
-                if os.path.exists(norm):
-                    with open(norm, "rb") as f:
-                        import base64
-                        b64 = base64.b64encode(f.read()).decode()
-                    ext  = os.path.splitext(norm)[1].lower().lstrip(".")
-                    mime = "jpeg" if ext in ("jpg", "jpeg") else (ext or "png")
-                    img_cols[i % 3].markdown(
-                        f'<img src="data:image/{mime};base64,{b64}" '
-                        f'style="width:100%;border-radius:6px;margin-bottom:6px;">',
-                        unsafe_allow_html=True,
-                    )
-            except Exception:
-                pass
-
-    # ── Mini mapa ─────────────────────────────────────────────────────────────
-    if lat and lon:
-        try:
-            import folium
-            import streamlit.components.v1 as _stc
-            m = folium.Map(location=[float(lat), float(lon)], zoom_start=15)
-            folium.Marker(
-                location=[float(lat), float(lon)],
-                icon=folium.Icon(color="orange", icon="building", prefix="fa"),
-                tooltip=titulo,
-            ).add_to(m)
-            st.markdown("---")
-            st.markdown("### Ubicación")
-            st.caption("Ubicación aproximada — dirección exacta disponible tras reserva")
-            _stc.html(m._repr_html_(), height=300)
-        except Exception:
-            pass
-
-    # ── Badge validación catastral ─────────────────────────────────────────────
+    # ── Verificación catastral — versión MLS (sin PDF, usa datos de API) ──────
+    st.subheader("🔍 Verificación Técnica")
     if finca.get("catastro_validada"):
-        geo_txt = ""
-        if lat and lon:
-            geo_txt = f" · lat {float(lat):.5f}, lon {float(lon):.5f}"
-        st.success(f"✅ Referencia catastral validada por Sede Electrónica del Catastro{geo_txt}")
+        st.success("✅ Datos verificados con Catastro — La referencia catastral está validada oficialmente")
+        with st.expander("📊 Ver datos de validación", expanded=False):
+            col_v1, col_v2 = st.columns(2)
+            with col_v1:
+                st.write(f"**Superficie:** {sup:,.0f} m²")
+                st.write(f"**Referencia Catastral:** {catastro_ref or '—'}")
+                st.write(f"**Tipo suelo:** {tipo_suelo}")
+            with col_v2:
+                if lat and lon:
+                    st.write(f"**Latitud:** {float(lat):.6f}")
+                    st.write(f"**Longitud:** {float(lon):.6f}")
+    else:
+        st.info("📋 Validación catastral en proceso. Contacta con ArchiRapid para más información.")
 
-    # ── Calculadora de financiación ───────────────────────────────────────────
+    st.markdown("---")
+
+    # ── Alertas de fincas similares — igual que pin azul ─────────────────────
+    import sqlite3 as _sq_al
+    import datetime as _dt_al
+    with st.expander("🔔 Avisarme cuando haya fincas similares", expanded=False):
+        st.markdown("""
+        <div style="background:rgba(245,166,35,0.08);border:1px solid rgba(245,166,35,0.3);
+                    border-radius:10px;padding:12px 16px;margin-bottom:10px;">
+            <div style="font-weight:700;color:#F8FAFC;font-size:14px;">
+                🔔 Alertas de nuevas fincas
+            </div>
+            <div style="color:#94A3B8;font-size:12px;margin-top:2px;">
+                Te avisamos por email cuando publiquemos fincas similares
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        _al_c1, _al_c2 = st.columns(2)
+        with _al_c1:
+            _al_name  = st.text_input("Tu nombre",  placeholder="Nombre",       key=f"mls_aln_{finca_id}")
+            _al_email = st.text_input("Email *",     placeholder="tu@email.com", key=f"mls_ale_{finca_id}")
+        with _al_c2:
+            _al_price = st.number_input(
+                "Presupuesto máximo (€)", min_value=0.0, max_value=5_000_000.0,
+                value=precio * 2, step=10_000.0, format="%.0f",
+                key=f"mls_alp_{finca_id}", help="0 = sin límite",
+            )
+            _al_tipo = st.text_input("Tipo de suelo de interés", value=tipo_suelo, key=f"mls_alv_{finca_id}")
+        if st.button("🔔 Activar alerta", key=f"mls_albtn_{finca_id}", type="primary", use_container_width=True):
+            if not _al_email or "@" not in _al_email:
+                st.error("Introduce un email válido.")
+            else:
+                try:
+                    _c_al = _sq_al.connect("database.db", timeout=10)
+                    _c_al.execute("PRAGMA journal_mode=WAL")
+                    _c_al.execute("""CREATE TABLE IF NOT EXISTS plot_alerts (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        email TEXT, name TEXT, province TEXT,
+                        max_price REAL DEFAULT 0, created_at TEXT, active INTEGER DEFAULT 1)""")
+                    _exists = _c_al.execute(
+                        "SELECT id FROM plot_alerts WHERE email=?",
+                        (_al_email.lower().strip(),)
+                    ).fetchone()
+                    _now_al = _dt_al.datetime.utcnow().isoformat(timespec="seconds") + "Z"
+                    if _exists:
+                        _c_al.execute(
+                            "UPDATE plot_alerts SET name=?, max_price=?, active=1, created_at=? WHERE id=?",
+                            (_al_name, _al_price, _now_al, _exists[0]),
+                        )
+                    else:
+                        _c_al.execute(
+                            "INSERT INTO plot_alerts (email,name,province,max_price,created_at) VALUES (?,?,?,?,?)",
+                            (_al_email.lower().strip(), _al_name, _al_tipo, _al_price, _now_al),
+                        )
+                    _c_al.commit()
+                    _c_al.close()
+                    st.success(f"✅ Alerta activada para fincas {_al_tipo or 'similares'}.")
+                except Exception:
+                    st.info("✅ Petición recibida. Te contactaremos en hola@archirapid.com")
+
+    # ── Calculadora de financiación — igual que pin azul ─────────────────────
     st.markdown("---")
     try:
         from modules.marketplace.hipoteca import render_calculadora
-        coste_obra = float(superficie or 0) * 0.33 * 1300
-        with st.expander(
-            "🏦 Calculadora de Financiación — ¿Cuánto pagaría al mes?",
-            expanded=False,
-        ):
+        with st.expander("🏦 Calculadora de Financiación — ¿Cuánto pagaría al mes?", expanded=False):
             render_calculadora(
                 precio_terreno=precio,
-                coste_construccion=coste_obra,
+                coste_construccion=sup * 0.33 * 1300,
                 key_prefix=f"mls_{finca_id}",
             )
     except Exception:
         pass
 
-    # ── Proyectos compatibles ─────────────────────────────────────────────────
+    # ── Proyectos compatibles — igual que pin azul ────────────────────────────
     st.markdown("---")
     st.subheader("🏠 Proyectos Compatibles para esta Parcela")
     try:
         from modules.marketplace.compatibilidad import get_proyectos_compatibles
-        proyectos = get_proyectos_compatibles(
-            client_parcel_size=float(superficie or 0),
-        )
+        proyectos = get_proyectos_compatibles(client_parcel_size=sup)
         if proyectos:
             p_cols = st.columns(min(len(proyectos), 3))
             for i, p in enumerate(proyectos[:3]):
