@@ -1398,6 +1398,7 @@ def ensure_tables():
             "ALTER TABLE fincas_mls ADD COLUMN servicios    TEXT",
             "ALTER TABLE fincas_mls ADD COLUMN forma_solar  TEXT",
             "ALTER TABLE fincas_mls ADD COLUMN orientacion  TEXT",
+            "ALTER TABLE fincas_mls ADD COLUMN featured     INTEGER DEFAULT 0",
         ]
         for _sql in _mls_migrations:
             try:

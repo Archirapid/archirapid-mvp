@@ -39,6 +39,12 @@ def set_query_param(key, value):
 
 def get_plot_image_path(plot):
     """Get the image path for a plot, preferring uploaded photos from BD."""
+    # MLS fincas store resolved path directly in image_path
+    if plot.get("_is_mls") and plot.get("image_path"):
+        p = plot["image_path"].replace("\\", "/")
+        if os.path.exists(p):
+            return p
+
     if plot.get('photo_paths'):
         try:
             paths = json.loads(plot['photo_paths'])
@@ -50,7 +56,7 @@ def get_plot_image_path(plot):
                     return upload_path
         except (json.JSONDecodeError, TypeError):
             pass
-    
+
     # Si no hay imagen subida, usar placeholder genérico de ARCHIRAPID
     return 'assets/branding/logo.png'
 
@@ -256,27 +262,53 @@ def get_filtered_plots(min_surface=0, max_surface=1000000, query=""):
     return filtered
 
 def _render_plot_card(plot, key_prefix, show_premium_badge=False):
-    """Renderiza una tarjeta de finca uniforme."""
+    """Renderiza una tarjeta de finca uniforme (plots propios y MLS)."""
     import base64 as _b64
+    is_mls = plot.get("_is_mls", False)
     img_path = get_plot_image_path(plot)
-    st.markdown('<style>.finca-badge{display:inline-block;background:#FFF5E0;color:#F5A623;border:1px solid #F5A623;border-radius:8px;font-size:0.68em;font-weight:700;padding:1px 7px;margin-bottom:4px;}</style>', unsafe_allow_html=True)
-    # Imagen con altura fija via HTML para uniformidad entre cards
+    st.markdown('<style>.finca-badge{display:inline-block;background:#FFF5E0;color:#F5A623;border:1px solid #F5A623;border-radius:8px;font-size:0.68em;font-weight:700;padding:1px 7px;margin-bottom:4px;}.mls-badge{display:inline-block;background:#F59E0B;color:#fff;border-radius:6px;font-size:0.65em;font-weight:800;padding:2px 7px;letter-spacing:1px;margin-bottom:4px;}</style>', unsafe_allow_html=True)
+    # Imagen con altura fija; para MLS superponemos badge naranja
+    img_html = ""
     try:
         with open(img_path, 'rb') as f:
             b64 = _b64.b64encode(f.read()).decode()
         ext = str(img_path).rsplit('.', 1)[-1].lower()
         mime = 'image/png' if ext == 'png' else ('image/gif' if ext == 'gif' else 'image/jpeg')
-        st.markdown(
+        mls_overlay = (
+            '<div style="position:absolute;top:7px;left:7px;background:#F59E0B;color:#fff;'
+            'border-radius:5px;font-size:0.62em;font-weight:900;padding:2px 7px;'
+            'letter-spacing:1.5px;pointer-events:none;">MLS</div>'
+            if is_mls else ""
+        )
+        img_html = (
+            f'<div style="position:relative;width:100%;">'
             f'<img src="data:{mime};base64,{b64}" '
-            f'style="width:100%;height:160px;object-fit:cover;border-radius:10px;display:block;">',
-            unsafe_allow_html=True
+            f'style="width:100%;height:160px;object-fit:cover;border-radius:10px;display:block;">'
+            f'{mls_overlay}'
+            f'</div>'
         )
     except Exception:
+        img_html = ""
+    if img_html:
+        st.markdown(img_html, unsafe_allow_html=True)
+    else:
         st.image(img_path, use_container_width=True)
+
     if show_premium_badge:
         st.markdown('<span class="finca-badge">⭐ DESTACADA</span>', unsafe_allow_html=True)
-    st.markdown(f"**{plot['title'][:28]}{'…' if len(plot.get('title',''))>28 else ''}**")
-    st.caption(f"📏 {plot.get('m2','N/A')} m²  ·  💰 €{plot.get('price',0):,.0f}")
+
+    title = plot.get('title') or "Sin título"
+    st.markdown(f"**{title[:28]}{'…' if len(title)>28 else ''}**")
+    st.caption(f"📏 {plot.get('m2','N/A')} m²  ·  💰 €{float(plot.get('price',0) or 0):,.0f}")
+
+    if is_mls:
+        mls_id = plot.get("_mls_id") or plot.get("id")
+        if st.button("Ver Detalles", key=f"{key_prefix}_mls_{mls_id}", use_container_width=True):
+            set_query_param("mls_ficha", str(mls_id))
+            st.rerun()
+        # MLS fincas no participan en el comparador nativo (distintos campos)
+        return
+
     if st.button("Ver Detalles", key=f"{key_prefix}_{plot['id']}", use_container_width=True):
         set_query_param("selected_plot", plot["id"])
         st.rerun()
@@ -371,16 +403,71 @@ def render_comparador(plots_all: list):
         st.rerun()
 
 
+def _get_mls_fincas_for_grid():
+    """Fetch MLS fincas (publicadas) and normalize to plots-dict shape."""
+    try:
+        from modules.marketplace.utils import db_conn
+        with db_conn() as conn:
+            conn.row_factory = sqlite3.Row
+            cur = conn.cursor()
+            cur.execute("""
+                SELECT id, titulo, descripcion_publica, precio, superficie_m2,
+                       catastro_lat, catastro_lon, tipo_suelo, created_at,
+                       imagenes,
+                       COALESCE(featured, 0) AS featured
+                FROM fincas_mls
+                WHERE estado IN ('publicada','reservada')
+            """)
+            rows = [dict(r) for r in cur.fetchall()]
+        result = []
+        for r in rows:
+            # resolve first image path
+            img_path = None
+            try:
+                imgs = json.loads(r.get("imagenes") or "[]")
+                for _p in imgs:
+                    if _p:
+                        _p = _p.replace("\\", "/")
+                        if not _p.startswith("uploads/"):
+                            _p = "uploads/" + _p
+                        if os.path.exists(_p):
+                            img_path = _p
+                            break
+            except Exception:
+                pass
+            result.append({
+                "id":          f"mls_{r['id']}",   # unique key in merged list
+                "_mls_id":     r["id"],
+                "_is_mls":     True,
+                "title":       r.get("titulo") or "Finca MLS",
+                "description": r.get("descripcion_publica") or "",
+                "m2":          r.get("superficie_m2"),
+                "price":       r.get("precio") or 0,
+                "lat":         r.get("catastro_lat"),
+                "lon":         r.get("catastro_lon"),
+                "featured":    r.get("featured") or 0,
+                "created_at":  r.get("created_at") or "",
+                "image_path":  img_path,
+            })
+        return result
+    except Exception:
+        return []
+
+
 def render_featured_plots(plots):
-    """Grid 5 columnas: fila destacadas (premium) + fila recientes."""
-    if not plots:
+    """Grid 5 columnas: fila destacadas (premium) + fila recientes — incluye MLS."""
+    # Merge regular plots + MLS fincas
+    mls_fincas = _get_mls_fincas_for_grid()
+    all_plots = list(plots) + mls_fincas
+
+    if not all_plots:
         st.info("No hay fincas disponibles con los filtros actuales.")
         return
 
-    # Separar premium y normales
-    premium = sorted([p for p in plots if p.get("featured") == 1],
+    # Separar premium y normales (ambas fuentes)
+    premium = sorted([p for p in all_plots if p.get("featured") == 1],
                      key=lambda p: str(p.get("created_at") or ""), reverse=True)
-    normal  = sorted([p for p in plots if p.get("featured") != 1],
+    normal  = sorted([p for p in all_plots if p.get("featured") != 1],
                      key=lambda p: str(p.get("created_at") or ""), reverse=True)
 
     N = 5  # columnas
@@ -393,16 +480,15 @@ def render_featured_plots(plots):
             with cols[i]:
                 _render_plot_card(plot, "prem", show_premium_badge=True)
 
-    # Fila 2: Recientes
+    # Fila 2: Recientes (hasta 10 = 2 filas de 5)
     st.markdown("#### 🏠 Fincas Disponibles")
-    # Si no hay premium, mostrar todas las normales; si hay, excluir las ya mostradas
-    to_show = normal[:N]
+    to_show = normal[:N * 2]
     if not to_show:
         st.info("Sube fincas para verlas aquí.")
         return
     cols = st.columns(N)
     for i, plot in enumerate(to_show):
-        with cols[i]:
+        with cols[i % N]:
             _render_plot_card(plot, "norm", show_premium_badge=False)
 
     # ── Comparador (aparece solo cuando hay 2-3 seleccionadas) ───────────────
