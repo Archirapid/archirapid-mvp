@@ -658,10 +658,37 @@ def main():
             c3.metric("Pendientes", _total - _approved)
             st.markdown("---")
             if _total > 0:
-                st.dataframe(_dfw.rename(columns={
-                    'name': 'Nombre', 'email': 'Email', 'profile': 'Perfil',
-                    'created_at': 'Fecha', 'approved': 'Aprobado'
-                }), use_container_width=True, hide_index=True)
+                # Pendientes — con botones de acción
+                _cw2 = db_conn()
+                _cur_wl2 = _cw2.execute("SELECT id, name, email, profile, created_at, approved FROM waitlist ORDER BY approved ASC, created_at DESC")
+                _rows_wl2 = _cur_wl2.fetchall()
+                _cols_wl2 = [d[0] for d in (_cur_wl2.description or [])]
+                _data_wl2 = []
+                for _r2 in _rows_wl2:
+                    try:
+                        _data_wl2.append([_r2[i] for i in range(len(_cols_wl2))])
+                    except Exception:
+                        _data_wl2.append([_r2[c] for c in _cols_wl2])
+                _cw2.close()
+                for _wrow in _data_wl2:
+                    _wid, _wname, _wemail, _wprofile, _wdate, _wapproved = _wrow
+                    _badge = "✅ Aprobado" if _wapproved else "⏳ Pendiente"
+                    with st.expander(f"{_badge} · {_wname} ({_wemail})"):
+                        st.markdown(f"**Perfil:** {_wprofile or '—'}  \n**Fecha:** {_wdate}")
+                        if not _wapproved:
+                            _wa1, _wa2 = st.columns(2)
+                            if _wa1.button("✅ Aprobar", key=f"wl_apr_{_wid}", type="primary", use_container_width=True):
+                                _cwa = db_conn()
+                                _cwa.execute("UPDATE waitlist SET approved=1 WHERE id=?", (_wid,))
+                                _cwa.commit(); _cwa.close()
+                                st.success(f"✅ {_wname} aprobado.")
+                                st.rerun()
+                            if _wa2.button("🗑️ Eliminar", key=f"wl_del_{_wid}", use_container_width=True):
+                                _cwd = db_conn()
+                                _cwd.execute("DELETE FROM waitlist WHERE id=?", (_wid,))
+                                _cwd.commit(); _cwd.close()
+                                st.rerun()
+                st.markdown("---")
                 # Exportar CSV
                 _csv = _dfw.to_csv(index=False).encode('utf-8')
                 st.download_button(
