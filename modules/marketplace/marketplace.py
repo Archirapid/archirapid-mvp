@@ -412,8 +412,8 @@ def _get_mls_fincas_for_grid():
             cur = conn.cursor()
             cur.execute("""
                 SELECT id, titulo, descripcion_publica, precio, superficie_m2,
-                       catastro_lat, catastro_lon, tipo_suelo, created_at,
-                       imagenes,
+                       catastro_lat, catastro_lon, created_at,
+                       image_paths,
                        COALESCE(featured, 0) AS featured
                 FROM fincas_mls
                 WHERE estado IN ('publicada','reservada')
@@ -424,7 +424,7 @@ def _get_mls_fincas_for_grid():
             # resolve first image path
             img_path = None
             try:
-                imgs = json.loads(r.get("imagenes") or "[]")
+                imgs = json.loads(r.get("image_paths") or "[]")
                 for _p in imgs:
                     if _p:
                         _p = _p.replace("\\", "/")
@@ -480,16 +480,19 @@ def render_featured_plots(plots):
             with cols[i]:
                 _render_plot_card(plot, "prem", show_premium_badge=True)
 
-    # Fila 2: Recientes (hasta 10 = 2 filas de 5)
+    # Fila 2 (y fila 3 si hay): Recientes — máximo 2 filas × 5 = 10 tarjetas
     st.markdown("#### 🏠 Fincas Disponibles")
     to_show = normal[:N * 2]
     if not to_show:
         st.info("Sube fincas para verlas aquí.")
         return
-    cols = st.columns(N)
-    for i, plot in enumerate(to_show):
-        with cols[i % N]:
-            _render_plot_card(plot, "norm", show_premium_badge=False)
+    # Renderizar en filas reales de 5 columnas
+    for row_start in range(0, len(to_show), N):
+        row_plots = to_show[row_start:row_start + N]
+        cols = st.columns(N)
+        for i, plot in enumerate(row_plots):
+            with cols[i]:
+                _render_plot_card(plot, f"norm_r{row_start}", show_premium_badge=False)
 
     # ── Comparador (aparece solo cuando hay 2-3 seleccionadas) ───────────────
     _n_cmp = len(st.session_state.get("compare_plots", []))
