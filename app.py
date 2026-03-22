@@ -1509,6 +1509,40 @@ if "selected_plot" in st.query_params and not page_from_query:
         st.error(f"Error mostrando finca: {e}")
     st.stop()
 
+# ── Páginas públicas MLS — sin login (mismo patrón que selected_plot) ───────
+if "mls_ficha" in st.query_params and not page_from_query:
+    try:
+        from modules.mls.mls_publico import show_ficha_publica
+        show_ficha_publica(st.query_params["mls_ficha"])
+    except Exception as e:
+        st.error(f"Error mostrando ficha MLS: {e}")
+    st.stop()
+
+if "mls_reservar" in st.query_params and not page_from_query:
+    try:
+        from modules.mls.mls_publico import show_reservar_publico
+        show_reservar_publico(st.query_params["mls_reservar"])
+    except Exception as e:
+        st.error(f"Error en formulario de reserva MLS: {e}")
+    st.stop()
+
+if "mls_contacto" in st.query_params and not page_from_query:
+    try:
+        from modules.mls.mls_publico import show_contacto_publico
+        show_contacto_publico(st.query_params["mls_contacto"])
+    except Exception as e:
+        st.error(f"Error en formulario de contacto MLS: {e}")
+    st.stop()
+
+if st.query_params.get("mls_reserva_ok") == "1" and st.query_params.get("tipo") == "cliente_directo" and not page_from_query:
+    try:
+        from modules.mls.mls_publico import show_retorno_reserva_cliente
+        show_retorno_reserva_cliente()
+    except Exception as e:
+        st.error(f"Error en confirmación de reserva: {e}")
+    st.stop()
+# ────────────────────────────────────────────────────────────────────────────
+
 if st.query_params.get("page") == "👤 Panel de Cliente" and st.session_state.get('selected_page') != "🏠 Propietarios":
     try:
         panel_cliente_v2()
