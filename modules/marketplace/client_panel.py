@@ -187,8 +187,111 @@ def generate_3d_viewer_html(model_url: str, fmt: str = "glb") -> str:
 </body>
 </html>'''
 
+def _show_mls_reserva_panel(client_email: str, finca_id: str) -> None:
+    """Panel post-reserva para clientes que vienen del pin naranja MLS."""
+    from modules.mls import mls_db
+
+    finca = mls_db.get_finca_sin_identidad_listante(finca_id)
+
+    st.success(f"✅ Bienvenido/a, {st.session_state.get('user_name', client_email)}")
+    st.markdown(
+        "<div style='color:#F5A623;font-weight:700;font-size:13px;"
+        "margin-bottom:4px;'>🟠 ArchiRapid MLS</div>",
+        unsafe_allow_html=True,
+    )
+    st.subheader("🏡 Tu Reserva MLS")
+
+    if finca:
+        titulo    = finca.get("titulo") or "Finca MLS"
+        precio    = float(finca.get("precio") or 0)
+        superficie = finca.get("superficie_m2")
+        catastro_ref = finca.get("catastro_ref") or "—"
+        estado    = finca.get("estado", "reserva_pendiente_confirmacion")
+        servicios_raw = finca.get("servicios")
+        tipo_suelo = finca.get("tipo_suelo") or "—"
+
+        st.markdown(f"### {titulo}")
+        col1, col2 = st.columns(2)
+        col1.metric("Precio", f"€{precio:,.0f}")
+        if superficie:
+            col2.metric("Superficie", f"{float(superficie):,.0f} m²")
+        st.markdown(f"**Referencia catastral:** `{catastro_ref}`")
+        st.markdown(f"**Tipo de suelo:** {tipo_suelo}")
+
+        if servicios_raw:
+            try:
+                import json as _json
+                servicios = _json.loads(servicios_raw) if isinstance(servicios_raw, str) else servicios_raw
+                if servicios:
+                    st.markdown(f"**Servicios:** {', '.join(servicios)}")
+            except Exception:
+                pass
+
+        estado_txt = {
+            "reserva_pendiente_confirmacion": "🔒 Reserva pendiente de confirmación por ArchiRapid (48h)",
+            "reservada": "🔒 Reserva activa",
+            "publicada": "🟢 Disponible",
+        }.get(estado, estado)
+        st.info(estado_txt)
+    else:
+        st.warning("No se pudo cargar la ficha de la finca. Contacta con soporte.")
+
+    st.markdown("---")
+
+    # Proyectos compatibles
+    st.subheader("🏠 Proyectos Compatibles para tu Parcela")
+    try:
+        from modules.marketplace.compatibilidad import get_proyectos_compatibles
+        sup = float(finca.get("superficie_m2") or 0) if finca else 0
+        proyectos = get_proyectos_compatibles(client_parcel_size=sup, client_email=client_email)
+        if proyectos:
+            p_cols = st.columns(min(len(proyectos), 3))
+            for i, p in enumerate(proyectos[:3]):
+                with p_cols[i % 3]:
+                    m2_p = p.get("m2_construidos") or p.get("area_m2") or 0
+                    price_p = float(p.get("price") or 0)
+                    st.markdown(f"**{p.get('title', 'Proyecto')}**")
+                    st.caption(f"{m2_p:,.0f} m² · €{price_p:,.0f}")
+                    if st.button("Ver proyecto →", key=f"mls_panel_proj_{p['id']}",
+                                 use_container_width=True):
+                        st.query_params["selected_project_v2"] = str(p["id"])
+                        st.rerun()
+        else:
+            st.info("Próximamente proyectos de vivienda compatibles con tu finca.")
+    except Exception:
+        pass
+
+    st.markdown("---")
+
+    # Calculadora de financiación
+    try:
+        from modules.marketplace.hipoteca import render_calculadora
+        precio_f = float(finca.get("precio") or 0) if finca else 0
+        sup_f    = float(finca.get("superficie_m2") or 0) if finca else 0
+        coste_obra = sup_f * 0.33 * 1300
+        with st.expander("🏦 Calculadora de Financiación", expanded=False):
+            render_calculadora(
+                precio_terreno=precio_f,
+                coste_construccion=coste_obra,
+                key_prefix=f"mls_panel_{finca_id}",
+            )
+    except Exception:
+        pass
+
+    st.markdown("---")
+    if st.button("🔍 Ver ficha completa de la finca", key="mls_panel_ver_ficha"):
+        st.query_params["mls_ficha"] = finca_id
+        st.rerun()
+
+
 def show_full_client_dashboard(client_email):
     """Muestra el panel completo del cliente para usuarios ya logueados"""
+    # Si viene de reserva naranja MLS → panel MLS específico
+    mls_finca_id = st.session_state.get("mls_reserva_finca_id")
+    if mls_finca_id:
+        _show_mls_reserva_panel(client_email, mls_finca_id)
+        return
+
     # Panel de cliente logueado
     user_role = st.session_state.get("user_role", "buyer")
     has_transactions = st.session_state.get("has_transactions", False)

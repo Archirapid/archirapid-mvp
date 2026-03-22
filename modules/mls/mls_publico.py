@@ -120,6 +120,58 @@ def show_ficha_publica(finca_id: str) -> None:
         except Exception:
             pass
 
+    # ── Badge validación catastral ─────────────────────────────────────────────
+    if finca.get("catastro_validada"):
+        geo_txt = ""
+        if lat and lon:
+            geo_txt = f" · lat {float(lat):.5f}, lon {float(lon):.5f}"
+        st.success(f"✅ Referencia catastral validada por Sede Electrónica del Catastro{geo_txt}")
+
+    # ── Calculadora de financiación ───────────────────────────────────────────
+    st.markdown("---")
+    try:
+        from modules.marketplace.hipoteca import render_calculadora
+        coste_obra = float(superficie or 0) * 0.33 * 1300
+        with st.expander(
+            "🏦 Calculadora de Financiación — ¿Cuánto pagaría al mes?",
+            expanded=False,
+        ):
+            render_calculadora(
+                precio_terreno=precio,
+                coste_construccion=coste_obra,
+                key_prefix=f"mls_{finca_id}",
+            )
+    except Exception:
+        pass
+
+    # ── Proyectos compatibles ─────────────────────────────────────────────────
+    st.markdown("---")
+    st.subheader("🏠 Proyectos Compatibles para esta Parcela")
+    try:
+        from modules.marketplace.compatibilidad import get_proyectos_compatibles
+        proyectos = get_proyectos_compatibles(
+            client_parcel_size=float(superficie or 0),
+        )
+        if proyectos:
+            p_cols = st.columns(min(len(proyectos), 3))
+            for i, p in enumerate(proyectos[:3]):
+                with p_cols[i % 3]:
+                    m2_p = p.get("m2_construidos") or p.get("area_m2") or 0
+                    price_p = float(p.get("price") or 0)
+                    st.markdown(f"**{p.get('title', 'Proyecto')}**")
+                    st.caption(f"{m2_p:,.0f} m² construidos · €{price_p:,.0f}")
+                    if st.button(
+                        "Ver proyecto →",
+                        key=f"mls_proj_{finca_id}_{p['id']}",
+                        use_container_width=True,
+                    ):
+                        st.query_params["selected_project_v2"] = str(p["id"])
+                        st.rerun()
+        else:
+            st.info("Aún no hay proyectos de vivienda en el catálogo. Próximamente.")
+    except Exception:
+        pass
+
     # ── Reservar / Comprar (mismo flujo que pin azul) ─────────────────────────
     st.markdown("---")
     st.subheader("📝 ¿Interesado en esta finca?")

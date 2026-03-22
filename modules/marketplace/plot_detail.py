@@ -596,4 +596,31 @@ def show_plot_detail_page(plot_id: str):
     except Exception:
         pass
 
+    # ── Proyectos compatibles ─────────────────────────────────────────────────
+    try:
+        sup_plot = float(plot.get("m2") or plot.get("surface_m2") or 0)
+        proyectos = get_proyectos_compatibles(
+            plot_id=str(plot.get("id", "")),
+            client_parcel_size=sup_plot,
+        )
+        if proyectos:
+            st.markdown("---")
+            st.subheader("🏠 Proyectos Compatibles con tu Parcela")
+            p_cols = st.columns(min(len(proyectos), 3))
+            for i, p in enumerate(proyectos[:3]):
+                with p_cols[i % 3]:
+                    m2_p = p.get("m2_construidos") or p.get("area_m2") or 0
+                    price_p = float(p.get("price") or 0)
+                    st.markdown(f"**{p.get('title', 'Proyecto')}**")
+                    st.caption(f"{m2_p:,.0f} m² construidos · €{price_p:,.0f}")
+                    if st.button(
+                        "Ver proyecto →",
+                        key=f"pd_proj_{plot.get('id','x')}_{p['id']}",
+                        use_container_width=True,
+                    ):
+                        st.query_params["selected_project_v2"] = str(p["id"])
+                        st.rerun()
+    except Exception:
+        pass
+
     st.markdown("---")
