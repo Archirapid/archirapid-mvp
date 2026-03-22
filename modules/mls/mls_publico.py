@@ -50,8 +50,8 @@ def _get_mls_images(finca: dict) -> list:
 def _show_capa_profesional_inmo(finca: dict, finca_id: str) -> None:
     """Sección profesional — visible SOLO para inmos con plan activo y firma válida.
 
-    Muestra: REF MLS, comisión colaboradora, importe estimado, notas privadas,
-    y botón de solicitud de colaboración 72h.
+    Muestra: REF MLS, comisión, importe estimado, notas privadas.
+    La ACCIÓN (reserva) se centraliza en el Portal MLS para evitar duplicidad de flujos.
     """
     inmo = st.session_state.get("mls_inmo")
     if not inmo:
@@ -101,64 +101,25 @@ def _show_capa_profesional_inmo(finca: dict, finca_id: str) -> None:
     st.markdown("---")
 
     if reservada:
-        st.warning("🔒 Esta finca tiene una reserva activa. No es posible solicitar colaboración ahora.")
-        return
-
-    sol_key = f"_mls_sol_{finca_id}"
-    if not st.session_state.get(sol_key):
-        if st.button(
-            "🤝 Solicitar Colaboración 72h",
-            key=f"mls_sol_btn_{finca_id}",
-            type="primary",
-            use_container_width=True,
-        ):
-            st.session_state[sol_key] = True
-            st.rerun()
+        st.warning("🔒 Esta finca tiene una reserva activa en este momento.")
     else:
         st.info(
-            "📋 Rellena el formulario y envía la solicitud. ArchiRapid confirmará disponibilidad "
-            "y te enviará las instrucciones de pago para formalizar la reserva."
+            "**Para reservar esta finca para tu cliente**, utiliza tu **Portal MLS** "
+            "donde gestionas todo el flujo: reserva, visita y comisiones."
         )
-        with st.form(f"mls_sol_form_{finca_id}"):
-            sol_notas = st.text_area(
-                "Notas adicionales (opcional)",
-                placeholder="Nombre del cliente potencial, situación de la operación...",
-                height=80,
-            )
-            enviado = st.form_submit_button(
-                "📨 Enviar solicitud de colaboración",
-                type="primary",
-                use_container_width=True,
-            )
-        if enviado:
-            try:
-                payload = json.dumps({
-                    "finca_id":    finca_id,
-                    "ref_codigo":  ref_codigo,
-                    "inmo_id":     inmo.get("id"),
-                    "inmo_nombre": inmo.get("nombre_comercial") or inmo.get("nombre") or "",
-                    "inmo_email":  inmo.get("email") or "",
-                    "notas":       sol_notas or "",
-                })
-                mls_db.create_notificacion(
-                    destinatario_tipo="archirapid",
-                    destinatario_id="admin",
-                    tipo_evento="solicitud_colaboracion_72h",
-                    payload=payload,
-                )
-                mls_db.create_notificacion(
-                    destinatario_tipo="inmo",
-                    destinatario_id=inmo.get("id", ""),
-                    tipo_evento="solicitud_colaboracion_enviada",
-                    payload=payload,
-                )
-                st.success(
-                    "✅ Solicitud enviada correctamente. ArchiRapid revisará disponibilidad "
-                    "y te contactará en menos de 24h para coordinar la reserva."
-                )
-                st.session_state[sol_key] = False
-            except Exception as _e:
-                st.error(f"Error al enviar la solicitud: {_e}")
+
+    # Botón único: lleva directamente a la ficha profesional dentro del portal
+    if st.button(
+        "🏢 Gestionar en mi Portal MLS →",
+        key=f"mls_ir_portal_{finca_id}",
+        type="primary",
+        use_container_width=True,
+    ):
+        st.session_state["mls_ficha_id"] = finca_id
+        st.session_state["mls_vista"]    = "ficha"
+        st.session_state["selected_page"] = "🏢 Inmobiliarias MLS"
+        st.query_params.clear()
+        st.rerun()
 
 
 # =============================================================================

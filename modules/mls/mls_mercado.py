@@ -186,6 +186,29 @@ def ui_mercado_mls(inmo: dict) -> None:
 
     st.subheader("🏘️ Mercado MLS")
 
+    # ── Guía de flujo (colapsada por defecto) ────────────────────────────────
+    with st.expander("📖 ¿Cómo funciona la colaboración MLS? (5 pasos)", expanded=False):
+        st.markdown("""
+**El flujo es simple y protege a todas las partes:**
+
+| Paso | Qué haces tú | Qué hace ArchiRapid |
+|---|---|---|
+| **1. Encuentras la finca** | Buscas en este mercado por precio, m², comisión | — |
+| **2. Ves la ficha profesional** | REF, comisión %, importe estimado, notas privadas del listante | — |
+| **3. Reservas para tu cliente (€200, 72h)** | Pulsas "Reservar €200" y pagas — exclusiva activada | Notifica al listante que hay colaboradora activa |
+| **4. Coordinación de visita** | Contacta a ArchiRapid: **hola@archirapid.com** con el REF | Coordina acceso con el listante (identidad protegida) |
+| **5. Cierre y comisión** | Presenta la oferta de tu cliente a ArchiRapid | Gestiona contrato, arras y reparto en notaría |
+
+---
+**Preguntas frecuentes:**
+
+- **¿Quién es el listante?** — La identidad queda protegida hasta el cierre. Tú gestionas tu cliente, ArchiRapid coordina con el listante.
+- **¿Cuánto cobro?** — Lo que ves en "Tu comisión %" y el importe en €. Se descuentan los €200 de reserva al cobrar.
+- **¿Qué pasa si expira la reserva?** — La finca vuelve a estar disponible automáticamente a las 72h.
+- **¿Cómo se formaliza?** — Arras → contrato privado → escritura notarial. ArchiRapid distribuye las comisiones.
+- **¿Si mi cliente no compra?** — La reserva de €200 es tu coste de exclusiva. Hablamos si hubo causa justificada.
+        """)
+
     fincas_todas = _get_fincas_mercado_visible()
 
     if not fincas_todas:
@@ -636,6 +659,34 @@ def ui_mis_reservas_colaboradora(inmo: dict) -> None:
 
             if precio > 0 and colab_pct > 0:
                 st.caption(f"Comisión potencial si cierras: **€{colab_eur:,.0f}** ({colab_pct}%)")
+
+            # Próximos pasos — solo para reservas activas con tiempo restante
+            if estado_res == "activa" and horas_left > 0:
+                with st.expander("📋 ¿Qué hago ahora? — Próximos pasos", expanded=True):
+                    st.markdown(f"""
+**Tu exclusiva de 72h está activa.** Tienes **{horas_left:.1f}h** para avanzar.
+
+**① Coordina la visita ahora mismo**
+Escribe a ArchiRapid indicando el REF `{ref}`:
+- 📧 **hola@archirapid.com**
+- O usa el botón "📩 Solicitar más información" en la ficha de la finca
+
+**② Presenta la oferta de tu cliente**
+Si tu cliente quiere comprar, comunícalo a ArchiRapid con:
+- Precio de oferta
+- Forma de pago (hipoteca / contado)
+- Plazo deseado para arras
+
+**③ ArchiRapid coordina con el listante**
+La identidad del listante y sus datos de contacto se revelan en esta fase, coordinados por ArchiRapid.
+
+**④ Firma de arras y escritura**
+Contrato privado → notaría → ArchiRapid distribuye comisiones.
+Tu comisión de **€{colab_eur:,.0f}** se abona al cierre (menos los €200 ya pagados).
+
+---
+*¿Tienes dudas? Contacta: hola@archirapid.com · Ref: `{ref}`*
+                    """)
 
 
 # =============================================================================
