@@ -761,6 +761,58 @@ Obtén el token creando un bot con @BotFather en Telegram.
         try:
             _db9 = db_conn()
 
+            # ══ 🚨 ALERTAS Y PENDIENTES ══════════════════════════════════════
+            st.subheader("🚨 Alertas y pendientes — Acción requerida")
+            _alerts_list = []
+            try:
+                _n_inmo_pend = _db9.execute(
+                    "SELECT COUNT(*) FROM inmobiliarias WHERE activa=0"
+                ).fetchone()[0]
+                if _n_inmo_pend > 0:
+                    _alerts_list.append(f"🏢 **{_n_inmo_pend} inmobiliaria(s)** pendiente(s) de aprobación → pestaña MLS")
+            except Exception:
+                pass
+            try:
+                _n_finca_pend = _db9.execute(
+                    "SELECT COUNT(*) FROM fincas_mls WHERE estado='validada_pendiente_aprobacion'"
+                ).fetchone()[0]
+                if _n_finca_pend > 0:
+                    _alerts_list.append(f"🏠 **{_n_finca_pend} finca(s) MLS** pendiente(s) de publicación → pestaña MLS")
+            except Exception:
+                pass
+            try:
+                _n_colab_pend = _db9.execute(
+                    "SELECT COUNT(*) FROM notificaciones_mls WHERE tipo_evento='solicitud_colaboracion_72h' AND destinatario_id='admin' AND leida=0"
+                ).fetchone()[0]
+                if _n_colab_pend > 0:
+                    _alerts_list.append(f"🤝 **{_n_colab_pend} solicitud(es) de colaboración 72h** sin gestionar → pestaña MLS")
+            except Exception:
+                pass
+            try:
+                _n_res_48h = _db9.execute(
+                    "SELECT COUNT(*) FROM reservas_mls WHERE estado='pendiente_confirmacion_48h'"
+                ).fetchone()[0]
+                if _n_res_48h > 0:
+                    _alerts_list.append(f"⏰ **{_n_res_48h} reserva(s)** cliente pendientes confirmación 48h → pestaña MLS")
+            except Exception:
+                pass
+            try:
+                _n_waitlist_pend = _db9.execute(
+                    "SELECT COUNT(*) FROM waitlist WHERE approved=0"
+                ).fetchone()[0]
+                if _n_waitlist_pend > 0:
+                    _alerts_list.append(f"🎯 **{_n_waitlist_pend} persona(s)** en waitlist sin aprobar → pestaña Waitlist")
+            except Exception:
+                pass
+
+            if _alerts_list:
+                for _al in _alerts_list:
+                    st.warning(_al)
+            else:
+                st.success("✅ Sin alertas activas. Todo al día.")
+
+            st.markdown("---")
+
             # ── KPIs principales ──────────────────────────────────────────────
             st.subheader("Métricas globales")
 
@@ -995,6 +1047,101 @@ Obtén el token creando un bot con @BotFather en Telegram.
                     st.code("https://archirapid.streamlit.app/?seccion=arquitecto&demo=true&from=linkedin&user=nombre")
             except Exception as _ev:
                 st.error(f"Error tracking: {_ev}")
+
+            # ── MLS Analytics ─────────────────────────────────────────────────
+            st.markdown("---")
+            st.subheader("🏢 MLS — Estadísticas consolidadas")
+            try:
+                _mls_a_conn = db_conn()
+
+                # KPIs MLS en una fila
+                _mls_total_inmos   = _mls_a_conn.execute("SELECT COUNT(*) FROM inmobiliarias").fetchone()[0]
+                _mls_act_inmos     = _mls_a_conn.execute("SELECT COUNT(*) FROM inmobiliarias WHERE activa=1").fetchone()[0]
+                _mls_pend_inmos    = _mls_a_conn.execute("SELECT COUNT(*) FROM inmobiliarias WHERE activa=0").fetchone()[0]
+                _mls_fincas_pub    = _mls_a_conn.execute("SELECT COUNT(*) FROM fincas_mls WHERE estado='publicada'").fetchone()[0]
+                _mls_fincas_res    = _mls_a_conn.execute("SELECT COUNT(*) FROM fincas_mls WHERE estado='reservada'").fetchone()[0]
+                _mls_fincas_pend   = _mls_a_conn.execute("SELECT COUNT(*) FROM fincas_mls WHERE estado='validada_pendiente_aprobacion'").fetchone()[0]
+                _mls_reservas_act  = _mls_a_conn.execute("SELECT COUNT(*) FROM reservas_mls WHERE estado='activa'").fetchone()[0]
+
+                _ma1, _ma2, _ma3, _ma4 = st.columns(4)
+                _ma1.metric("🏢 Inmos totales", _mls_total_inmos,
+                            delta=f"{_mls_act_inmos} activas / {_mls_pend_inmos} pend.")
+                _ma2.metric("🏠 Fincas publicadas", _mls_fincas_pub)
+                _ma3.metric("🔒 Fincas reservadas", _mls_fincas_res)
+                _ma4.metric("📋 Reservas activas", _mls_reservas_act)
+
+                _col_mls1, _col_mls2 = st.columns(2)
+
+                with _col_mls1:
+                    # Fincas MLS por estado
+                    try:
+                        _df_mls_estado = _pd9.read_sql_query(
+                            "SELECT estado as Estado, COUNT(*) as Total FROM fincas_mls GROUP BY estado ORDER BY Total DESC",
+                            _mls_a_conn
+                        )
+                        if not _df_mls_estado.empty:
+                            st.caption("Fincas MLS por estado")
+                            st.bar_chart(_df_mls_estado.set_index("Estado"))
+                    except Exception as _em1:
+                        st.warning(f"Fincas MLS estado: {_em1}")
+
+                with _col_mls2:
+                    # Inmos por provincia
+                    try:
+                        _df_mls_prov = _pd9.read_sql_query(
+                            "SELECT provincia as Provincia, COUNT(*) as Inmos FROM inmobiliarias GROUP BY provincia ORDER BY Inmos DESC LIMIT 10",
+                            _mls_a_conn
+                        )
+                        if not _df_mls_prov.empty:
+                            st.caption("Inmos MLS por provincia (top 10)")
+                            st.bar_chart(_df_mls_prov.set_index("Provincia"))
+                    except Exception as _em2:
+                        st.warning(f"Inmos provincia: {_em2}")
+
+                # Actividad MLS últimos 30 días (registros de inmos + fincas subidas)
+                try:
+                    _df_mls_act = _pd9.read_sql_query(
+                        """
+                        SELECT DATE(created_at) as Fecha, 'Inmobiliarias' as Tipo, COUNT(*) as N
+                        FROM inmobiliarias
+                        WHERE created_at >= DATE('now', '-30 days')
+                        GROUP BY DATE(created_at)
+                        UNION ALL
+                        SELECT DATE(created_at) as Fecha, 'Fincas MLS' as Tipo, COUNT(*) as N
+                        FROM fincas_mls
+                        WHERE created_at >= DATE('now', '-30 days')
+                        GROUP BY DATE(created_at)
+                        ORDER BY Fecha
+                        """,
+                        _mls_a_conn
+                    )
+                    if not _df_mls_act.empty:
+                        _df_mls_pivot = _df_mls_act.pivot_table(
+                            index="Fecha", columns="Tipo", values="N", aggfunc="sum"
+                        ).fillna(0)
+                        st.caption("Actividad MLS — últimos 30 días")
+                        st.bar_chart(_df_mls_pivot)
+                except Exception as _em3:
+                    pass  # tabla puede estar vacía — no mostrar error
+
+                # Notificaciones MLS pendientes por tipo
+                try:
+                    _df_notifs = _pd9.read_sql_query(
+                        """SELECT tipo_evento as Tipo, COUNT(*) as Total
+                           FROM notificaciones_mls
+                           WHERE leida=0
+                           GROUP BY tipo_evento ORDER BY Total DESC""",
+                        _mls_a_conn
+                    )
+                    if not _df_notifs.empty:
+                        st.caption("Notificaciones MLS sin leer por tipo")
+                        st.dataframe(_df_notifs, use_container_width=True, hide_index=True)
+                except Exception:
+                    pass
+
+                _mls_a_conn.close()
+            except Exception as _emls:
+                st.warning(f"Error estadísticas MLS: {_emls}")
 
             _db9.close()
 
