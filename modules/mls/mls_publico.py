@@ -10,8 +10,9 @@ Cuatro funciones de UI para los botones del popup naranja:
 
 Seguridad:
   - Solo usa get_finca_sin_identidad_listante() — inmo_id NUNCA expuesto
-  - No muestra REF MLS, comisiones ni datos identificativos de la listante
-  - Zero imports de mls_portal (no arrastra login gate)
+  - La capa profesional (_show_capa_profesional_inmo) solo se activa cuando
+    st.session_state["mls_inmo"] tiene activa=1 Y firma_hash válido
+  - REF MLS y comisiones solo visibles para inmos colaboradoras con acuerdo firmado
 """
 import json
 import os
@@ -22,7 +23,7 @@ from modules.mls import mls_db
 
 
 # =============================================================================
-# SHOW FICHA PÚBLICA
+# HELPERS
 # =============================================================================
 
 def _get_mls_images(finca: dict) -> list:
@@ -45,6 +46,124 @@ def _get_mls_images(finca: dict) -> list:
         result = ["assets/fincas/image1.jpg"]
     return result
 
+
+def _show_capa_profesional_inmo(finca: dict, finca_id: str) -> None:
+    """Sección profesional — visible SOLO para inmos con plan activo y firma válida.
+
+    Muestra: REF MLS, comisión colaboradora, importe estimado, notas privadas,
+    y botón de solicitud de colaboración 72h.
+    """
+    inmo = st.session_state.get("mls_inmo")
+    if not inmo:
+        return
+    if not inmo.get("activa"):
+        return
+    if not inmo.get("firma_hash"):
+        return
+
+    ref_codigo     = finca.get("ref_codigo") or "Pendiente asignación"
+    comision_colab = finca.get("comision_colaboradora_pct")
+    notas          = finca.get("notas_privadas") or ""
+    precio         = float(finca.get("precio") or 0)
+    estado         = finca.get("estado", "")
+    reservada      = estado in ("reservada", "reserva_pendiente_confirmacion")
+
+    st.markdown("---")
+    st.markdown(
+        """<div style="background:linear-gradient(135deg,#0a1f0a,#0d2b0d);
+                      border:1.5px solid #22c55e;border-radius:10px;
+                      padding:14px 18px;margin-bottom:12px;">
+            <div style="color:#22c55e;font-weight:800;font-size:13px;letter-spacing:1px;">
+                🏢 INFORMACIÓN PROFESIONAL MLS — COLABORADORA
+            </div>
+            <div style="color:#94a3b8;font-size:11px;margin-top:3px;">
+                Visible solo para inmobiliarias colaboradoras con acuerdo MLS firmado
+            </div>
+        </div>""",
+        unsafe_allow_html=True,
+    )
+
+    col_p1, col_p2, col_p3 = st.columns(3)
+    with col_p1:
+        st.metric("🔑 REF MLS", ref_codigo)
+    with col_p2:
+        colab_str = f"{comision_colab:.1f}%" if comision_colab is not None else "—"
+        st.metric("💶 Tu comisión", colab_str)
+    with col_p3:
+        if comision_colab and precio:
+            importe_colab = precio * comision_colab / 100
+            st.metric("💰 Importe estimado", f"€{importe_colab:,.0f}")
+
+    if notas:
+        with st.expander("📝 Notas del listante (privadas)", expanded=False):
+            st.markdown(notas)
+
+    st.markdown("---")
+
+    if reservada:
+        st.warning("🔒 Esta finca tiene una reserva activa. No es posible solicitar colaboración ahora.")
+        return
+
+    sol_key = f"_mls_sol_{finca_id}"
+    if not st.session_state.get(sol_key):
+        if st.button(
+            "🤝 Solicitar Colaboración 72h",
+            key=f"mls_sol_btn_{finca_id}",
+            type="primary",
+            use_container_width=True,
+        ):
+            st.session_state[sol_key] = True
+            st.rerun()
+    else:
+        st.info(
+            "📋 Rellena el formulario y envía la solicitud. ArchiRapid confirmará disponibilidad "
+            "y te enviará las instrucciones de pago para formalizar la reserva."
+        )
+        with st.form(f"mls_sol_form_{finca_id}"):
+            sol_notas = st.text_area(
+                "Notas adicionales (opcional)",
+                placeholder="Nombre del cliente potencial, situación de la operación...",
+                height=80,
+            )
+            enviado = st.form_submit_button(
+                "📨 Enviar solicitud de colaboración",
+                type="primary",
+                use_container_width=True,
+            )
+        if enviado:
+            try:
+                payload = json.dumps({
+                    "finca_id":    finca_id,
+                    "ref_codigo":  ref_codigo,
+                    "inmo_id":     inmo.get("id"),
+                    "inmo_nombre": inmo.get("nombre_comercial") or inmo.get("nombre") or "",
+                    "inmo_email":  inmo.get("email") or "",
+                    "notas":       sol_notas or "",
+                })
+                mls_db.create_notificacion(
+                    destinatario_tipo="archirapid",
+                    destinatario_id="admin",
+                    tipo_evento="solicitud_colaboracion_72h",
+                    payload=payload,
+                )
+                mls_db.create_notificacion(
+                    destinatario_tipo="inmo",
+                    destinatario_id=inmo.get("id", ""),
+                    tipo_evento="solicitud_colaboracion_enviada",
+                    payload=payload,
+                )
+                st.success(
+                    "✅ Solicitud enviada correctamente. ArchiRapid revisará disponibilidad "
+                    "y te contactará en menos de 24h para coordinar la reserva."
+                )
+                st.session_state[sol_key] = False
+            except Exception as _e:
+                st.error(f"Error al enviar la solicitud: {_e}")
+
+
+# =============================================================================
+# SHOW FICHA PÚBLICA
+# =============================================================================
 
 def show_ficha_publica(finca_id: str) -> None:
     """Ficha pública de una finca MLS. Sin login. Sin identidad listante."""
@@ -298,6 +417,9 @@ def show_ficha_publica(finca_id: str) -> None:
             st.info("Aún no hay proyectos de vivienda en el catálogo. Próximamente.")
     except Exception:
         pass
+
+    # ── Capa profesional: visible solo para inmos colaboradoras ──────────────
+    _show_capa_profesional_inmo(finca, finca_id)
 
     # ── Reservar / Comprar (mismo flujo que pin azul) ─────────────────────────
     st.markdown("---")
