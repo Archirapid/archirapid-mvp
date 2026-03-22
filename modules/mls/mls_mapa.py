@@ -107,15 +107,15 @@ def _popup_html_naranja(finca: dict) -> str:
   <span style="color:#64748B;">REF: {ref}</span><br>
   <span style="color:#64748B;">{m2_str} m²</span>&nbsp;·&nbsp;
   <b style="color:#1B2A6B;">€{precio:,.0f}</b><br>
-  <a href="/?mls_ficha={finca_id}"
+  <a href="/?mls_ficha={finca_id}" target="_blank"
      style="{_BTN_BASE}background:#1B2A6B;">
     Ver ficha →
   </a>
-  <a href="/?mls_reservar={finca_id}"
+  <a href="/?mls_reservar={finca_id}" target="_blank"
      style="{_BTN_BASE}background:#F5A623;color:#1B2A6B;">
     Reservar €200
   </a>
-  <a href="/?mls_contacto={finca_id}"
+  <a href="/?mls_contacto={finca_id}" target="_blank"
      style="{_BTN_BASE}background:#64748B;">
     Solicitar info
   </a>

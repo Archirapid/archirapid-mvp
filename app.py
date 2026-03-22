@@ -1337,25 +1337,26 @@ if _qp_mls_pago == "ok":
     st.session_state["mls_verificar_pago"] = True
 
 if _qp_mls_reserva == "1":
-    st.session_state["selected_page"] = "🏢 Inmobiliarias MLS"
-    st.session_state["mls_reserva_ok_params"] = {
-        "finca_id": st.query_params.get("finca_id", ""),
-        "inmo_id":  st.query_params.get("inmo_id", ""),
-        "tipo":     st.query_params.get("tipo", ""),
-        "nombre":   st.query_params.get("nombre", ""),
-        "email":    st.query_params.get("email", ""),
-    }
+    if st.query_params.get("tipo") == "cliente_directo":
+        # Retorno Stripe cliente directo → página pública de confirmación
+        st.session_state["selected_page"] = "_mls_retorno_cliente"
+    else:
+        # Retorno Stripe inmo colaboradora → portal MLS (lo gestiona internamente)
+        st.session_state["selected_page"] = "🏢 Inmobiliarias MLS"
 
 if _qp_mls_ficha:
-    st.session_state["selected_page"] = "🏢 Inmobiliarias MLS"
+    # Ficha pública — sin login requerido
+    st.session_state["selected_page"] = "_mls_ficha_publica"
     st.session_state["mls_ficha_id"] = _qp_mls_ficha
 
 if _qp_mls_reservar:
-    st.session_state["selected_page"] = "🏢 Inmobiliarias MLS"
+    # Reserva pública €200 — sin login requerido
+    st.session_state["selected_page"] = "_mls_reservar_publica"
     st.session_state["mls_reservar_id"] = _qp_mls_reservar
 
 if _qp_mls_contacto:
-    st.session_state["selected_page"] = "🏢 Inmobiliarias MLS"
+    # Contacto público — sin login requerido
+    st.session_state["selected_page"] = "_mls_contacto_publica"
     st.session_state["mls_contacto_id"] = _qp_mls_contacto
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -2425,3 +2426,47 @@ elif st.session_state.get('selected_page') == "🏢 Inmobiliarias MLS":
     with st.container():
         from modules.mls import mls_portal
         mls_portal.main()
+
+elif st.session_state.get('selected_page') == "_mls_ficha_publica":
+    st.components.v1.html(
+        "<script>window.parent.document"
+        ".querySelector('section.main')"
+        ".scrollTo(0,0);</script>",
+        height=0,
+    )
+    with st.container():
+        from modules.mls.mls_publico import show_ficha_publica
+        show_ficha_publica(st.session_state.get("mls_ficha_id", ""))
+
+elif st.session_state.get('selected_page') == "_mls_reservar_publica":
+    st.components.v1.html(
+        "<script>window.parent.document"
+        ".querySelector('section.main')"
+        ".scrollTo(0,0);</script>",
+        height=0,
+    )
+    with st.container():
+        from modules.mls.mls_publico import show_reservar_publico
+        show_reservar_publico(st.session_state.get("mls_reservar_id", ""))
+
+elif st.session_state.get('selected_page') == "_mls_contacto_publica":
+    st.components.v1.html(
+        "<script>window.parent.document"
+        ".querySelector('section.main')"
+        ".scrollTo(0,0);</script>",
+        height=0,
+    )
+    with st.container():
+        from modules.mls.mls_publico import show_contacto_publico
+        show_contacto_publico(st.session_state.get("mls_contacto_id", ""))
+
+elif st.session_state.get('selected_page') == "_mls_retorno_cliente":
+    st.components.v1.html(
+        "<script>window.parent.document"
+        ".querySelector('section.main')"
+        ".scrollTo(0,0);</script>",
+        height=0,
+    )
+    with st.container():
+        from modules.mls.mls_publico import show_retorno_reserva_cliente
+        show_retorno_reserva_cliente()
