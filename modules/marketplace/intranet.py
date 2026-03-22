@@ -134,6 +134,20 @@ def main():
         st.header("💰 Ventas y Transacciones — Todos los flujos")
         import sqlite3 as _sq3, pandas as _pd3
 
+        def _read3(conn, sql):
+            cur = conn.execute(sql)
+            rows = cur.fetchall()
+            if not rows:
+                return _pd3.DataFrame()
+            cols = [d[0] for d in (cur.description or [])]
+            data = []
+            for r in rows:
+                try:
+                    data.append([r[i] for i in range(len(cols))])
+                except Exception:
+                    data.append([r[c] for c in cols])
+            return _pd3.DataFrame(data, columns=cols)
+
         # ── KPIs de ingresos ──────────────────────────────────────────────────
         try:
             _db3 = db_conn()
@@ -177,12 +191,12 @@ def main():
         st.subheader("🏡 Reservas y Compras de Fincas")
         try:
             _db3b = db_conn()
-            _df_res3 = _pd3.read_sql_query(
+            _df_res3 = _read3(
+                _db3b,
                 """SELECT r.id, r.buyer_name, r.buyer_email, p.title as finca,
                           r.amount, r.kind, r.created_at
                    FROM reservations r LEFT JOIN plots p ON r.plot_id=p.id
-                   ORDER BY r.created_at DESC""",
-                _db3b
+                   ORDER BY r.created_at DESC"""
             )
             _db3b.close()
             if not _df_res3.empty:
@@ -207,7 +221,8 @@ def main():
         st.subheader("💎 Suscripciones de Arquitectos (Planes BASIC / PRO / ENTERPRISE)")
         try:
             _db3c = db_conn()
-            _df_subs = _pd3.read_sql_query(
+            _df_subs = _read3(
+                _db3c,
                 """SELECT s.id, COALESCE(a.name, u.name) as arquitecto,
                           COALESCE(a.email, u.email) as email,
                           s.plan_type as plan, s.price as precio_mes,
@@ -217,8 +232,7 @@ def main():
                    FROM subscriptions s
                    LEFT JOIN architects a ON s.architect_id = a.id
                    LEFT JOIN users u ON s.architect_id = u.id
-                   ORDER BY s.created_at DESC""",
-                _db3c
+                   ORDER BY s.created_at DESC"""
             )
             _db3c.close()
             if not _df_subs.empty:
@@ -244,11 +258,11 @@ def main():
         st.subheader("🏠 Proyectos AI Designer — Pagos Realizados")
         try:
             _db3d = db_conn()
-            _df_ai = _pd3.read_sql_query(
+            _df_ai = _read3(
+                _db3d,
                 """SELECT client_email, project_name, total_area, total_cost,
                           style, energy_label, status, created_at
-                   FROM ai_projects ORDER BY created_at DESC""",
-                _db3d
+                   FROM ai_projects ORDER BY created_at DESC"""
             )
             _db3d.close()
             if not _df_ai.empty:
@@ -274,7 +288,8 @@ def main():
         st.subheader("🎨 Proyectos Modo Estudio — Arquitectos")
         try:
             _db3e = db_conn()
-            _df_est = _pd3.read_sql_query(
+            _df_est = _read3(
+                _db3e,
                 """SELECT ep.architect_id,
                           COALESCE(a.name, u.name) as arquitecto,
                           COALESCE(a.email, u.email) as email,
@@ -283,8 +298,7 @@ def main():
                    FROM estudio_projects ep
                    LEFT JOIN architects a ON ep.architect_id = a.id
                    LEFT JOIN users u ON ep.architect_id = u.id
-                   ORDER BY ep.created_at DESC""",
-                _db3e
+                   ORDER BY ep.created_at DESC"""
             )
             _db3e.close()
             if not _df_est.empty:
@@ -357,7 +371,10 @@ def main():
                     _conn5.execute(f"ALTER TABLE service_providers ADD COLUMN {_col} {_def}")
                     _conn5.commit()
                 except Exception:
-                    pass
+                    try:
+                        _conn5.rollback()
+                    except Exception:
+                        pass
 
             _providers5 = _conn5.execute("""
                 SELECT id, name, email, company, specialty, experience_years,
@@ -622,10 +639,16 @@ def main():
         try:
             import sqlite3 as _sq3w, pandas as _pdw
             _cw = db_conn()
-            _dfw = _pdw.read_sql_query(
-                "SELECT name, email, profile, created_at, approved FROM waitlist ORDER BY created_at DESC",
-                _cw
-            )
+            _cur_wl = _cw.execute("SELECT name, email, profile, created_at, approved FROM waitlist ORDER BY created_at DESC")
+            _rows_wl = _cur_wl.fetchall()
+            _cols_wl = [d[0] for d in (_cur_wl.description or [])]
+            _data_wl = []
+            for _r_wl in _rows_wl:
+                try:
+                    _data_wl.append([_r_wl[i] for i in range(len(_cols_wl))])
+                except Exception:
+                    _data_wl.append([_r_wl[c] for c in _cols_wl])
+            _dfw = _pdw.DataFrame(_data_wl, columns=_cols_wl)
             _cw.close()
             _total = len(_dfw)
             _approved = int(_dfw['approved'].sum()) if _total > 0 else 0
@@ -684,12 +707,26 @@ Obtén el token creando un bot con @BotFather en Telegram.
 
         _ca = db_conn()
 
+        def _read_tab8(conn, sql):
+            cur = conn.execute(sql)
+            rows = cur.fetchall()
+            if not rows:
+                return _pda.DataFrame()
+            cols = [d[0] for d in (cur.description or [])]
+            data = []
+            for r in rows:
+                try:
+                    data.append([r[i] for i in range(len(cols))])
+                except Exception:
+                    data.append([r[c] for c in cols])
+            return _pda.DataFrame(data, columns=cols)
+
         # Últimos registros
         st.subheader("👤 Últimos registros de usuarios")
         try:
-            _df_users = _pda.read_sql_query(
-                "SELECT name, email, role, created_at FROM users ORDER BY created_at DESC LIMIT 20",
-                _ca
+            _df_users = _read_tab8(
+                _ca,
+                "SELECT name, email, role, created_at FROM users ORDER BY created_at DESC LIMIT 20"
             )
             if not _df_users.empty:
                 _df_users["✉️"] = _df_users["email"].apply(
@@ -709,11 +746,11 @@ Obtén el token creando un bot con @BotFather en Telegram.
         # Últimas reservas/compras
         st.subheader("💰 Últimas reservas y compras de fincas")
         try:
-            _df_res = _pda.read_sql_query(
+            _df_res = _read_tab8(
+                _ca,
                 """SELECT r.buyer_name, r.buyer_email, p.title as finca, r.amount, r.kind, r.created_at
                    FROM reservations r LEFT JOIN plots p ON r.plot_id=p.id
-                   ORDER BY r.created_at DESC LIMIT 20""",
-                _ca
+                   ORDER BY r.created_at DESC LIMIT 20"""
             )
             if not _df_res.empty:
                 _df_res["kind"] = _df_res["kind"].map({"purchase": "Compra", "reservation": "Reserva"}).fillna(_df_res["kind"])
@@ -735,9 +772,9 @@ Obtén el token creando un bot con @BotFather en Telegram.
         # Waitlist reciente
         st.subheader("🎯 Waitlist reciente")
         try:
-            _df_wl = _pda.read_sql_query(
-                "SELECT name, email, profile, created_at FROM waitlist ORDER BY created_at DESC LIMIT 10",
-                _ca
+            _df_wl = _read_tab8(
+                _ca,
+                "SELECT name, email, profile, created_at FROM waitlist ORDER BY created_at DESC LIMIT 10"
             )
             if not _df_wl.empty:
                 st.dataframe(
@@ -765,7 +802,7 @@ Obtén el token creando un bot con @BotFather en Telegram.
                 rows = cur.fetchall()
                 if not rows:
                     return _pd9.DataFrame()
-                cols = [d[0] for d in (cur.description or [])]
+                cols = [d[0].title() if d[0].islower() else d[0] for d in (cur.description or [])]
                 data = []
                 for r in rows:
                     try:
@@ -774,6 +811,10 @@ Obtén el token creando un bot con @BotFather en Telegram.
                         data.append([r[c] for c in cols])
                 return _pd9.DataFrame(data, columns=cols)
             except Exception as _re:
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
                 raise _re
 
         try:
@@ -995,7 +1036,7 @@ Obtén el token creando un bot con @BotFather en Telegram.
                     _db9,
                     """SELECT DATE(created_at) as Fecha, COUNT(*) as Registros
                        FROM users
-                       WHERE created_at >= DATE('now', '-30 days')
+                       WHERE DATE(created_at) >= DATE('now', '-30 days')
                        GROUP BY DATE(created_at)
                        ORDER BY Fecha"""
                 )
