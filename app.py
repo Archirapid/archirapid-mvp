@@ -1560,6 +1560,15 @@ if st.query_params.get("page") == "Registro de Usuario":
 
 if st.query_params.get("page") == "Diseñador de Vivienda":
     try:
+        if st.session_state.get("mls_origin"):
+            if st.button("← Volver al portal MLS", key="diseñador_back_mls"):
+                st.session_state.pop("mls_origin", None)
+                st.session_state["selected_page"] = "🏢 Inmobiliarias MLS"
+                try:
+                    del st.query_params["page"]
+                except Exception:
+                    pass
+                st.rerun()
         with st.container():
             ai_house_flow.main()
             st.stop()

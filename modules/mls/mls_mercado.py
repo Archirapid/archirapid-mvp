@@ -73,12 +73,13 @@ def _horas_restantes(timestamp_expira: str) -> float:
         return 0.0
 
 
-def _get_fincas_mercado_visible() -> list:
+def _get_fincas_mercado_visible(exclude_inmo_id: str | None = None) -> list:
     """
     Devuelve fincas visibles para colaboradoras:
     estado IN ('publicada', 'reservada', 'reserva_pendiente_confirmacion')
     con catastro_validada=1.
-    Columnas seguras — inmo_id NUNCA incluido.
+    exclude_inmo_id: filtra las fincas propias del listante (no aparecen en su mercado).
+    Columnas seguras — inmo_id NUNCA incluido en el resultado.
     Devuelve [] en caso de error.
     """
     _COLS = (
@@ -92,17 +93,32 @@ def _get_fincas_mercado_visible() -> list:
         from src import db as _db
         conn = _db.get_conn()
         cur  = conn.cursor()
-        cur.execute(
-            f"""SELECT {_COLS}
-                FROM fincas_mls
-                WHERE catastro_validada = 1
-                  AND estado IN (
-                      'publicada',
-                      'reservada',
-                      'reserva_pendiente_confirmacion'
-                  )
-                ORDER BY created_at DESC"""
-        )
+        if exclude_inmo_id:
+            cur.execute(
+                f"""SELECT {_COLS}
+                    FROM fincas_mls
+                    WHERE catastro_validada = 1
+                      AND inmo_id != ?
+                      AND estado IN (
+                          'publicada',
+                          'reservada',
+                          'reserva_pendiente_confirmacion'
+                      )
+                    ORDER BY created_at DESC""",
+                (exclude_inmo_id,),
+            )
+        else:
+            cur.execute(
+                f"""SELECT {_COLS}
+                    FROM fincas_mls
+                    WHERE catastro_validada = 1
+                      AND estado IN (
+                          'publicada',
+                          'reservada',
+                          'reserva_pendiente_confirmacion'
+                      )
+                    ORDER BY created_at DESC"""
+            )
         rows = [dict(r) for r in cur.fetchall()]
         conn.close()
         # Guardia defensiva
@@ -156,7 +172,10 @@ def lanzar_disenador_desde_mls(finca: dict) -> None:
     ):
         st.session_state.pop(_k, None)
 
-    # 3. Inyectar datos de la finca MLS en design_plot_data
+    # 3. Marcar origen MLS para mostrar botón "Volver" en el diseñador
+    st.session_state["mls_origin"] = True
+
+    # 4. Inyectar datos de la finca MLS en design_plot_data
     superficie = float(finca.get("superficie_m2") or 0)
     st.session_state["design_plot_data"] = {
         "id":            finca["id"],
@@ -169,10 +188,10 @@ def lanzar_disenador_desde_mls(finca: dict) -> None:
         "origen":        "mls",
     }
 
-    # 4. Forzar paso 1 del diseñador
+    # 5. Forzar paso 1 del diseñador
     st.session_state["ai_house_step"] = 1
 
-    # 5. Navegar al diseñador 6-step (app.py L1475) — NUNCA disenador_vivienda.main()
+    # 6. Navegar al diseñador 6-step (app.py L1475) — NUNCA disenador_vivienda.main()
     st.query_params["page"] = "Diseñador de Vivienda"
     st.rerun()
 
@@ -209,7 +228,7 @@ def ui_mercado_mls(inmo: dict) -> None:
 - **¿Si mi cliente no compra?** — La reserva de €200 es tu coste de exclusiva. Hablamos si hubo causa justificada.
         """)
 
-    fincas_todas = _get_fincas_mercado_visible()
+    fincas_todas = _get_fincas_mercado_visible(exclude_inmo_id=inmo.get("id"))
 
     if not fincas_todas:
         st.info("No hay fincas disponibles en el mercado en este momento.")
