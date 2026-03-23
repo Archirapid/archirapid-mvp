@@ -177,11 +177,15 @@ def ui_login_registro() -> None:
     st.caption("Bolsa de colaboración entre inmobiliarias. Listantes + colaboradoras.")
 
     # ── Mensaje post-registro ────────────────────────────────────────────────────
-    # Consumimos la flag ANTES de crear los tabs; guardamos el valor local para
-    # usarlo también dentro del tab "Registrarse" (Streamlit recuerda la pestaña activa).
     _reg_ok = st.session_state.pop("mls_registro_ok", False)
     if _reg_ok:
-        st.success("✅ Solicitud enviada. Recibirás un email en cuanto tu cuenta sea aprobada (24-48h hábiles).")
+        st.success("✅ Solicitud de alta enviada correctamente")
+        st.info(
+            "Nuestro equipo revisará tu solicitud en **24-48 horas hábiles**. "
+            "Recibirás un email cuando tu cuenta esté aprobada. "
+            "Una vez aprobada, usa la pestaña **🔑 Acceder** con tu email y contraseña."
+        )
+        st.markdown("---")
 
     tab_login, tab_registro = st.tabs(["🔑 Acceder", "📝 Registrarse"])
 

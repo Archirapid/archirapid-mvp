@@ -168,7 +168,7 @@ def create_inmo(datos: dict, ip: str = None) -> str | None:
         return inmo_id
     except Exception as e:
         logger.error("create_inmo error: %s", e)
-        return None
+        raise  # propaga al caller para que muestre el error real en UI
     finally:
         conn.close()
 
