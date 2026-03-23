@@ -26,6 +26,19 @@ from modules.mls.mls_notificaciones import notif_finca_reservada
 
 
 # =============================================================================
+# HELPERS DE NAVEGACIÓN
+# =============================================================================
+
+def _nav_vista(vista: str) -> None:
+    """Actualiza la vista MLS en session_state y en query params (?mls_view=X)."""
+    st.session_state["mls_vista"] = vista
+    try:
+        st.query_params["mls_view"] = vista
+    except Exception:
+        pass
+
+
+# =============================================================================
 # CONSTANTES
 # =============================================================================
 
@@ -331,7 +344,7 @@ def ui_mercado_mls(inmo: dict) -> None:
                     type="secondary",
                 ):
                     st.session_state["mls_ficha_id"]  = finca["id"]
-                    st.session_state["mls_vista"]     = "ficha"
+                    _nav_vista("ficha")
                     st.rerun()
 
 
@@ -347,7 +360,7 @@ def ui_ficha_finca(finca_id: str, inmo: dict) -> None:
 
     if st.button("← Volver al mercado", key="mls_ficha_back"):
         st.session_state.pop("mls_ficha_id", None)
-        st.session_state["mls_vista"] = "mercado"
+        _nav_vista("mercado")
         st.rerun()
 
     finca = mls_db.get_finca_sin_identidad_listante(finca_id)
@@ -434,7 +447,7 @@ def ui_ficha_finca(finca_id: str, inmo: dict) -> None:
                 type="primary",
             ):
                 st.session_state["mls_reservar_finca"] = finca
-                st.session_state["mls_vista"]          = "reservar"
+                _nav_vista("reservar")
                 st.rerun()
         with col_r2:
             if st.button(
@@ -442,7 +455,7 @@ def ui_ficha_finca(finca_id: str, inmo: dict) -> None:
                 key=f"mls_contacto_{finca_id}",
             ):
                 st.session_state["mls_contacto_finca"] = finca
-                st.session_state["mls_vista"]          = "contacto"
+                _nav_vista("contacto")
                 st.rerun()
 
     elif estado == "reservada":
@@ -464,7 +477,7 @@ def ui_hacer_reserva(finca: dict, inmo: dict) -> None:
     """
 
     if st.button("← Volver a la ficha", key="mls_reserva_back"):
-        st.session_state["mls_vista"] = "ficha"
+        _nav_vista("ficha")
         st.rerun()
 
     st.subheader("🔒 Reservar finca")
@@ -554,7 +567,7 @@ def ui_contacto_archirapid(finca: dict, inmo: dict) -> None:
     """Formulario para que la colaboradora solicite información sobre una finca."""
 
     if st.button("← Volver a la ficha", key="mls_contacto_back"):
-        st.session_state["mls_vista"] = "ficha"
+        _nav_vista("ficha")
         st.rerun()
 
     ref    = finca.get("ref_codigo") or "—"
@@ -743,7 +756,10 @@ def main(inmo: dict) -> None:
         st.info("Ve a la sección **Acuerdo** de tu panel para firmarlo.")
         return
 
-    # ── Router de vistas ─────────────────────────────────────────────────────
+    # ── Router de vistas — sincroniza con ?mls_view= ─────────────────────────
+    _qp = st.query_params.get("mls_view")
+    if _qp in ("mercado", "ficha", "reservar", "contacto"):
+        st.session_state["mls_vista"] = _qp
     vista = st.session_state.get("mls_vista", "mercado")
 
     if vista == "mercado":
@@ -761,7 +777,7 @@ def main(inmo: dict) -> None:
         if finca_id:
             ui_ficha_finca(finca_id, inmo)
         else:
-            st.session_state["mls_vista"] = "mercado"
+            _nav_vista("mercado")
             st.rerun()
 
     elif vista == "reservar":
@@ -769,7 +785,7 @@ def main(inmo: dict) -> None:
         if finca:
             ui_hacer_reserva(finca, inmo)
         else:
-            st.session_state["mls_vista"] = "mercado"
+            _nav_vista("mercado")
             st.rerun()
 
     elif vista == "contacto":
@@ -777,9 +793,9 @@ def main(inmo: dict) -> None:
         if finca:
             ui_contacto_archirapid(finca, inmo)
         else:
-            st.session_state["mls_vista"] = "mercado"
+            _nav_vista("mercado")
             st.rerun()
 
     else:
-        st.session_state["mls_vista"] = "mercado"
+        _nav_vista("mercado")
         st.rerun()
