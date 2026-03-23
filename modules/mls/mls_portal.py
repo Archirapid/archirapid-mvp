@@ -415,8 +415,14 @@ def ui_login_registro() -> None:
                             )
                         except Exception:
                             pass
-                        st.session_state["mls_registro_ok"] = True
-                        st.rerun()
+                        # Sin rerun — mensaje inline bajo el formulario
+                        st.success("✅ ¡Solicitud de alta enviada correctamente!")
+                        st.info(
+                            "**Tu solicitud está siendo revisada.**\n\n"
+                            "- Recibirás un **email de confirmación** en cuanto sea aprobada (24-48h hábiles).\n"
+                            "- Una vez aprobada, vuelve aquí y accede con tu email y contraseña."
+                        )
+                        st.stop()
                     else:
                         st.error("Error al guardar. Comprueba que el CIF y el email de acceso no estén ya registrados.")
                 except Exception as exc:
