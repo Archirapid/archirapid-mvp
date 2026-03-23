@@ -614,6 +614,7 @@ _PG_DDL = [
         catastro_lat REAL, catastro_lon REAL,
         titulo TEXT, descripcion_publica TEXT,
         notas_privadas TEXT, precio REAL, superficie_m2 REAL,
+        tipo_suelo TEXT, servicios TEXT, forma_solar TEXT, orientacion TEXT,
         comision_total_pct REAL,
         comision_archirapid_pct REAL DEFAULT 1.0,
         comision_colaboradora_pct REAL, comision_listante_pct REAL,
@@ -685,8 +686,18 @@ _PG_PREFAB_SEED = [
 ]
 
 
+_PG_ALTER_MIGRATIONS = [
+    # fincas_mls: columnas añadidas post-creación inicial
+    "ALTER TABLE fincas_mls ADD COLUMN IF NOT EXISTS tipo_suelo TEXT DEFAULT 'Urbana'",
+    "ALTER TABLE fincas_mls ADD COLUMN IF NOT EXISTS servicios TEXT",
+    "ALTER TABLE fincas_mls ADD COLUMN IF NOT EXISTS forma_solar TEXT",
+    "ALTER TABLE fincas_mls ADD COLUMN IF NOT EXISTS orientacion TEXT",
+    "ALTER TABLE fincas_mls ADD COLUMN IF NOT EXISTS featured INTEGER DEFAULT 0",
+]
+
+
 def _run_postgres_migrations(conn) -> None:
-    """Ejecuta todos los CREATE TABLE e índices en PostgreSQL."""
+    """Ejecuta todos los CREATE TABLE, índices y ALTER TABLE en PostgreSQL."""
     errors = []
     for sql in _PG_DDL:
         try:
@@ -698,6 +709,11 @@ def _run_postgres_migrations(conn) -> None:
             conn.execute(sql)
         except Exception as e:
             errors.append(f"INDEX error: {e}")
+    for sql in _PG_ALTER_MIGRATIONS:
+        try:
+            conn.execute(sql)
+        except Exception as e:
+            errors.append(f"ALTER error: {e} | SQL: {sql[:80]}")
     if errors:
         for err in errors:
             print(f"[PG migration] {err}")
@@ -1331,6 +1347,10 @@ def ensure_tables():
             notas_privadas            TEXT,
             precio                    REAL,
             superficie_m2             REAL,
+            tipo_suelo                TEXT,
+            servicios                 TEXT,
+            forma_solar               TEXT,
+            orientacion               TEXT,
             comision_total_pct        REAL,
             comision_archirapid_pct   REAL DEFAULT 1.0,
             comision_colaboradora_pct REAL,

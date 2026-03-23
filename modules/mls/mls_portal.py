@@ -370,6 +370,7 @@ def ui_login_registro() -> None:
                 for e in errores:
                     st.error(e)
             else:
+                _reg_success = False
                 try:
                     ip = _get_client_ip()
                     datos = {
@@ -415,14 +416,7 @@ def ui_login_registro() -> None:
                             )
                         except Exception:
                             pass
-                        # Sin rerun — mensaje inline bajo el formulario
-                        st.success("✅ ¡Solicitud de alta enviada correctamente!")
-                        st.info(
-                            "**Tu solicitud está siendo revisada.**\n\n"
-                            "- Recibirás un **email de confirmación** en cuanto sea aprobada (24-48h hábiles).\n"
-                            "- Una vez aprobada, vuelve aquí y accede con tu email y contraseña."
-                        )
-                        st.stop()
+                        _reg_success = True
                     else:
                         st.error("Error al guardar. Comprueba que el CIF y el email de acceso no estén ya registrados.")
                 except Exception as exc:
@@ -433,6 +427,15 @@ def ui_login_registro() -> None:
                         st.error("Ya existe una cuenta con ese email.")
                     else:
                         st.error(f"Error al registrar: {msg}")
+
+                if _reg_success:
+                    st.success("✅ ¡Solicitud de alta enviada correctamente!")
+                    st.info(
+                        "**Tu solicitud está siendo revisada.**\n\n"
+                        "- Recibirás un **email de confirmación** en cuanto sea aprobada (24-48h hábiles).\n"
+                        "- Una vez aprobada, vuelve aquí y accede con tu email y contraseña."
+                    )
+                    st.link_button("🏠 Volver a la home", "/")
 
 
 def _get_client_ip() -> str:
