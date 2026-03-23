@@ -176,16 +176,20 @@ def ui_login_registro() -> None:
     st.markdown("## 🏢 ArchiRapid MLS — Portal Inmobiliario")
     st.caption("Bolsa de colaboración entre inmobiliarias. Listantes + colaboradoras.")
 
-    # ── Mensaje post-registro ────────────────────────────────────────────────────
+    # ── Pantalla post-registro: muestra SOLO el aviso, sin form ─────────────────
     _reg_ok = st.session_state.pop("mls_registro_ok", False)
     if _reg_ok:
         st.success("✅ Solicitud de alta enviada correctamente")
         st.info(
-            "Nuestro equipo revisará tu solicitud en **24-48 horas hábiles**. "
-            "Recibirás un email cuando tu cuenta esté aprobada. "
-            "Una vez aprobada, usa la pestaña **🔑 Acceder** con tu email y contraseña."
+            "**¿Qué pasa ahora?**\n\n"
+            "1. Nuestro equipo revisará tu solicitud en **24-48 horas hábiles**.\n"
+            "2. Recibirás un **email de confirmación** cuando tu cuenta esté aprobada.\n"
+            "3. Una vez aprobada, vuelve aquí y accede con tu email y contraseña."
         )
         st.markdown("---")
+        if st.button("🔑 Ir a Acceder", type="primary"):
+            st.rerun()
+        return  # ← no renderiza tabs ni formulario
 
     tab_login, tab_registro = st.tabs(["🔑 Acceder", "📝 Registrarse"])
 
@@ -411,19 +415,7 @@ def ui_login_registro() -> None:
                             )
                         except Exception:
                             pass
-                        # Auto-login inmediato con los datos recién guardados.
-                        # No re-leemos la BD (podría fallar justo tras el INSERT).
-                        # _estado_inmo solo necesita activa, plan_activo, firma_hash.
-                        _login_inmo({
-                            "id":          inmo_id,
-                            "nombre":      datos.get("nombre_comercial") or datos.get("nombre", ""),
-                            "email":       datos.get("email", ""),
-                            "email_login": datos.get("email_login", ""),
-                            "cif":         datos.get("cif", ""),
-                            "activa":      0,
-                            "plan_activo": 0,
-                            "firma_hash":  None,
-                        })
+                        st.session_state["mls_registro_ok"] = True
                         st.rerun()
                     else:
                         st.error("Error al guardar. Comprueba que el CIF y el email de acceso no estén ya registrados.")
