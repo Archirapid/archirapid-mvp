@@ -411,14 +411,19 @@ def ui_login_registro() -> None:
                             )
                         except Exception:
                             pass
-                        # Auto-login: la inmo recién creada tiene activa=0 →
-                        # el router muestra ui_espera_aprobacion directamente.
-                        try:
-                            _new_inmo = mls_db.get_inmo_by_id(inmo_id)
-                            if _new_inmo:
-                                _login_inmo(_new_inmo)
-                        except Exception:
-                            st.session_state["mls_registro_ok"] = True  # fallback
+                        # Auto-login inmediato con los datos recién guardados.
+                        # No re-leemos la BD (podría fallar justo tras el INSERT).
+                        # _estado_inmo solo necesita activa, plan_activo, firma_hash.
+                        _login_inmo({
+                            "id":          inmo_id,
+                            "nombre":      datos.get("nombre_comercial") or datos.get("nombre", ""),
+                            "email":       datos.get("email", ""),
+                            "email_login": datos.get("email_login", ""),
+                            "cif":         datos.get("cif", ""),
+                            "activa":      0,
+                            "plan_activo": 0,
+                            "firma_hash":  None,
+                        })
                         st.rerun()
                     else:
                         st.error("Error al guardar. Comprueba que el CIF y el email de acceso no estén ya registrados.")
