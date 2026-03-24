@@ -4677,16 +4677,17 @@ def render_step6_pago():
                     total_cost REAL, services_json TEXT, style TEXT,
                     energy_label TEXT, created_at TEXT, status TEXT
                 )""")
+            _req_json_val = _js6.dumps(st.session_state.get("ai_house_requirements") or {})
             _conn6.execute("""
                 INSERT OR REPLACE INTO ai_projects
-                (client_email, project_name, total_area, total_cost, services_json, style, energy_label, created_at, status)
-                VALUES (?,?,?,?,?,?,?,?,?)""",
+                (client_email, project_name, total_area, total_cost, services_json, style, energy_label, created_at, status, req_json)
+                VALUES (?,?,?,?,?,?,?,?,?,?)""",
                 (st.session_state.get("client_email",""),
                  req.get("nombre_proyecto","Proyecto ArchiRapid"),
                  float(total_area), float(total_cost),
                  _js6.dumps({"doc": _doc_detail_6, "svc": _svc_detail_6, "total_iva": _total_iva_6}),
                  style, energy_label,
-                 _dt6.datetime.now().isoformat(), "pagado"))
+                 _dt6.datetime.now().isoformat(), "pagado", _req_json_val))
             _conn6.commit(); _conn6.close()
         except Exception:
             pass  # nunca interrumpe el flujo

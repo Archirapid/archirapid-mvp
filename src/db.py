@@ -445,7 +445,8 @@ _PG_DDL = [
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         client_email TEXT, project_name TEXT,
         total_area REAL, total_cost REAL, services_json TEXT,
-        style TEXT, energy_label TEXT, created_at TEXT, status TEXT
+        style TEXT, energy_label TEXT, created_at TEXT, status TEXT,
+        req_json TEXT
     )""",
     """CREATE TABLE IF NOT EXISTS estudio_projects (
         id TEXT PRIMARY KEY,
@@ -708,6 +709,7 @@ _PG_ALTER_MIGRATIONS = [
     "ALTER TABLE fincas_mls ADD COLUMN IF NOT EXISTS featured INTEGER DEFAULT 0",
     "ALTER TABLE fincas_mls ADD COLUMN IF NOT EXISTS catastro_direccion TEXT",
     "ALTER TABLE fincas_mls ADD COLUMN IF NOT EXISTS catastro_municipio TEXT",
+    "ALTER TABLE ai_projects ADD COLUMN IF NOT EXISTS req_json TEXT",
 ]
 
 
@@ -965,8 +967,13 @@ def ensure_tables():
             style TEXT,
             energy_label TEXT,
             created_at TEXT,
-            status TEXT
+            status TEXT,
+            req_json TEXT
         )""")
+        try:
+            c.execute("ALTER TABLE ai_projects ADD COLUMN req_json TEXT")
+        except Exception:
+            pass  # columna ya existe
 
         # Tabla estudio_projects (proyectos generados en Modo Estudio por arquitectos)
         c.execute("""CREATE TABLE IF NOT EXISTS estudio_projects (
