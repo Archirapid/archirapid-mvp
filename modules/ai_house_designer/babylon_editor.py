@@ -191,6 +191,57 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                 <p style="margin:2px 0; color:#2ECC71;">🏗️ Máx. construible: <strong id="fence-build">—</strong> m²</p>
             </div>
         </div>
+
+        <!-- MEP Instalaciones -->
+        <div style="margin-top:8px;border-top:1px solid #1e293b;padding-top:8px;">
+          <div onclick="document.getElementById('mep_panel').style.display=document.getElementById('mep_panel').style.display==='none'?'block':'none'"
+               style="cursor:pointer;color:#F5A623;font-size:11px;font-weight:700;letter-spacing:1px;
+                      display:flex;align-items:center;justify-content:space-between;padding:4px 0;">
+            <span>⚙️ INSTALACIONES MEP</span><span id="mep_toggle_arrow">▼</span>
+          </div>
+          <div id="mep_panel" style="display:none;">
+            <!-- Ground transparency slider -->
+            <div style="margin:6px 0;font-size:10px;color:#94a3b8;">Transparencia suelo</div>
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">
+              <span style="font-size:10px;color:#64748b;">🏔️</span>
+              <input id="ground_alpha_slider" type="range" min="0" max="1" step="0.1" value="1"
+                     oninput="setGroundTransparency(parseFloat(this.value))"
+                     style="flex:1;accent-color:#F5A623;cursor:pointer;">
+              <span style="font-size:10px;color:#64748b;">👁️</span>
+            </div>
+            <!-- Layer toggles -->
+            <button id="mep_btn_sewage"     onclick="toggleMEPLayer('sewage')"
+              style="width:100%;margin:2px 0;padding:5px 6px;background:#1e293b;border:1px solid #334155;
+                     border-radius:6px;color:#94a3b8;font-size:10px;cursor:pointer;text-align:left;">
+              🚽 Saneamiento
+            </button>
+            <button id="mep_btn_water"      onclick="toggleMEPLayer('water')"
+              style="width:100%;margin:2px 0;padding:5px 6px;background:#1e293b;border:1px solid #334155;
+                     border-radius:6px;color:#94a3b8;font-size:10px;cursor:pointer;text-align:left;">
+              💧 Agua
+            </button>
+            <button id="mep_btn_electrical" onclick="toggleMEPLayer('electrical')"
+              style="width:100%;margin:2px 0;padding:5px 6px;background:#1e293b;border:1px solid #334155;
+                     border-radius:6px;color:#94a3b8;font-size:10px;cursor:pointer;text-align:left;">
+              ⚡ Eléctrico
+            </button>
+            <button id="mep_btn_rainwater"  onclick="toggleMEPLayer('rainwater')"
+              style="width:100%;margin:2px 0;padding:5px 6px;background:#1e293b;border:1px solid #334155;
+                     border-radius:6px;color:#94a3b8;font-size:10px;cursor:pointer;text-align:left;">
+              🌧️ Recogida Agua
+            </button>
+            <button id="mep_btn_domotics"   onclick="toggleMEPLayer('domotics')"
+              style="width:100%;margin:2px 0;padding:5px 6px;background:#1e293b;border:1px solid #334155;
+                     border-radius:6px;color:#94a3b8;font-size:10px;cursor:pointer;text-align:left;">
+              📡 Domótica
+            </button>
+            <div style="margin-top:6px;padding:4px 6px;background:#0f172a;border-radius:4px;
+                        font-size:9px;color:#475569;line-height:1.4;">
+              Las capas MEP se construyen automáticamente con los datos del proyecto.
+            </div>
+          </div>
+        </div>
+
         <hr class="divider">
         <button class="tool-btn" onclick="setTopView()">🔝 Vista Planta</button>
         <button class="tool-btn" onclick="setIsoView()">🏠 Vista 3D</button>
@@ -429,6 +480,7 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
         ground.material = groundMat;
         ground.receiveShadows = true;
         ground.position.set(plotCX, 0, plotCZ);
+        window.groundMesh = ground;
 
         // Plano de parcela — delimita exactamente los m² reales de la finca
         const plotPlane = BABYLON.MeshBuilder.CreateGround("plotPlane", {{
@@ -454,6 +506,7 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
         gridPlane.material  = gridMat;
         gridPlane.position.set(plotCX, 0.01, plotCZ);
         gridPlane.isPickable = false;
+        window.gridPlaneMesh = gridPlane;
 
         // Borde naranja del límite de parcela (4 líneas finas a y=0.02)
         const borderColor = new BABYLON.Color3(0.95, 0.55, 0.10);
@@ -1261,6 +1314,37 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
         window.customWalls = [];
         let fenceActive = false;
         let fenceMeshes = [];
+
+        // ─── MEP Layer Manager ────────────────────────────────────────────────────
+        const MEPLayers = {{
+          sewage:     {{ meshes: [], visible: false, color: [0.35, 0.35, 0.35], label: "Saneamiento",    emoji: "🚽" }},
+          water:      {{ meshes: [], visible: false, color: [0.18, 0.45, 0.85], label: "Agua",           emoji: "💧" }},
+          electrical: {{ meshes: [], visible: false, color: [1.00, 0.45, 0.00], label: "Eléctrico",      emoji: "⚡" }},
+          rainwater:  {{ meshes: [], visible: false, color: [0.10, 0.60, 0.30], label: "Recogida Agua",  emoji: "🌧️" }},
+          domotics:   {{ meshes: [], visible: false, color: [0.60, 0.20, 0.80], label: "Domótica",       emoji: "📡" }}
+        }};
+
+        function toggleMEPLayer(layerName) {{
+          const layer = MEPLayers[layerName];
+          if (!layer) return;
+          layer.visible = !layer.visible;
+          layer.meshes.forEach(m => {{ m.isVisible = layer.visible; }});
+          const btn = document.getElementById("mep_btn_" + layerName);
+          if (btn) {{
+            btn.style.background = layer.visible ? "#1a472a" : "#1e293b";
+            btn.style.borderColor = layer.visible ? "#22c55e" : "#334155";
+            btn.style.color = layer.visible ? "#86efac" : "#94a3b8";
+            btn.textContent = layer.emoji + " " + layer.label + (layer.visible ? " ✓" : "");
+          }}
+        }}
+
+        function setGroundTransparency(alpha) {{
+          // alpha: 0.0 = invisible, 1.0 = opaque
+          if (window.groundMesh) window.groundMesh.visibility = alpha;
+          if (window.gridPlaneMesh) window.gridPlaneMesh.visibility = alpha;
+          const slider = document.getElementById("ground_alpha_slider");
+          if (slider && parseFloat(slider.value) !== alpha) slider.value = alpha;
+        }}
 
         function toggleFence() {{
             if (fenceActive) {{
