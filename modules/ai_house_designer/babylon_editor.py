@@ -794,6 +794,7 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
 
         // Construir todas las habitaciones
         roomsData.forEach((_, i) => buildRoom(i));
+        buildMEPLayers(roomsData);
 
         // Área original para presupuesto
         let originalTotalArea = roomsData.reduce((s, r) => s + (r.area_m2 || 0), 0);
@@ -1081,6 +1082,7 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             }});
             // Reconstruir todos
             roomsData.forEach((_,i) => buildRoom(i));
+            buildMEPLayers(roomsData);
             selectedMesh = null;
             selectedIndex = null;
             updateBudget();
@@ -1344,6 +1346,140 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
           if (window.gridPlaneMesh) window.gridPlaneMesh.visibility = alpha;
           const slider = document.getElementById("ground_alpha_slider");
           if (slider && parseFloat(slider.value) !== alpha) slider.value = alpha;
+        }}
+
+        function buildMEPLayers(rooms) {{
+            // Clear existing MEP meshes before rebuild
+            Object.values(MEPLayers).forEach(layer => {{
+                layer.meshes.forEach(m => {{ try {{ m.dispose(); }} catch(e) {{}} }});
+                layer.meshes = [];
+            }});
+
+            const BURIED_Y = -0.4;
+            const WATER_Y  = 0.5;
+            const ELEC_Y   = WALL_H - 0.2;
+
+            function mepLine(name, pts, col, layer) {{
+                if (!pts || pts.length < 2) return;
+                const ln = BABYLON.MeshBuilder.CreateLines(name, {{points: pts}}, scene);
+                ln.color      = col;
+                ln.isPickable = false;
+                ln.isVisible  = layer.visible;
+                layer.meshes.push(ln);
+            }}
+
+            // Room bounding box
+            const houseMaxZ = Math.max(...rooms.map(r => r.z + r.depth));
+            const houseMaxX = Math.max(...rooms.map(r => r.x + r.width));
+            const houseMinX = Math.min(...rooms.map(r => r.x));
+
+            // Wet rooms: need water + sewage
+            const wetRooms = rooms.filter(r =>
+                ['bano','aseo','cocina'].some(c =>
+                    (r.code||'').toLowerCase().includes(c) ||
+                    (r.name||'').toLowerCase().includes(c)
+                )
+            );
+
+            // ── SANEAMIENTO ───────────────────────────────────────────────────
+            const SEW = new BABYLON.Color3(0.35, 0.35, 0.35);
+            const collectorZ = houseMaxZ + 0.3;
+            mepLine('sewage_collector', [
+                new BABYLON.Vector3(houseMinX, BURIED_Y, collectorZ),
+                new BABYLON.Vector3(houseMaxX, BURIED_Y, collectorZ)
+            ], SEW, MEPLayers.sewage);
+            wetRooms.forEach((r, idx) => {{
+                const cx = r.x + r.width / 2, cz = r.z + r.depth / 2;
+                mepLine(`sewage_drop_${{idx}}`, [
+                    new BABYLON.Vector3(cx, 0, cz),
+                    new BABYLON.Vector3(cx, BURIED_Y, cz)
+                ], SEW, MEPLayers.sewage);
+                mepLine(`sewage_run_${{idx}}`, [
+                    new BABYLON.Vector3(cx, BURIED_Y, cz),
+                    new BABYLON.Vector3(cx, BURIED_Y, collectorZ)
+                ], SEW, MEPLayers.sewage);
+            }});
+            // Fosa séptica
+            const fosaX = houseMaxX + 2.5, fosaZ = houseMaxZ * 0.5;
+            const fosa  = BABYLON.MeshBuilder.CreateBox('sewage_fosa',
+                {{width:2, height:1.2, depth:1.5}}, scene);
+            fosa.position.set(fosaX, BURIED_Y - 0.3, fosaZ);
+            const fosaMat = new BABYLON.StandardMaterial('mep_fosa_mat', scene);
+            fosaMat.diffuseColor = new BABYLON.Color3(0.3, 0.3, 0.3);
+            fosaMat.alpha = 0.85;
+            fosa.material  = fosaMat;
+            fosa.isPickable = false;
+            fosa.isVisible  = MEPLayers.sewage.visible;
+            MEPLayers.sewage.meshes.push(fosa);
+            mepLine('sewage_to_fosa', [
+                new BABYLON.Vector3(houseMaxX, BURIED_Y, collectorZ),
+                new BABYLON.Vector3(fosaX - 1, BURIED_Y, fosaZ)
+            ], SEW, MEPLayers.sewage);
+
+            // ── AGUA ──────────────────────────────────────────────────────────
+            const WAT = new BABYLON.Color3(0.18, 0.45, 0.85);
+            const manifoldZ = houseMaxZ * 0.5;
+            mepLine('water_manifold', [
+                new BABYLON.Vector3(houseMinX - 0.5, WATER_Y, manifoldZ),
+                new BABYLON.Vector3(houseMaxX + 0.2, WATER_Y, manifoldZ)
+            ], WAT, MEPLayers.water);
+            wetRooms.forEach((r, idx) => {{
+                const cx = r.x + r.width / 2, cz = r.z + r.depth / 2;
+                mepLine(`water_branch_${{idx}}`, [
+                    new BABYLON.Vector3(cx, WATER_Y, manifoldZ),
+                    new BABYLON.Vector3(cx, WATER_Y, cz),
+                    new BABYLON.Vector3(cx, 0.05, cz)
+                ], WAT, MEPLayers.water);
+            }});
+
+            // ── ELÉCTRICO ─────────────────────────────────────────────────────
+            const ELC = new BABYLON.Color3(1.0, 0.45, 0.0);
+            const panelX  = houseMinX + 0.3;
+            const trunkZ  = rooms[0] ? rooms[0].z + rooms[0].depth / 2 : houseMaxZ * 0.5;
+            mepLine('elec_trunk', [
+                new BABYLON.Vector3(panelX, ELEC_Y, trunkZ),
+                new BABYLON.Vector3(houseMaxX + 0.1, ELEC_Y, trunkZ)
+            ], ELC, MEPLayers.electrical);
+            rooms.forEach((r, idx) => {{
+                const cx = r.x + r.width / 2, cz = r.z + r.depth / 2;
+                mepLine(`elec_drop_${{idx}}`, [
+                    new BABYLON.Vector3(cx, ELEC_Y, trunkZ),
+                    new BABYLON.Vector3(cx, ELEC_Y, cz)
+                ], ELC, MEPLayers.electrical);
+            }});
+
+            // ── RECOGIDA AGUA (canalones) ─────────────────────────────────────
+            const RAIN = new BABYLON.Color3(0.1, 0.6, 0.3);
+            const gutY = WALL_H + 0.05;
+            mepLine('rain_gutter_front', [
+                new BABYLON.Vector3(houseMinX - 0.2, gutY, houseMaxZ + 0.2),
+                new BABYLON.Vector3(houseMaxX + 0.2, gutY, houseMaxZ + 0.2)
+            ], RAIN, MEPLayers.rainwater);
+            mepLine('rain_gutter_back', [
+                new BABYLON.Vector3(houseMinX - 0.2, gutY, -0.2),
+                new BABYLON.Vector3(houseMaxX + 0.2, gutY, -0.2)
+            ], RAIN, MEPLayers.rainwater);
+            [[-0.2, houseMaxZ + 0.2],[houseMaxX + 0.2, houseMaxZ + 0.2],
+             [-0.2, -0.2],[houseMaxX + 0.2, -0.2]].forEach(([dx, dz], idx) => {{
+                mepLine(`rain_down_${{idx}}`, [
+                    new BABYLON.Vector3(dx, gutY, dz),
+                    new BABYLON.Vector3(dx, 0, dz)
+                ], RAIN, MEPLayers.rainwater);
+            }});
+
+            // ── DOMÓTICA (canalización datos) ─────────────────────────────────
+            const DOM = new BABYLON.Color3(0.6, 0.2, 0.8);
+            mepLine('dom_trunk', [
+                new BABYLON.Vector3(panelX, ELEC_Y - 0.15, trunkZ),
+                new BABYLON.Vector3(houseMaxX + 0.1, ELEC_Y - 0.15, trunkZ)
+            ], DOM, MEPLayers.domotics);
+            rooms.forEach((r, idx) => {{
+                const cx = r.x + r.width / 2, cz = r.z + r.depth / 2;
+                mepLine(`dom_drop_${{idx}}`, [
+                    new BABYLON.Vector3(cx, ELEC_Y - 0.15, trunkZ),
+                    new BABYLON.Vector3(cx, ELEC_Y - 0.15, cz)
+                ], DOM, MEPLayers.domotics);
+            }});
         }}
 
         function toggleFence() {{
