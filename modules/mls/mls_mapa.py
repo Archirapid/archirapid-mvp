@@ -107,11 +107,18 @@ def _popup_html_naranja(finca: dict) -> str:
   <span style="color:#64748B;">REF: {ref}</span><br>
   <span style="color:#64748B;">{m2_str} m²</span>&nbsp;·&nbsp;
   <b style="color:#1B2A6B;">€{precio:,.0f}</b><br>
-  <a href="/?mls_ficha={finca_id}" target="_blank"
-     style="margin-top:6px;padding:5px 10px;background:#ff4b4b;color:white;
-            text-decoration:none;border-radius:3px;display:inline-block;font-weight:600;">
-    Ver más detalles
-  </a>
+  <div style="margin-top:6px;display:flex;gap:6px;">
+    <a href="/?mls_ficha={finca_id}" target="_blank"
+       style="padding:5px 8px;background:#ff4b4b;color:white;
+              text-decoration:none;border-radius:3px;font-weight:600;font-size:11px;">
+      Ver Detalles
+    </a>
+    <a href="/?mls_goto_finca={finca_id}" target="_blank"
+       style="padding:5px 8px;background:#1a5276;color:white;
+              text-decoration:none;border-radius:3px;font-weight:600;font-size:11px;">
+      Panel Inmo →
+    </a>
+  </div>
 </div>"""
 
 

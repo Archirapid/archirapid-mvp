@@ -8,7 +8,14 @@ def main():
 
     # Verificar si ya está logueado como admin
     if st.session_state.get("rol") == "admin":
-        st.success("✅ Acceso autorizado a Intranet (sesión activa)")
+        _col_info, _col_exit = st.columns([5, 1])
+        with _col_info:
+            st.success("✅ Acceso autorizado a Intranet (sesión activa)")
+        with _col_exit:
+            if st.button("🚪 Salir", key="intranet_logout", help="Cerrar sesión Admin"):
+                st.session_state.pop("rol", None)
+                st.session_state.pop("selected_page", None)
+                st.rerun()
     else:
         # SOLO ACCESO CON CONTRASEÑA DE ADMIN
         password = st.text_input("Contraseña de Acceso Administrativo", type="password")
@@ -27,7 +34,23 @@ def main():
         st.rerun()
 
     # PANEL DE GESTIÓN INTERNA
-    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10 = st.tabs(["📋 Gestión de Fincas", "🏗️ Gestión de Proyectos", "💰 Ventas y Transacciones", "📞 Consultas", "🛠️ Profesionales", "⚙️ Admin", "🎯 Waitlist", "📬 Actividad", "📊 Analytics", "🏢 MLS — Inmobiliarias"])
+    # Badge en Analytics: cuenta leads MLS nuevos para alertar al admin
+    _leads_nuevos_badge = ""
+    try:
+        import sqlite3 as _sq_badge
+        _bc = _sq_badge.connect("database.db").execute(
+            "SELECT COUNT(*) FROM leads_mls WHERE estado='nuevo'"
+        ).fetchone()
+        if _bc and _bc[0] > 0:
+            _leads_nuevos_badge = f" 🔴{_bc[0]}"
+    except Exception:
+        pass
+
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10 = st.tabs([
+        "📋 Gestión de Fincas", "🏗️ Gestión de Proyectos", "💰 Ventas y Transacciones",
+        "📞 Consultas", "🛠️ Profesionales", "⚙️ Admin", "🎯 Waitlist", "📬 Actividad",
+        f"📊 Analytics{_leads_nuevos_badge}", "🏢 MLS — Inmobiliarias",
+    ])
 
     with tab1:
         try:
@@ -348,7 +371,7 @@ def main():
             else:
                 st.info("Sin sesiones Stripe todavía. Usa tarjeta 4242 4242 4242 4242 para test.")
         except Exception as _est3:
-            st.warning(f"Stripe no disponible: {_est3}")
+            st.warning(f"Stripe error: {type(_est3).__name__}: {_est3}")
 
     with tab4:
         try:
@@ -985,7 +1008,7 @@ Obtén el token creando un bot con @BotFather en Telegram.
                 else:
                     st.info("Aún no hay pagos completados en Stripe (modo test). Realiza una compra de prueba con la tarjeta 4242 4242 4242 4242.")
             except Exception as _stripe_err:
-                st.warning(f"Stripe no disponible: {_stripe_err}")
+                st.warning(f"Stripe error: {type(_stripe_err).__name__}: {_stripe_err}")
 
             st.markdown("---")
 
@@ -1219,6 +1242,37 @@ Obtén el token creando un bot con @BotFather en Telegram.
                         st.dataframe(_df_notifs, use_container_width=True, hide_index=True)
                 except Exception:
                     pass
+
+                # ── Leads MLS (solicitudes demo/contacto desde la home) ──────
+                st.markdown("---")
+                st.subheader("📋 Leads MLS — Solicitudes de demo")
+                try:
+                    _leads_conn = db_conn()
+                    _df_leads = _read_sql9(
+                        _leads_conn,
+                        """SELECT id, nombre as Nombre, empresa as Empresa, email as Email,
+                                  telefono as Teléfono, num_fincas as 'Fincas cartera',
+                                  mensaje as Mensaje, origen as Origen,
+                                  estado as Estado, created_at as Fecha
+                           FROM leads_mls
+                           ORDER BY id DESC
+                           LIMIT 100"""
+                    )
+                    _leads_conn.close()
+                    if not _df_leads.empty:
+                        _ltotal = len(_df_leads)
+                        _lnuevos = len(_df_leads[_df_leads["Estado"] == "nuevo"]) if "Estado" in _df_leads.columns else 0
+                        _ll1, _ll2 = st.columns(2)
+                        _ll1.metric("Total leads MLS", _ltotal)
+                        _ll2.metric("Sin contactar", _lnuevos)
+                        st.caption("URL demo para compartir:")
+                        st.code("https://archirapid.streamlit.app/?seccion=mls&demo=true&from=linkedin")
+                        st.dataframe(_df_leads, use_container_width=True, hide_index=True)
+                    else:
+                        st.info("Sin leads MLS todavía. Comparte la URL demo para empezar a recibir solicitudes.")
+                        st.code("https://archirapid.streamlit.app/?seccion=mls&demo=true&from=linkedin")
+                except Exception as _el:
+                    st.warning(f"Error leads MLS: {_el}")
 
                 _mls_a_conn.close()
             except Exception as _emls:

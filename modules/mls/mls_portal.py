@@ -173,22 +173,27 @@ def _detectar_plan_desde_session(sess) -> str | None:
 # ── UI: Login / Registro ──────────────────────────────────────────────────────
 
 def ui_login_registro() -> None:
+    # Botón volver al mapa/home (útil si un visitante llega aquí por error)
+    if st.button("← Volver al mapa", key="mls_login_volver"):
+        st.session_state.pop("selected_page", None)
+        st.session_state.pop("mls_goto_finca_pending", None)
+        st.query_params.clear()
+        st.rerun()
+
     st.markdown("## 🏢 ArchiRapid MLS — Portal Inmobiliario")
     st.caption("Bolsa de colaboración entre inmobiliarias. Listantes + colaboradoras.")
 
     # ── Pantalla post-registro: muestra SOLO el aviso, sin form ─────────────────
     _reg_ok = st.session_state.pop("mls_registro_ok", False)
     if _reg_ok:
-        st.success("✅ Solicitud de alta enviada correctamente")
+        st.success("✅ ¡Solicitud de alta enviada correctamente!")
         st.info(
-            "**¿Qué pasa ahora?**\n\n"
-            "1. Nuestro equipo revisará tu solicitud en **24-48 horas hábiles**.\n"
-            "2. Recibirás un **email de confirmación** cuando tu cuenta esté aprobada.\n"
-            "3. Una vez aprobada, vuelve aquí y accede con tu email y contraseña."
+            "**Tu solicitud está siendo revisada.**\n\n"
+            "Recibirás un **email de confirmación** en cuanto sea aprobada (24-48h hábiles).\n\n"
+            "Una vez aprobada, vuelve aquí y accede con tu email y contraseña."
         )
         st.markdown("---")
-        if st.button("🔑 Ir a Acceder", type="primary"):
-            st.rerun()
+        st.link_button("🏠 Volver a la home", "/")
         return  # ← no renderiza tabs ni formulario
 
     tab_login, tab_registro = st.tabs(["🔑 Acceder", "📝 Registrarse"])
@@ -213,9 +218,20 @@ def ui_login_registro() -> None:
                 if row and check_password_hash(row["password_hash"], password):
                     _login_inmo(dict(row))
                     st.success(f"Bienvenido, {row['nombre']}.")
+                    # Post-login: si venía de pin naranja del mapa, abrir esa finca
+                    _pending_finca = st.session_state.pop("mls_goto_finca_pending", None)
+                    if _pending_finca:
+                        st.session_state["mls_ficha_id"] = _pending_finca
+                        st.session_state["mls_vista"]    = "ficha"
                     st.rerun()
                 else:
                     st.error("Email o contraseña incorrectos.")
+
+        st.markdown("---")
+        if st.button("¿Olvidaste tu contraseña?", key="mls_goto_forgot"):
+            st.session_state["selected_page"] = "_mls_forgot_password"
+            st.query_params.clear()
+            st.rerun()
 
     # ── Tab Registro ──────────────────────────────────────────────────────────
     with tab_registro:
@@ -429,29 +445,19 @@ def ui_login_registro() -> None:
                         st.error(f"Error al registrar: {msg}")
 
                 if _reg_success:
-                    st.success("✅ ¡Solicitud de alta enviada correctamente!")
-                    st.info(
-                        "**Tu solicitud está siendo revisada.**\n\n"
-                        "- Recibirás un **email de confirmación** en cuanto sea aprobada (24-48h hábiles).\n"
-                        "- Una vez aprobada, vuelve aquí y accede con tu email y contraseña."
-                    )
-                    st.link_button("🏠 Volver a la home", "/")
+                    st.session_state["mls_registro_ok"] = True
+                    st.rerun()
 
 
 def _get_client_ip() -> str:
     """Intenta obtener la IP del cliente desde headers de Streamlit."""
     try:
-        from streamlit.runtime.scriptrunner import get_script_run_ctx
-        ctx = get_script_run_ctx()
-        if ctx:
-            from streamlit.web.server.websocket_headers import _get_websocket_headers
-            headers = _get_websocket_headers()
-            if headers:
-                return (
-                    headers.get("X-Forwarded-For", "")
-                    or headers.get("X-Real-Ip", "")
-                    or "unknown"
-                )
+        headers = st.context.headers
+        return (
+            headers.get("X-Forwarded-For", "")
+            or headers.get("X-Real-Ip", "")
+            or "unknown"
+        )
     except Exception:
         pass
     return "unknown"
@@ -564,10 +570,8 @@ def _iniciar_checkout_plan(plan_key: str, inmo: dict) -> None:
         _stc_mls.html(f'<script>window.top.location.href="{url}";</script>', height=0)
         st.link_button("💳 Ir al pago →", url, type="primary", use_container_width=True)
 
-    except ImportError:
-        st.error("Stripe no disponible en este entorno.")
     except Exception as exc:
-        st.error(f"Error al iniciar pago: {exc}")
+        st.error(f"Error al iniciar pago Stripe: {type(exc).__name__}: {exc}")
 
 
 # ── UI: Portal operativo ──────────────────────────────────────────────────────
@@ -612,21 +616,85 @@ def _ui_contacto_archirapid_btn(inmo: dict) -> None:
 
 
 def ui_portal_operativo(inmo: dict) -> None:
-    """Portal completo — 6 tabs para inmobiliaria con plan activo y firma."""
-    st.markdown(
-        f"### 🏢 Portal MLS — {inmo['nombre']} "
-        f"<span style='font-size:0.75rem;color:#888;'>"
-        f"Plan: **{inmo.get('plan','?').upper()}**</span>",
-        unsafe_allow_html=True,
-    )
+    """Portal completo — 8 tabs para inmobiliaria con plan activo y firma."""
+    # ── Banner modo demo ──────────────────────────────────────────────────────
+    if st.session_state.get("mls_demo_mode"):
+        st.markdown(
+            "<div style='background:linear-gradient(90deg,#F59E0B,#EF4444);"
+            "border-radius:8px;padding:8px 16px;color:white;font-weight:700;"
+            "font-size:0.88em;margin-bottom:8px;'>"
+            "⚡ Modo Demo — Estás explorando ArchiRapid MLS como visitante. "
+            "Los datos son de demostración. "
+            "<a href='/?seccion=mls' target='_self' "
+            "style='color:white;text-decoration:underline;'>Registrar mi inmobiliaria →</a>"
+            "</div>",
+            unsafe_allow_html=True,
+        )
+
+    _col_titulo, _col_logout = st.columns([5, 1])
+    with _col_titulo:
+        st.markdown(
+            f"### 🏢 Portal MLS — {inmo['nombre']} "
+            f"<span style='font-size:0.75rem;color:#888;'>"
+            f"Plan: **{inmo.get('plan','?').upper()}**</span>",
+            unsafe_allow_html=True,
+        )
+    with _col_logout:
+        if st.button("🚪 Salir", key="mls_header_logout", help="Cerrar sesión MLS"):
+            st.session_state.pop(_SESSION_KEY, None)
+            st.session_state.pop("selected_page", None)
+            st.query_params.clear()
+            st.rerun()
+    # ── Vista directa desde pin del mapa (o navegación interna):
+    #    ficha / reservar / contacto → pantalla completa sin tabs
+    #    mercado → pantalla completa sin tabs si el usuario vino por pin
+    _vista_actual  = st.session_state.get("mls_vista", "mercado")
+    _vino_por_pin  = bool(st.session_state.get("_mls_goto_active"))
+    _bypass_tabs   = (_vista_actual in ("ficha", "reservar", "contacto")
+                      or (_vino_por_pin and _vista_actual == "mercado"))
+
+    if _bypass_tabs:
+        if st.button("← Volver al portal completo", key="mls_direct_back"):
+            st.session_state.pop("mls_ficha_id", None)
+            st.session_state.pop("mls_reservar_finca", None)
+            st.session_state.pop("mls_contacto_finca", None)
+            st.session_state["_mls_goto_active"] = False  # desactiva bypass, NO borrar _mls_goto_last
+            st.session_state["mls_vista"] = "mercado"
+            st.rerun()
+        try:
+            from modules.mls import mls_mercado as _mm
+            _mm.main(inmo)
+        except Exception as _exc:
+            st.error(f"Error en vista MLS: {_exc}")
+        return
+
     # Botón de contacto siempre visible en el portal
     _ui_contacto_archirapid_btn(inmo)
 
-    tab_fincas, tab_mercado, tab_reservas, tab_solicitudes, tab_stats, tab_cuenta = st.tabs([
+    # ── Instrucciones / bienvenida ─────────────────────────────────────────────
+    with st.expander("ℹ️ Guía rápida del portal MLS", expanded=False):
+        st.markdown(
+            """
+**Bienvenido al Portal MLS de ArchiRapid** — aquí gestionas tu cartera y colaboras con otras inmobiliarias.
+
+- **Mis Fincas** — revisa y gestiona tus propiedades publicadas. Usa el botón **➕ Publicar nueva finca** para añadir una nueva.
+- **Mercado MLS** — explora fincas de otras inmobiliarias, reserva para tu cliente y solicita información.
+- **Mis Reservas** — seguimiento de las reservas de colaboración que has iniciado.
+- **Solicitudes** — peticiones de información que otras inmos han enviado sobre tus fincas.
+- **Estadísticas** — visitas, contactos y actividad de tu cartera.
+- **Mi Cuenta** — datos de empresa, plan activo y facturación.
+
+💬 ¿Dudas? Pregunta a **Lola**, la asistente IA de ArchiRapid (botón inferior izquierdo), o escríbenos desde el botón *Contactar con ArchiRapid*.
+"""
+        )
+
+    tab_fincas, tab_mercado, tab_reservas, tab_solicitudes, tab_proyectos, tab_prefab, tab_stats, tab_cuenta = st.tabs([
         "🏠 Mis Fincas",
         "🌐 Mercado MLS",
         "📋 Mis Reservas",
         "📬 Solicitudes",
+        "🏗️ Proyectos",
+        "🏡 Prefabricadas",
         "📊 Estadísticas",
         "⚙️ Mi Cuenta",
     ])
@@ -634,11 +702,11 @@ def ui_portal_operativo(inmo: dict) -> None:
     with tab_fincas:
         try:
             from modules.mls import mls_fincas
-            _sf, _mf = st.tabs(["📤 Subir Finca", "🏠 Mis Fincas"])
-            with _sf:
+            # Lista de fincas directamente — sin sub-tabs
+            mls_fincas.ui_mis_fincas(inmo)
+            st.divider()
+            with st.expander("➕ Publicar nueva finca", expanded=False):
                 mls_fincas.ui_subir_finca(inmo)
-            with _mf:
-                mls_fincas.ui_mis_fincas(inmo)
         except Exception as exc:
             st.error(f"Error en Mis Fincas: {exc}")
 
@@ -662,6 +730,20 @@ def ui_portal_operativo(inmo: dict) -> None:
             _f.ui_solicitudes_visita(inmo)
         except Exception as exc:
             st.error(f"Error en Solicitudes: {exc}")
+
+    with tab_proyectos:
+        try:
+            from modules.mls import mls_proyectos
+            mls_proyectos.ui_tab_proyectos(inmo)
+        except Exception as exc:
+            st.error(f"Error en Proyectos: {exc}")
+
+    with tab_prefab:
+        try:
+            from modules.mls import mls_prefabricadas
+            mls_prefabricadas.ui_tab_prefabricadas(inmo)
+        except Exception as exc:
+            st.error(f"Error en Prefabricadas: {exc}")
 
     with tab_stats:
         try:
@@ -759,6 +841,209 @@ def _ui_mi_cuenta(inmo: dict) -> None:
         st.rerun()
 
 
+# ── Password reset MLS ────────────────────────────────────────────────────────
+
+def _init_mls_reset_table() -> None:
+    """Crea la tabla de tokens de reset si no existe (compartida con users)."""
+    conn = _db.get_conn()
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS password_reset_tokens (
+            token      TEXT PRIMARY KEY,
+            email      TEXT NOT NULL,
+            expires_at TEXT NOT NULL,
+            used       INTEGER DEFAULT 0,
+            created_at TEXT NOT NULL
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+
+def _send_mls_reset_email(email: str, token: str) -> bool:
+    """Envía email de reset vía Resend + notificación Telegram al admin."""
+    import os, secrets as _sec
+    try:
+        import requests as _req
+        try:
+            import streamlit as _st
+            key = str(_st.secrets.get("RESEND_API_KEY", "")).strip()
+        except Exception:
+            key = os.getenv("RESEND_API_KEY", "").strip()
+        if not key:
+            return False
+
+        reset_url = f"https://archirapid.streamlit.app/?mls_reset_token={token}"
+        html = f"""<!DOCTYPE html>
+<html><body style="background:#0D1B2A;font-family:Arial,sans-serif;margin:0;padding:32px;">
+  <div style="max-width:520px;margin:0 auto;background:#162241;border-radius:16px;
+              padding:32px;border:1px solid rgba(255,165,0,0.2);">
+    <div style="text-align:center;margin-bottom:24px;">
+      <div style="font-size:1.3rem;font-weight:900;color:#F5A623;">🟠 ArchiRapid MLS</div>
+      <div style="color:#94A3B8;font-size:13px;">Portal Inmobiliario</div>
+    </div>
+    <h2 style="color:#F8FAFC;font-size:1.1rem;margin-bottom:8px;">Restablecer contraseña</h2>
+    <p style="color:#94A3B8;font-size:14px;line-height:1.7;">
+      Hemos recibido una solicitud para restablecer la contraseña de
+      <b style="color:#F8FAFC;">{email}</b>.<br>
+      El enlace es válido durante <b style="color:#F8FAFC;">1 hora</b>.
+    </p>
+    <div style="text-align:center;margin:28px 0;">
+      <a href="{reset_url}"
+         style="background:#1a5276;color:#fff;text-decoration:none;padding:14px 32px;
+                border-radius:8px;font-weight:700;font-size:15px;display:inline-block;">
+        Restablecer contraseña
+      </a>
+    </div>
+    <p style="color:#475569;font-size:12px;text-align:center;">
+      Si no solicitaste este cambio, ignora este email.<br>
+      © 2026 ArchiRapid · hola@archirapid.com
+    </p>
+  </div>
+</body></html>"""
+
+        resp = _req.post(
+            "https://api.resend.com/emails",
+            headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+            json={
+                "from": "ArchiRapid MLS <noreply@archirapid.com>",
+                "to": [email],
+                "subject": "Restablecer contraseña — ArchiRapid MLS",
+                "html": html,
+            },
+            timeout=10,
+        )
+        ok = resp.status_code in (200, 201)
+    except Exception:
+        ok = False
+
+    # Notificación Telegram al admin siempre
+    try:
+        from modules.marketplace.email_notify import _send
+        _send(f"🔑 <b>Reset contraseña MLS solicitado</b>\nEmail: {email}\nEmail enviado: {'✅' if ok else '❌'}")
+    except Exception:
+        pass
+    return ok
+
+
+def show_mls_forgot_password() -> None:
+    """Paso 1: formulario solicitud reset contraseña MLS."""
+    _init_mls_reset_table()
+
+    if st.button("← Volver al portal MLS", key="mls_forgot_back"):
+        st.session_state.pop("selected_page", None)
+        st.session_state["selected_page"] = "🏢 Inmobiliarias MLS"
+        st.query_params.clear()
+        st.rerun()
+
+    st.markdown("## 🔑 Recuperar contraseña MLS")
+    st.markdown("Introduce tu email registrado y te enviaremos un enlace para crear una nueva contraseña.")
+
+    with st.form("mls_forgot_form"):
+        email = st.text_input("Email", placeholder="tu@inmobiliaria.com").strip().lower()
+        submitted = st.form_submit_button("Enviar enlace de recuperación", type="primary",
+                                          use_container_width=True)
+
+    if submitted:
+        if not email or "@" not in email:
+            st.error("Introduce un email válido.")
+            return
+
+        import secrets
+        from datetime import timedelta
+
+        conn = _db.get_conn()
+        row = conn.execute(
+            "SELECT email_login FROM inmobiliarias WHERE email_login = ? OR email = ?",
+            (email, email)
+        ).fetchone()
+        conn.close()
+
+        if row:
+            token = secrets.token_urlsafe(32)
+            expires = (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()
+            conn = _db.get_conn()
+            conn.execute("UPDATE password_reset_tokens SET used=1 WHERE email=?", (email,))
+            conn.execute(
+                "INSERT INTO password_reset_tokens (token,email,expires_at,used,created_at) VALUES (?,?,?,0,?)",
+                (token, email, expires, datetime.now(timezone.utc).isoformat())
+            )
+            conn.commit()
+            conn.close()
+            _send_mls_reset_email(email, token)
+
+        # Mensaje genérico (no revelar si el email existe)
+        st.success("Si ese email está registrado, recibirás un enlace en los próximos minutos. Revisa también la carpeta de spam.")
+
+
+def show_mls_reset_password(token: str) -> None:
+    """Paso 2: formulario nueva contraseña con token válido."""
+    _init_mls_reset_table()
+
+    conn = _db.get_conn()
+    row = conn.execute(
+        "SELECT email, expires_at, used FROM password_reset_tokens WHERE token=?", (token,)
+    ).fetchone()
+    conn.close()
+
+    if not row:
+        st.error("El enlace de recuperación no es válido.")
+        if st.button("← Volver al portal MLS", key="mls_reset_invalid_back"):
+            st.session_state["selected_page"] = "🏢 Inmobiliarias MLS"
+            st.query_params.clear()
+            st.rerun()
+        return
+
+    email, expires_at, used = row["email"], row["expires_at"], row["used"]
+
+    if used:
+        st.error("Este enlace ya ha sido utilizado. Solicita uno nuevo.")
+        if st.button("← Solicitar nuevo enlace", key="mls_reset_used_back"):
+            st.session_state["selected_page"] = "_mls_forgot_password"
+            st.query_params.clear()
+            st.rerun()
+        return
+
+    if datetime.now(timezone.utc).isoformat() > expires_at:
+        st.error("El enlace ha caducado (válido 1 hora). Solicita uno nuevo.")
+        if st.button("← Solicitar nuevo enlace", key="mls_reset_expired_back"):
+            st.session_state["selected_page"] = "_mls_forgot_password"
+            st.query_params.clear()
+            st.rerun()
+        return
+
+    st.markdown("## 🔑 Nueva contraseña MLS")
+    st.markdown(f"Creando nueva contraseña para **{email}**")
+
+    with st.form("mls_reset_form"):
+        new_pass = st.text_input("Nueva contraseña", type="password", placeholder="Mínimo 8 caracteres")
+        confirm  = st.text_input("Confirmar contraseña", type="password")
+        submitted = st.form_submit_button("Guardar nueva contraseña", type="primary", use_container_width=True)
+
+    if submitted:
+        if len(new_pass) < 8:
+            st.error("La contraseña debe tener al menos 8 caracteres.")
+            return
+        if new_pass != confirm:
+            st.error("Las contraseñas no coinciden.")
+            return
+
+        new_hash = generate_password_hash(new_pass)
+        conn = _db.get_conn()
+        conn.execute(
+            "UPDATE inmobiliarias SET password_hash=? WHERE email_login=? OR email=?",
+            (new_hash, email, email)
+        )
+        conn.execute("UPDATE password_reset_tokens SET used=1 WHERE token=?", (token,))
+        conn.commit()
+        conn.close()
+
+        st.success("Contraseña actualizada. Ya puedes iniciar sesión en el portal MLS.")
+        if st.button("→ Ir al portal MLS", type="primary", key="mls_reset_ok_goto"):
+            st.session_state["selected_page"] = "🏢 Inmobiliarias MLS"
+            st.query_params.clear()
+            st.rerun()
+
+
 # ── Función principal ─────────────────────────────────────────────────────────
 
 def main() -> None:
@@ -806,7 +1091,21 @@ def main() -> None:
         except Exception:
             pass
 
-    # ── 5. Router principal ───────────────────────────────────────────────────
+    # ── 5. Demo mode — auto-login con inmo demo si ?seccion=mls&demo=true ────
+    if inmo is None and st.session_state.get("mls_demo_mode"):
+        try:
+            conn_d = _db.get_conn()
+            _demo_row = conn_d.execute(
+                "SELECT * FROM inmobiliarias WHERE id LIKE 'archirapid-demo-%' LIMIT 1"
+            ).fetchone()
+            conn_d.close()
+            if _demo_row:
+                _login_inmo(dict(_demo_row))
+                inmo = _get_inmo()
+        except Exception:
+            pass
+
+    # ── 5b. Router principal ──────────────────────────────────────────────────
     if inmo is None:
         ui_login_registro()
         return

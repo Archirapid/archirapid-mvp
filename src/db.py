@@ -612,6 +612,7 @@ _PG_DDL = [
         ref_codigo TEXT UNIQUE, catastro_ref TEXT NOT NULL,
         catastro_validada INTEGER DEFAULT 0,
         catastro_lat REAL, catastro_lon REAL,
+        catastro_direccion TEXT, catastro_municipio TEXT,
         titulo TEXT, descripcion_publica TEXT,
         notas_privadas TEXT, precio REAL, superficie_m2 REAL,
         tipo_suelo TEXT, servicios TEXT, forma_solar TEXT, orientacion TEXT,
@@ -645,6 +646,18 @@ _PG_DDL = [
         destinatario_tipo TEXT, destinatario_id TEXT,
         tipo_evento TEXT, payload TEXT, timestamp TEXT,
         leida INTEGER DEFAULT 0
+    )""",
+    """CREATE TABLE IF NOT EXISTS leads_mls (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nombre TEXT NOT NULL,
+        empresa TEXT,
+        email TEXT NOT NULL,
+        telefono TEXT,
+        num_fincas TEXT,
+        mensaje TEXT,
+        origen TEXT DEFAULT 'web',
+        estado TEXT DEFAULT 'nuevo',
+        created_at TEXT
     )""",
 ]
 
@@ -693,6 +706,8 @@ _PG_ALTER_MIGRATIONS = [
     "ALTER TABLE fincas_mls ADD COLUMN IF NOT EXISTS forma_solar TEXT",
     "ALTER TABLE fincas_mls ADD COLUMN IF NOT EXISTS orientacion TEXT",
     "ALTER TABLE fincas_mls ADD COLUMN IF NOT EXISTS featured INTEGER DEFAULT 0",
+    "ALTER TABLE fincas_mls ADD COLUMN IF NOT EXISTS catastro_direccion TEXT",
+    "ALTER TABLE fincas_mls ADD COLUMN IF NOT EXISTS catastro_municipio TEXT",
 ]
 
 
@@ -1342,6 +1357,8 @@ def ensure_tables():
             catastro_validada         INTEGER DEFAULT 0,
             catastro_lat              REAL,
             catastro_lon              REAL,
+            catastro_direccion        TEXT,
+            catastro_municipio        TEXT,
             titulo                    TEXT,
             descripcion_publica       TEXT,
             notas_privadas            TEXT,
@@ -1401,6 +1418,19 @@ def ensure_tables():
             leida             INTEGER DEFAULT 0
         )""")
 
+        c.execute("""CREATE TABLE IF NOT EXISTS leads_mls (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            nombre     TEXT NOT NULL,
+            empresa    TEXT,
+            email      TEXT NOT NULL,
+            telefono   TEXT,
+            num_fincas TEXT,
+            mensaje    TEXT,
+            origen     TEXT DEFAULT 'web',
+            estado     TEXT DEFAULT 'nuevo',
+            created_at TEXT
+        )""")
+
         # Índices MLS (mejoran rendimiento sin afectar tablas existentes)
         try:
             c.execute("CREATE INDEX IF NOT EXISTS idx_inmobiliarias_email ON inmobiliarias(email)")
@@ -1433,11 +1463,13 @@ def ensure_tables():
 
         # ── Migraciones aditivas fincas_mls (safe ALTER TABLE) ───────────────
         _mls_migrations = [
-            "ALTER TABLE fincas_mls ADD COLUMN tipo_suelo   TEXT DEFAULT 'Urbana'",
-            "ALTER TABLE fincas_mls ADD COLUMN servicios    TEXT",
-            "ALTER TABLE fincas_mls ADD COLUMN forma_solar  TEXT",
-            "ALTER TABLE fincas_mls ADD COLUMN orientacion  TEXT",
-            "ALTER TABLE fincas_mls ADD COLUMN featured     INTEGER DEFAULT 0",
+            "ALTER TABLE fincas_mls ADD COLUMN tipo_suelo         TEXT DEFAULT 'Urbana'",
+            "ALTER TABLE fincas_mls ADD COLUMN servicios          TEXT",
+            "ALTER TABLE fincas_mls ADD COLUMN forma_solar        TEXT",
+            "ALTER TABLE fincas_mls ADD COLUMN orientacion        TEXT",
+            "ALTER TABLE fincas_mls ADD COLUMN featured           INTEGER DEFAULT 0",
+            "ALTER TABLE fincas_mls ADD COLUMN catastro_direccion TEXT",
+            "ALTER TABLE fincas_mls ADD COLUMN catastro_municipio TEXT",
         ]
         for _sql in _mls_migrations:
             try:

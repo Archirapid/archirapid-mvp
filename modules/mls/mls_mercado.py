@@ -414,19 +414,53 @@ def ui_ficha_finca(finca_id: str, inmo: dict) -> None:
             f"| Listante (confidencial) | — | — |"
         )
 
-    # ── Botón diseñador IA ────────────────────────────────────────────────────
-    with col_s2:
-        if finca.get("catastro_lat") and finca.get("catastro_lon"):
-            if st.button(
-                "🏗️ Ver potencial constructivo con IA →",
-                key=f"mls_diseñador_{finca_id}",
-                help=f"Edificabilidad estimada: {m2 * 0.33:,.0f} m²",
-            ):
-                lanzar_disenador_desde_mls(finca)
+    # Diseñador IA no aplica al flujo colaborativo entre inmos (es para compradores)
+
+    # ── Fotos ─────────────────────────────────────────────────────────────────
+    _image_paths_raw = finca.get("image_paths")
+    if _image_paths_raw:
+        try:
+            _imgs = json.loads(_image_paths_raw) if isinstance(_image_paths_raw, str) else _image_paths_raw
+            _imgs = [p for p in (_imgs or []) if p]
+            if _imgs:
+                st.markdown("---")
+                st.markdown("**Fotos de la finca:**")
+                _img_cols = st.columns(min(len(_imgs), 3))
+                for _i, _path in enumerate(_imgs[:6]):
+                    with _img_cols[_i % 3]:
+                        try:
+                            st.image(_path, use_container_width=True)
+                        except Exception:
+                            pass
+        except Exception:
+            pass
+
+    # ── Ubicación y características ───────────────────────────────────────────
+    st.markdown("---")
+    _cat_dir = finca.get("catastro_direccion")
+    _cat_mun = finca.get("catastro_municipio")
+    _tipo    = finca.get("tipo_suelo") or "—"
+    _forma   = finca.get("forma_solar") or "—"
+    _orient  = finca.get("orientacion") or "—"
+    _serv_raw = finca.get("servicios")
+    try:
+        _servicios = ", ".join(json.loads(_serv_raw)) if _serv_raw else "—"
+    except Exception:
+        _servicios = _serv_raw or "—"
+
+    if _cat_dir or _cat_mun:
+        st.markdown("**Ubicación:**")
+        if _cat_dir:
+            st.write(f"📍 {_cat_dir}")
+        if _cat_mun:
+            st.caption(f"Municipio: {_cat_mun}")
+
+    st.markdown("**Características del solar:**")
+    _c1, _c2 = st.columns(2)
+    _c1.markdown(f"**Tipo de suelo:** {_tipo}  \n**Forma:** {_forma}")
+    _c2.markdown(f"**Orientación:** {_orient}  \n**Servicios:** {_servicios}")
 
     # ── Datos catastrales ─────────────────────────────────────────────────────
-    st.markdown("---")
-    st.markdown("**Datos catastrales validados:**")
     cat_ref = finca.get("catastro_ref") or "—"
     cat_lat = finca.get("catastro_lat")
     cat_lon = finca.get("catastro_lon")
@@ -482,14 +516,10 @@ def ui_hacer_reserva(finca: dict, inmo: dict) -> None:
 
     st.subheader("🔒 Reservar finca")
 
-    # ── Guardia de plan ───────────────────────────────────────────────────────
-    plan = (inmo.get("plan") or "starter").lower()
-    if plan not in _PLANES_RESERVA or not inmo.get("plan_activo"):
-        st.warning(
-            f"Las reservas como colaboradora requieren plan **AGENCY** o **ENTERPRISE**. "
-            f"Tu plan actual es **{plan.upper()}**."
-        )
-        if st.button("⬆️ Actualizar a AGENCY", key="mls_reserva_upgrade"):
+    # ── Guardia de plan — cualquier plan activo puede reservar ───────────────
+    if not inmo.get("plan_activo"):
+        st.warning("Tu plan MLS no está activo. Activa un plan para realizar reservas.")
+        if st.button("💳 Ver planes", key="mls_reserva_upgrade"):
             st.session_state["mls_tab_force"] = "planes"
             st.rerun()
         return
@@ -523,6 +553,27 @@ def ui_hacer_reserva(finca: dict, inmo: dict) -> None:
         "🔒 La exclusiva es de **72 horas** desde el momento del pago.  \n"
         "🔐 La identidad de la inmobiliaria listante se revelará tras el pago exitoso."
     )
+    st.warning(
+        "⚠️ **Importe no reembolsable.** Si la operación no se formaliza por decisión "
+        "del cliente, causas ajenas a ArchiRapid, o cualquier motivo no imputable a la "
+        "inmobiliaria listante, los €200 no serán devueltos. "
+        "Reserva solo si tienes un cliente con interés real y capacidad de compra confirmada."
+    )
+
+    # ── Fechas preferidas de visita ───────────────────────────────────────────
+    st.markdown("**📅 Fechas preferidas para la visita** *(ArchiRapid coordinará con la listante)*")
+    from datetime import date, timedelta
+    _hoy = date.today()
+    _col1, _col2, _col3 = st.columns(3)
+    fecha1 = _col1.date_input("1ª opción", value=_hoy + timedelta(days=3),  min_value=_hoy, key="mls_visita_f1")
+    fecha2 = _col2.date_input("2ª opción", value=_hoy + timedelta(days=5),  min_value=_hoy, key="mls_visita_f2")
+    fecha3 = _col3.date_input("3ª opción", value=_hoy + timedelta(days=7),  min_value=_hoy, key="mls_visita_f3")
+    comentario_visita = st.text_area(
+        "Comentario adicional (opcional)",
+        placeholder="ej. Preferimos mañanas, el cliente trabaja por las tardes.",
+        max_chars=300,
+        key="mls_visita_comentario",
+    )
 
     confirmado = st.checkbox(
         "Confirmo que tengo un cliente interesado y acepto las condiciones de la reserva.",
@@ -542,7 +593,22 @@ def ui_hacer_reserva(finca: dict, inmo: dict) -> None:
                 inmo_id=inmo["id"],
             )
             if checkout_url:
-                # Auto-redirect a Stripe (misma pestaña) + botón de fallback
+                # Notificar al admin inmediatamente con fechas (antes de redirigir a Stripe)
+                try:
+                    from modules.marketplace.email_notify import _send
+                    _send(
+                        f"🔒 <b>Reserva iniciada — pago Stripe en curso</b>\n"
+                        f"Finca: {ref} — {titulo}\n"
+                        f"Inmo colaboradora: {inmo.get('nombre','?')} ({inmo.get('email','?')})\n"
+                        f"Fechas preferidas visita:\n"
+                        f"  1ª: {fecha1.strftime('%d/%m/%Y')}\n"
+                        f"  2ª: {fecha2.strftime('%d/%m/%Y')}\n"
+                        f"  3ª: {fecha3.strftime('%d/%m/%Y')}\n"
+                        + (f"Comentario: {comentario_visita}" if comentario_visita.strip() else "")
+                    )
+                except Exception:
+                    pass
+                # Redirigir a Stripe
                 st.components.v1.html(
                     f'<script>window.top.location.href="{checkout_url}";</script>',
                     height=0,

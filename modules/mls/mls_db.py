@@ -278,8 +278,10 @@ def get_inmos_activas() -> list:
 # Columnas seguras para colaboradoras — NUNCA incluyen inmo_id
 _COLS_COLABORADORA = (
     "id, secuencial, ref_codigo, catastro_ref, catastro_validada, "
-    "catastro_lat, catastro_lon, titulo, descripcion_publica, notas_privadas, "
-    "precio, superficie_m2, comision_archirapid_pct, comision_colaboradora_pct, "
+    "catastro_lat, catastro_lon, catastro_direccion, catastro_municipio, "
+    "titulo, descripcion_publica, notas_privadas, "
+    "precio, superficie_m2, tipo_suelo, servicios, forma_solar, orientacion, "
+    "comision_archirapid_pct, comision_colaboradora_pct, "
     "split_aceptado, estado, image_paths, precio_historial, "
     "dias_en_mercado_inicio, created_at, updated_at"
 )
@@ -467,16 +469,23 @@ def update_finca_estado(finca_id: str, estado: str) -> bool:
 
 
 def update_finca_catastro(finca_id: str, lat: float,
-                          lon: float, validada: int = 1) -> bool:
-    """Registra coordenadas y marca catastro_validada=1 tras validación exitosa."""
+                          lon: float, validada: int = 1,
+                          direccion: str = None,
+                          municipio: str = None) -> bool:
+    """Registra coordenadas, dirección y marca catastro_validada=1 tras validación exitosa."""
     conn = _db.get_conn()
     try:
         conn.execute(
             """UPDATE fincas_mls
                SET catastro_lat = ?, catastro_lon = ?,
-                   catastro_validada = ?, updated_at = ?
+                   catastro_validada = ?,
+                   catastro_direccion = COALESCE(?, catastro_direccion),
+                   catastro_municipio = COALESCE(?, catastro_municipio),
+                   updated_at = ?
                WHERE id = ?""",
-            (float(lat), float(lon), int(validada), _now_utc(), finca_id)
+            (float(lat), float(lon), int(validada),
+             direccion, municipio,
+             _now_utc(), finca_id)
         )
         conn.commit()
         return True

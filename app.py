@@ -1328,9 +1328,16 @@ _qp_modo    = st.query_params.get("modo", "")
 # ── Handlers retorno Stripe MLS y deep links MLS ─────────────────────────────
 _qp_mls_pago    = st.query_params.get("mls_pago", "")
 _qp_mls_reserva = st.query_params.get("mls_reserva_ok", "")
-_qp_mls_ficha   = st.query_params.get("mls_ficha", "")
-_qp_mls_reservar = st.query_params.get("mls_reservar", "")
+_qp_mls_ficha    = st.query_params.get("mls_ficha", "")
+_qp_mls_goto       = st.query_params.get("mls_goto_finca", "")
+_qp_mls_reset_tok  = st.query_params.get("mls_reset_token", "")
+_qp_mls_reservar   = st.query_params.get("mls_reservar", "")
 _qp_mls_contacto = st.query_params.get("mls_contacto", "")
+_qp_mls_open_form = st.query_params.get("mls_open_demo_form", "")
+
+if _qp_mls_open_form == "1" and not st.session_state.get("_mls_form_opened"):
+    st.session_state["_mls_demo_form_open"] = True
+    st.session_state["_mls_form_opened"] = True
 
 if _qp_mls_pago == "ok":
     st.session_state["selected_page"] = "🏢 Inmobiliarias MLS"
@@ -1343,6 +1350,24 @@ if _qp_mls_reserva == "1":
     else:
         # Retorno Stripe inmo colaboradora → portal MLS (lo gestiona internamente)
         st.session_state["selected_page"] = "🏢 Inmobiliarias MLS"
+
+if _qp_mls_reset_tok:
+    # Enlace de reset contraseña MLS — sin login requerido
+    st.session_state["selected_page"] = "_mls_reset_password"
+    st.session_state["mls_reset_token"] = _qp_mls_reset_tok
+
+if _qp_mls_goto:
+    # Solo procesar la primera vez — evita resetear navegación en cada rerun
+    # mientras ?mls_goto_finca= sigue en la URL
+    if st.session_state.get("_mls_goto_last") != _qp_mls_goto:
+        st.session_state["_mls_goto_last"]   = _qp_mls_goto
+        st.session_state["_mls_goto_active"] = True   # activa el bypass-tabs
+        if st.session_state.get("mls_inmo"):
+            st.session_state["mls_ficha_id"] = _qp_mls_goto
+            st.session_state["mls_vista"]    = "ficha"
+        else:
+            st.session_state["mls_goto_finca_pending"] = _qp_mls_goto
+    st.session_state["selected_page"] = "🏢 Inmobiliarias MLS"
 
 if _qp_mls_ficha:
     # Ficha pública — sin login requerido
@@ -1368,8 +1393,8 @@ if "_demo_session_id" not in st.session_state:
     import uuid as _uuid_mod
     st.session_state["_demo_session_id"] = _uuid_mod.uuid4().hex
 
-# Registrar origen una sola vez por sesión (demo=true o seccion=arquitecto)
-_es_visita_demo = _qp_demo == "true" or _qp_seccion == "arquitecto"
+# Registrar origen una sola vez por sesión (demo=true o seccion=arquitecto/mls)
+_es_visita_demo = _qp_demo == "true" or _qp_seccion in ("arquitecto", "mls")
 if _es_visita_demo and not st.session_state.get("_origen_registrado"):
     _origen_final = _qp_origen or "directo"
     _registrar_visita_demo(_origen_final, _qp_user or "anonimo", f"visita:{_qp_seccion or 'home'}")
@@ -1394,6 +1419,13 @@ if _qp_seccion == "arquitecto" and not st.session_state.get("_deep_link_routed")
     # Si sandbox + modo estudio, marcar para abrir esa pestaña al entrar
     if _qp_modo == "estudio" or _qp_demo == "true":
         st.session_state["_open_estudio_tab"] = True
+
+# Navegar directo al portal MLS si ?seccion=mls
+if _qp_seccion == "mls" and not st.session_state.get("_deep_link_routed"):
+    st.session_state["selected_page"] = "🏢 Inmobiliarias MLS"
+    st.session_state["_deep_link_routed"] = True
+    if _qp_demo == "true":
+        st.session_state["mls_demo_mode"] = True
 
 # === RESTAURAR selected_page DESDE SLUG ?page=X (deep-link / refresh) ===
 _SLUG_TO_PAGE = {
@@ -2096,7 +2128,8 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
 <div style="background:linear-gradient(135deg,#0D1B2A,#1E3A5F);border-radius:12px;
             padding:12px 20px;border:1px solid rgba(245,158,11,0.3);
             display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;height:100%;">
-  <div>
+  <!-- Sección izquierda: Beta Privada -->
+  <div style="flex:1;min-width:220px;">
     <span style="font-size:10px;font-weight:700;color:#F59E0B;letter-spacing:2px;
                  text-transform:uppercase;">Beta Privada · Acceso Anticipado</span>
     <div style="font-size:1em;font-weight:800;color:#F8FAFC;line-height:1.2;">
@@ -2105,18 +2138,38 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
         ⚖️ Información orientativa basada en datos catastrales públicos. No sustituye el asesoramiento técnico, jurídico o urbanístico de un profesional colegiado.
       </span>
     </div>
+    <div style="display:flex;align-items:center;gap:10px;margin-top:6px;">
+      <div style="background:rgba(255,255,255,0.06);border-radius:8px;padding:6px 12px;white-space:nowrap;">
+        <span style="color:#F59E0B;font-weight:700;">{_taken}</span>
+        <span style="color:#94A3B8;font-size:0.85em;"> / {_MAX}</span>
+        &nbsp;
+        <span style="color:#10B981;font-weight:600;font-size:0.85em;">{_left} disponibles</span>
+      </div>
+      <div style="background:rgba(255,255,255,0.08);border-radius:6px;height:8px;width:80px;overflow:hidden;">
+        <div style="background:linear-gradient(90deg,#F59E0B,#EF4444);
+                    width:{_pct}%;height:100%;border-radius:6px;"></div>
+      </div>
+    </div>
   </div>
-  <div style="display:flex;align-items:center;gap:10px;">
-    <div style="background:rgba(255,255,255,0.06);border-radius:8px;padding:6px 12px;white-space:nowrap;">
-      <span style="color:#F59E0B;font-weight:700;">{_taken}</span>
-      <span style="color:#94A3B8;font-size:0.85em;"> / {_MAX}</span>
-      &nbsp;
-      <span style="color:#10B981;font-weight:600;font-size:0.85em;">{_left} disponibles</span>
+  <!-- Separador vertical -->
+  <div style="width:1px;background:rgba(245,158,11,0.25);align-self:stretch;margin:0 8px;"></div>
+  <!-- Sección derecha: MLS Inmobiliarias -->
+  <div style="flex:0 0 auto;max-width:260px;">
+    <span style="font-size:10px;font-weight:700;color:#F5A623;letter-spacing:2px;
+                 text-transform:uppercase;">🏢 ¿Eres Inmobiliaria?</span>
+    <div style="font-size:0.88em;font-weight:700;color:#F8FAFC;line-height:1.3;margin-top:2px;">
+      Bolsa MLS colaborativa
     </div>
-    <div style="background:rgba(255,255,255,0.08);border-radius:6px;height:8px;width:80px;overflow:hidden;">
-      <div style="background:linear-gradient(90deg,#F59E0B,#EF4444);
-                  width:{_pct}%;height:100%;border-radius:6px;"></div>
+    <div style="font-size:0.78em;color:#94A3B8;margin-top:2px;">
+      Comparte fincas, multiplica ventas.<br>
+      Sin captación. Split automático.
     </div>
+    <a href="/?mls_open_demo_form=1"
+       style="display:inline-block;margin-top:6px;padding:4px 12px;
+              background:linear-gradient(90deg,#F5A623,#ef4444);color:white;
+              border-radius:6px;font-size:0.78em;font-weight:700;text-decoration:none;">
+      📋 Solicitar demo MLS →
+    </a>
   </div>
 </div>""", unsafe_allow_html=True)
 
@@ -2161,6 +2214,71 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
             else:
                 _wname_saved = st.session_state.get("waitlist_name", "")
                 st.success(f"✅ Plaza reservada{', ' + _wname_saved if _wname_saved else ''}.")
+
+            # ── Demo MLS para inmobiliarias ───────────────────────────────────
+            _mls_lead_key = "mls_lead_submitted"
+            _mls_form_autoopen = st.session_state.pop("_mls_demo_form_open", False)
+            if not st.session_state.get(_mls_lead_key):
+                with st.expander("🏢 Solicitar demo MLS", expanded=_mls_form_autoopen):
+                    with st.form("mls_lead_form", clear_on_submit=True):
+                        _ml_nombre  = st.text_input("Nombre *", placeholder="Tu nombre")
+                        _ml_empresa = st.text_input("Agencia / Empresa *", placeholder="Inmobiliaria Sur SL")
+                        _ml_email   = st.text_input("Email *", placeholder="tu@agencia.com")
+                        _ml_tel     = st.text_input("Teléfono", placeholder="+34 600 000 000")
+                        _ml_fincas  = st.selectbox(
+                            "Fincas en cartera",
+                            ["1–5", "6–20", "21–75", "Más de 75"],
+                        )
+                        _ml_msg     = st.text_input(
+                            "¿Qué buscas?",
+                            placeholder="Ampliar cartera, vender más rápido…",
+                        )
+                        _ml_sub = st.form_submit_button(
+                            "Solicitar demo gratuita",
+                            type="primary",
+                            use_container_width=True,
+                        )
+                        if _ml_sub:
+                            if not _ml_nombre or not _ml_empresa or not _ml_email or "@" not in _ml_email:
+                                st.error("Nombre, empresa y email requeridos.")
+                            else:
+                                try:
+                                    from datetime import datetime as _dt, timezone as _tz
+                                    import sqlite3 as _sq3c
+                                    _lconn = _sq3c.connect("database.db")
+                                    _lconn.execute(
+                                        """INSERT INTO leads_mls
+                                           (nombre, empresa, email, telefono, num_fincas, mensaje, origen, created_at)
+                                           VALUES (?,?,?,?,?,?,?,?)""",
+                                        (_ml_nombre.strip(), _ml_empresa.strip(),
+                                         _ml_email.strip().lower(), _ml_tel.strip(),
+                                         _ml_fincas, _ml_msg.strip(),
+                                         "web", _dt.now(_tz.utc).isoformat(timespec="seconds")),
+                                    )
+                                    _lconn.commit(); _lconn.close()
+                                    st.session_state[_mls_lead_key] = True
+                                    st.session_state["mls_lead_name"] = _ml_nombre.strip()
+                                    # Notificación triple: Telegram + Email Resend
+                                    try:
+                                        from modules.marketplace.email_notify import notify_lead_mls
+                                        notify_lead_mls(
+                                            nombre=_ml_nombre,
+                                            empresa=_ml_empresa,
+                                            email=_ml_email,
+                                            telefono=_ml_tel,
+                                            num_fincas=_ml_fincas,
+                                            mensaje=_ml_msg,
+                                        )
+                                    except Exception:
+                                        pass
+                                    st.rerun()
+                                except Exception as _le:
+                                    st.error(f"Error al enviar: {_le}")
+            else:
+                _ml_saved = st.session_state.get("mls_lead_name", "")
+                st.success(f"✅ Solicitud enviada{', ' + _ml_saved if _ml_saved else ''}. Te contactamos en 24h.")
+                st.caption("Mientras tanto, puedes explorar el portal en modo demo:")
+                st.link_button("▶ Acceder a la demo MLS →", "/?seccion=mls&demo=true", use_container_width=True)
 
         # ── 4 tarjetas de acceso en columnas iguales ─────────────────────────
         _hc1, _hc2, _hc3, _hc4 = st.columns(4, gap="small")
@@ -2513,3 +2631,13 @@ elif st.session_state.get('selected_page') == "_mls_retorno_cliente":
     with st.container():
         from modules.mls.mls_publico import show_retorno_reserva_cliente
         show_retorno_reserva_cliente()
+
+elif st.session_state.get('selected_page') == "_mls_forgot_password":
+    with st.container():
+        from modules.mls.mls_portal import show_mls_forgot_password
+        show_mls_forgot_password()
+
+elif st.session_state.get('selected_page') == "_mls_reset_password":
+    with st.container():
+        from modules.mls.mls_portal import show_mls_reset_password
+        show_mls_reset_password(st.session_state.get("mls_reset_token", ""))

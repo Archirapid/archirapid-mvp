@@ -122,6 +122,40 @@ def ui_subir_finca(inmo: dict) -> None:
     # ── BLOQUE 1 — Validación catastral ─────────────────────────────────────
     st.markdown("#### 📋 Paso 1 — Identificación catastral")
 
+    # ── Opción A: subir PDF nota catastral → Gemini extrae la REF y m² ──────
+    with st.expander("📄 Subir Nota Catastral (PDF) — extracción automática con IA", expanded=False):
+        st.caption("Opcional. Sube el PDF y la IA extraerá la referencia catastral y la superficie automáticamente.")
+        pdf_nota = st.file_uploader(
+            "Nota Catastral (PDF)",
+            type=["pdf"],
+            key="mls_subir_nota_pdf",
+        )
+        if pdf_nota and st.button("👁️ Extraer datos con IA", key="mls_extraer_nota_btn"):
+            with st.spinner("Analizando PDF con Gemini Vision…"):
+                try:
+                    import os
+                    from modules.marketplace.utils import save_upload
+                    save_path = save_upload(pdf_nota, prefix="nota_catastral_mls")
+                    from modules.marketplace.ai_engine import extraer_datos_nota_catastral
+                    resultado = extraer_datos_nota_catastral(save_path)
+                    if isinstance(resultado, dict) and "error" in resultado:
+                        st.error(f"Error IA: {resultado['error']}")
+                    elif all(k in resultado for k in ["referencia_catastral", "superficie_grafica_m2", "municipio"]):
+                        st.session_state["mls_subir_ref_catastral"] = resultado["referencia_catastral"]
+                        st.session_state["mls_nota_m2_auto"] = resultado["superficie_grafica_m2"]
+                        st.success(
+                            f"✅ Datos extraídos  \n"
+                            f"REF: **{resultado['referencia_catastral']}**  \n"
+                            f"Superficie: **{resultado['superficie_grafica_m2']} m²**  \n"
+                            f"Municipio: **{resultado['municipio']}**"
+                        )
+                        st.info("Los campos se han rellenado automáticamente. Pulsa 'Validar referencia' para confirmar.")
+                        st.rerun()
+                    else:
+                        st.warning("No se pudieron extraer todos los datos. Introduce la referencia manualmente.")
+                except Exception as exc:
+                    st.error(f"Error procesando PDF: {exc}")
+
     ref_catastral = st.text_input(
         "Referencia Catastral *",
         placeholder="ej. 9872023VH5797S0001WX",
@@ -418,9 +452,14 @@ def ui_subir_finca(inmo: dict) -> None:
                 st.error("Error al registrar la finca. Inténtalo de nuevo.")
                 return
 
-            # 3. Actualizar catastro + estado
+            # 3. Actualizar catastro + estado (+ dirección y municipio del API)
             if lat and lng:
-                mls_db.update_finca_catastro(finca_id, lat=lat, lon=lng, validada=1)
+                _cat_dir = geo.get("direccion_completa") or None
+                _cat_mun = geo.get("municipio") or None
+                mls_db.update_finca_catastro(
+                    finca_id, lat=lat, lon=lng, validada=1,
+                    direccion=_cat_dir, municipio=_cat_mun,
+                )
                 mls_db.update_finca_estado(finca_id, "validada_pendiente_aprobacion")
             else:
                 st.warning("No se pudo obtener coordenadas del catastro. "
