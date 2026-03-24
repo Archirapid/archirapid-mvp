@@ -794,7 +794,7 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
 
         // Construir todas las habitaciones
         roomsData.forEach((_, i) => buildRoom(i));
-        buildMEPLayers(roomsData);
+        try {{ buildMEPLayers(roomsData); }} catch(e) {{ console.warn('MEP init error:', e); }}
 
         // Área original para presupuesto
         let originalTotalArea = roomsData.reduce((s, r) => s + (r.area_m2 || 0), 0);
@@ -1082,7 +1082,7 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             }});
             // Reconstruir todos
             roomsData.forEach((_,i) => buildRoom(i));
-            buildMEPLayers(roomsData);
+            try {{ buildMEPLayers(roomsData); }} catch(e) {{ console.warn('MEP rebuild error:', e); }}
             selectedMesh = null;
             selectedIndex = null;
             updateBudget();
@@ -1349,6 +1349,10 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
         }}
 
         function buildMEPLayers(rooms) {{
+            // Guard: skip if no rooms
+            if (!rooms || rooms.length === 0) return;
+            try {{
+
             // Clear existing MEP meshes before rebuild
             Object.values(MEPLayers).forEach(layer => {{
                 layer.meshes.forEach(m => {{ try {{ m.dispose(); }} catch(e) {{}} }});
@@ -1361,11 +1365,13 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
 
             function mepLine(name, pts, col, layer) {{
                 if (!pts || pts.length < 2) return;
+                try {{
                 const ln = BABYLON.MeshBuilder.CreateLines(name, {{points: pts}}, scene);
                 ln.color      = col;
                 ln.isPickable = false;
                 ln.isVisible  = layer.visible;
                 layer.meshes.push(ln);
+                }} catch(e) {{}}
             }}
 
             // Room bounding box
@@ -1480,6 +1486,8 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                     new BABYLON.Vector3(cx, ELEC_Y - 0.15, cz)
                 ], DOM, MEPLayers.domotics);
             }});
+
+            }} catch(mepErr) {{ console.warn('MEP build error (non-fatal):', mepErr); }}
         }}
 
         function toggleFence() {{
