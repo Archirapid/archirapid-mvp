@@ -2333,8 +2333,9 @@ def render_step3_editor():
             total_width = 10
             total_depth = 10
 
-        st.session_state["babylon_total_width"] = total_width
-        st.session_state["babylon_total_depth"] = total_depth
+        st.session_state["babylon_total_width"]   = total_width
+        st.session_state["babylon_total_depth"]   = total_depth
+        st.session_state["babylon_initial_layout"] = layout_result
 
         roof_type = st.session_state.get('request', {}).get('roof_type', 'Dos aguas (clásico, eficiente)')
         plot_data = st.session_state.get("design_plot_data", {})
@@ -2380,6 +2381,45 @@ def render_step3_editor():
             scrolling=False
         )
     
+    # ── Planos Técnicos MEP ──────────────────────────────────────────────────
+    _mep_rooms = (st.session_state.get("babylon_modified_layout")
+                  or st.session_state.get("babylon_initial_layout"))
+    if _mep_rooms:
+        with st.expander("📐 Planos Técnicos MEP — Descargar por capa", expanded=False):
+            st.caption("Planos independientes para cada instalación. Generados automáticamente a partir del layout actual.")
+            try:
+                from .floor_plan_svg import generate_mep_plan_png as _gen_mep
+                import json as _json
+                if isinstance(_mep_rooms, str):
+                    _mep_rooms = _json.loads(_mep_rooms)
+                _tw = st.session_state.get("babylon_total_width")
+                _td = st.session_state.get("babylon_total_depth")
+                _mep_layers = [
+                    ("sewage",     "🚽 Saneamiento"),
+                    ("water",      "💧 Agua"),
+                    ("electrical", "⚡ Eléctrico"),
+                    ("rainwater",  "🌧️ Canalones"),
+                    ("domotics",   "📡 Domótica"),
+                ]
+                _cols = st.columns(5)
+                for _i, (_lid, _lbl) in enumerate(_mep_layers):
+                    with _cols[_i]:
+                        try:
+                            _png = _gen_mep(_mep_rooms, _lid, _tw, _td)
+                            if _png:
+                                st.image(_png, use_container_width=True)
+                                st.download_button(
+                                    f"⬇️ {_lbl}", _png,
+                                    file_name=f"plano_mep_{_lid}.png",
+                                    mime="image/png",
+                                    key=f"dl_mep_{_lid}",
+                                    use_container_width=True,
+                                )
+                        except Exception as _le:
+                            st.caption(f"⚠️ {_lbl}: {_le}")
+            except Exception as _me:
+                st.warning(f"No se pudieron generar los planos MEP: {_me}")
+
     # Botón continuar DESPUÉS del editor
     st.markdown("### ✅ Ya terminé de diseñar")
     

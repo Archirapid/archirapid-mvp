@@ -475,3 +475,211 @@ class FloorPlanSVG:
         plt.close()
         buf.seek(0)
         return buf.getvalue()
+
+
+# ─── Planos Técnicos MEP ──────────────────────────────────────────────────────
+
+def generate_mep_plan_png(rooms_layout, layer_name: str,
+                          total_width: float = None, total_depth: float = None) -> bytes:
+    """
+    Genera un plano técnico 2D en PNG para una capa MEP específica.
+
+    Args:
+        rooms_layout : lista de dicts {x, z, width, depth, name, code, zone, area_m2}
+                       o JSON string equivalente
+        layer_name   : 'sewage' | 'water' | 'electrical' | 'rainwater' | 'domotics'
+        total_width/depth : dimensiones casa (se calculan si None)
+
+    Returns:
+        PNG bytes
+    """
+    import json
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+    import matplotlib.patches as mpatches
+    import io as _io
+
+    if isinstance(rooms_layout, str):
+        try:
+            rooms_layout = json.loads(rooms_layout)
+        except Exception:
+            return None
+    if not rooms_layout:
+        return None
+
+    SCALE  = 50   # px / metro
+    MARGIN = 70
+
+    if total_width is None:
+        total_width  = max(r['x'] + r['width']  for r in rooms_layout)
+    if total_depth is None:
+        total_depth  = max(r['z'] + r['depth']  for r in rooms_layout)
+
+    house_max_z = max(r['z'] + r['depth']  for r in rooms_layout)
+    house_max_x = max(r['x'] + r['width']  for r in rooms_layout)
+    house_min_x = min(r['x']               for r in rooms_layout)
+
+    LAYERS_CFG = {
+        'sewage':     {'label': 'SANEAMIENTO',          'color': '#555555', 'bg': '#F9F9F9'},
+        'water':      {'label': 'AGUA FRÍA / CALIENTE', 'color': '#1565C0', 'bg': '#F0F8FF'},
+        'electrical': {'label': 'INSTALACIÓN ELÉCTRICA','color': '#BF360C', 'bg': '#FFF8F0'},
+        'rainwater':  {'label': 'RECOGIDA PLUVIAL',     'color': '#1B5E20', 'bg': '#F0FFF0'},
+        'domotics':   {'label': 'DOMÓTICA / RED DATOS', 'color': '#4A148C', 'bg': '#F8F0FF'},
+    }
+    cfg = LAYERS_CFG.get(layer_name, LAYERS_CFG['electrical'])
+    lc  = cfg['color']
+
+    # Canvas
+    svg_w = int(total_width  * SCALE + MARGIN * 3 + 60)
+    svg_h = int(total_depth  * SCALE + MARGIN * 4 + 60)
+
+    fig, ax = plt.subplots(figsize=(svg_w / 100, svg_h / 100), facecolor=cfg['bg'])
+    ax.set_xlim(0, svg_w)
+    ax.set_ylim(0, svg_h)
+    ax.set_aspect('equal')
+    ax.axis('off')
+    fig.patch.set_facecolor(cfg['bg'])
+
+    def to_px(x_m, z_m):
+        """Metros → píxeles (z invertido: arriba = z pequeño)"""
+        return MARGIN + x_m * SCALE, MARGIN + (total_depth - z_m) * SCALE
+
+    def pline(x1, z1, x2, z2, color=None, lw=2.0, ls='-', zo=6):
+        c = color or lc
+        px1, py1 = to_px(x1, z1)
+        px2, py2 = to_px(x2, z2)
+        ax.plot([px1, px2], [py1, py2], color=c, linewidth=lw,
+                linestyle=ls, zorder=zo, solid_capstyle='round')
+
+    # ── Dibujar habitaciones ──────────────────────────────────────────────────
+    ZONE_FILL = {
+        'day':        '#FFF8E1',
+        'night':      '#EDE7F6',
+        'wet':        '#E0F2F1',
+        'service':    '#ECEFF1',
+        'garage':     '#E0E0E0',
+        'exterior':   '#E8F5E9',
+        'circulation':'#F5F5F5',
+    }
+    for r in rooms_layout:
+        zone = (r.get('zone') or '').lower()
+        code = (r.get('code') or '').lower()
+        # Color por zona o código
+        if any(c in code for c in ['bano', 'aseo', 'cocina']):
+            fill = ZONE_FILL['wet']
+        else:
+            fill = ZONE_FILL.get(zone, '#F5F5F5')
+
+        px, py = to_px(r['x'], r['z'] + r['depth'])
+        pw, ph = r['width'] * SCALE, r['depth'] * SCALE
+        rect = mpatches.Rectangle((px, py), pw, ph,
+                                   linewidth=2, edgecolor='#333333',
+                                   facecolor=fill, zorder=2)
+        ax.add_patch(rect)
+        cx, cy = px + pw / 2, py + ph / 2
+        ax.text(cx, cy + 5, r.get('name', ''), ha='center', va='center',
+                fontsize=6.5, color='#333333', fontweight='bold', zorder=5)
+        ax.text(cx, cy - 7, f"{r['width']:.1f}×{r['depth']:.1f}m",
+                ha='center', va='center', fontsize=5.5, color='#777777', zorder=5)
+
+    # Wet rooms list (shared)
+    wet_codes = ['bano', 'aseo', 'cocina']
+    wet_rooms = [r for r in rooms_layout
+                 if any(c in (r.get('code','') + r.get('name','')).lower() for c in wet_codes)]
+
+    # ── Capa MEP ─────────────────────────────────────────────────────────────
+    if layer_name == 'sewage':
+        col_z = house_max_z + 0.6
+        pline(house_min_x, col_z, house_max_x, col_z, lw=3)
+        for r in wet_rooms:
+            cx, cz = r['x'] + r['width']/2, r['z'] + r['depth']/2
+            pline(cx, cz, cx, col_z, lw=1.5, ls='--')
+            ppx, ppy = to_px(cx, cz)
+            ax.plot(ppx, ppy, 'o', color=lc, markersize=6, zorder=7)
+            ax.text(ppx + 6, ppy, '⊕', fontsize=8, color=lc, va='center', zorder=7)
+        # Fosa séptica
+        fx, fz = house_max_x + 2.2, house_max_z * 0.5
+        fpx, fpy = to_px(fx, fz + 0.75)
+        ax.add_patch(mpatches.Rectangle((fpx, fpy - 0.75*SCALE), 2*SCALE, 1.5*SCALE,
+                                         linewidth=2, edgecolor=lc, facecolor='#DDDDDD', zorder=6))
+        ax.text(fpx + SCALE, fpy - 0.375*SCALE, 'FOSA\nSÉPTICA',
+                ha='center', va='center', fontsize=5.5, color=lc, fontweight='bold', zorder=7)
+        pline(house_max_x, house_max_z*0.5, fx, fz, lw=2)
+
+    elif layer_name == 'water':
+        mz = house_max_z * 0.5
+        pline(house_min_x - 0.7, mz, house_max_x + 0.3, mz, lw=3)
+        for r in wet_rooms:
+            cx, cz = r['x'] + r['width']/2, r['z'] + r['depth']/2
+            pline(cx, mz, cx, cz, lw=1.8)
+            ppx, ppy = to_px(cx, cz)
+            ax.plot(ppx, ppy, 's', color=lc, markersize=5, zorder=7)
+        epx, epy = to_px(house_min_x - 0.7, mz)
+        ax.text(epx - 4, epy, 'ACOMETIDA', ha='right', va='center',
+                fontsize=5.5, color=lc, fontweight='bold', rotation=90)
+
+    elif layer_name == 'electrical':
+        tz = rooms_layout[0]['z'] + rooms_layout[0]['depth']/2
+        px0 = house_min_x + 0.3
+        pline(px0, tz, house_max_x + 0.2, tz, lw=3)
+        for r in rooms_layout:
+            cx, cz = r['x'] + r['width']/2, r['z'] + r['depth']/2
+            pline(cx, tz, cx, cz, lw=1.2, ls='--')
+            ppx, ppy = to_px(cx, cz)
+            ax.plot(ppx, ppy, '^', color=lc, markersize=4, zorder=7)
+        # Panel (CGP)
+        ppx, ppy = to_px(px0, tz)
+        ax.add_patch(mpatches.Rectangle((ppx-10, ppy-12), 20, 24,
+                                         linewidth=1.5, edgecolor=lc, facecolor='#FFE082', zorder=8))
+        ax.text(ppx, ppy, 'CGP', ha='center', va='center',
+                fontsize=5, color='#333333', fontweight='bold', zorder=9)
+
+    elif layer_name == 'rainwater':
+        for z_val in [house_max_z + 0.3, -0.3]:
+            pline(house_min_x - 0.3, z_val, house_max_x + 0.3, z_val, lw=2.5)
+        for dx, dz in [(house_min_x-0.3, house_max_z+0.3), (house_max_x+0.3, house_max_z+0.3),
+                       (house_min_x-0.3, -0.3),             (house_max_x+0.3, -0.3)]:
+            ppx, ppy = to_px(dx, dz)
+            ax.plot(ppx, ppy, 'v', color=lc, markersize=9, zorder=7)
+            ax.text(ppx, ppy - 14, 'BAJANTE', ha='center', va='top',
+                    fontsize=5, color=lc, fontweight='bold')
+
+    elif layer_name == 'domotics':
+        tz = rooms_layout[0]['z'] + rooms_layout[0]['depth']/2 - 0.4
+        px0 = house_min_x + 0.3
+        pline(px0, tz, house_max_x + 0.2, tz, lw=2, ls='-.')
+        for r in rooms_layout:
+            cx, cz = r['x'] + r['width']/2, r['z'] + r['depth']/2
+            pline(cx, tz, cx, cz, lw=1, ls=':')
+            ppx, ppy = to_px(cx, cz)
+            ax.plot(ppx, ppy, 'D', color=lc, markersize=4, zorder=7)
+        # Hub
+        ppx, ppy = to_px(px0, tz)
+        ax.add_patch(mpatches.Circle((ppx, ppy), 10, linewidth=1.5,
+                                      edgecolor=lc, facecolor='#E1BEE7', zorder=8))
+        ax.text(ppx, ppy, 'HUB', ha='center', va='center',
+                fontsize=5, color='#333333', fontweight='bold', zorder=9)
+
+    # ── Título ────────────────────────────────────────────────────────────────
+    title_h = 44
+    ax.add_patch(mpatches.Rectangle((0, svg_h - title_h), svg_w, title_h,
+                                     facecolor='#1A237E', zorder=10))
+    ax.text(svg_w/2, svg_h - title_h/2,
+            f'PLANO DE {cfg["label"]}  ·  Escala aprox. 1:100',
+            ha='center', va='center', fontsize=10, fontweight='bold',
+            color='white', fontfamily='monospace', zorder=11)
+
+    # ── Pie ───────────────────────────────────────────────────────────────────
+    ax.text(MARGIN, 10, f'Capa: {cfg["label"]}', color=lc,
+            fontsize=6.5, fontweight='bold', va='bottom')
+    ax.text(svg_w - MARGIN, 10, 'ArchiRapid AI  ·  © 2026',
+            color='#AAAAAA', fontsize=6, ha='right', va='bottom')
+
+    buf = _io.BytesIO()
+    plt.tight_layout(pad=0)
+    plt.savefig(buf, format='png', dpi=130, bbox_inches='tight',
+                facecolor=cfg['bg'], edgecolor='none')
+    plt.close(fig)
+    buf.seek(0)
+    return buf.read()
