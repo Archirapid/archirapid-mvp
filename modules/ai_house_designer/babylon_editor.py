@@ -1374,13 +1374,23 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                 }} catch(e) {{}}
             }}
 
-            // Room bounding box
-            const houseMaxZ = Math.max(...rooms.map(r => r.z + r.depth));
-            const houseMaxX = Math.max(...rooms.map(r => r.x + r.width));
-            const houseMinX = Math.min(...rooms.map(r => r.x));
+            // Habitaciones interiores: excluir garden/exterior (paneles, piscina, huerto…)
+            const _GARDEN_CODES = ['panel','solar','piscin','pool','huerto','caseta','apero','bomba'];
+            const habRooms = rooms.filter(r => {{
+                const z = (r.zone||'').toLowerCase();
+                const c = (r.code||'').toLowerCase();
+                return z !== 'garden' && z !== 'exterior' &&
+                       !_GARDEN_CODES.some(x => c.includes(x));
+            }});
+            const _baseRooms = habRooms.length > 0 ? habRooms : rooms;
+
+            // Room bounding box — solo habitaciones interiores
+            const houseMaxZ = Math.max(..._baseRooms.map(r => r.z + r.depth));
+            const houseMaxX = Math.max(..._baseRooms.map(r => r.x + r.width));
+            const houseMinX = Math.min(..._baseRooms.map(r => r.x));
 
             // Wet rooms: need water + sewage
-            const wetRooms = rooms.filter(r =>
+            const wetRooms = _baseRooms.filter(r =>
                 ['bano','aseo','cocina'].some(c =>
                     (r.code||'').toLowerCase().includes(c) ||
                     (r.name||'').toLowerCase().includes(c)
@@ -1441,12 +1451,12 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             // ── ELÉCTRICO ─────────────────────────────────────────────────────
             const ELC = new BABYLON.Color3(1.0, 0.45, 0.0);
             const panelX  = houseMinX + 0.3;
-            const trunkZ  = rooms[0] ? rooms[0].z + rooms[0].depth / 2 : houseMaxZ * 0.5;
+            const trunkZ  = _baseRooms[0] ? _baseRooms[0].z + _baseRooms[0].depth / 2 : houseMaxZ * 0.5;
             mepLine('elec_trunk', [
                 new BABYLON.Vector3(panelX, ELEC_Y, trunkZ),
                 new BABYLON.Vector3(houseMaxX + 0.1, ELEC_Y, trunkZ)
             ], ELC, MEPLayers.electrical);
-            rooms.forEach((r, idx) => {{
+            _baseRooms.forEach((r, idx) => {{
                 const cx = r.x + r.width / 2, cz = r.z + r.depth / 2;
                 mepLine(`elec_drop_${{idx}}`, [
                     new BABYLON.Vector3(cx, ELEC_Y, trunkZ),
@@ -1479,7 +1489,7 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                 new BABYLON.Vector3(panelX, ELEC_Y - 0.15, trunkZ),
                 new BABYLON.Vector3(houseMaxX + 0.1, ELEC_Y - 0.15, trunkZ)
             ], DOM, MEPLayers.domotics);
-            rooms.forEach((r, idx) => {{
+            _baseRooms.forEach((r, idx) => {{
                 const cx = r.x + r.width / 2, cz = r.z + r.depth / 2;
                 mepLine(`dom_drop_${{idx}}`, [
                     new BABYLON.Vector3(cx, ELEC_Y - 0.15, trunkZ),
@@ -2001,6 +2011,7 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                 btn.classList.remove('active');
                 document.getElementById('roof-panel').style.display = 'none';
                 showToast('Tejado ocultado');
+                try {{ buildMEPLayers(roomsData); }} catch(e) {{}}
 
             }} else {{
                 buildRoof();
@@ -2010,6 +2021,7 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                 document.getElementById('roof-panel').style.display = 'block';
                 showToast('Tejado: ' + roofType.split('(')[0].trim());
                 buildSolarPanels();
+                try {{ buildMEPLayers(roomsData); }} catch(e) {{}}
             }}
         }}                                                                                                                             
         // ================================================
