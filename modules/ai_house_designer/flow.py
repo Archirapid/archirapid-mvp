@@ -2420,6 +2420,16 @@ def render_step3_editor():
             except Exception as _me:
                 st.warning(f"No se pudieron generar los planos MEP: {_me}")
 
+    # ── Cálculo CTE HS-5 Saneamiento ─────────────────────────────────────────
+    if _mep_rooms:
+        with st.expander("🚽 Instalación de Saneamiento — Cálculo CTE HS-5", expanded=False):
+            try:
+                from .mep_hs5 import render_mep_hs5_panel as _render_hs5
+                _hs5_req = st.session_state.get("ai_house_requirements", {})
+                _render_hs5(_mep_rooms, _hs5_req)
+            except Exception as _hs5e:
+                st.warning(f"No se pudo calcular el saneamiento: {_hs5e}")
+
     # Botón continuar DESPUÉS del editor
     st.markdown("### ✅ Ya terminé de diseñar")
     

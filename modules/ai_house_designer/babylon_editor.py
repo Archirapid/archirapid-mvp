@@ -576,6 +576,10 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             else if (zone === 'exterior') fMat.diffuseColor = new BABYLON.Color3(0.75, 0.90, 0.70);
             else if (zone === 'garden' && (room.code||'').toLowerCase().includes('panel'))
                                           fMat.diffuseColor = new BABYLON.Color3(0.95, 0.85, 0.20);
+            else if (zone === 'garden' && ['caseta','apero','bomba'].some(x => (room.code||'').toLowerCase().includes(x)))
+                                          fMat.diffuseColor = new BABYLON.Color3(0.70, 0.70, 0.70);  // gris caseta/aperos
+            else if (zone === 'garden' && (room.code||'').toLowerCase().includes('huerto'))
+                                          fMat.diffuseColor = new BABYLON.Color3(0.18, 0.48, 0.12);  // verde oscuro huerto
             else if (zone === 'garden')   fMat.diffuseColor = new BABYLON.Color3(0.20, 0.55, 0.85);
             else                          fMat.diffuseColor = new BABYLON.Color3(0.94, 0.93, 0.90);
 
@@ -1373,6 +1377,20 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                 layer.meshes.push(ln);
                 }} catch(e) {{}}
             }}
+            // Tubos 3D para saneamiento (grosor real, radio 6cm)
+            function mepTube(name, pts, col, layer) {{
+                if (!pts || pts.length < 2) return;
+                try {{
+                const tube = BABYLON.MeshBuilder.CreateTube(name, {{path: pts, radius: 0.06, tessellation: 6, cap: 3}}, scene);
+                const mat  = new BABYLON.StandardMaterial(name + '_m', scene);
+                mat.diffuseColor  = col;
+                mat.specularColor = new BABYLON.Color3(0.1, 0.1, 0.1);
+                tube.material   = mat;
+                tube.isPickable  = false;
+                tube.isVisible   = layer.visible;
+                layer.meshes.push(tube);
+                }} catch(e) {{}}
+            }}
 
             // Habitaciones interiores: excluir garden/exterior (paneles, piscina, huerto…)
             const _GARDEN_CODES = ['panel','solar','piscin','pool','huerto','caseta','apero','bomba'];
@@ -1398,36 +1416,47 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             );
 
             // ── SANEAMIENTO ───────────────────────────────────────────────────
-            const SEW = new BABYLON.Color3(0.35, 0.35, 0.35);
+            const SEW = new BABYLON.Color3(0.50, 0.28, 0.05);   // marrón tierra (diferenciado)
             const collectorZ = houseMaxZ + 0.3;
-            mepLine('sewage_collector', [
+            mepTube('sewage_collector', [
                 new BABYLON.Vector3(houseMinX, BURIED_Y, collectorZ),
                 new BABYLON.Vector3(houseMaxX, BURIED_Y, collectorZ)
             ], SEW, MEPLayers.sewage);
             wetRooms.forEach((r, idx) => {{
                 const cx = r.x + r.width / 2, cz = r.z + r.depth / 2;
-                mepLine(`sewage_drop_${{idx}}`, [
+                mepTube(`sewage_drop_${{idx}}`, [
                     new BABYLON.Vector3(cx, 0, cz),
                     new BABYLON.Vector3(cx, BURIED_Y, cz)
                 ], SEW, MEPLayers.sewage);
-                mepLine(`sewage_run_${{idx}}`, [
+                mepTube(`sewage_run_${{idx}}`, [
                     new BABYLON.Vector3(cx, BURIED_Y, cz),
                     new BABYLON.Vector3(cx, BURIED_Y, collectorZ)
                 ], SEW, MEPLayers.sewage);
             }});
-            // Fosa séptica
+            // Fosa séptica — semisumergida, tapa visible al nivel del suelo
             const fosaX = houseMaxX + 2.5, fosaZ = houseMaxZ * 0.5;
             const fosa  = BABYLON.MeshBuilder.CreateBox('sewage_fosa',
                 {{width:2, height:1.2, depth:1.5}}, scene);
-            fosa.position.set(fosaX, BURIED_Y - 0.3, fosaZ);
+            fosa.position.set(fosaX, -0.8, fosaZ);   // mayormente enterrada
             const fosaMat = new BABYLON.StandardMaterial('mep_fosa_mat', scene);
-            fosaMat.diffuseColor = new BABYLON.Color3(0.3, 0.3, 0.3);
-            fosaMat.alpha = 0.85;
+            fosaMat.diffuseColor = new BABYLON.Color3(0.45, 0.30, 0.10);  // ocre tierra
+            fosaMat.alpha = 0.92;
             fosa.material  = fosaMat;
             fosa.isPickable = false;
             fosa.isVisible  = MEPLayers.sewage.visible;
             MEPLayers.sewage.meshes.push(fosa);
-            mepLine('sewage_to_fosa', [
+            // Tapa registro hierro (disco gris en superficie)
+            const fosaTapa = BABYLON.MeshBuilder.CreateCylinder('fosa_tapa',
+                {{diameter:0.8, height:0.06, tessellation:16}}, scene);
+            fosaTapa.position.set(fosaX, 0.04, fosaZ);  // tapa a ras de suelo
+            const tapaMat = new BABYLON.StandardMaterial('fosa_tapa_mat', scene);
+            tapaMat.diffuseColor = new BABYLON.Color3(0.30, 0.30, 0.30);
+            fosaTapa.material   = tapaMat;
+            fosaTapa.isPickable  = false;
+            fosaTapa.isVisible   = MEPLayers.sewage.visible;
+            MEPLayers.sewage.meshes.push(fosaTapa);
+            // Colector → fosa
+            mepTube('sewage_to_fosa', [
                 new BABYLON.Vector3(houseMaxX, BURIED_Y, collectorZ),
                 new BABYLON.Vector3(fosaX - 1, BURIED_Y, fosaZ)
             ], SEW, MEPLayers.sewage);
@@ -1435,6 +1464,20 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             // ── AGUA ──────────────────────────────────────────────────────────
             const WAT = new BABYLON.Color3(0.18, 0.45, 0.85);
             const manifoldZ = houseMaxZ * 0.5;
+            // Acometida agua — esfera azul oscuro en fachada oeste (red municipal)
+            const watAcometida = BABYLON.MeshBuilder.CreateSphere('water_acometida',
+                {{diameter:0.35, segments:8}}, scene);
+            watAcometida.position.set(houseMinX - 1.0, WATER_Y, manifoldZ);
+            const watAcMat = new BABYLON.StandardMaterial('water_ac_mat', scene);
+            watAcMat.diffuseColor = new BABYLON.Color3(0.08, 0.28, 0.70);
+            watAcometida.material   = watAcMat;
+            watAcometida.isPickable  = false;
+            watAcometida.isVisible   = MEPLayers.water.visible;
+            MEPLayers.water.meshes.push(watAcometida);
+            mepLine('water_from_street', [
+                new BABYLON.Vector3(houseMinX - 1.0, WATER_Y, manifoldZ),
+                new BABYLON.Vector3(houseMinX - 0.5, WATER_Y, manifoldZ)
+            ], WAT, MEPLayers.water);
             mepLine('water_manifold', [
                 new BABYLON.Vector3(houseMinX - 0.5, WATER_Y, manifoldZ),
                 new BABYLON.Vector3(houseMaxX + 0.2, WATER_Y, manifoldZ)
@@ -1452,6 +1495,22 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             const ELC = new BABYLON.Color3(1.0, 0.45, 0.0);
             const panelX  = houseMinX + 0.3;
             const trunkZ  = _baseRooms[0] ? _baseRooms[0].z + _baseRooms[0].depth / 2 : houseMaxZ * 0.5;
+            // Cuadro eléctrico / ICP en fachada exterior oeste (caja amarilla)
+            const elecBox = BABYLON.MeshBuilder.CreateBox('elec_cuadro',
+                {{width:0.15, height:0.45, depth:0.35}}, scene);
+            elecBox.position.set(houseMinX - 0.08, 1.3, trunkZ);
+            const elecBoxMat = new BABYLON.StandardMaterial('elec_cuadro_mat', scene);
+            elecBoxMat.diffuseColor = new BABYLON.Color3(0.90, 0.80, 0.05);
+            elecBox.material   = elecBoxMat;
+            elecBox.isPickable  = false;
+            elecBox.isVisible   = MEPLayers.electrical.visible;
+            MEPLayers.electrical.meshes.push(elecBox);
+            // Acometida eléctrica desde la calle (cable entrante oeste → cuadro)
+            mepLine('elec_acometida', [
+                new BABYLON.Vector3(houseMinX - 1.8, ELEC_Y, trunkZ),
+                new BABYLON.Vector3(houseMinX - 0.08, ELEC_Y, trunkZ),
+                new BABYLON.Vector3(houseMinX - 0.08, 1.55, trunkZ)
+            ], ELC, MEPLayers.electrical);
             mepLine('elec_trunk', [
                 new BABYLON.Vector3(panelX, ELEC_Y, trunkZ),
                 new BABYLON.Vector3(houseMaxX + 0.1, ELEC_Y, trunkZ)
@@ -2086,11 +2145,16 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             const INCLINATION = 0.52;  // 30° en radianes — óptimo España
 
             // Calcular cuántos paneles caben según el área solicitada
+            // rows siempre = 1 para evitar que una segunda fila flote sobre el tejado
             let totalPanelArea = 0;
             panelRooms.forEach(r => {{ totalPanelArea += (r.area_m2 || 10); }});
-            const numPanels = Math.max(2, Math.round(totalPanelArea / (PANEL_W * PANEL_D)));
-            const cols = Math.min(numPanels, Math.floor(houseW / (PANEL_W + PANEL_GAP)));
-            const rows = Math.ceil(numPanels / cols);
+            const maxColsByWidth = Math.max(1, Math.floor(houseW / (PANEL_W + PANEL_GAP)));
+            const numPanels = Math.min(
+                Math.max(2, Math.round(totalPanelArea / (PANEL_W * PANEL_D))),
+                maxColsByWidth
+            );
+            const cols = numPanels;
+            const rows = 1;
 
             // Posición sobre faldón sur según tipo de tejado
             const houseD = maxZ - minZ;
