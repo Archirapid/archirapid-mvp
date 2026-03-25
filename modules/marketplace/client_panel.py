@@ -317,6 +317,7 @@ def show_full_client_dashboard(client_email):
     
     # Botón de cerrar sesión en sidebar
     with st.sidebar:
+        st.info("💡 Puedes volver a acceder a tu portal en cualquier momento desde la página de inicio con tu email.")
         if st.button("🚪 Cerrar Sesión", width='stretch', key="logout_button"):
             st.session_state["client_logged_in"] = False
             for key in ["client_email", "user_role", "has_transactions", "has_properties", "selected_project_for_panel"]:
