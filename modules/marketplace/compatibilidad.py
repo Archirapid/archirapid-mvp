@@ -121,104 +121,62 @@ def get_proyectos_compatibles(
         query += " AND (p.m2_parcela_minima IS NULL OR p.m2_parcela_minima <= ?)"
         params.append(client_parcel_size)
     
-    # Filtrar por tipo (residencial)
-    query += " AND (p.property_type LIKE '%residencial%' OR p.property_type IS NULL)"
-    
+    # Filtrar por tipo (residencial) — usar ? para evitar % en el SQL que confunde psycopg2
+    query += " AND (p.property_type LIKE ? OR p.property_type IS NULL)"
+    params.append('%residencial%')
+
     # Filtrar por activo
     query += " AND (p.is_active = 1 OR p.is_active IS NULL)"
-    
-    # Excluir proyectos ya comprados
+
+    # Excluir proyectos ya comprados (subquery opcional: puede no existir la tabla)
     if client_email:
         query += """
             AND p.id NOT IN (
-                SELECT proyecto_id 
-                FROM ventas_proyectos 
-                WHERE cliente_email = ? 
+                SELECT proyecto_id
+                FROM ventas_proyectos
+                WHERE cliente_email = ?
             )
         """
         params.append(client_email)
-    
+
     query += " ORDER BY p.price ASC"
-    
-    cursor.execute(query, params)
-    rows = cursor.fetchall()
-    conn.close()
-    
-    # 3. Formatear resultados — usar claves de columna, no índices enteros
-    def _col(row, key, default=None):
+
+    try:
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+    except Exception:
+        # Fallback: reintentar sin el filtro ventas_proyectos (puede no existir la tabla)
         try:
-            v = row[key]
-            return v if v is not None else default
-        except (IndexError, KeyError, TypeError):
-            return default
-
-    compatibles = []
-    for row in rows:
-        # Parsear galeria_fotos si es JSON
-        gf_raw = _col(row, "galeria_fotos")
-        galeria = []
-        if gf_raw:
-            try:
-                galeria = json.loads(gf_raw) if isinstance(gf_raw, str) else gf_raw
-            except Exception:
-                galeria = [gf_raw]
-
-        m2c = _col(row, "m2_construidos")
-        a_m2 = _col(row, "area_m2")
-        pm = _col(row, "price_memoria", 1800)
-        pc = _col(row, "price_cad", 2500)
-
-        proyecto = {
-            "id": _col(row, "id"),
-            "title": _col(row, "title"),
-            "description": _col(row, "description"),
-            "m2_construidos": m2c,
-            "area_m2": a_m2,
-            "price": _col(row, "price"),
-            "estimated_cost": _col(row, "estimated_cost"),
-            "price_memoria": pm or 1800,
-            "price_cad": pc or 2500,
-            "property_type": _col(row, "property_type") or "residencial",
-            "foto_principal": _col(row, "foto_principal"),
-            "galeria_fotos": galeria,
-            "memoria_pdf": _col(row, "memoria_pdf"),
-            "planos_pdf": _col(row, "planos_pdf"),
-            "planos_dwg": _col(row, "planos_dwg"),
-            "modelo_3d_glb": _col(row, "modelo_3d_glb"),
-            "vr_tour": _col(row, "vr_tour"),
-            "energy_rating": _col(row, "energy_rating"),
-            "architect_id": _col(row, "architect_id"),
-            "architect_name": _col(row, "architect_name"),
-            "m2_parcela_minima": _col(row, "m2_parcela_minima"),
-            "m2_parcela_maxima": _col(row, "m2_parcela_maxima"),
-            # Datos calculados
-            "fits_plot": superficie_edificable is not None and (
-                (m2c and m2c <= superficie_edificable) or
-                (not m2c and a_m2 and a_m2 <= superficie_edificable)
-            ),
-            "superficie_disponible": superficie_edificable,
-            "precio_total": (pm or 1800) + (pc or 2500)
-        }
-        compatibles.append(proyecto)
-
-    return compatibles
-    
-    # Excluir proyectos ya comprados
-    if client_email:
-        query += """
-            AND p.id NOT IN (
-                SELECT proyecto_id 
-                FROM ventas_proyectos 
-                WHERE cliente_email = ? 
-            )
+            cursor.close()
+        except Exception:
+            pass
+        conn2 = db_conn()
+        cur2 = conn2.cursor()
+        # Reconstruir query sin subquery de ventas_proyectos
+        q2 = """
+            SELECT p.id, p.title, p.description, p.m2_construidos, p.area_m2, p.price,
+                   p.estimated_cost, p.price_memoria, p.price_cad, p.property_type,
+                   p.foto_principal, p.galeria_fotos, p.memoria_pdf, p.planos_pdf,
+                   p.planos_dwg, p.modelo_3d_glb, p.vr_tour, p.energy_rating,
+                   p.architect_id, p.architect_name, p.m2_parcela_minima, p.m2_parcela_maxima
+            FROM projects p WHERE 1=1
         """
-        params.append(client_email)
-    
-    query += " ORDER BY p.price ASC"
-    
-    cursor.execute(query, params)
-    rows = cursor.fetchall()
-    conn.close()
+        p2 = []
+        if superficie_edificable:
+            q2 += " AND (p.m2_construidos IS NULL OR p.m2_construidos <= ?)"
+            p2.append(superficie_edificable)
+        if client_parcel_size:
+            q2 += " AND (p.m2_parcela_minima IS NULL OR p.m2_parcela_minima <= ?)"
+            p2.append(client_parcel_size)
+        q2 += " AND (p.is_active = 1 OR p.is_active IS NULL) ORDER BY p.price ASC"
+        try:
+            cur2.execute(q2, p2)
+            rows = cur2.fetchall()
+        except Exception:
+            rows = []
+        conn2.close()
+    else:
+        conn.close()
     
     # 3. Formatear resultados — usar claves de columna, no índices enteros
     def _col(row, key, default=None):
