@@ -494,8 +494,34 @@ def show_buyer_panel_mls(client_email: str, finca_id: str) -> None:
 
 def show_full_client_dashboard(client_email):
     """Muestra el panel completo del cliente para usuarios ya logueados"""
-    # Si viene de reserva naranja MLS → panel completo con 6 botones (igual que pin azul)
+    # Si viene de reserva naranja MLS (sesión activa) → panel completo con 6 botones
     mls_finca_id = st.session_state.get("mls_reserva_finca_id")
+
+    # Si no hay finca MLS en sesión, comprobar si la última reserva del cliente
+    # corresponde a una finca MLS (caso retorno desde Stripe u otras entradas)
+    if not mls_finca_id:
+        try:
+            _conn_mls_check = db_conn()
+            _last_res = _conn_mls_check.execute(
+                "SELECT plot_id FROM reservations WHERE buyer_email=? ORDER BY created_at DESC LIMIT 1",
+                (client_email,),
+            ).fetchone()
+            _conn_mls_check.close()
+            if _last_res:
+                _candidate = str(_last_res[0]) if _last_res[0] else ""
+                # Una finca MLS tiene UUID hex de 32 chars y NO existe en plots
+                if len(_candidate) == 32:
+                    _conn_chk2 = db_conn()
+                    _in_plots = _conn_chk2.execute(
+                        "SELECT id FROM plots WHERE id=?", (_candidate,)
+                    ).fetchone()
+                    _conn_chk2.close()
+                    if not _in_plots:
+                        mls_finca_id = _candidate
+                        st.session_state["mls_reserva_finca_id"] = mls_finca_id
+        except Exception:
+            pass
+
     if mls_finca_id:
         show_buyer_panel_mls(client_email, mls_finca_id)
         return
