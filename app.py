@@ -1626,6 +1626,7 @@ if st.query_params.get("page") == "👤 Panel de Cliente" and st.session_state.g
         st.stop()
     except Exception as e:
         st.error(f"Error mostrando panel cliente v2: {e}")
+        st.stop()
 
 if st.query_params.get("page") == "Registro de Usuario":
     try:

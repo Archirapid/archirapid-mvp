@@ -1938,6 +1938,11 @@ def show_documentacion(client_email: str, plot_data, reservation):
             (client_email,)
         ).fetchone()
     except Exception:
+        # PostgreSQL: rollback obligatorio antes de cualquier nueva query
+        try:
+            _conn_d.rollback()
+        except Exception:
+            pass
         _res_ext = _conn_d.execute(
             """SELECT r.id, r.plot_id, r.buyer_name, r.buyer_email, r.amount, r.kind,
                       r.created_at, p.title, p.catastral_ref, p.address, p.price
@@ -1946,7 +1951,8 @@ def show_documentacion(client_email: str, plot_data, reservation):
                ORDER BY r.created_at DESC LIMIT 1""",
             (client_email,)
         ).fetchone()
-    _conn_d.close()
+    finally:
+        _conn_d.close()
 
     if _res_ext:
         _arras_html = _generar_contrato_arras(_res_ext, plot_data)
