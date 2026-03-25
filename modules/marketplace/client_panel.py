@@ -1173,7 +1173,7 @@ def show_buyer_panel(client_email):
     cursor = conn.cursor()
 
     # Buscar la finca que el cliente ha comprado/reservado
-    cursor.execute("SELECT * FROM reservations WHERE buyer_email=? ORDER BY created_at DESC LIMIT 1", (client_email,))
+    cursor.execute("SELECT * FROM reservations WHERE buyer_email=? AND kind != 'pending' ORDER BY created_at DESC LIMIT 1", (client_email,))
     reservation = cursor.fetchone()
 
     if reservation:
@@ -1235,6 +1235,7 @@ def show_buyer_panel(client_email):
 
                 # BOTÓN NOTA CATASTRAL - Solo aquí
                 registry_note_path = plot_data[7]  # registry_note_path
+                _cat_ref = plot_data[2]
                 if registry_note_path and os.path.exists(registry_note_path):
                     st.markdown("---")
                     if st.button("📥 DESCARGAR NOTA CATASTRAL (PDF)", type="primary", key="download_catastral"):
@@ -1246,8 +1247,14 @@ def show_buyer_panel(client_email):
                                 mime="application/pdf",
                                 key="catastral_download"
                             )
-                else:
-                    st.info("📄 Nota catastral no disponible aún")
+                elif _cat_ref:
+                    st.markdown("---")
+                    st.success(f"✅ **Nota Catastral verificada** — Referencia: `{_cat_ref}`")
+                    st.markdown(
+                        f'<a href="https://www1.sedecatastro.gob.es/CYCBienInmueble/OVCBusqueda.aspx" '
+                        f'target="_blank" style="font-size:13px;color:#1a5276;">📄 Descargar desde Sede Electrónica del Catastro →</a>',
+                        unsafe_allow_html=True
+                    )
 
             st.markdown("---")
 
@@ -1447,6 +1454,7 @@ def show_buyer_panel(client_email):
 
                 # BOTÓN PDF SIEMPRE VISIBLE (como solicitado)
                 registry_note_path = plot_data[7]  # registry_note_path
+                _cat_ref2 = plot_data[2]
                 if registry_note_path and os.path.exists(registry_note_path):
                     st.markdown("---")
                     col_pdf1, col_pdf2 = st.columns([3, 1])
@@ -1461,8 +1469,14 @@ def show_buyer_panel(client_email):
                                 mime="application/pdf",
                                 key="catastral_download_auto"
                             )
-                else:
-                    st.info("📄 Nota catastral no disponible - Contacta con soporte para obtenerla")
+                elif _cat_ref2:
+                    st.markdown("---")
+                    st.success(f"✅ **Nota Catastral verificada** — Referencia: `{_cat_ref2}`")
+                    st.markdown(
+                        '<a href="https://www1.sedecatastro.gob.es/CYCBienInmueble/OVCBusqueda.aspx" '
+                        'target="_blank" style="font-size:13px;color:#1a5276;">📄 Descargar desde Sede Electrónica del Catastro →</a>',
+                        unsafe_allow_html=True
+                    )
 
             st.markdown("---")
 

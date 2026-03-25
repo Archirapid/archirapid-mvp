@@ -52,24 +52,83 @@ def notify_new_registration(name: str, email: str, role: str):
 
 def notify_new_reservation(plot_id: str, buyer_name: str, buyer_email: str,
                             amount: float, kind: str):
+    import os as _os
     kind_label = "Compra" if kind == "purchase" else "Reserva"
     plot_title = plot_id
     try:
-        import sqlite3
-        _c = sqlite3.connect("database.db", timeout=5)
-        row = _c.execute("SELECT title FROM plots WHERE id=?", (plot_id,)).fetchone()
-        _c.close()
+        from src.db import get_conn as _get_db_n
+        _cn = _get_db_n()
+        row = _cn.execute("SELECT title FROM plots WHERE id=?", (plot_id,)).fetchone()
+        _cn.close()
         if row:
-            plot_title = row[0]
+            plot_title = row[0] or plot_id
     except Exception:
         pass
+
+    # ── 1. Telegram al admin ─────────────────────────────────────────────────
     _send(
-        f"💰 <b>{kind_label} de finca</b>\n"
+        f"💰 <b>{kind_label} de finca confirmada</b>\n"
         f"Finca: {plot_title}\n"
         f"Comprador: {buyer_name}\n"
         f"Email: {buyer_email}\n"
-        f"Importe: €{amount:,.0f}"
+        f"Importe: €{amount:,.0f}\n"
+        f"👉 Intranet → Reservas para gestionar"
     )
+
+    # ── 2. Email Resend → hola@archirapid.com ────────────────────────────────
+    try:
+        try:
+            import streamlit as _st
+            _rkey = str(_st.secrets.get("RESEND_API_KEY", "")).strip()
+        except Exception:
+            _rkey = _os.getenv("RESEND_API_KEY", "").strip()
+        if not _rkey:
+            return
+        _html_r = f"""<!DOCTYPE html>
+<html><body style="font-family:Arial,sans-serif;background:#f8fafc;padding:32px;margin:0;">
+  <div style="max-width:520px;margin:0 auto;background:white;border-radius:12px;
+              padding:32px;border:1px solid #e2e8f0;">
+    <div style="font-size:1.2rem;font-weight:900;color:#1E3A5F;margin-bottom:4px;">
+      🏡 ArchiRapid — Nueva {kind_label} de Finca
+    </div>
+    <div style="color:#64748b;font-size:13px;margin-bottom:24px;">
+      Pago Stripe confirmado — acción requerida
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:14px;">
+      <tr><td style="padding:8px 0;color:#64748b;width:140px;">Finca</td>
+          <td style="padding:8px 0;font-weight:700;color:#0f172a;">{plot_title}</td></tr>
+      <tr style="background:#f8fafc;"><td style="padding:8px 4px;color:#64748b;">Comprador</td>
+          <td style="padding:8px 4px;font-weight:700;color:#0f172a;">{buyer_name}</td></tr>
+      <tr><td style="padding:8px 0;color:#64748b;">Email</td>
+          <td style="padding:8px 0;"><a href="mailto:{buyer_email}" style="color:#1a5276;">{buyer_email}</a></td></tr>
+      <tr style="background:#f8fafc;"><td style="padding:8px 4px;color:#64748b;">Importe</td>
+          <td style="padding:8px 4px;font-weight:700;color:#0f172a;">€{amount:,.0f}</td></tr>
+      <tr><td style="padding:8px 0;color:#64748b;">Tipo</td>
+          <td style="padding:8px 0;color:#0f172a;">{kind_label} · reserva 7 días</td></tr>
+    </table>
+    <div style="margin-top:24px;padding:12px 16px;background:#eff6ff;border-radius:8px;
+                border-left:4px solid #1E3A5F;font-size:13px;color:#1e40af;">
+      ⚡ Gestionar en Intranet → Reservas → Confirmar o contactar al comprador.
+    </div>
+    <p style="color:#94a3b8;font-size:11px;margin-top:24px;text-align:center;">
+      ArchiRapid · <a href="https://archirapid.streamlit.app" style="color:#94a3b8;">archirapid.streamlit.app</a>
+    </p>
+  </div>
+</body></html>"""
+        _requests.post(
+            "https://api.resend.com/emails",
+            headers={"Authorization": f"Bearer {_rkey}", "Content-Type": "application/json"},
+            json={
+                "from": "ArchiRapid Reservas <noreply@archirapid.com>",
+                "to": ["hola@archirapid.com"],
+                "reply_to": buyer_email,
+                "subject": f"🏡 {kind_label} confirmada — {plot_title} · €{amount:,.0f}",
+                "html": _html_r,
+            },
+            timeout=10,
+        )
+    except Exception:
+        pass
 
 
 def notify_waitlist(name: str, email: str, profile: str):

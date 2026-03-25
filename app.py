@@ -1513,6 +1513,12 @@ if st.query_params.get("stripe_session") and st.query_params.get("payment") == "
                         except Exception as _re:
                             st.toast(f"Reserva anotada (aviso técnico: {_re})", icon="ℹ️")
                         st.session_state[f"stripe_verified_{_ss_id}"] = True
+                        # Notificaciones admin: Telegram + email
+                        try:
+                            from modules.marketplace.email_notify import notify_new_reservation as _notify_res
+                            _notify_res(_plot_id_r, _buyer_name, _buyer_mail, _amount, "reservation")
+                        except Exception:
+                            pass
                         st.session_state["logged_in"]       = True
                         st.session_state["user_email"]      = _buyer_mail
                         st.session_state["role"]            = "client"

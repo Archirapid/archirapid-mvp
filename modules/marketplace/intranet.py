@@ -224,7 +224,7 @@ def main():
             _db3b.close()
             if not _df_res3.empty:
                 _df_res3["kind"] = _df_res3["kind"].map(
-                    {"purchase": "Compra", "reservation": "Reserva"}
+                    {"purchase": "✅ Compra", "reservation": "🔒 Reserva 7d", "pending": "⏳ Pendiente pago"}
                 ).fillna(_df_res3["kind"])
                 st.dataframe(
                     _df_res3.rename(columns={
