@@ -8,6 +8,24 @@ except ImportError:
     sys.path.append(r"C:/ARCHIRAPID_PROYECT25")
     from src import db as db_module
     def db_conn():
+
+def _img_finca(width=250, caption=None):
+    """Muestra imagen finca o placeholder si el archivo no existe en Cloud."""
+    _p = "assets/fincas/image1.jpg"
+    if os.path.exists(_p):
+        if caption:
+            st.image(_p, width=width, caption=caption)
+        else:
+            st.image(_p, width=width)
+    else:
+        _h = int(width * 0.62)
+        st.markdown(
+            f'<div style="width:{width}px;height:{_h}px;background:#0f1b2d;'
+            f'border:1px solid #1e3a5f;border-radius:8px;display:flex;'
+            f'align-items:center;justify-content:center;font-size:36px;">🏡</div>',
+            unsafe_allow_html=True
+        )
+
         return db_module.get_conn()
 import json
 import os
@@ -1017,9 +1035,9 @@ def show_selected_project_panel(client_email, project_id):
                             try:
                                 st.image(foto, width=250, caption=proyecto['title'])
                             except:
-                                st.image("assets/fincas/image1.jpg", width=250, caption=proyecto['title'])
+                                _img_finca(width=250, caption=proyecto['title'])
                         else:
-                            st.image("assets/fincas/image1.jpg", width=250, caption=proyecto['title'])
+                            _img_finca(width=250, caption=proyecto['title'])
 
                         # Información básica
                         st.markdown(f"**🏗️ {proyecto['title']}**")
@@ -1077,9 +1095,9 @@ def show_client_interests(client_email):
                     try:
                         st.image(foto, width=200)
                     except:
-                        st.image("assets/fincas/image1.jpg", width=200)
+                        _img_finca(width=200)
                 else:
-                    st.image("assets/fincas/image1.jpg", width=200)
+                    _img_finca(width=200)
             
             with col2:
                 st.markdown(f"**🏗️ Proyecto:** {title}")
@@ -1208,13 +1226,13 @@ def show_buyer_panel(client_email):
                             if os.path.exists(img_path):
                                 st.image(img_path, width=250)
                             else:
-                                st.image("assets/fincas/image1.jpg", width=250)
+                                _img_finca(width=250)
                         else:
-                            st.image("assets/fincas/image1.jpg", width=250)
+                            _img_finca(width=250)
                     except:
-                        st.image("assets/fincas/image1.jpg", width=250)
+                        _img_finca(width=250)
                 else:
-                    st.image("assets/fincas/image1.jpg", width=250)
+                    _img_finca(width=250)
 
             with col2:
                 st.markdown(f"### 🏠 {plot_data[1]}")  # title
@@ -2320,9 +2338,9 @@ def show_owner_panel_v2(client_email):
                             if os.path.exists(img_path):
                                 st.image(img_path, width=200)
                     except:
-                        st.image("assets/fincas/image1.jpg", width=200)
+                        _img_finca(width=200)
                 else:
-                    st.image("assets/fincas/image1.jpg", width=200)
+                    _img_finca(width=200)
             
             with col2:
                 st.markdown(f"**🏠 Propiedad:** {title}")
@@ -2535,9 +2553,9 @@ def show_advanced_project_search(client_email):
                         try:
                             st.image(foto, width=250, caption=proyecto['title'])
                         except:
-                            st.image("assets/fincas/image1.jpg", width=250, caption=proyecto['title'])
+                            _img_finca(width=250, caption=proyecto['title'])
                     else:
-                        st.image("assets/fincas/image1.jpg", width=250, caption=proyecto['title'])
+                        _img_finca(width=250, caption=proyecto['title'])
                     
                     # Información básica
                     st.markdown(f"**🏗️ {proyecto['title']}**")
