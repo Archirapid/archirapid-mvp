@@ -388,32 +388,40 @@ def create_or_update_client_user(email, name, password=None):
     from datetime import datetime
 
     conn = db_conn()
-    c = conn.cursor()
+    try:
+        c = conn.cursor()
 
-    # Verificar si el usuario ya existe
-    c.execute("SELECT id, password_hash FROM users WHERE email = ?", (email,))
-    existing_user = c.fetchone()
+        # Verificar si el usuario ya existe
+        c.execute("SELECT id, password_hash FROM users WHERE email = ?", (email,))
+        existing_user = c.fetchone()
 
-    if existing_user:
-        # Usuario existe - actualizar rol y nombre
-        c.execute("UPDATE users SET role = 'client', name = ? WHERE email = ?", (name, email))
+        if existing_user:
+            # Usuario existe - actualizar rol y nombre
+            c.execute("UPDATE users SET role = 'client', name = ? WHERE email = ?", (name, email))
 
-        # Si se proporciona nueva password, actualizarla
-        if password:
+            # Si se proporciona nueva password, actualizarla
+            if password:
+                password_hash = generate_password_hash(password)
+                c.execute("UPDATE users SET password_hash = ? WHERE email = ?", (password_hash, email))
+        else:
+            # Crear usuario nuevo - password es obligatoria para nuevos usuarios
+            if not password:
+                raise ValueError("Se requiere contraseña para crear un nuevo usuario cliente")
+
+            user_id = str(uuid.uuid4())
             password_hash = generate_password_hash(password)
-            c.execute("UPDATE users SET password_hash = ? WHERE email = ?", (password_hash, email))
-    else:
-        # Crear usuario nuevo - password es obligatoria para nuevos usuarios
-        if not password:
-            raise ValueError("Se requiere contraseña para crear un nuevo usuario cliente")
 
-        user_id = str(uuid.uuid4())
-        password_hash = generate_password_hash(password)
+            c.execute("""
+                INSERT INTO users (id, email, name, role, password_hash, created_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (user_id, email, name, 'client', password_hash, datetime.utcnow().isoformat()))
 
-        c.execute("""
-            INSERT INTO users (id, email, name, role, password_hash, created_at)
-            VALUES (?, ?, ?, ?, ?, ?)
-        """, (user_id, email, name, 'client', password_hash, datetime.utcnow().isoformat()))
-
-    conn.commit()
-    conn.close()
+        conn.commit()
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        raise
+    finally:
+        conn.close()

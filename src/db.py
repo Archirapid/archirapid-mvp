@@ -323,6 +323,12 @@ def _get_postgres_conn():
         try:
             raw = pool.getconn()
             raw.autocommit = False
+            # Garantizar estado limpio: si la conexión vuelve al pool sin rollback,
+            # la siguiente llamada la encontraría en "transaction aborted".
+            try:
+                raw.rollback()
+            except Exception:
+                pass
             return _PooledPostgresConn(raw, pool)
         except Exception:
             pass  # Pool agotado o error, usar conexión directa
