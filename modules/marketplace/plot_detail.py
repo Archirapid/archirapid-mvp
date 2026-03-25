@@ -468,12 +468,24 @@ def show_plot_detail_page(plot_id: str):
                     # 2. Insertar reserva pendiente (se confirmará tras el pago Stripe)
                     _pending_id = _uuid_mod.uuid4().hex
                     _conn_r = _get_db()
-                    _conn_r.execute(
-                        "INSERT INTO reservations (id,plot_id,buyer_name,buyer_email,amount,kind,created_at) "
-                        "VALUES (?,?,?,?,?,?,?)",
-                        (_pending_id, str(plot_id), buyer_name, buyer_email,
-                         _precio_reserva, "pending", _dt.utcnow().isoformat())
-                    )
+                    try:
+                        _conn_r.execute(
+                            "INSERT INTO reservations "
+                            "(id,plot_id,buyer_name,buyer_email,amount,kind,created_at,"
+                            "buyer_dni,buyer_domicilio,buyer_province) "
+                            "VALUES (?,?,?,?,?,?,?,?,?,?)",
+                            (_pending_id, str(plot_id), buyer_name, buyer_email,
+                             _precio_reserva, "pending", _dt.utcnow().isoformat(),
+                             buyer_dni, buyer_dom, buyer_prov)
+                        )
+                    except Exception:
+                        # fallback sin columnas nuevas (pre-migración)
+                        _conn_r.execute(
+                            "INSERT INTO reservations (id,plot_id,buyer_name,buyer_email,amount,kind,created_at) "
+                            "VALUES (?,?,?,?,?,?,?)",
+                            (_pending_id, str(plot_id), buyer_name, buyer_email,
+                             _precio_reserva, "pending", _dt.utcnow().isoformat())
+                        )
                     _conn_r.commit()
                     _conn_r.close()
 

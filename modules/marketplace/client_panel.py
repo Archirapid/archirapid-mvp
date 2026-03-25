@@ -1512,14 +1512,18 @@ def show_buyer_panel(client_email):
                     st.session_state['show_prefab_config'] = False
                     st.session_state['show_project_search'] = False
                     st.session_state['show_construccion_offers'] = False
-                    st.info("💰 Mostrando historial de transacciones...")
+                    st.session_state['show_documentacion'] = False
+                    st.session_state['show_transacciones'] = True
+                    st.rerun()
 
             with col5:
                 if st.button("📑 DOCUMENTACIÓN", type="secondary", use_container_width=True):
                     st.session_state['show_prefab_config'] = False
                     st.session_state['show_project_search'] = False
                     st.session_state['show_construccion_offers'] = False
-                    st.info("📑 Accediendo a documentación...")
+                    st.session_state['show_transacciones'] = False
+                    st.session_state['show_documentacion'] = True
+                    st.rerun()
 
             with col6:
                 # Contar ofertas pendientes para badge
@@ -1550,6 +1554,10 @@ def show_buyer_panel(client_email):
                 show_integrated_project_search(client_email, plot_data)
             elif st.session_state.get('show_construccion_offers', False):
                 show_construccion_offers(client_email)
+            elif st.session_state.get('show_transacciones', False):
+                show_mis_transacciones(client_email, plot_data)
+            elif st.session_state.get('show_documentacion', False):
+                show_documentacion(client_email, plot_data, reservation)
 
     # Si no tiene finca adquirida, mostrar mensaje
     else:
@@ -1562,6 +1570,405 @@ def show_buyer_panel(client_email):
 
     # ELIMINAR LAS PESTAÑAS GENÉRICAS - El cliente quiere ver SU finca, no catálogo
     # Las pestañas "🔍 Buscar Proyectos" y "📋 Mis Intereses" se eliminan por completo
+
+
+
+def show_mis_transacciones(client_email: str, plot_data):
+    """Historial de transacciones del cliente con recibo descargable."""
+    import hashlib as _hl
+
+    st.markdown("### 💰 Mis Transacciones")
+
+    _conn_t = db_conn()
+    _rows_t = _conn_t.execute(
+        """SELECT r.id, r.plot_id, r.buyer_name, r.buyer_email, r.amount, r.kind,
+                  r.created_at, p.title, p.catastral_ref, p.address, p.price
+           FROM reservations r LEFT JOIN plots p ON r.plot_id=p.id
+           WHERE r.buyer_email=? AND r.kind != 'pending'
+           ORDER BY r.created_at DESC""",
+        (client_email,)
+    ).fetchall()
+    _conn_t.close()
+
+    if not _rows_t:
+        st.info("No hay transacciones registradas aún.")
+        return
+
+    _STATUS_MAP = {
+        "reservation":     ("🔒 Reserva activa (7 días)", "#1E3A5F", "#dbeafe"),
+        "en_tramitacion":  ("⚙️ En tramitación",          "#92400e", "#fef3c7"),
+        "aceptado":        ("✅ Aceptada por el vendedor", "#065f46", "#d1fae5"),
+        "compra_completa": ("🏡 Compra completada",        "#374151", "#f3f4f6"),
+        "purchase":        ("✅ Compra completada",        "#065f46", "#d1fae5"),
+    }
+
+    for _row in _rows_t:
+        (_rid, _plot_id_t, _bname, _bemail, _amount, _kind,
+         _date, _ptitle, _catref, _paddress, _pprice) = _row
+
+        _status_txt, _status_col, _status_bg = _STATUS_MAP.get(
+            _kind, ("ℹ️ " + str(_kind), "#374151", "#f3f4f6")
+        )
+        _date_short = (_date or "")[:10]
+        _hash_id = _hl.sha256(f"{_rid}{_bemail}{_date}".encode()).hexdigest()[:16].upper()
+        _pprice = _pprice or 0
+
+        st.markdown(
+            f"""<div style="background:#0f1b2d;border:1px solid #1e3a5f;border-radius:12px;
+                padding:20px 24px;margin-bottom:16px;">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;">
+                <div>
+                  <div style="font-size:1rem;font-weight:700;color:#F8FAFC;margin-bottom:4px;">
+                    🏡 {_ptitle or _plot_id_t}
+                  </div>
+                  <div style="font-size:12px;color:#94a3b8;">
+                    Ref. Catastral: <span style="color:#7dd3fc;">{_catref or "—"}</span>
+                    &nbsp;·&nbsp; ID operación: <span style="font-family:monospace;color:#7dd3fc;">{_hash_id}</span>
+                  </div>
+                </div>
+                <div style="text-align:right;">
+                  <div style="font-size:1.3rem;font-weight:900;color:#F5A623;">€{_amount:,.0f}</div>
+                  <div style="font-size:11px;color:#94a3b8;">{_date_short}</div>
+                </div>
+              </div>
+              <div style="margin-top:12px;display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
+                <span style="background:{_status_bg};color:{_status_col};
+                      padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700;">
+                  {_status_txt}
+                </span>
+                <span style="font-size:12px;color:#94a3b8;">
+                  Precio total finca: €{_pprice:,.0f}
+                </span>
+              </div>
+            </div>""",
+            unsafe_allow_html=True
+        )
+
+        # Recibo descargable en HTML
+        _receipt_html = f"""<!DOCTYPE html>
+<html lang="es"><head><meta charset="UTF-8">
+<title>Recibo ArchiRapid {_hash_id}</title>
+<style>
+body{{font-family:Arial,sans-serif;background:#f8fafc;padding:40px;margin:0;color:#0f172a;}}
+.card{{max-width:600px;margin:0 auto;background:#fff;border-radius:12px;padding:40px;
+       border:1px solid #e2e8f0;box-shadow:0 4px 24px rgba(0,0,0,.08);}}
+.logo{{font-size:1.4rem;font-weight:900;color:#1E3A5F;margin-bottom:4px;}}
+.subtitle{{color:#64748b;font-size:13px;margin-bottom:32px;}}
+h2{{color:#1E3A5F;font-size:1.1rem;border-bottom:2px solid #dbeafe;padding-bottom:8px;margin-top:28px;}}
+table{{width:100%;border-collapse:collapse;font-size:14px;margin-top:12px;}}
+td{{padding:8px 4px;border-bottom:1px solid #f1f5f9;}}
+td:first-child{{color:#64748b;width:180px;}}
+td:last-child{{font-weight:600;}}
+.amount{{font-size:2rem;font-weight:900;color:#F5A623;text-align:center;
+         background:#fff7ed;border-radius:8px;padding:16px;margin:24px 0;}}
+.status{{text-align:center;background:{_status_bg};color:{_status_col};border-radius:8px;
+         padding:10px;font-weight:700;font-size:14px;margin-bottom:24px;}}
+.hash{{font-family:monospace;font-size:11px;background:#f1f5f9;padding:8px 12px;
+       border-radius:6px;word-break:break-all;color:#475569;}}
+.footer{{text-align:center;color:#94a3b8;font-size:11px;margin-top:32px;}}
+</style></head><body>
+<div class="card">
+  <div class="logo">🏡 ArchiRapid</div>
+  <div class="subtitle">Plataforma PropTech · archirapid.streamlit.app</div>
+  <div class="status">{_status_txt}</div>
+  <div class="amount">€{_amount:,.0f} <span style="font-size:1rem;color:#92400e;">(reserva 1%)</span></div>
+  <h2>Datos de la Operación</h2>
+  <table>
+    <tr><td>ID Operación</td><td class="hash">{_hash_id}</td></tr>
+    <tr><td>Fecha</td><td>{_date_short}</td></tr>
+    <tr><td>Tipo</td><td>{_status_txt}</td></tr>
+  </table>
+  <h2>Inmueble</h2>
+  <table>
+    <tr><td>Denominación</td><td>{_ptitle or _plot_id_t}</td></tr>
+    <tr><td>Ref. Catastral</td><td>{_catref or "—"}</td></tr>
+    <tr><td>Dirección</td><td>{_paddress or "—"}</td></tr>
+    <tr><td>Precio total</td><td>€{_pprice:,.0f}</td></tr>
+  </table>
+  <h2>Comprador</h2>
+  <table>
+    <tr><td>Nombre</td><td>{_bname}</td></tr>
+    <tr><td>Email</td><td>{_bemail}</td></tr>
+  </table>
+  <h2>Verificación Digital</h2>
+  <p style="font-size:13px;color:#475569;">Hash de integridad SHA-256:</p>
+  <div class="hash">{_hl.sha256(f"{_rid}{_bemail}{_date}{_amount}".encode()).hexdigest()}</div>
+  <div class="footer">
+    ArchiRapid · archirapid.streamlit.app<br>
+    Generado el {_date_short} — válido como justificante de reserva
+  </div>
+</div></body></html>"""
+
+        st.download_button(
+            label="⬇️ Descargar Recibo",
+            data=_receipt_html.encode("utf-8"),
+            file_name=f"recibo_archirapid_{_hash_id}.html",
+            mime="text/html",
+            key=f"receipt_{_rid}",
+        )
+        st.markdown("---")
+
+
+def _generar_contrato_arras(res_row, plot_data) -> str:
+    """Genera contrato de arras penitenciales en HTML imprimible."""
+    import hashlib as _hl, datetime as _dt
+
+    _rid     = res_row[0]
+    _plot_id = res_row[1]
+    _bname   = res_row[2]
+    _bemail  = res_row[3]
+    _amount  = res_row[4] or 0
+    _kind    = res_row[5]
+    _date    = res_row[6] or ""
+    _ptitle  = res_row[7] or _plot_id
+    _catref  = res_row[8] or "—"
+    _paddress = res_row[9] or "—"
+    _pprice  = res_row[10] or 0
+    _dni     = res_row[11] if len(res_row) > 11 and res_row[11] else "—"
+    _domicilio = res_row[12] if len(res_row) > 12 and res_row[12] else "—"
+    _bprov   = res_row[13] if len(res_row) > 13 and res_row[13] else "—"
+
+    _hash_id  = _hl.sha256(f"{_rid}{_bemail}{_date}".encode()).hexdigest()[:16].upper()
+    _full_hash = _hl.sha256(f"{_rid}{_bemail}{_date}{_amount}{_catref}".encode()).hexdigest()
+    _today    = _dt.datetime.utcnow().strftime("%d/%m/%Y")
+    _date_short = _date[:10]
+
+    _owner_name  = plot_data[14] if len(plot_data) > 14 and plot_data[14] else "El Propietario"
+    _owner_email = plot_data[15] if len(plot_data) > 15 and plot_data[15] else "—"
+    _saldo = max(0, _pprice - _amount)
+
+    return f"""<!DOCTYPE html>
+<html lang="es"><head><meta charset="UTF-8">
+<title>Contrato de Arras Penitenciales {_hash_id}</title>
+<style>
+@page{{margin:2.5cm;}}
+body{{font-family:"Times New Roman",Times,serif;font-size:12pt;line-height:1.7;
+      background:#fff;color:#000;max-width:780px;margin:0 auto;padding:40px;}}
+h1{{text-align:center;font-size:16pt;text-transform:uppercase;letter-spacing:2px;
+    color:#1E3A5F;border-bottom:3px double #1E3A5F;padding-bottom:12px;}}
+h2{{font-size:13pt;color:#1E3A5F;border-bottom:1px solid #ddd;padding-bottom:4px;margin-top:32px;}}
+.clausula{{margin-bottom:18px;text-align:justify;}}
+.highlight{{background:#eff6ff;border-left:4px solid #1E3A5F;padding:12px 16px;
+            border-radius:4px;margin:16px 0;font-size:11pt;}}
+.warning{{background:#fff7ed;border-left:4px solid #F5A623;padding:12px 16px;
+          border-radius:4px;margin:16px 0;font-size:11pt;}}
+.firma{{display:flex;justify-content:space-between;margin-top:60px;gap:40px;}}
+.firma-box{{flex:1;border-top:2px solid #000;padding-top:8px;text-align:center;font-size:10pt;}}
+.hash-block{{font-family:monospace;font-size:9pt;background:#f1f5f9;padding:10px;
+             border-radius:4px;word-break:break-all;color:#475569;margin-top:8px;}}
+table.datos{{width:100%;border-collapse:collapse;font-size:11pt;margin:12px 0;}}
+table.datos td{{padding:6px 8px;border-bottom:1px solid #eee;}}
+table.datos td:first-child{{color:#475569;width:200px;}}
+.sello{{text-align:center;margin:32px 0;}}
+.sello-inner{{display:inline-block;border:3px double #1E3A5F;border-radius:8px;
+             padding:12px 32px;color:#1E3A5F;font-weight:900;font-size:12pt;}}
+.footer{{text-align:center;font-size:9pt;color:#94a3b8;margin-top:40px;
+         border-top:1px solid #e2e8f0;padding-top:16px;}}
+</style></head><body>
+
+<div style="text-align:center;margin-bottom:32px;">
+  <div style="font-size:16pt;font-weight:900;color:#1E3A5F;">ARCHIRAPID</div>
+  <div style="font-size:10pt;color:#64748b;">Plataforma PropTech · archirapid.streamlit.app</div>
+</div>
+
+<h1>Contrato de Arras Penitenciales</h1>
+<p style="text-align:center;color:#64748b;font-size:10pt;">
+  Referencia: <strong>{_hash_id}</strong> &nbsp;|&nbsp; Fecha: {_today}
+</p>
+
+<h2>I. PARTES CONTRATANTES</h2>
+<p class="clausula">
+  <strong>VENDEDOR/PROMITENTE VENDEDOR:</strong><br>
+  {_owner_name} ({_owner_email}), titular del inmueble objeto del presente contrato.
+</p>
+<p class="clausula"><strong>COMPRADOR/PROMITENTE COMPRADOR:</strong></p>
+<table class="datos">
+  <tr><td>Nombre completo</td><td><strong>{_bname}</strong></td></tr>
+  <tr><td>DNI / NIF</td><td>{_dni}</td></tr>
+  <tr><td>Domicilio</td><td>{_domicilio}</td></tr>
+  <tr><td>Provincia</td><td>{_bprov}</td></tr>
+  <tr><td>Email</td><td>{_bemail}</td></tr>
+</table>
+
+<h2>II. OBJETO DEL CONTRATO</h2>
+<p class="clausula">
+  El presente contrato tiene por objeto la reserva y compraventa futura del siguiente inmueble:
+</p>
+<table class="datos">
+  <tr><td>Denominación</td><td><strong>{_ptitle}</strong></td></tr>
+  <tr><td>Referencia Catastral</td><td><strong>{_catref}</strong></td></tr>
+  <tr><td>Dirección / Paraje</td><td>{_paddress}</td></tr>
+  <tr><td>Precio total de venta</td><td><strong>€{_pprice:,.0f}</strong></td></tr>
+</table>
+
+<h2>III. ARRAS PENITENCIALES</h2>
+<p class="clausula">
+  Al amparo del artículo <strong>1454 del Código Civil</strong>, el COMPRADOR entrega al VENDEDOR,
+  como señal de arras penitenciales, la cantidad de <strong>€{_amount:,.0f}</strong>
+  (1% del precio total de compraventa), cuyo pago quedó verificado electrónicamente
+  el <strong>{_date_short}</strong> mediante la plataforma de pagos Stripe,
+  operación ID: <strong>{_hash_id}</strong>.
+</p>
+
+<div class="highlight">
+  <strong>Vigencia de la reserva: 7 días naturales</strong> desde {_date_short}.<br>
+  Durante este período el VENDEDOR se compromete a no transmitir el inmueble a terceros.
+  Transcurrido dicho plazo sin escritura pública, la reserva caduca y las arras quedan
+  en poder del VENDEDOR como indemnización.
+</div>
+
+<h2>IV. CONSECUENCIAS DEL DESISTIMIENTO</h2>
+<p class="clausula">De conformidad con el artículo 1454 CC:</p>
+<ul>
+  <li>Si el <strong>COMPRADOR</strong> desiste, <strong>pierde las arras</strong> entregadas (€{_amount:,.0f}).</li>
+  <li>Si el <strong>VENDEDOR</strong> desiste, deberá <strong>devolver el doble</strong> de las arras recibidas (€{_amount*2:,.0f}).</li>
+</ul>
+
+<div class="warning">
+  ⚠️ <strong>Garantía ArchiRapid:</strong> En caso de cualquier incidencia técnica imputable
+  a la plataforma, el importe íntegro de las arras (€{_amount:,.0f}) será devuelto
+  al comprador sin penalización en un plazo máximo de <strong>5 días hábiles</strong>.
+</div>
+
+<h2>V. PRECIO PENDIENTE DE PAGO</h2>
+<p class="clausula">
+  En caso de formalizarse la compraventa dentro del plazo, el COMPRADOR abonará
+  el saldo pendiente de <strong>€{_saldo:,.0f}</strong>
+  (precio total €{_pprice:,.0f} menos arras ya entregadas €{_amount:,.0f}),
+  conforme a las condiciones que las partes acuerden ante Notario.
+</p>
+
+<h2>VI. LEGISLACIÓN APLICABLE Y FUERO</h2>
+<p class="clausula">
+  Este contrato se rige por la legislación española vigente (Código Civil arts. 1445 y ss.
+  y art. 1454). Para cualquier controversia, las partes se someten a los Juzgados y Tribunales
+  del lugar de situación del inmueble, con renuncia a cualquier otro fuero.
+</p>
+
+<h2>VII. VALIDEZ DIGITAL E INTEGRIDAD</h2>
+<p class="clausula">
+  Documento generado y registrado digitalmente por ArchiRapid con marca de tiempo verificada.
+  El siguiente hash SHA-256 garantiza la integridad del documento:
+</p>
+<div class="hash-block">{_full_hash}</div>
+<p style="font-size:10pt;color:#475569;margin-top:8px;">
+  Verificable en: Intranet ArchiRapid → Reservas → Verificar integridad de documento.
+</p>
+
+<div class="firma">
+  <div class="firma-box">
+    <div style="height:80px;"></div>
+    <strong>EL VENDEDOR</strong><br>
+    {_owner_name}<br>
+    <span style="font-size:9pt;color:#94a3b8;">Firma y fecha</span>
+  </div>
+  <div class="firma-box">
+    <div style="height:80px;"></div>
+    <strong>EL COMPRADOR</strong><br>
+    {_bname} · DNI: {_dni}<br>
+    <span style="font-size:9pt;color:#94a3b8;">Firma y fecha</span>
+  </div>
+</div>
+
+<div class="sello">
+  <div class="sello-inner">
+    ✅ REGISTRADO EN ARCHIRAPID<br>
+    <span style="font-size:9pt;font-weight:400;">{_today} · Ref: {_hash_id}</span>
+  </div>
+</div>
+
+<div class="footer">
+  ArchiRapid · Plataforma PropTech Española · archirapid.streamlit.app<br>
+  Generado automáticamente con validez contractual según art. 23 LSSI-CE<br>
+  Hash de integridad: {_hash_id}
+</div>
+</body></html>"""
+
+
+def show_documentacion(client_email: str, plot_data, reservation):
+    """Documentación: nota catastral + contrato de arras descargable."""
+    import hashlib as _hl
+
+    st.markdown("### 📑 Documentación")
+
+    # ── Nota catastral ────────────────────────────────────────────────────────
+    st.markdown("#### 📋 Nota Catastral")
+    _reg_path = plot_data[7]
+    _cat_ref  = plot_data[2]
+
+    if _reg_path and os.path.exists(_reg_path):
+        with open(_reg_path, "rb") as _f:
+            st.download_button(
+                label="📥 Descargar Nota Catastral (PDF)",
+                data=_f,
+                file_name=f"nota_catastral_{_cat_ref or 'finca'}.pdf",
+                mime="application/pdf",
+                key="doc_catastral_btn",
+                type="primary",
+            )
+    elif _cat_ref:
+        st.success(f"✅ Nota catastral verificada — Ref: `{_cat_ref}`")
+        st.markdown(
+            '<a href="https://www1.sedecatastro.gob.es/CYCBienInmueble/OVCBusqueda.aspx" '
+            'target="_blank">📄 Obtener desde Sede Electrónica del Catastro →</a>',
+            unsafe_allow_html=True
+        )
+    else:
+        st.info("📋 Nota catastral no disponible aún.")
+
+    st.markdown("---")
+
+    # ── Contrato de arras ─────────────────────────────────────────────────────
+    st.markdown("#### 📝 Contrato de Arras Penitenciales")
+    st.markdown(
+        "Documento legal estándar (art. 1454 CC) que acredita tu reserva. "
+        "Abre en el navegador y usa Ctrl+P → Guardar como PDF para firmarlo."
+    )
+
+    # Obtener reserva con columnas extendidas (post-migración)
+    _conn_d = db_conn()
+    try:
+        _res_ext = _conn_d.execute(
+            """SELECT r.id, r.plot_id, r.buyer_name, r.buyer_email, r.amount, r.kind,
+                      r.created_at, p.title, p.catastral_ref, p.address, p.price,
+                      r.buyer_dni, r.buyer_domicilio, r.buyer_province
+               FROM reservations r LEFT JOIN plots p ON r.plot_id=p.id
+               WHERE r.buyer_email=? AND r.kind != 'pending'
+               ORDER BY r.created_at DESC LIMIT 1""",
+            (client_email,)
+        ).fetchone()
+    except Exception:
+        _res_ext = _conn_d.execute(
+            """SELECT r.id, r.plot_id, r.buyer_name, r.buyer_email, r.amount, r.kind,
+                      r.created_at, p.title, p.catastral_ref, p.address, p.price
+               FROM reservations r LEFT JOIN plots p ON r.plot_id=p.id
+               WHERE r.buyer_email=? AND r.kind != 'pending'
+               ORDER BY r.created_at DESC LIMIT 1""",
+            (client_email,)
+        ).fetchone()
+    _conn_d.close()
+
+    if _res_ext:
+        _arras_html = _generar_contrato_arras(_res_ext, plot_data)
+        _hash_id = _hl.sha256(
+            f"{_res_ext[0]}{_res_ext[3]}{_res_ext[6]}".encode()
+        ).hexdigest()[:16].upper()
+        st.download_button(
+            label="📄 Descargar Contrato de Arras (HTML · imprimible como PDF)",
+            data=_arras_html.encode("utf-8"),
+            file_name=f"contrato_arras_{_hash_id}.html",
+            mime="text/html",
+            key="doc_arras_btn",
+            type="primary",
+        )
+        with st.expander("🔐 Hash de integridad SHA-256"):
+            _full_hash = _hl.sha256(
+                f"{_res_ext[0]}{_res_ext[3]}{_res_ext[6]}{_res_ext[4]}{_res_ext[8] or ''}".encode()
+            ).hexdigest()
+            st.code(_full_hash, language=None)
+            st.caption("Calculado sobre: ID reserva + email + fecha + importe + ref catastral")
+    else:
+        st.info("No hay reserva activa para generar el contrato.")
 
 
 def show_construccion_offers(client_email: str):

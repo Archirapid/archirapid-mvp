@@ -223,16 +223,53 @@ def main():
             )
             _db3b.close()
             if not _df_res3.empty:
-                _df_res3["kind"] = _df_res3["kind"].map(
-                    {"purchase": "✅ Compra", "reservation": "🔒 Reserva 7d", "pending": "⏳ Pendiente pago"}
-                ).fillna(_df_res3["kind"])
+                _STATUS_LABELS = {
+                    "purchase": "✅ Compra", "reservation": "🔒 Reserva 7d",
+                    "pending": "⏳ Pendiente pago", "en_tramitacion": "⚙️ En tramitación",
+                    "aceptado": "✅ Aceptada", "compra_completa": "🏡 Compra completada",
+                }
+                _df_res3["estado"] = _df_res3["kind"].map(_STATUS_LABELS).fillna(_df_res3["kind"])
                 st.dataframe(
-                    _df_res3.rename(columns={
+                    _df_res3[["id","buyer_name","buyer_email","finca","amount","estado","created_at"]].rename(columns={
                         "id": "ID", "buyer_name": "Comprador", "buyer_email": "Email",
-                        "finca": "Finca", "amount": "Importe (€)", "kind": "Tipo", "created_at": "Fecha"
+                        "finca": "Finca", "amount": "Importe (€)", "estado": "Estado", "created_at": "Fecha"
                     }),
                     use_container_width=True, hide_index=True
                 )
+
+                # Gestión de estado — admin puede avanzar el estado de cualquier reserva
+                st.markdown("**⚙️ Actualizar estado de reserva:**")
+                _col_r1, _col_r2, _col_r3 = st.columns(3)
+                with _col_r1:
+                    _res_ids = _df_res3[_df_res3["kind"].isin(["reservation","en_tramitacion"])]["id"].tolist()
+                    _res_sel = st.selectbox("Reserva a gestionar", _res_ids, key="intra_res_sel") if _res_ids else None
+                with _col_r2:
+                    _new_status = st.selectbox(
+                        "Nuevo estado", ["en_tramitacion", "aceptado", "compra_completa"],
+                        key="intra_res_status"
+                    ) if _res_ids else None
+                with _col_r3:
+                    st.markdown("<br>", unsafe_allow_html=True)
+                    if _res_sel and _new_status and st.button("✅ Actualizar", key="intra_res_update", type="primary"):
+                        try:
+                            _db_up = db_conn()
+                            _db_up.execute(
+                                "UPDATE reservations SET kind=? WHERE id=?", (_new_status, _res_sel)
+                            )
+                            _db_up.commit()
+                            _db_up.close()
+                            # Notificar al comprador via Telegram
+                            try:
+                                _buyer_r = _df_res3[_df_res3["id"]==_res_sel].iloc[0]
+                                from modules.marketplace.email_notify import _send as _t_send
+                                _lbl = {"en_tramitacion":"⚙️ en tramitación","aceptado":"✅ aceptada","compra_completa":"🏡 completada"}
+                                _t_send(f"📋 Admin actualizó reserva {_res_sel[:8]}... → {_lbl.get(_new_status, _new_status)}\nComprador: {_buyer_r['buyer_email']}")
+                            except Exception:
+                                pass
+                            st.success(f"Estado actualizado a '{_new_status}'")
+                            st.rerun()
+                        except Exception as _eu:
+                            st.error(f"Error: {_eu}")
             else:
                 st.info("Sin reservas ni compras todavía.")
         except Exception as _er3:
