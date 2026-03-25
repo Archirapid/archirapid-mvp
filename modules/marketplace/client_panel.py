@@ -1742,17 +1742,24 @@ def _generar_contrato_arras(res_row, plot_data) -> str:
     _catref  = res_row[8] or "—"
     _paddress = res_row[9] or "—"
     _pprice  = res_row[10] or 0
-    _dni     = res_row[11] if len(res_row) > 11 and res_row[11] else "—"
-    _domicilio = res_row[12] if len(res_row) > 12 and res_row[12] else "—"
-    _bprov   = res_row[13] if len(res_row) > 13 and res_row[13] else "—"
+    def _safe(row, key, default="—"):
+        try:
+            v = row[key]
+            return v if v else default
+        except (IndexError, KeyError, TypeError):
+            return default
+
+    _dni       = _safe(res_row, 11)
+    _domicilio = _safe(res_row, 12)
+    _bprov     = _safe(res_row, 13)
 
     _hash_id  = _hl.sha256(f"{_rid}{_bemail}{_date}".encode()).hexdigest()[:16].upper()
     _full_hash = _hl.sha256(f"{_rid}{_bemail}{_date}{_amount}{_catref}".encode()).hexdigest()
     _today    = _dt.datetime.utcnow().strftime("%d/%m/%Y")
     _date_short = _date[:10]
 
-    _owner_name  = plot_data[14] if len(plot_data) > 14 and plot_data[14] else "El Propietario"
-    _owner_email = plot_data[15] if len(plot_data) > 15 and plot_data[15] else "—"
+    _owner_name  = _safe(plot_data, 14, "El Propietario")
+    _owner_email = _safe(plot_data, 15)
     _saldo = max(0, _pprice - _amount)
 
     return f"""<!DOCTYPE html>
@@ -2805,8 +2812,15 @@ def show_integrated_project_search(client_email, plot_data):
 
     # Calcular superficie máxima edificable
     # plot_data[3] = m2 total, plot_data[4] = superficie_edificable
-    superficie_edificable = plot_data[4] if (len(plot_data) > 4 and plot_data[4]) else None
-    m2_total = plot_data[3] if (len(plot_data) > 3 and plot_data[3]) else 0
+    def _safe_pd(key, default=None):
+        try:
+            v = plot_data[key]
+            return v if v else default
+        except (IndexError, KeyError, TypeError):
+            return default
+
+    superficie_edificable = _safe_pd(4)
+    m2_total = _safe_pd(3, 0)
 
     verified_m2 = st.session_state.get('verified_m2')
     if verified_m2:
