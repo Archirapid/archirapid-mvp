@@ -382,69 +382,80 @@ def show_ficha_publica(finca_id: str) -> None:
     # ── Capa profesional: visible solo para inmos colaboradoras ──────────────
     _show_capa_profesional_inmo(finca, finca_id)
 
-    # ── Reservar / Comprar (mismo flujo que pin azul) ─────────────────────────
+    # ── Acceso al Portal de Cliente (igual que pin azul) ─────────────────────
     st.markdown("---")
-    st.subheader("📝 ¿Interesado en esta finca?")
+    st.subheader("👤 ¿Interesado en esta finca?")
+    st.info(
+        "Regístrate o inicia sesión para acceder a tu **Portal de Cliente**: "
+        "proyectos compatibles, casa prefabricada, documentación, diseño con IA y más."
+    )
 
     if reservada:
         st.warning("🔒 Esta finca está actualmente reservada.")
         st.info("Déjanos tu contacto por si quedara disponible.")
         _form_contacto(finca)
     else:
-        show_form = st.session_state.get(f"_mls_form_{finca_id}", False)
-
-        if st.button("📝 Reservar o Comprar Finca", type="primary", key="fp_btn_reservar"):
-            st.session_state[f"_mls_form_{finca_id}"] = not show_form
-            st.rerun()
-
-        if st.session_state.get(f"_mls_form_{finca_id}", False):
-            st.markdown("### 📋 Formulario de Contacto")
+        if not st.session_state.get(f"_mls_portal_{finca_id}", False):
+            col_pb1, col_pb2 = st.columns(2)
+            with col_pb1:
+                if st.button(
+                    "📋 Acceder / Registrarse",
+                    type="primary",
+                    key=f"mls_portal_btn_{finca_id}",
+                    use_container_width=True,
+                ):
+                    st.session_state[f"_mls_portal_{finca_id}"] = True
+                    st.rerun()
+            with col_pb2:
+                st.markdown("**¿Solo quieres información?**")
+                _form_contacto(finca)
+        else:
+            st.markdown("### 📋 Registro / Inicio de Sesión")
             col1, col2 = st.columns(2)
             with col1:
-                buyer_name     = st.text_input("Nombre completo *", key=f"mls_name_{finca_id}")
-                buyer_email    = st.text_input("Email *",            key=f"mls_email_{finca_id}")
-                buyer_password = st.text_input(
-                    "Contraseña de acceso *", type="password",
-                    key=f"mls_pwd_{finca_id}",
-                    help="Será tu contraseña para el panel de cliente",
-                )
+                buyer_name     = st.text_input("Nombre completo",      key=f"mls_name_{finca_id}")
+                buyer_email    = st.text_input("Email *",               key=f"mls_email_{finca_id}")
             with col2:
-                buyer_phone = st.text_input("Teléfono", key=f"mls_phone_{finca_id}")
-                reservation_type = st.selectbox(
-                    "Tipo de interés",
-                    ["Reserva (10%)", "Compra completa (100%)"],
-                    key=f"mls_type_{finca_id}",
+                buyer_password = st.text_input(
+                    "Contraseña *", type="password",
+                    key=f"mls_pwd_{finca_id}",
+                    help="Mínimo 6 caracteres · Será tu contraseña para el portal",
                 )
+                buyer_phone = st.text_input("Teléfono (opcional)", key=f"mls_phone_{finca_id}")  # noqa: F841
 
-            if reservation_type == "Reserva (10%)":
-                amount = precio * 0.1
-                amount_text = f"€{amount:,.0f} (10% del precio total)"
-            else:
-                amount = precio
-                amount_text = f"€{amount:,.0f} (precio completo)"
-            st.markdown(f"**Importe a pagar:** {amount_text}")
-
-            if st.button("✅ Confirmar y Proceder", type="primary", key=f"mls_confirm_{finca_id}"):
-                if not buyer_name or not buyer_email or not buyer_password:
-                    st.error("Completa nombre, email y contraseña (*obligatorios).")
-                elif len(buyer_password) < 6:
-                    st.error("La contraseña debe tener al menos 6 caracteres.")
-                else:
-                    try:
-                        from modules.marketplace.utils import create_or_update_client_user
-                        create_or_update_client_user(buyer_email, buyer_name, buyer_password)
-
-                        # Sesión y redirección — idéntico al flujo azul
-                        st.session_state["logged_in"]       = True
-                        st.session_state["user_email"]      = buyer_email
-                        st.session_state["role"]            = "client"
-                        st.session_state["user_name"]       = buyer_name
-                        st.session_state["selected_page"]   = "👤 Panel de Cliente"
-                        st.session_state["mls_reserva_finca_id"] = finca_id
-                        st.query_params.clear()
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Error al procesar: {e}")
+            colc1, colc2 = st.columns(2)
+            with colc1:
+                if st.button(
+                    "✅ Acceder a mi Portal",
+                    type="primary",
+                    key=f"mls_portal_confirm_{finca_id}",
+                    use_container_width=True,
+                ):
+                    if not buyer_email or not buyer_password:
+                        st.error("Email y contraseña son obligatorios.")
+                    elif len(buyer_password) < 6:
+                        st.error("La contraseña debe tener al menos 6 caracteres.")
+                    else:
+                        try:
+                            from modules.marketplace.utils import create_or_update_client_user
+                            _name = (buyer_name or "").strip() or buyer_email.split("@")[0]
+                            create_or_update_client_user(
+                                buyer_email.strip().lower(), _name, buyer_password
+                            )
+                            st.session_state["logged_in"]             = True
+                            st.session_state["user_email"]            = buyer_email.strip().lower()
+                            st.session_state["role"]                  = "client"
+                            st.session_state["user_name"]             = _name
+                            st.session_state["selected_page"]         = "👤 Panel de Cliente"
+                            st.session_state["mls_reserva_finca_id"]  = finca_id
+                            st.query_params.clear()
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Error al procesar: {e}")
+            with colc2:
+                if st.button("← Cancelar", key=f"mls_portal_cancel_{finca_id}", use_container_width=True):
+                    st.session_state[f"_mls_portal_{finca_id}"] = False
+                    st.rerun()
 
     st.markdown("---")
     st.markdown("[← Volver al mapa](/)")

@@ -302,12 +302,202 @@ def _show_mls_reserva_panel(client_email: str, finca_id: str) -> None:
         st.rerun()
 
 
+def show_buyer_panel_mls(client_email: str, finca_id: str) -> None:
+    """Panel completo para clientes que vienen del pin naranja MLS.
+    Muestra los mismos 6 botones que el panel azul."""
+    from modules.mls import mls_db
+    import json as _json_mls
+
+    # ── Sidebar: warning + logout (igual que panel azul) ─────────────────
+    with st.sidebar:
+        st.info("💡 Puedes volver a acceder a tu portal en cualquier momento desde la página de inicio con tu email.")
+        if st.button("🚪 Cerrar Sesión", key="mls_logout_btn"):
+            for _k in ["logged_in", "user_email", "role", "user_name", "mls_reserva_finca_id",
+                       "mls_show_project_search", "mls_show_prefab_config", "mls_show_transacciones",
+                       "mls_show_documentacion", "mls_show_construccion_offers"]:
+                st.session_state.pop(_k, None)
+            st.rerun()
+
+    finca = mls_db.get_finca_sin_identidad_listante(finca_id)
+
+    st.success(f"✅ Bienvenido/a, {st.session_state.get('user_name', client_email)}")
+    st.markdown(
+        "<div style='color:#F5A623;font-weight:700;font-size:13px;margin-bottom:4px;'>🟠 ArchiRapid MLS</div>",
+        unsafe_allow_html=True,
+    )
+
+    if finca:
+        titulo        = finca.get("titulo") or "Finca MLS"
+        precio        = float(finca.get("precio") or 0)
+        sup           = float(finca.get("superficie_m2") or 0)
+        catastro_ref  = finca.get("catastro_ref") or "—"
+        estado        = finca.get("estado", "publicada")
+        tipo_suelo    = finca.get("tipo_suelo") or "—"
+        lat           = finca.get("catastro_lat")
+        lon           = finca.get("catastro_lon")
+        servicios_raw = finca.get("servicios")
+
+        st.subheader("🏡 MI FINCA MLS")
+        col1, col2 = st.columns([1, 2])
+        with col1:
+            # Intentar mostrar imagen de la finca MLS
+            _raw_imgs = finca.get("image_paths") or "[]"
+            try:
+                _img_paths = _json_mls.loads(_raw_imgs) if isinstance(_raw_imgs, str) else _raw_imgs
+            except Exception:
+                _img_paths = []
+            _shown = False
+            for _ip in (_img_paths or []):
+                _norm = str(_ip).replace("\\", "/")
+                _candidates = [_norm, f"uploads/{_norm}"]
+                for _c in _candidates:
+                    if os.path.exists(_c):
+                        st.image(_c, width=250)
+                        _shown = True
+                        break
+                if _shown:
+                    break
+            if not _shown:
+                _img_finca(width=250)
+
+        with col2:
+            st.markdown(f"### 🏠 {titulo}")
+            st.markdown(f"**💰 Precio:** €{precio:,.0f}")
+            st.markdown(f"**📏 Superficie:** {sup:,.0f} m²")
+            st.markdown(f"**🏗️ Máx. construible (33%):** {sup * 0.33:,.0f} m²")
+            st.markdown(f"**📋 Ref. Catastral:** `{catastro_ref}`")
+            st.markdown(f"**🏷️ Tipo:** {tipo_suelo}")
+            _estado_txt = {
+                "reserva_pendiente_confirmacion": "🔒 Reserva pendiente (48h)",
+                "reservada": "🔒 Reservada",
+                "publicada":  "🟢 Disponible",
+            }.get(estado, estado)
+            st.info(_estado_txt)
+
+        # Tuple compatible con plot_data para reutilizar funciones existentes:
+        # [0]=id [1]=title [2]=catastral_ref [3]=m2 [4]=sup_edificable
+        # [5]=type [6]=vertices [7]=registry_path [8]=price [9]=lat [10]=lon
+        # [11]=status [12]=created_at [13]=photo_paths [14]=owner_name
+        # [15]=owner_email [16]=owner_phone [17]=services [18]=type [19]=address
+        mls_plot = (
+            finca_id,
+            titulo,
+            catastro_ref,
+            sup,
+            sup * 0.33,
+            tipo_suelo,
+            None,
+            None,
+            precio,
+            lat,
+            lon,
+            estado,
+            None,
+            None,
+            None,
+            None,
+            None,
+            servicios_raw,
+            tipo_suelo,
+            finca.get("catastro_direccion"),
+        )
+    else:
+        st.warning("No se pudo cargar la ficha de la finca. Contacta con soporte.")
+        mls_plot = None
+
+    st.markdown("---")
+    st.subheader("🛠️ Herramientas para tu Propiedad")
+
+    _col1, _col2, _col3 = st.columns(3)
+    _col4, _col5, _col6 = st.columns(3)
+
+    with _col1:
+        if st.button("🎨 DISEÑAR CON IA", type="primary", use_container_width=True, key="mls_dsh_ia"):
+            st.session_state["design_plot_id"]  = finca_id
+            st.session_state["ai_house_step"]   = 1
+            st.session_state.pop("mls_show_project_search", None)
+            st.session_state.pop("mls_show_prefab_config", None)
+            st.query_params["page"] = "Diseñador de Vivienda"
+            st.rerun()
+
+    with _col2:
+        if st.button("📐 PROYECTOS COMPATIBLES", type="secondary", use_container_width=True, key="mls_dsh_proj"):
+            st.session_state["mls_show_project_search"]      = True
+            st.session_state.pop("mls_show_prefab_config", None)
+            st.session_state.pop("mls_show_transacciones", None)
+            st.session_state.pop("mls_show_documentacion", None)
+            st.session_state.pop("mls_show_construccion_offers", None)
+            st.rerun()
+
+    with _col3:
+        if st.button("🏠 CASA PREFABRICADA", type="secondary", use_container_width=True, key="mls_dsh_pref"):
+            st.session_state["mls_show_prefab_config"]       = True
+            st.session_state.pop("mls_show_project_search", None)
+            st.session_state.pop("mls_show_transacciones", None)
+            st.session_state.pop("mls_show_documentacion", None)
+            st.session_state.pop("mls_show_construccion_offers", None)
+            st.rerun()
+
+    with _col4:
+        if st.button("💰 MIS TRANSACCIONES", type="secondary", use_container_width=True, key="mls_dsh_trans"):
+            st.session_state["mls_show_transacciones"]       = True
+            st.session_state.pop("mls_show_project_search", None)
+            st.session_state.pop("mls_show_prefab_config", None)
+            st.session_state.pop("mls_show_documentacion", None)
+            st.session_state.pop("mls_show_construccion_offers", None)
+            st.rerun()
+
+    with _col5:
+        if st.button("📑 DOCUMENTACIÓN", type="secondary", use_container_width=True, key="mls_dsh_doc"):
+            st.session_state["mls_show_documentacion"]       = True
+            st.session_state.pop("mls_show_project_search", None)
+            st.session_state.pop("mls_show_prefab_config", None)
+            st.session_state.pop("mls_show_transacciones", None)
+            st.session_state.pop("mls_show_construccion_offers", None)
+            st.rerun()
+
+    with _col6:
+        try:
+            _conn_of = db_conn()
+            _n_of = _conn_of.execute("""
+                SELECT COUNT(*) FROM construction_offers co
+                JOIN project_tablon pt ON co.tablon_id = pt.id
+                WHERE pt.client_email=? AND co.estado='enviada'
+            """, (client_email,)).fetchone()[0]
+            _conn_of.close()
+        except Exception:
+            _n_of = 0
+        _of_label = f"🏗️ OFERTAS ({_n_of})" if _n_of > 0 else "🏗️ OFERTAS"
+        _of_type  = "primary" if _n_of > 0 else "secondary"
+        if st.button(_of_label, type=_of_type, use_container_width=True, key="mls_dsh_of"):
+            st.session_state["mls_show_construccion_offers"] = True
+            st.session_state.pop("mls_show_project_search", None)
+            st.session_state.pop("mls_show_prefab_config", None)
+            st.session_state.pop("mls_show_transacciones", None)
+            st.session_state.pop("mls_show_documentacion", None)
+            st.rerun()
+
+    st.markdown("---")
+
+    # SECCIONES INDEPENDIENTES — solo una activa a la vez
+    if st.session_state.get("mls_show_prefab_config") and mls_plot:
+        show_prefab_configurator(mls_plot)
+    elif st.session_state.get("mls_show_project_search") and mls_plot:
+        show_integrated_project_search(client_email, mls_plot)
+    elif st.session_state.get("mls_show_construccion_offers"):
+        show_construccion_offers(client_email)
+    elif st.session_state.get("mls_show_transacciones"):
+        show_mis_transacciones(client_email, mls_plot)
+    elif st.session_state.get("mls_show_documentacion") and mls_plot:
+        show_documentacion(client_email, mls_plot, None)
+
+
 def show_full_client_dashboard(client_email):
     """Muestra el panel completo del cliente para usuarios ya logueados"""
-    # Si viene de reserva naranja MLS → panel MLS específico
+    # Si viene de reserva naranja MLS → panel completo con 6 botones (igual que pin azul)
     mls_finca_id = st.session_state.get("mls_reserva_finca_id")
     if mls_finca_id:
-        _show_mls_reserva_panel(client_email, mls_finca_id)
+        show_buyer_panel_mls(client_email, mls_finca_id)
         return
 
     # Panel de cliente logueado
