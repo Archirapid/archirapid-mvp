@@ -1984,12 +1984,19 @@ def show_construccion_offers(client_email: str):
     st.markdown("### 🏗️ Ofertas de Construcción Recibidas")
 
     conn = db_conn()
-    # Proyectos del cliente en el tablón
-    proyectos = conn.execute("""
-        SELECT id, project_name, province, style, total_area, total_cost, coste_m2, created_at
-        FROM project_tablon WHERE client_email=? AND active=1 ORDER BY created_at DESC
-    """, (client_email,)).fetchall()
-    conn.close()
+    try:
+        proyectos = conn.execute("""
+            SELECT id, project_name, province, style, total_area, total_cost, coste_m2, created_at
+            FROM project_tablon WHERE client_email=? AND active=1 ORDER BY created_at DESC
+        """, (client_email,)).fetchall()
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        proyectos = []
+    finally:
+        conn.close()
 
     if not proyectos:
         st.markdown("""

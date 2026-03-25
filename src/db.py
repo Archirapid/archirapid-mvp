@@ -566,6 +566,21 @@ _PG_DDL = [
         bio TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP,
         name TEXT, company TEXT, phone TEXT, specialty TEXT
     )""",
+    """CREATE TABLE IF NOT EXISTS project_tablon (
+        id TEXT PRIMARY KEY, client_email TEXT, client_name TEXT,
+        project_name TEXT, province TEXT, style TEXT,
+        total_area REAL, total_cost REAL, coste_m2 REAL,
+        budget_json TEXT, created_at TEXT, active INTEGER DEFAULT 1
+    )""",
+    """CREATE TABLE IF NOT EXISTS construction_offers (
+        id TEXT PRIMARY KEY, tablon_id TEXT, provider_id TEXT,
+        provider_name TEXT, provider_email TEXT, client_email TEXT,
+        project_name TEXT, total_area REAL, price_no_mat REAL,
+        price_with_mat REAL, includes_materials INTEGER DEFAULT 0,
+        plazo_semanas INTEGER, garantia_anos INTEGER DEFAULT 5,
+        nota_tecnica TEXT, breakdown_json TEXT,
+        estado TEXT DEFAULT 'enviada', created_at TEXT
+    )""",
     """CREATE TABLE IF NOT EXISTS service_assignments (
         id TEXT PRIMARY KEY, venta_id TEXT, proveedor_id TEXT,
         servicio_tipo TEXT, cliente_email TEXT, proyecto_id TEXT,
@@ -936,6 +951,24 @@ def ensure_tables():
             buyer_dni TEXT, buyer_domicilio TEXT, buyer_province TEXT
         )""")
         
+        # Tablón de obras y ofertas de construcción
+        c.execute("""CREATE TABLE IF NOT EXISTS project_tablon (
+            id           TEXT PRIMARY KEY,
+            client_email TEXT, client_name TEXT, project_name TEXT,
+            province TEXT, style TEXT, total_area REAL, total_cost REAL,
+            coste_m2 REAL, budget_json TEXT, created_at TEXT,
+            active INTEGER DEFAULT 1
+        )""")
+        c.execute("""CREATE TABLE IF NOT EXISTS construction_offers (
+            id                TEXT PRIMARY KEY,
+            tablon_id         TEXT, provider_id TEXT, provider_name TEXT,
+            provider_email    TEXT, client_email TEXT, project_name TEXT,
+            total_area        REAL, price_no_mat REAL, price_with_mat REAL,
+            includes_materials INTEGER DEFAULT 0, plazo_semanas INTEGER,
+            garantia_anos     INTEGER DEFAULT 5, nota_tecnica TEXT,
+            breakdown_json    TEXT, estado TEXT DEFAULT 'enviada', created_at TEXT
+        )""")
+
         # Tabla architects (arquitectos registrados)
         c.execute("""CREATE TABLE IF NOT EXISTS architects (
             id TEXT PRIMARY KEY,
