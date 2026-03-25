@@ -144,50 +144,63 @@ def get_proyectos_compatibles(
     rows = cursor.fetchall()
     conn.close()
     
-    # 3. Formatear resultados
+    # 3. Formatear resultados — usar claves de columna, no índices enteros
+    def _col(row, key, default=None):
+        try:
+            v = row[key]
+            return v if v is not None else default
+        except (IndexError, KeyError, TypeError):
+            return default
+
     compatibles = []
     for row in rows:
         # Parsear galeria_fotos si es JSON
+        gf_raw = _col(row, "galeria_fotos")
         galeria = []
-        if row[11]:  # galeria_fotos
-            try: 
-                galeria = json.loads(row[11]) if isinstance(row[11], str) else row[11]
-            except: 
-                galeria = [row[11]] if row[11] else []
-        
+        if gf_raw:
+            try:
+                galeria = json.loads(gf_raw) if isinstance(gf_raw, str) else gf_raw
+            except Exception:
+                galeria = [gf_raw]
+
+        m2c = _col(row, "m2_construidos")
+        a_m2 = _col(row, "area_m2")
+        pm = _col(row, "price_memoria", 1800)
+        pc = _col(row, "price_cad", 2500)
+
         proyecto = {
-            "id": row[0],
-            "title": row[1],
-            "description": row[2],
-            "m2_construidos": row[3],
-            "area_m2": row[4],
-            "price": row[5],
-            "estimated_cost": row[6],
-            "price_memoria": row[7] or 1800,
-            "price_cad": row[8] or 2500,
-            "property_type": row[9] or "residencial",
-            "foto_principal": row[10],
+            "id": _col(row, "id"),
+            "title": _col(row, "title"),
+            "description": _col(row, "description"),
+            "m2_construidos": m2c,
+            "area_m2": a_m2,
+            "price": _col(row, "price"),
+            "estimated_cost": _col(row, "estimated_cost"),
+            "price_memoria": pm or 1800,
+            "price_cad": pc or 2500,
+            "property_type": _col(row, "property_type") or "residencial",
+            "foto_principal": _col(row, "foto_principal"),
             "galeria_fotos": galeria,
-            "memoria_pdf": row[12],
-            "planos_pdf": row[13],
-            "planos_dwg": row[14],
-            "modelo_3d_glb": row[15],
-            "vr_tour": row[16],
-            "energy_rating": row[17],
-            "architect_id": row[18],
-            "architect_name": row[19],
-            "m2_parcela_minima": row[20],
-            "m2_parcela_maxima": row[21],
+            "memoria_pdf": _col(row, "memoria_pdf"),
+            "planos_pdf": _col(row, "planos_pdf"),
+            "planos_dwg": _col(row, "planos_dwg"),
+            "modelo_3d_glb": _col(row, "modelo_3d_glb"),
+            "vr_tour": _col(row, "vr_tour"),
+            "energy_rating": _col(row, "energy_rating"),
+            "architect_id": _col(row, "architect_id"),
+            "architect_name": _col(row, "architect_name"),
+            "m2_parcela_minima": _col(row, "m2_parcela_minima"),
+            "m2_parcela_maxima": _col(row, "m2_parcela_maxima"),
             # Datos calculados
             "fits_plot": superficie_edificable is not None and (
-                (row[3] and row[3] <= superficie_edificable) or
-                (not row[3] and row[4] and row[4] <= superficie_edificable)
+                (m2c and m2c <= superficie_edificable) or
+                (not m2c and a_m2 and a_m2 <= superficie_edificable)
             ),
             "superficie_disponible": superficie_edificable,
-            "precio_total": (row[7] or 1800) + (row[8] or 2500)
+            "precio_total": (pm or 1800) + (pc or 2500)
         }
         compatibles.append(proyecto)
-    
+
     return compatibles
     
     # Excluir proyectos ya comprados
@@ -207,48 +220,61 @@ def get_proyectos_compatibles(
     rows = cursor.fetchall()
     conn.close()
     
-    # 3. Formatear resultados
+    # 3. Formatear resultados — usar claves de columna, no índices enteros
+    def _col(row, key, default=None):
+        try:
+            v = row[key]
+            return v if v is not None else default
+        except (IndexError, KeyError, TypeError):
+            return default
+
     compatibles = []
     for row in rows:
         # Parsear galeria_fotos si es JSON
+        gf_raw = _col(row, "galeria_fotos")
         galeria = []
-        if row[11]:  # galeria_fotos
-            try: 
-                galeria = json.loads(row[11]) if isinstance(row[11], str) else row[11]
-            except: 
-                galeria = [row[11]] if row[11] else []
-        
+        if gf_raw:
+            try:
+                galeria = json.loads(gf_raw) if isinstance(gf_raw, str) else gf_raw
+            except Exception:
+                galeria = [gf_raw]
+
+        m2c = _col(row, "m2_construidos")
+        a_m2 = _col(row, "area_m2")
+        pm = _col(row, "price_memoria", 1800)
+        pc = _col(row, "price_cad", 2500)
+
         proyecto = {
-            "id": row[0],
-            "title": row[1],
-            "description": row[2],
-            "m2_construidos": row[3],
-            "area_m2": row[4],
-            "price": row[5],
-            "estimated_cost": row[6],
-            "price_memoria": row[7] or 1800,
-            "price_cad": row[8] or 2500,
-            "property_type": row[9] or "residencial",
-            "foto_principal": row[10],
+            "id": _col(row, "id"),
+            "title": _col(row, "title"),
+            "description": _col(row, "description"),
+            "m2_construidos": m2c,
+            "area_m2": a_m2,
+            "price": _col(row, "price"),
+            "estimated_cost": _col(row, "estimated_cost"),
+            "price_memoria": pm or 1800,
+            "price_cad": pc or 2500,
+            "property_type": _col(row, "property_type") or "residencial",
+            "foto_principal": _col(row, "foto_principal"),
             "galeria_fotos": galeria,
-            "memoria_pdf": row[12],
-            "planos_pdf": row[13],
-            "planos_dwg": row[14],
-            "modelo_3d_glb": row[15],
-            "vr_tour": row[16],
-            "energy_rating": row[17],
-            "architect_id": row[18],
-            "architect_name": row[19],
-            "m2_parcela_minima": row[20],
-            "m2_parcela_maxima": row[21],
+            "memoria_pdf": _col(row, "memoria_pdf"),
+            "planos_pdf": _col(row, "planos_pdf"),
+            "planos_dwg": _col(row, "planos_dwg"),
+            "modelo_3d_glb": _col(row, "modelo_3d_glb"),
+            "vr_tour": _col(row, "vr_tour"),
+            "energy_rating": _col(row, "energy_rating"),
+            "architect_id": _col(row, "architect_id"),
+            "architect_name": _col(row, "architect_name"),
+            "m2_parcela_minima": _col(row, "m2_parcela_minima"),
+            "m2_parcela_maxima": _col(row, "m2_parcela_maxima"),
             # Datos calculados
             "fits_plot": superficie_edificable is not None and (
-                (row[3] and row[3] <= superficie_edificable) or
-                (not row[3] and row[4] and row[4] <= superficie_edificable)
+                (m2c and m2c <= superficie_edificable) or
+                (not m2c and a_m2 and a_m2 <= superficie_edificable)
             ),
             "superficie_disponible": superficie_edificable,
-            "precio_total": (row[7] or 1800) + (row[8] or 2500)
+            "precio_total": (pm or 1800) + (pc or 2500)
         }
         compatibles.append(proyecto)
-    
+
     return compatibles

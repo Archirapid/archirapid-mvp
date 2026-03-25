@@ -2225,7 +2225,7 @@ def show_prefab_configurator(plot_data):
         floors_filter = st.selectbox("Plantas", [0, 1, 2], format_func=lambda x: "Todas" if x == 0 else str(x), key="pf_floors")
 
     # Consulta catálogo con límite de m²
-    query = "SELECT id, name, m2, rooms, bathrooms, floors, material, price, description FROM prefab_catalog WHERE active=1 AND m2 <= ?"
+    query = "SELECT id, name, m2, rooms, bathrooms, floors, material, price, description, image_path FROM prefab_catalog WHERE active=1 AND m2 <= ?"
     params = [prefab_max_m2 if prefab_max_m2 > 0 else 9999]
     if mat_filter != "Todos":
         query += " AND material = ?"
@@ -2252,15 +2252,23 @@ def show_prefab_configurator(plot_data):
     N = 5
     cols = st.columns(N)
     for idx, pf in enumerate(prefabs):
-        pf_id, name, m2, rooms, bathrooms, floors, material, price, description = pf
+        pf_id, name, m2, rooms, bathrooms, floors, material, price, description, image_path = pf
         with cols[idx % N]:
             selected = st.session_state.get('prefab_selected_id') == pf_id
             border_color = "#2563EB" if selected else "#E2E8F0"
             bg_color = "#EFF6FF" if selected else "#F8FAFC"
+            # Imagen del modelo
+            if image_path and os.path.exists(str(image_path)):
+                st.image(str(image_path), use_container_width=True)
+            else:
+                st.markdown(
+                    '<div style="height:100px;background:#F1F5F9;border-radius:8px;'
+                    'display:flex;align-items:center;justify-content:center;font-size:2em;">🏠</div>',
+                    unsafe_allow_html=True
+                )
             st.markdown(
                 f'<div style="background:{bg_color};border:2px solid {border_color};border-radius:10px;'
-                f'padding:12px 8px 8px;text-align:center;margin-bottom:6px;">'
-                f'<div style="font-size:1.8em;">🏠</div>'
+                f'padding:8px 8px 8px;text-align:center;margin-bottom:6px;">'
                 f'<div style="font-weight:700;font-size:0.82em;color:#0D1B2A;line-height:1.2;">{name}</div>'
                 f'<div style="font-size:0.75em;color:#64748B;margin:4px 0;">{m2} m² · {rooms}hab · {bathrooms}baños · {floors}pl</div>'
                 f'<div style="font-size:0.73em;color:#475569;margin-bottom:4px;">{material}</div>'
@@ -2277,11 +2285,11 @@ def show_prefab_configurator(plot_data):
     if selected_id:
         conn2 = db_conn()
         cur2 = conn2.cursor()
-        cur2.execute("SELECT id, name, m2, rooms, bathrooms, floors, material, price, description FROM prefab_catalog WHERE id=?", (selected_id,))
+        cur2.execute("SELECT id, name, m2, rooms, bathrooms, floors, material, price, description, image_path FROM prefab_catalog WHERE id=?", (selected_id,))
         sel = cur2.fetchone()
         conn2.close()
         if sel:
-            pf_id, name, m2, rooms, bathrooms, floors, material, price, description = sel
+            pf_id, name, m2, rooms, bathrooms, floors, material, price, description, image_path = sel
             st.markdown("---")
             st.markdown(f"### ✅ Modelo seleccionado: **{name}**")
             col_d1, col_d2 = st.columns([2, 1])
