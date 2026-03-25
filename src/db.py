@@ -428,7 +428,8 @@ _PG_DDL = [
     """CREATE TABLE IF NOT EXISTS reservations (
         id TEXT PRIMARY KEY,
         plot_id TEXT, buyer_name TEXT, buyer_email TEXT,
-        amount REAL, kind TEXT, created_at TEXT
+        amount REAL, kind TEXT, created_at TEXT,
+        buyer_dni TEXT, buyer_domicilio TEXT, buyer_province TEXT
     )""",
     """CREATE TABLE IF NOT EXISTS architects (
         id TEXT PRIMARY KEY,
@@ -925,7 +926,8 @@ def ensure_tables():
         )""")
         c.execute("""CREATE TABLE IF NOT EXISTS reservations (
             id TEXT PRIMARY KEY,
-            plot_id TEXT, buyer_name TEXT, buyer_email TEXT, amount REAL, kind TEXT, created_at TEXT
+            plot_id TEXT, buyer_name TEXT, buyer_email TEXT, amount REAL, kind TEXT, created_at TEXT,
+            buyer_dni TEXT, buyer_domicilio TEXT, buyer_province TEXT
         )""")
         
         # Tabla architects (arquitectos registrados)
@@ -950,6 +952,9 @@ def ensure_tables():
             "ALTER TABLE plots ADD COLUMN tour_360_b64 TEXT",
             "ALTER TABLE plots ADD COLUMN buildable_m2 REAL",
             "ALTER TABLE plots ADD COLUMN ai_verification_cache TEXT",
+            "ALTER TABLE reservations ADD COLUMN buyer_dni TEXT",
+            "ALTER TABLE reservations ADD COLUMN buyer_domicilio TEXT",
+            "ALTER TABLE reservations ADD COLUMN buyer_province TEXT",
         ]:
             try:
                 c.execute(_mig_sql)
