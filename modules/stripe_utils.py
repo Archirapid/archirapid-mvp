@@ -115,6 +115,41 @@ def create_custom_session(line_items: list, client_email: str,
     return session.url, session.id
 
 
+
+def create_reservation_checkout(plot_id: str, pending_id: str, buyer_name: str,
+                                 buyer_email: str, amount_cents: int, plot_ref: str,
+                                 success_url: str, cancel_url: str) -> tuple:
+    """
+    Crea sesion Stripe Checkout para reserva del 1%% de una finca.
+    Devuelve (checkout_url, session_id).
+    """
+    _stripe.api_key = _get_key()
+    session = _stripe.checkout.Session.create(
+        payment_method_types=["card"],
+        line_items=[{
+            "price_data": {
+                "currency": "eur",
+                "product_data": {"name": f"Reserva 7 dias Finca {plot_ref[:60]}"},
+                "unit_amount": max(amount_cents, 50),
+            },
+            "quantity": 1,
+        }],
+        mode="payment",
+        customer_email=buyer_email or None,
+        success_url=success_url,
+        cancel_url=cancel_url,
+        metadata={
+            "type": "plot_reservation",
+            "plot_id": str(plot_id)[:100],
+            "pending_id": str(pending_id)[:100],
+            "buyer_name": str(buyer_name)[:100],
+            "buyer_email": str(buyer_email)[:100],
+            "plot_ref": str(plot_ref)[:100],
+        },
+    )
+    return session.url, session.id
+
+
 def verify_session(session_id: str):
     """Recupera y devuelve la sesión de Stripe (incluye payment_status y metadata)."""
     _stripe.api_key = _get_key()

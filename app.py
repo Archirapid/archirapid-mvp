@@ -1489,22 +1489,61 @@ if st.query_params.get("stripe_session") and st.query_params.get("payment") == "
                 _cli_mail = _meta.get("client_email", "") or (_sess.customer_email or "")
                 _prods    = _meta.get("products", "")
                 _amount   = (_sess.amount_total or 0) / 100
-                _con3 = _sq3.connect("database.db", timeout=15)
-                _con3.execute("PRAGMA journal_mode=WAL")
-                _exists3 = _con3.execute(
-                    "SELECT id FROM ventas_proyectos WHERE stripe_session_id = ?", (_ss_id,)
-                ).fetchone()
-                if not _exists3:
-                    _con3.execute("""
-                        INSERT INTO ventas_proyectos
-                        (proyecto_id, cliente_email, nombre_cliente, productos_comprados,
-                         total_pagado, metodo_pago, fecha_compra, stripe_session_id)
-                        VALUES (?, ?, ?, ?, ?, 'Stripe', datetime('now'), ?)
-                    """, (_proj_id, _cli_mail, _cli_mail, _prods, _amount, _ss_id))
-                    _con3.commit()
-                _con3.close()
-                st.session_state[f"stripe_verified_{_ss_id}"] = True
-                st.toast("🎉 Pago completado. Ya puedes descargar tus archivos.", icon="✅")
+                if _meta.get("type") == "plot_reservation":
+                    # ── Reserva de finca: confirmar pago y auto-login ──
+                    _plot_id_r  = _meta.get("plot_id", "")
+                    _pending_id = _meta.get("pending_id", "")
+                    _buyer_mail = _meta.get("buyer_email", "") or _cli_mail
+                    _buyer_name = _meta.get("buyer_name", "")
+                    if not st.session_state.get(f"stripe_verified_{_ss_id}"):
+                        try:
+                            from src.db import get_conn as _get_db_r
+                            _conn_r = _get_db_r()
+                            if _pending_id:
+                                _conn_r.execute(
+                                    "UPDATE reservations SET kind='reservation' WHERE id=? AND kind='pending'",
+                                    (_pending_id,)
+                                )
+                                _conn_r.execute(
+                                    "UPDATE plots SET status='reserved' WHERE id=?",
+                                    (_plot_id_r,)
+                                )
+                                _conn_r.commit()
+                            _conn_r.close()
+                        except Exception as _re:
+                            st.toast(f"Reserva anotada (aviso técnico: {_re})", icon="ℹ️")
+                        st.session_state[f"stripe_verified_{_ss_id}"] = True
+                        st.session_state["logged_in"]       = True
+                        st.session_state["user_email"]      = _buyer_mail
+                        st.session_state["role"]            = "client"
+                        st.session_state["user_name"]       = _buyer_name
+                        st.session_state["auto_owner_email"] = _buyer_mail
+                        st.session_state["selected_page"]  = "👤 Panel de Cliente"
+                        st.session_state["payment_confirmed"] = True
+                        st.toast("🎉 ¡Reserva confirmada! Bienvenido a tu panel de cliente.", icon="✅")
+                        try:
+                            del st.query_params["stripe_session"]
+                            del st.query_params["payment"]
+                        except Exception:
+                            pass
+                        st.rerun()
+                else:
+                    _con3 = _sq3.connect("database.db", timeout=15)
+                    _con3.execute("PRAGMA journal_mode=WAL")
+                    _exists3 = _con3.execute(
+                        "SELECT id FROM ventas_proyectos WHERE stripe_session_id = ?", (_ss_id,)
+                    ).fetchone()
+                    if not _exists3:
+                        _con3.execute("""
+                            INSERT INTO ventas_proyectos
+                            (proyecto_id, cliente_email, nombre_cliente, productos_comprados,
+                             total_pagado, metodo_pago, fecha_compra, stripe_session_id)
+                            VALUES (?, ?, ?, ?, ?, 'Stripe', datetime('now'), ?)
+                        """, (_proj_id, _cli_mail, _cli_mail, _prods, _amount, _ss_id))
+                        _con3.commit()
+                    _con3.close()
+                    st.session_state[f"stripe_verified_{_ss_id}"] = True
+                    st.toast("🎉 Pago completado. Ya puedes descargar tus archivos.", icon="✅")
         except Exception as _se:
             st.toast(f"Error verificando pago Stripe: {_se}", icon="⚠️")
     # Limpiar params de Stripe sin perder el proyecto

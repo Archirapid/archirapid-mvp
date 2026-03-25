@@ -399,81 +399,104 @@ def show_plot_detail_page(plot_id: str):
 
     st.markdown("---")
 
-    # Botón de acción principal: Reservar o Comprar
-    st.subheader("📝 ¿Interesado en esta finca?")
+    # ── Sección de reserva de finca ──────────────────────────────────────────
+    st.subheader("🏡 Reservar esta Finca")
 
-    # Estado de expansión del formulario
-    show_form = st.session_state.get(f'form_expanded_{plot_id}', False)
+    # Calcular importe reserva 1%
+    _precio_reserva = precio * 0.01
+    _precio_str = f"{precio:,.0f}".replace(",", ".")
+    _reserva_str = f"{_precio_reserva:,.0f}".replace(",", ".")
 
-    if st.button("📝 Reservar o Comprar Finca", type="primary"):
-        st.session_state[f'form_expanded_{plot_id}'] = not show_form
-        st.rerun()
+    # Si ya hay URL de Stripe pendiente, mostrar botón de pago
+    _stripe_url_key = f"stripe_reserva_url_{plot_id}"
+    if st.session_state.get(_stripe_url_key):
+        _s_url = st.session_state[_stripe_url_key]
+        st.success("✅ Formulario recibido. Completa el pago para confirmar tu reserva.")
+        st.markdown(
+            f'<a href="{_s_url}" target="_blank" style="display:inline-block;'
+            'background:#1E3A5F;color:#fff;padding:14px 28px;border-radius:8px;'
+            'font-weight:700;font-size:16px;text-decoration:none;margin-top:8px;">'
+            f'💳 Pagar €{_reserva_str} con Tarjeta — Reserva 7 días</a>',
+            unsafe_allow_html=True,
+        )
+        if st.button("✏️ Cambiar datos del formulario", key=f"reset_reserva_{plot_id}"):
+            del st.session_state[_stripe_url_key]
+            st.rerun()
+    else:
+        st.markdown(
+            f"Precio de la finca: **€{_precio_str}** · "
+            f"Importe de reserva (1%): **€{_reserva_str}**"
+        )
+        st.info(
+            "⚠️ **Reserva temporal de 7 días** — Al completar el pago, la finca quedará reservada "
+            "exclusivamente a tu nombre durante 7 días naturales (art. 1454 CC). "
+            "Pasado ese plazo sin escritura, la reserva caduca y el importe queda a favor del vendedor "
+            "como señal de arras.",
+        )
 
-    # Formulario de contacto (expandible)
-    if st.session_state.get(f'form_expanded_{plot_id}', False):
-        st.markdown("### 📋 Formulario de Contacto")
+        with st.form(key=f"form_reservar_{plot_id}"):
+            st.markdown("### 📋 Formulario de Registro")
+            col_f1, col_f2 = st.columns(2)
+            with col_f1:
+                buyer_name  = st.text_input("Nombre completo *")
+                buyer_email = st.text_input("Email *")
+                buyer_pass  = st.text_input("Contraseña de acceso *", type="password",
+                                            help="Con esta contraseña accederás a tu panel de cliente")
+            with col_f2:
+                buyer_phone = st.text_input("Teléfono")
+                buyer_dni   = st.text_input("DNI / NIF *")
+                buyer_dom   = st.text_input("Domicilio")
+                buyer_prov  = st.text_input("Provincia")
+            _submitted = st.form_submit_button("🏡 Reservar esta Finca", type="primary", use_container_width=True)
 
-        col_form1, col_form2 = st.columns(2)
-
-        with col_form1:
-            buyer_name = st.text_input("Nombre completo *", key=f"name_{plot_id}")
-            buyer_email = st.text_input("Email *", key=f"email_{plot_id}")
-            buyer_password = st.text_input("Contraseña de acceso *", type="password", key=f"password_{plot_id}",
-                                         help="Esta será tu contraseña para acceder a tu panel de cliente")
-
-        with col_form2:
-            buyer_phone = st.text_input("Teléfono", key=f"phone_{plot_id}")
-            reservation_type = st.selectbox(
-                "Tipo de interés",
-                ["Reserva (10%)", "Compra completa (100%)"],
-                key=f"type_{plot_id}"
-            )
-
-        # Calcular importe según tipo
-        if reservation_type == "Reserva (10%)":
-            amount = precio * 0.1
-            amount_text = f"€{amount:,.0f} (10% del precio total)"
-        else:
-            amount = precio
-            amount_text = f"€{amount:,.0f} (precio completo)"
-
-        st.markdown(f"**Importe a pagar:** {amount_text}")
-
-        if st.button("✅ Confirmar y Proceder", type="primary", key=f"confirm_{plot_id}"):
-            if not buyer_name or not buyer_email or not buyer_password:
-                st.error("Por favor completa nombre, email y contraseña (todos los campos marcados con * son obligatorios)")
-            elif len(buyer_password) < 6:
+        if _submitted:
+            if not buyer_name or not buyer_email or not buyer_pass or not buyer_dni:
+                st.error("Nombre, email, contraseña y DNI/NIF son obligatorios (*)")
+            elif len(buyer_pass) < 6:
                 st.error("La contraseña debe tener al menos 6 caracteres")
+            elif "@" not in buyer_email:
+                st.error("Introduce un email válido")
             else:
                 try:
-                    kind = "reservation" if "Reserva" in reservation_type else "purchase"
-                    rid = reserve_plot(
-                        plot_id,
-                        buyer_name,
-                        buyer_email,
-                        amount,
-                        kind=kind
+                    import uuid as _uuid_mod
+                    from datetime import datetime as _dt
+                    from src.db import get_conn as _get_db
+
+                    # 1. Crear/actualizar usuario cliente
+                    create_or_update_client_user(buyer_email, buyer_name, buyer_pass)
+
+                    # 2. Insertar reserva pendiente (se confirmará tras el pago Stripe)
+                    _pending_id = _uuid_mod.uuid4().hex
+                    _conn_r = _get_db()
+                    _conn_r.execute(
+                        "INSERT INTO reservations (id,plot_id,buyer_name,buyer_email,amount,kind,created_at) "
+                        "VALUES (?,?,?,?,?,?,?)",
+                        (_pending_id, str(plot_id), buyer_name, buyer_email,
+                         _precio_reserva, "pending", _dt.utcnow().isoformat())
                     )
+                    _conn_r.commit()
+                    _conn_r.close()
 
-                    # Crear/actualizar usuario cliente con contraseña
-                    create_or_update_client_user(buyer_email, buyer_name, buyer_password)
-
-                    # SESIÓN REFORZADA - Asegurar acceso inmediato al panel
-                    st.session_state['payment_confirmed'] = True
-                    st.session_state['active_purchase_id'] = rid
-
-                    # FLUJO DE ENTRADA OBLIGATORIO - CERO FRICCIÓN
-                    st.session_state['logged_in'] = True
-                    st.session_state['user_email'] = buyer_email
-                    st.session_state['role'] = 'client'
-                    st.session_state['auto_owner_email'] = buyer_email  # ESTA ES LA LLAVE QUE FALTA
-                    st.session_state['user_name'] = buyer_name  # Guardar nombre del usuario
-                    st.session_state['selected_page'] = '👤 Panel de Cliente'
-                    st.query_params.clear()  # Eliminar ?selected_plot=... para que el routing vaya al panel
+                    # 3. Crear sesión Stripe y mostrar botón de pago
+                    from modules.stripe_utils import create_reservation_checkout as _crc
+                    _plot_ref = plot.get("catastral_ref") or plot.get("ref_catastral") or str(plot_id)
+                    _s_url, _s_id = _crc(
+                        plot_id=str(plot_id),
+                        pending_id=_pending_id,
+                        buyer_name=buyer_name,
+                        buyer_email=buyer_email,
+                        amount_cents=max(int(_precio_reserva * 100), 50),
+                        plot_ref=_plot_ref,
+                        success_url=(
+                            "https://archirapid.streamlit.app/"
+                            "?stripe_session={CHECKOUT_SESSION_ID}&payment=success"
+                        ),
+                        cancel_url=f"https://archirapid.streamlit.app/?selected_plot={plot_id}",
+                    )
+                    st.session_state[_stripe_url_key] = _s_url
                     st.rerun()
-
-                except Exception as e:
-                    st.error(f"Error al procesar la operación: {str(e)}")
+                except Exception as _e:
+                    st.error(f"Error al preparar la reserva: {_e}")
 
     # ── Tour Virtual 360° ─────────────────────────────────────────────────────
     _b64_360 = plot.get("tour_360_b64", "") or ""
