@@ -1,5 +1,9 @@
 # modules/marketplace/client_panel.py
 import streamlit as st
+import json
+import os
+import base64 as _b64
+from pathlib import Path
 try:
     from modules.marketplace.utils import db_conn
 except ImportError:
@@ -8,6 +12,10 @@ except ImportError:
     sys.path.append(r"C:/ARCHIRAPID_PROYECT25")
     from src import db as db_module
     def db_conn():
+        return db_module.get_conn()
+from modules.marketplace.compatibilidad import get_proyectos_compatibles
+from modules.ai_house_designer import flow as ai_house_flow
+
 
 def _img_finca(width=250, caption=None):
     """Muestra imagen finca o placeholder si el archivo no existe en Cloud."""
@@ -25,14 +33,6 @@ def _img_finca(width=250, caption=None):
             f'align-items:center;justify-content:center;font-size:36px;">🏡</div>',
             unsafe_allow_html=True
         )
-
-        return db_module.get_conn()
-import json
-import os
-import base64 as _b64
-from pathlib import Path
-from modules.marketplace.compatibilidad import get_proyectos_compatibles
-from modules.ai_house_designer import flow as ai_house_flow
 
 
 _GITHUB_RAW = "https://raw.githubusercontent.com/Archirapid/archirapid-mvp/main"
