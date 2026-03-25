@@ -478,16 +478,23 @@ def show_plot_detail_page(plot_id: str):
                              _precio_reserva, "pending", _dt.utcnow().isoformat(),
                              buyer_dni, buyer_dom, buyer_prov)
                         )
+                        _conn_r.commit()
                     except Exception:
-                        # fallback sin columnas nuevas (pre-migración)
+                        # PostgreSQL: rollback obligatorio antes de cualquier nueva query
+                        try:
+                            _conn_r.rollback()
+                        except Exception:
+                            pass
+                        # Fallback sin columnas nuevas (pre-migración)
                         _conn_r.execute(
                             "INSERT INTO reservations (id,plot_id,buyer_name,buyer_email,amount,kind,created_at) "
                             "VALUES (?,?,?,?,?,?,?)",
                             (_pending_id, str(plot_id), buyer_name, buyer_email,
                              _precio_reserva, "pending", _dt.utcnow().isoformat())
                         )
-                    _conn_r.commit()
-                    _conn_r.close()
+                        _conn_r.commit()
+                    finally:
+                        _conn_r.close()
 
                     # 3. Crear sesión Stripe y mostrar botón de pago
                     from modules.stripe_utils import create_reservation_checkout as _crc
