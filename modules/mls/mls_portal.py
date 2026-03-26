@@ -753,7 +753,7 @@ def ui_portal_operativo(inmo: dict) -> None:
 - **Estadísticas** — visitas, contactos y actividad de tu cartera.
 - **Mi Cuenta** — datos de empresa, plan activo y facturación.
 
-💬 ¿Dudas? Pregunta a **Lola**, la asistente IA de ArchiRapid (botón inferior izquierdo), o escríbenos desde el botón *Contactar con ArchiRapid*.
+💬 ¿Dudas? Pregunta a **Lola**, la asistente IA de ArchiRapid (botón inferior derecho), o escríbenos desde el botón *Contactar con ArchiRapid*.
 """
         )
 
