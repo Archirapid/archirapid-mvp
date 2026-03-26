@@ -63,8 +63,8 @@ _CSS = """
     min-height: 44px    !important;
   }
 
-  /* ── Expanders: área de click más generosa ── */
-  .streamlit-expanderHeader {
+  /* ── Expanders: área de click más generosa (Streamlit 1.42+) ── */
+  details[data-testid="stExpander"] summary {
     font-size: 14px     !important;
     padding: 12px 8px   !important;
     min-height: 44px    !important;
