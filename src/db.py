@@ -627,7 +627,10 @@ _PG_DDL = [
         contacto_telegram TEXT, factura_razon_social TEXT,
         factura_cif TEXT, factura_direccion TEXT, factura_email TEXT,
         iban TEXT, banco_nombre TEXT, banco_titular TEXT,
-        email_login TEXT
+        email_login TEXT,
+        trial_start_date TEXT DEFAULT NULL,
+        trial_active INTEGER DEFAULT 0,
+        trial_expired INTEGER DEFAULT 0
     )""",
     """CREATE TABLE IF NOT EXISTS fincas_mls (
         id TEXT PRIMARY KEY,
@@ -732,6 +735,10 @@ _PG_ALTER_MIGRATIONS = [
     "ALTER TABLE fincas_mls ADD COLUMN IF NOT EXISTS catastro_direccion TEXT",
     "ALTER TABLE fincas_mls ADD COLUMN IF NOT EXISTS catastro_municipio TEXT",
     "ALTER TABLE ai_projects ADD COLUMN IF NOT EXISTS req_json TEXT",
+    # inmobiliarias: columnas trial 30 días
+    "ALTER TABLE inmobiliarias ADD COLUMN IF NOT EXISTS trial_start_date TEXT DEFAULT NULL",
+    "ALTER TABLE inmobiliarias ADD COLUMN IF NOT EXISTS trial_active INTEGER DEFAULT 0",
+    "ALTER TABLE inmobiliarias ADD COLUMN IF NOT EXISTS trial_expired INTEGER DEFAULT 0",
 ]
 
 
@@ -1365,7 +1372,10 @@ def ensure_tables():
             firma_timestamp  TEXT,
             activa           INTEGER DEFAULT 0,
             ip_registro      TEXT,
-            created_at       TEXT
+            created_at       TEXT,
+            trial_start_date TEXT DEFAULT NULL,
+            trial_active     INTEGER DEFAULT 0,
+            trial_expired    INTEGER DEFAULT 0
         )""")
 
         # Migraciones MLS: columnas extendidas de inmobiliarias (add-only, idempotentes)
@@ -1392,6 +1402,10 @@ def ensure_tables():
             "ALTER TABLE inmobiliarias ADD COLUMN banco_nombre TEXT",
             "ALTER TABLE inmobiliarias ADD COLUMN banco_titular TEXT",
             "ALTER TABLE inmobiliarias ADD COLUMN email_login TEXT",
+            # Trial 30 días
+            "ALTER TABLE inmobiliarias ADD COLUMN trial_start_date TEXT DEFAULT NULL",
+            "ALTER TABLE inmobiliarias ADD COLUMN trial_active INTEGER DEFAULT 0",
+            "ALTER TABLE inmobiliarias ADD COLUMN trial_expired INTEGER DEFAULT 0",
         ]:
             try:
                 c.execute(_mls_col)

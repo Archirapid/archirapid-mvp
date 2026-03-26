@@ -831,3 +831,170 @@ def marcar_leida(notif_id: int) -> bool:
         return False
     finally:
         conn.close()
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# TRIAL 30 DÍAS
+# ═════════════════════════════════════════════════════════════════════════════
+
+_TRIAL_DAYS = 30
+
+
+def activate_trial(inmo_id: str) -> bool:
+    """
+    Activa el trial de 30 días para una inmobiliaria recién aprobada.
+    Guarda trial_start_date = fecha actual ISO (UTC), trial_active = 1.
+    Es idempotente: si el trial ya estaba activo no lo reinicia.
+    """
+    conn = _db.get_conn()
+    try:
+        row = conn.execute(
+            "SELECT trial_active FROM inmobiliarias WHERE id = ?",
+            (inmo_id,)
+        ).fetchone()
+        if row and row["trial_active"] == 1:
+            # Ya activo — no reiniciar
+            return True
+        conn.execute(
+            """UPDATE inmobiliarias
+               SET trial_start_date = ?,
+                   trial_active      = 1,
+                   trial_expired     = 0
+               WHERE id = ?""",
+            (_now_utc(), inmo_id)
+        )
+        conn.commit()
+        return True
+    except Exception as e:
+        logger.error("activate_trial error: %s", e)
+        return False
+    finally:
+        conn.close()
+
+
+def check_trial_status(inmo_id: str) -> dict:
+    """
+    Devuelve el estado actual del trial de una inmobiliaria.
+
+    Claves del dict:
+      active         bool  — trial en curso (no expirado, no sustituido por plan)
+      expired        bool  — trial expirado y sin plan de pago
+      days_remaining int   — días que quedan (0 si expirado o sin trial)
+      on_paid_plan   bool  — tiene plan de pago activo (plan_activo=1)
+      trial_day      int   — día del trial en que se encuentra (1-30, 0 si no aplica)
+    """
+    _default = {
+        "active": False,
+        "expired": False,
+        "days_remaining": 0,
+        "on_paid_plan": False,
+        "trial_day": 0,
+    }
+    conn = _db.get_conn()
+    try:
+        row = conn.execute(
+            """SELECT plan_activo, trial_start_date, trial_active, trial_expired
+               FROM inmobiliarias WHERE id = ?""",
+            (inmo_id,)
+        ).fetchone()
+    except Exception as e:
+        logger.error("check_trial_status error: %s", e)
+        return _default
+    finally:
+        conn.close()
+
+    if row is None:
+        return _default
+
+    on_paid_plan = bool(row["plan_activo"])
+    if on_paid_plan:
+        return {**_default, "on_paid_plan": True}
+
+    if not row["trial_active"] and not row["trial_expired"]:
+        # Nunca activado
+        return _default
+
+    if not row["trial_start_date"]:
+        return _default
+
+    from datetime import timedelta
+    try:
+        start = datetime.fromisoformat(row["trial_start_date"])
+        # Asegurar timezone-aware
+        if start.tzinfo is None:
+            start = start.replace(tzinfo=timezone.utc)
+    except Exception:
+        return _default
+
+    now = datetime.now(timezone.utc)
+    elapsed_days = (now - start).days
+    days_remaining = max(0, _TRIAL_DAYS - elapsed_days)
+    trial_day = min(elapsed_days + 1, _TRIAL_DAYS)
+
+    if days_remaining > 0 and not row["trial_expired"]:
+        return {
+            "active": True,
+            "expired": False,
+            "days_remaining": days_remaining,
+            "on_paid_plan": False,
+            "trial_day": trial_day,
+        }
+
+    # Trial expirado — marcar en BD si aún no estaba marcado
+    if not row["trial_expired"]:
+        try:
+            conn2 = _db.get_conn()
+            conn2.execute(
+                """UPDATE inmobiliarias
+                   SET trial_active = 0, trial_expired = 1
+                   WHERE id = ?""",
+                (inmo_id,)
+            )
+            conn2.commit()
+        except Exception as e:
+            logger.error("check_trial_status mark_expired error: %s", e)
+        finally:
+            try:
+                conn2.close()
+            except Exception:
+                pass
+
+    return {
+        "active": False,
+        "expired": True,
+        "days_remaining": 0,
+        "on_paid_plan": False,
+        "trial_day": _TRIAL_DAYS,
+    }
+
+
+def get_trial_days_remaining(inmo_id: str) -> int:
+    """
+    Helper simple: días que quedan del trial.
+    Devuelve 0 si el trial expiró, no existe o la inmo tiene plan de pago.
+    """
+    return check_trial_status(inmo_id)["days_remaining"]
+
+
+def get_inmos_con_trial_activo() -> list:
+    """
+    Devuelve lista de dicts con id, nombre, email, trial_start_date
+    de todas las inmobiliarias con trial_active=1 y plan_activo=0.
+    Usado por check_and_send_trial_emails() en intranet.
+    """
+    conn = _db.get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """SELECT id, nombre, nombre_comercial, email,
+                      trial_start_date, trial_active, trial_expired
+               FROM inmobiliarias
+               WHERE trial_active = 1 AND plan_activo = 0
+               ORDER BY trial_start_date ASC"""
+        )
+        return [_row_to_dict(r) for r in cur.fetchall()]
+    except Exception as e:
+        logger.error("get_inmos_con_trial_activo error: %s", e)
+        return []
+    finally:
+        conn.close()

@@ -1458,6 +1458,11 @@ Obtén el token creando un bot con @BotFather en Telegram.
                             if st.button("✅ Aprobar", key=f"mls_apro_{_p['id']}", type="primary",
                                          use_container_width=True):
                                 _mls.update_inmo_activa(_p["id"], 1)
+                                # Activar trial 30 días automáticamente al aprobar
+                                try:
+                                    _mls.activate_trial(_p["id"])
+                                except Exception:
+                                    pass
                                 try:
                                     _mls_notif.notif_aprobacion(
                                         nombre=_pnombre,
@@ -1466,7 +1471,17 @@ Obtén el token creando un bot con @BotFather en Telegram.
                                     )
                                 except Exception:
                                     pass
-                                st.success(f"✅ {_pnombre} aprobada.")
+                                # Email bienvenida trial
+                                try:
+                                    from modules.mls.mls_trial_emails import send_trial_email
+                                    send_trial_email(
+                                        inmo_email=_p.get("email", ""),
+                                        inmo_nombre=_pnombre,
+                                        tipo="bienvenida",
+                                    )
+                                except Exception:
+                                    pass
+                                st.success(f"✅ {_pnombre} aprobada. Trial de 30 días activado.")
                                 st.rerun()
 
                             st.markdown("")
@@ -2009,3 +2024,45 @@ Obtén el token creando un bot con @BotFather en Telegram.
                         st.caption("✅ Gestionada")
         except Exception as _ef_sec:
             st.warning(f"Error sección F: {_ef_sec}")
+
+        st.markdown("---")
+
+        # ══ SECCIÓN G: Trial 30 días ══════════════════════════════════════════
+        st.subheader("🎁 G. Emails de ciclo trial (día 7 y día 25)")
+        st.caption(
+            "Envía emails de check-in (día 7) y urgencia (día 25) a todas las "
+            "inmobiliarias con trial activo que cumplan el criterio. "
+            "Los emails no se duplican si el criterio ya no aplica."
+        )
+        try:
+            if st.button("📧 Ejecutar envío de emails de trial ahora",
+                         key="mls_trial_emails_run", type="primary"):
+                from modules.mls.mls_trial_emails import check_and_send_trial_emails
+                _sent = check_and_send_trial_emails()
+                if _sent:
+                    st.success(f"✅ Emails enviados: {_sent}")
+                else:
+                    st.info("Ninguna inmobiliaria cumple el criterio de envío ahora mismo.")
+
+            # Tabla resumen de trials activos
+            from modules.mls import mls_db as _mls_db_g
+            _trials = _mls_db_g.get_inmos_con_trial_activo()
+            if _trials:
+                import datetime as _dt_g
+                _trial_rows = []
+                for _t in _trials:
+                    _ts = _mls_db_g.check_trial_status(_t["id"])
+                    _trial_rows.append({
+                        "Nombre": _t.get("nombre_comercial") or _t.get("nombre", "?"),
+                        "Email": _t.get("email", "—"),
+                        "Inicio trial": (_t.get("trial_start_date") or "")[:10],
+                        "Días restantes": _ts["days_remaining"],
+                        "Día trial": _ts["trial_day"],
+                    })
+                import pandas as _pd_g
+                st.dataframe(_pd_g.DataFrame(_trial_rows),
+                             use_container_width=True, hide_index=True)
+            else:
+                st.info("No hay inmobiliarias con trial activo.")
+        except Exception as _eg:
+            st.warning(f"Error sección G: {_eg}")

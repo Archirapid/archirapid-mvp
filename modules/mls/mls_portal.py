@@ -631,6 +631,50 @@ def ui_portal_operativo(inmo: dict) -> None:
             unsafe_allow_html=True,
         )
 
+    # ── Banners de trial ──────────────────────────────────────────────────────
+    _trial_status = {}
+    try:
+        from modules.mls.mls_db import check_trial_status as _check_trial
+        _trial_status = _check_trial(inmo["id"])
+    except Exception:
+        pass
+
+    if _trial_status.get("active"):
+        _days_rem = _trial_status["days_remaining"]
+        _dias_label = "día" if _days_rem == 1 else "días"
+        st.markdown(
+            f"<div style='background:linear-gradient(90deg,#16A34A,#22C55E);"
+            f"border-radius:8px;padding:10px 18px;color:white;font-weight:600;"
+            f"font-size:0.9em;margin-bottom:10px;'>"
+            f"Trial gratuito activo &mdash; "
+            f"<b>{_days_rem} {_dias_label} restantes</b>"
+            f" | Elige tu plan antes de que expire"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+        if st.button("Ver planes de pago", key="mls_trial_ver_planes"):
+            st.session_state["mls_ir_a_planes"] = True
+            st.rerun()
+
+    elif _trial_status.get("expired") and not _trial_status.get("on_paid_plan"):
+        st.markdown(
+            "<div style='background:linear-gradient(90deg,#DC2626,#EF4444);"
+            "border-radius:8px;padding:12px 18px;color:white;font-weight:700;"
+            "font-size:0.95em;margin-bottom:12px;'>"
+            "Tu trial de 30 dias ha expirado. "
+            "Elige un plan para seguir operando en la red MLS."
+            "</div>",
+            unsafe_allow_html=True,
+        )
+        if st.button("Elegir plan ahora", key="mls_expired_ver_planes", type="primary"):
+            st.session_state["mls_ir_a_planes"] = True
+            st.rerun()
+        st.warning(
+            "Acceso limitado — puedes consultar tus datos pero no publicar "
+            "ni reservar fincas hasta activar un plan.",
+            icon="⏰",
+        )
+
     _col_titulo, _col_logout = st.columns([5, 1])
     with _col_titulo:
         st.markdown(
@@ -1111,6 +1155,11 @@ def main() -> None:
         return
 
     estado = _estado_inmo(inmo)
+
+    # Botones "Ver planes" desde banners de trial redirigen aquí
+    if st.session_state.pop("mls_ir_a_planes", False):
+        ui_planes(inmo)
+        return
 
     if estado == "espera_aprobacion":
         ui_espera_aprobacion(inmo)
