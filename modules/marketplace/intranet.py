@@ -38,9 +38,13 @@ def main():
     _leads_nuevos_badge = ""
     try:
         import sqlite3 as _sq_badge
-        _bc = _sq_badge.connect("database.db").execute(
-            "SELECT COUNT(*) FROM leads_mls WHERE estado='nuevo'"
-        ).fetchone()
+        _bc_conn = _sq_badge.connect("database.db")
+        try:
+            _bc = _bc_conn.execute(
+                "SELECT COUNT(*) FROM leads_mls WHERE estado='nuevo'"
+            ).fetchone()
+        finally:
+            _bc_conn.close()
         if _bc and _bc[0] > 0:
             _leads_nuevos_badge = f" 🔴{_bc[0]}"
     except Exception:
@@ -1200,8 +1204,8 @@ Obtén el token creando un bot con @BotFather en Telegram.
             # ── MLS Analytics ─────────────────────────────────────────────────
             st.markdown("---")
             st.subheader("🏢 MLS — Estadísticas consolidadas")
+            _mls_a_conn = db_conn()
             try:
-                _mls_a_conn = db_conn()
 
                 # KPIs MLS en una fila
                 _mls_total_inmos   = _mls_a_conn.execute("SELECT COUNT(*) FROM inmobiliarias").fetchone()[0]
@@ -1319,9 +1323,10 @@ Obtén el token creando un bot con @BotFather en Telegram.
                 except Exception as _el:
                     st.warning(f"Error leads MLS: {_el}")
 
-                _mls_a_conn.close()
             except Exception as _emls:
                 st.warning(f"Error estadísticas MLS: {_emls}")
+            finally:
+                _mls_a_conn.close()
 
             _db9.close()
 
@@ -1338,7 +1343,7 @@ Obtén el token creando un bot con @BotFather en Telegram.
             from modules.mls import mls_notificaciones as _mls_notif
         except Exception as _imp_err:
             st.error(f"No se pudo cargar el módulo MLS: {_imp_err}")
-            st.stop()
+            return
 
         def _mask_iban(iban: str) -> str:
             """Muestra solo los últimos 4 dígitos del IBAN en listados."""

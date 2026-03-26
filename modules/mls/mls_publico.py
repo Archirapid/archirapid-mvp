@@ -384,28 +384,30 @@ def show_ficha_publica(finca_id: str) -> None:
             else:
                 try:
                     _c_al = _sq_al.connect("database.db", timeout=10)
-                    _c_al.execute("PRAGMA journal_mode=WAL")
-                    _c_al.execute("""CREATE TABLE IF NOT EXISTS plot_alerts (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        email TEXT, name TEXT, province TEXT,
-                        max_price REAL DEFAULT 0, created_at TEXT, active INTEGER DEFAULT 1)""")
-                    _exists = _c_al.execute(
-                        "SELECT id FROM plot_alerts WHERE email=?",
-                        (_al_email.lower().strip(),)
-                    ).fetchone()
-                    _now_al = _dt_al.datetime.utcnow().isoformat(timespec="seconds") + "Z"
-                    if _exists:
-                        _c_al.execute(
-                            "UPDATE plot_alerts SET name=?, max_price=?, active=1, created_at=? WHERE id=?",
-                            (_al_name, _al_price, _now_al, _exists[0]),
-                        )
-                    else:
-                        _c_al.execute(
-                            "INSERT INTO plot_alerts (email,name,province,max_price,created_at) VALUES (?,?,?,?,?)",
-                            (_al_email.lower().strip(), _al_name, _al_tipo, _al_price, _now_al),
-                        )
-                    _c_al.commit()
-                    _c_al.close()
+                    try:
+                        _c_al.execute("PRAGMA journal_mode=WAL")
+                        _c_al.execute("""CREATE TABLE IF NOT EXISTS plot_alerts (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            email TEXT, name TEXT, province TEXT,
+                            max_price REAL DEFAULT 0, created_at TEXT, active INTEGER DEFAULT 1)""")
+                        _exists = _c_al.execute(
+                            "SELECT id FROM plot_alerts WHERE email=?",
+                            (_al_email.lower().strip(),)
+                        ).fetchone()
+                        _now_al = _dt_al.datetime.utcnow().isoformat(timespec="seconds") + "Z"
+                        if _exists:
+                            _c_al.execute(
+                                "UPDATE plot_alerts SET name=?, max_price=?, active=1, created_at=? WHERE id=?",
+                                (_al_name, _al_price, _now_al, _exists[0]),
+                            )
+                        else:
+                            _c_al.execute(
+                                "INSERT INTO plot_alerts (email,name,province,max_price,created_at) VALUES (?,?,?,?,?)",
+                                (_al_email.lower().strip(), _al_name, _al_tipo, _al_price, _now_al),
+                            )
+                        _c_al.commit()
+                    finally:
+                        _c_al.close()
                     st.success(f"✅ Alerta activada para fincas {_al_tipo or 'similares'}.")
                 except Exception:
                     st.info("✅ Petición recibida. Te contactaremos en hola@archirapid.com")

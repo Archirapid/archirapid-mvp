@@ -137,23 +137,26 @@ def _handle_pago_ok(inmo: dict) -> None:
         plan_key = _detectar_plan_desde_session(sess)
         if plan_key:
             conn = _db.get_conn()
-            conn.execute(
-                """UPDATE inmobiliarias
-                      SET plan = ?, plan_activo = 1, stripe_session_id = ?
-                    WHERE id = ?""",
-                (plan_key, session_id, inmo["id"]),
-            )
-            conn.commit()
-            # Refrescar sesión
-            row = conn.execute(
-                "SELECT * FROM inmobiliarias WHERE id = ?", (inmo["id"],)
-            ).fetchone()
-            if row:
-                st.session_state[_SESSION_KEY] = dict(row)
             try:
-                mls_notificaciones.notif_pago_suscripcion(dict(row) if row else inmo, plan_key)
-            except Exception:
-                pass
+                conn.execute(
+                    """UPDATE inmobiliarias
+                          SET plan = ?, plan_activo = 1, stripe_session_id = ?
+                        WHERE id = ?""",
+                    (plan_key, session_id, inmo["id"]),
+                )
+                conn.commit()
+                # Refrescar sesión
+                row = conn.execute(
+                    "SELECT * FROM inmobiliarias WHERE id = ?", (inmo["id"],)
+                ).fetchone()
+                if row:
+                    st.session_state[_SESSION_KEY] = dict(row)
+                try:
+                    mls_notificaciones.notif_pago_suscripcion(dict(row) if row else inmo, plan_key)
+                except Exception:
+                    pass
+            finally:
+                conn.close()
             st.success("✅ Pago confirmado. Tu plan MLS está activo.")
         else:
             st.warning("Pago recibido pero no se pudo identificar el plan. Contacta soporte.")
@@ -579,11 +582,14 @@ def _iniciar_checkout_plan(plan_key: str, inmo: dict) -> None:
         )
         # Guardar session_id en DB para verificación post-retorno
         conn = _db.get_conn()
-        conn.execute(
-            "UPDATE inmobiliarias SET stripe_session_id = ? WHERE id = ?",
-            (session_id, inmo["id"]),
-        )
-        conn.commit()
+        try:
+            conn.execute(
+                "UPDATE inmobiliarias SET stripe_session_id = ? WHERE id = ?",
+                (session_id, inmo["id"]),
+            )
+            conn.commit()
+        finally:
+            conn.close()
 
         import streamlit.components.v1 as _stc_mls
         _stc_mls.html(f'<script>window.top.location.href="{url}";</script>', height=0)
@@ -900,11 +906,14 @@ def _ui_mi_cuenta(inmo: dict) -> None:
                     st.error("Las contraseñas no coinciden.")
                 else:
                     conn = _db.get_conn()
-                    conn.execute(
-                        "UPDATE inmobiliarias SET password_hash = ? WHERE id = ?",
-                        (generate_password_hash(pwd_nueva1), inmo["id"]),
-                    )
-                    conn.commit()
+                    try:
+                        conn.execute(
+                            "UPDATE inmobiliarias SET password_hash = ? WHERE id = ?",
+                            (generate_password_hash(pwd_nueva1), inmo["id"]),
+                        )
+                        conn.commit()
+                    finally:
+                        conn.close()
                     st.success("Contraseña actualizada correctamente.")
 
     st.divider()
