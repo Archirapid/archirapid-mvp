@@ -148,6 +148,8 @@ def show_ficha_publica(finca_id: str) -> None:
     lon          = finca.get("catastro_lon")
     tipo_suelo   = finca.get("tipo_suelo") or "Urbana"
     servicios_raw = finca.get("servicios")
+    municipio    = finca.get("catastro_municipio") or ""
+    direccion    = finca.get("catastro_direccion") or ""
 
     # ── Cabecera ──────────────────────────────────────────────────────────────
     st.markdown(
@@ -155,7 +157,7 @@ def show_ficha_publica(finca_id: str) -> None:
         "margin-bottom:4px;'>🟠 ArchiRapid MLS</div>",
         unsafe_allow_html=True,
     )
-    st.title(titulo)
+    st.title(f"🏡 {titulo}")
     if reservada:
         st.warning("🔒 Esta finca tiene una reserva activa en este momento.")
     if st.button("← Volver al mapa", key="mls_back_btn"):
@@ -196,6 +198,14 @@ def show_ficha_publica(finca_id: str) -> None:
         st.metric("💰 Precio", f"€{precio:,.0f}")
         st.metric("📏 Superficie Total", f"{sup:,.0f} m²")
         st.metric("🏗️ Máximo Construible (33%)", f"{max_edificable:.0f} m²")
+
+        # Ubicación — municipio y/o dirección catastral
+        _loc_parts = [p for p in [municipio, direccion] if p]
+        if _loc_parts:
+            st.markdown(f"**📍 Ubicación:** {', '.join(_loc_parts)}")
+        elif lat and lon:
+            st.markdown(f"**📍 Coordenadas:** {float(lat):.5f}, {float(lon):.5f}")
+
         st.markdown(f"**🏷️ Tipo:** {tipo_suelo}")
         if catastro_ref:
             st.markdown(f"**📋 Referencia Catastral:** `{catastro_ref}`")
@@ -263,22 +273,82 @@ def show_ficha_publica(finca_id: str) -> None:
 
     st.markdown("---")
 
-    # ── Verificación catastral — versión MLS (sin PDF, usa datos de API) ──────
-    st.subheader("🔍 Verificación Técnica")
-    if finca.get("catastro_validada"):
+    # ── Verificación Técnica con IA — igual que pin azul ─────────────────────
+    st.subheader("🔍 Verificación Técnica con IA")
+
+    _ia_key      = f"ia_verified_mls_{finca_id}"
+    _ia_data_key = f"ia_verified_data_mls_{finca_id}"
+    ia_verified  = st.session_state.get(_ia_key, False)
+
+    if finca.get("catastro_validada") or ia_verified:
         st.success("✅ Datos verificados con Catastro — La referencia catastral está validada oficialmente")
+        _saved = st.session_state.get(_ia_data_key)
         with st.expander("📊 Ver datos de validación", expanded=False):
             col_v1, col_v2 = st.columns(2)
             with col_v1:
                 st.write(f"**Superficie:** {sup:,.0f} m²")
                 st.write(f"**Referencia Catastral:** {catastro_ref or '—'}")
-                st.write(f"**Tipo suelo:** {tipo_suelo}")
+                st.write(f"**Municipio:** {(_saved or {}).get('municipio', municipio) or '—'}")
             with col_v2:
                 if lat and lon:
                     st.write(f"**Latitud:** {float(lat):.6f}")
                     st.write(f"**Longitud:** {float(lon):.6f}")
     else:
-        st.info("📋 Validación catastral en proceso. Contacta con ArchiRapid para más información.")
+        st.info("📋 Recomendado: Verifica que los datos de la finca coincidan con la nota catastral antes de reservar")
+
+        if st.button(
+            "🔍 Verificar con Catastro Oficial",
+            key=f"mls_verify_ia_{finca_id}",
+            type="secondary",
+        ):
+            if not catastro_ref:
+                st.warning("⚠️ Esta finca no tiene referencia catastral asignada aún.")
+            else:
+                with st.spinner("Consultando Sede Electrónica del Catastro..."):
+                    try:
+                        from modules.marketplace.catastro_api import fetch_by_ref_catastral as _fetch_catastro
+                        _datos = _fetch_catastro(catastro_ref)
+                        if _datos and _datos.get("estado") == "validado_oficial":
+                            _loc_cat = _datos.get("ubicacion_geo", {})
+                            _municipio_cat = _loc_cat.get("municipio", "Detectado")
+                            _dir_cat = _loc_cat.get("direccion_completa", "")
+                            _lat_cat = _loc_cat.get("lat")
+                            _lon_cat = _loc_cat.get("lng")
+
+                            # Verificar coherencia lat/lon si tenemos ambos
+                            _coords_ok = True
+                            if lat and lon and _lat_cat and _lon_cat:
+                                _coords_ok = (
+                                    abs(float(lat) - float(_lat_cat)) < 0.01
+                                    and abs(float(lon) - float(_lon_cat)) < 0.01
+                                )
+
+                            with st.expander("📊 Resultados de Verificación Catastral", expanded=True):
+                                st.markdown("### 📋 Datos del Catastro Oficial")
+                                col_cv1, col_cv2 = st.columns(2)
+                                with col_cv1:
+                                    st.write(f"**Referencia Catastral:** {catastro_ref}")
+                                    st.write(f"**Municipio:** {_municipio_cat}")
+                                with col_cv2:
+                                    if _dir_cat:
+                                        st.write(f"**Dirección:** {_dir_cat}")
+                                    if _lat_cat and _lon_cat:
+                                        st.write(f"**Coordenadas:** {float(_lat_cat):.5f}, {float(_lon_cat):.5f}")
+
+                                st.markdown("### 🔍 Comparación con Datos Publicados")
+                                st.write(f"**Referencia finca:** {catastro_ref}")
+                                st.write(f"**Superficie publicada:** {sup:,.0f} m²")
+                                if _coords_ok:
+                                    st.success("✅ VERIFICACIÓN EXITOSA: La referencia catastral está validada en el Catastro oficial")
+                                    st.session_state[_ia_key]      = True
+                                    st.session_state[_ia_data_key] = {"municipio": _municipio_cat, "direccion": _dir_cat}
+                                    st.balloons()
+                                else:
+                                    st.warning("⚠️ Referencia catastral encontrada, pero las coordenadas difieren ligeramente. Verifica antes de proceder.")
+                        else:
+                            st.warning("⚠️ No se pudo obtener confirmación del Catastro para esta referencia. Inténtalo de nuevo.")
+                    except Exception as _e_cat:
+                        st.error(f"Error al consultar el Catastro: {_e_cat}")
 
     st.markdown("---")
 
