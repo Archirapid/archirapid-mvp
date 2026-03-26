@@ -83,11 +83,24 @@ def _estado_inmo(inmo: dict) -> str:
     """
     Devuelve el estado del flujo para la inmobiliaria autenticada:
       espera_aprobacion → sin_plan → firma_pendiente → operativo
+    Trial activo sustituye al plan de pago para pasar de sin_plan a firma_pendiente.
     """
+    from datetime import datetime, timezone
     if not inmo.get("activa"):
         return "espera_aprobacion"
     if not inmo.get("plan_activo"):
-        return "sin_plan"
+        _trial_ok = False
+        if inmo.get("trial_active") and inmo.get("trial_start_date"):
+            try:
+                _start = datetime.fromisoformat(inmo["trial_start_date"])
+                if _start.tzinfo is None:
+                    _start = _start.replace(tzinfo=timezone.utc)
+                if (datetime.now(timezone.utc) - _start).days <= 30:
+                    _trial_ok = True
+            except Exception:
+                pass
+        if not _trial_ok:
+            return "sin_plan"
     if not inmo.get("firma_hash"):
         return "firma_pendiente"
     return "operativo"
@@ -183,19 +196,6 @@ def ui_login_registro() -> None:
     st.markdown("## 🏢 ArchiRapid MLS — Portal Inmobiliario")
     st.caption("Bolsa de colaboración entre inmobiliarias. Listantes + colaboradoras.")
 
-    # ── Pantalla post-registro: muestra SOLO el aviso, sin form ─────────────────
-    _reg_ok = st.session_state.pop("mls_registro_ok", False)
-    if _reg_ok:
-        st.success("✅ ¡Solicitud de alta enviada correctamente!")
-        st.info(
-            "**Tu solicitud está siendo revisada.**\n\n"
-            "Recibirás un **email de confirmación** en cuanto sea aprobada (24-48h hábiles).\n\n"
-            "Una vez aprobada, vuelve aquí y accede con tu email y contraseña."
-        )
-        st.markdown("---")
-        st.link_button("🏠 Volver a la home", "/")
-        return  # ← no renderiza tabs ni formulario
-
     tab_login, tab_registro = st.tabs(["🔑 Acceder", "📝 Registrarse"])
 
     # ── Tab Login ─────────────────────────────────────────────────────────────
@@ -235,13 +235,6 @@ def ui_login_registro() -> None:
 
     # ── Tab Registro ──────────────────────────────────────────────────────────
     with tab_registro:
-        # Si acabamos de registrar, Streamlit mantiene este tab activo por memoria
-        # de widgets. Mostramos confirmación en vez del formulario para evitar confusión.
-        if _reg_ok:
-            st.success("✅ Tu solicitud ha sido enviada correctamente.")
-            st.info("Cuando tu cuenta sea aprobada (24-48h hábiles) podrás iniciar sesión en la pestaña **🔑 Acceder**.")
-            st.stop()
-
         st.markdown("### Alta de nueva inmobiliaria")
         st.info(
             "El registro requiere aprobación manual de ArchiRapid (24-48h hábiles). "
@@ -445,8 +438,13 @@ def ui_login_registro() -> None:
                         st.error(f"Error al registrar: {msg}")
 
                 if _reg_success:
-                    st.session_state["mls_registro_ok"] = True
-                    st.rerun()
+                    st.success("✅ ¡Solicitud de alta enviada correctamente!")
+                    st.info(
+                        "**Tu solicitud está siendo revisada.**\n\n"
+                        "Recibirás un **email de confirmación** en cuanto sea aprobada (24-48h hábiles).\n\n"
+                        "Una vez aprobada, vuelve aquí e inicia sesión en la pestaña **🔑 Acceder**."
+                    )
+                    st.stop()
 
 
 def _get_client_ip() -> str:

@@ -1333,12 +1333,6 @@ _qp_mls_goto       = st.query_params.get("mls_goto_finca", "")
 _qp_mls_reset_tok  = st.query_params.get("mls_reset_token", "")
 _qp_mls_reservar   = st.query_params.get("mls_reservar", "")
 _qp_mls_contacto = st.query_params.get("mls_contacto", "")
-_qp_mls_open_form = st.query_params.get("mls_open_demo_form", "")
-
-if _qp_mls_open_form == "1" and not st.session_state.get("_mls_form_opened"):
-    st.session_state["_mls_demo_form_open"] = True
-    st.session_state["_mls_form_opened"] = True
-
 if _qp_mls_pago == "ok":
     st.session_state["selected_page"] = "🏢 Inmobiliarias MLS"
     st.session_state["mls_verificar_pago"] = True
@@ -2210,11 +2204,11 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
       Comparte fincas, multiplica ventas.<br>
       Sin captación. Split automático.
     </div>
-    <a href="/?mls_open_demo_form=1"
+    <a href="/?seccion=mls"
        style="display:inline-block;margin-top:6px;padding:4px 12px;
               background:linear-gradient(90deg,#F5A623,#ef4444);color:white;
               border-radius:6px;font-size:0.78em;font-weight:700;text-decoration:none;">
-      📋 Solicitar demo MLS →
+      🎁 30 días Free Trial →
     </a>
   </div>
 </div>""", unsafe_allow_html=True)
@@ -2261,70 +2255,8 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
                 _wname_saved = st.session_state.get("waitlist_name", "")
                 st.success(f"✅ Plaza reservada{', ' + _wname_saved if _wname_saved else ''}.")
 
-            # ── Demo MLS para inmobiliarias ───────────────────────────────────
-            _mls_lead_key = "mls_lead_submitted"
-            _mls_form_autoopen = st.session_state.pop("_mls_demo_form_open", False)
-            if not st.session_state.get(_mls_lead_key):
-                with st.expander("🏢 Solicitar demo MLS", expanded=_mls_form_autoopen):
-                    with st.form("mls_lead_form", clear_on_submit=True):
-                        _ml_nombre  = st.text_input("Nombre *", placeholder="Tu nombre")
-                        _ml_empresa = st.text_input("Agencia / Empresa *", placeholder="Inmobiliaria Sur SL")
-                        _ml_email   = st.text_input("Email *", placeholder="tu@agencia.com")
-                        _ml_tel     = st.text_input("Teléfono", placeholder="+34 600 000 000")
-                        _ml_fincas  = st.selectbox(
-                            "Fincas en cartera",
-                            ["1–5", "6–20", "21–75", "Más de 75"],
-                        )
-                        _ml_msg     = st.text_input(
-                            "¿Qué buscas?",
-                            placeholder="Ampliar cartera, vender más rápido…",
-                        )
-                        _ml_sub = st.form_submit_button(
-                            "Solicitar demo gratuita",
-                            type="primary",
-                            use_container_width=True,
-                        )
-                        if _ml_sub:
-                            if not _ml_nombre or not _ml_empresa or not _ml_email or "@" not in _ml_email:
-                                st.error("Nombre, empresa y email requeridos.")
-                            else:
-                                try:
-                                    from datetime import datetime as _dt, timezone as _tz
-                                    import sqlite3 as _sq3c
-                                    _lconn = _sq3c.connect("database.db")
-                                    _lconn.execute(
-                                        """INSERT INTO leads_mls
-                                           (nombre, empresa, email, telefono, num_fincas, mensaje, origen, created_at)
-                                           VALUES (?,?,?,?,?,?,?,?)""",
-                                        (_ml_nombre.strip(), _ml_empresa.strip(),
-                                         _ml_email.strip().lower(), _ml_tel.strip(),
-                                         _ml_fincas, _ml_msg.strip(),
-                                         "web", _dt.now(_tz.utc).isoformat(timespec="seconds")),
-                                    )
-                                    _lconn.commit(); _lconn.close()
-                                    st.session_state[_mls_lead_key] = True
-                                    st.session_state["mls_lead_name"] = _ml_nombre.strip()
-                                    # Notificación triple: Telegram + Email Resend
-                                    try:
-                                        from modules.marketplace.email_notify import notify_lead_mls
-                                        notify_lead_mls(
-                                            nombre=_ml_nombre,
-                                            empresa=_ml_empresa,
-                                            email=_ml_email,
-                                            telefono=_ml_tel,
-                                            num_fincas=_ml_fincas,
-                                            mensaje=_ml_msg,
-                                        )
-                                    except Exception:
-                                        pass
-                                    st.rerun()
-                                except Exception as _le:
-                                    st.error(f"Error al enviar: {_le}")
-            else:
-                _ml_saved = st.session_state.get("mls_lead_name", "")
-                st.success(f"✅ Solicitud enviada{', ' + _ml_saved if _ml_saved else ''}. Te contactamos en 24h.")
-                st.caption("Mientras tanto, puedes explorar el portal en modo demo:")
-                st.link_button("▶ Acceder a la demo MLS →", "/?seccion=mls&demo=true", use_container_width=True)
+            # ── Acceso directo al portal MLS — 30 días free trial ────────────
+            st.link_button("🎁 30 días Free Trial — Acceder al portal MLS →", "/?seccion=mls", use_container_width=True, type="primary")
 
         # ── 4 tarjetas de acceso en columnas iguales ─────────────────────────
         _hc1, _hc2, _hc3, _hc4 = st.columns(4, gap="small")

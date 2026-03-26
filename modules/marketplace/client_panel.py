@@ -320,11 +320,21 @@ def show_buyer_panel_mls(client_email: str, finca_id: str) -> None:
 
     finca = mls_db.get_finca_sin_identidad_listante(finca_id)
 
-    st.success(f"✅ Bienvenido/a, {st.session_state.get('user_name', client_email)}")
-    st.markdown(
-        "<div style='color:#F5A623;font-weight:700;font-size:13px;margin-bottom:4px;'>🟠 ArchiRapid MLS</div>",
-        unsafe_allow_html=True,
-    )
+    _hdr_col, _back_col = st.columns([3, 1])
+    with _hdr_col:
+        st.success(f"✅ Bienvenido/a, {st.session_state.get('user_name', client_email)}")
+        st.markdown(
+            "<div style='color:#F5A623;font-weight:700;font-size:13px;margin-bottom:4px;'>🟠 ArchiRapid MLS</div>",
+            unsafe_allow_html=True,
+        )
+    with _back_col:
+        if st.button("← Volver al mapa", key="mls_back_to_map", use_container_width=True):
+            st.session_state.pop("mls_reserva_finca_id", None)
+            for _k in ["mls_show_project_search", "mls_show_prefab_config",
+                       "mls_show_transacciones", "mls_show_documentacion",
+                       "mls_show_construccion_offers"]:
+                st.session_state.pop(_k, None)
+            st.rerun()
 
     if finca:
         titulo        = finca.get("titulo") or "Finca MLS"
