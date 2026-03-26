@@ -364,7 +364,7 @@ def check_and_send_trial_emails() -> list[str]:
                 logger.error("Error checkin %s: %s", email, e)
 
         elif days_rem == 5:
-            # Día 25 del trial
+            # Día 25 del trial — email urgencia a la inmo
             try:
                 send_trial_email(email, nombre, "urgencia",
                                  days_remaining=days_rem,
@@ -373,5 +373,26 @@ def check_and_send_trial_emails() -> list[str]:
                 logger.info("Trial urgencia enviado a %s (%s)", nombre, email)
             except Exception as e:
                 logger.error("Error urgencia %s: %s", email, e)
+            # Aviso a admin: trial expira en 5 días
+            try:
+                from modules.mls.mls_notificaciones import _send_telegram, _send_email, _ADMIN_EMAIL
+                _send_telegram(
+                    f"⏰ <b>Trial expira en 5 días</b>\n"
+                    f"Inmo: <b>{nombre}</b>\nEmail: {email}\n"
+                    f"Accede a intranet para hacer seguimiento."
+                )
+                _send_email(
+                    to=_ADMIN_EMAIL,
+                    subject=f"⏰ Trial ArchiRapid MLS expira en 5 días — {nombre}",
+                    body_html=f"""
+                    <p>La inmobiliaria <b>{nombre}</b> ({email}) tiene su trial de 30 días a punto de vencer.</p>
+                    <p><b>Días restantes:</b> 5</p>
+                    <p>Considera contactarla para ayudarla a elegir un plan antes de que expire.</p>
+                    <p style="color:#64748b;font-size:0.85em;">Panel admin: archirapid.streamlit.app → Intranet → MLS → Trial</p>
+                    """,
+                )
+                enviados.append(f"admin-aviso → {nombre} trial expira en 5 días")
+            except Exception as e:
+                logger.error("Error aviso admin trial %s: %s", email, e)
 
     return enviados

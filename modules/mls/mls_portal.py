@@ -196,6 +196,24 @@ def ui_login_registro() -> None:
     st.markdown("## 🏢 ArchiRapid MLS — Portal Inmobiliario")
     st.caption("Bolsa de colaboración entre inmobiliarias. Listantes + colaboradoras.")
 
+    # ── Banner 30 días Free Trial ─────────────────────────────────────────────
+    st.markdown("""
+<div style="background:linear-gradient(135deg,#1e3a5f,#0f2d4a);border-radius:12px;
+            padding:16px 20px;margin:12px 0 18px 0;border-left:4px solid #F5A623;">
+  <div style="color:#F5A623;font-weight:700;font-size:1em;margin-bottom:6px;">
+    🎁 30 días de acceso gratuito — sin tarjeta, sin compromiso
+  </div>
+  <div style="color:#e2e8f0;font-size:0.85em;line-height:1.6;">
+    Regístrate y accede a la red MLS completa durante 30 días. Publica fincas, explora el mercado colaborativo y cierra operaciones con otras inmobiliarias.<br><br>
+    <b style="color:#ffffff;">¿Cómo funciona?</b><br>
+    1. Rellena el formulario de registro (pestaña <b>Registrarse</b>)<br>
+    2. ArchiRapid revisa y aprueba tu solicitud en <b>24–48h hábiles</b> — recibirás un email<br>
+    3. Accede con tu email y contraseña. Tu trial de 30 días empieza al ser aprobada<br>
+    4. Cuando quieras continuar, elige tu plan: <b>Starter 49€/mes · Agency 149€ · Enterprise 349€</b>
+  </div>
+</div>
+""", unsafe_allow_html=True)
+
     tab_login, tab_registro = st.tabs(["🔑 Acceder", "📝 Registrarse"])
 
     # ── Tab Login ─────────────────────────────────────────────────────────────
