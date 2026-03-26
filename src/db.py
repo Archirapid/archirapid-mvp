@@ -759,7 +759,7 @@ def _run_postgres_migrations(conn) -> None:
         except Exception as e:
             errors.append(f"DDL error: {e} | SQL: {sql[:60]}")
             try:
-                conn.execute("ROLLBACK")
+                conn.rollback()
             except Exception:
                 pass
     for sql in _PG_INDEXES:
@@ -768,7 +768,7 @@ def _run_postgres_migrations(conn) -> None:
         except Exception as e:
             errors.append(f"INDEX error: {e}")
             try:
-                conn.execute("ROLLBACK")
+                conn.rollback()
             except Exception:
                 pass
     for sql in _PG_ALTER_MIGRATIONS:
@@ -776,10 +776,10 @@ def _run_postgres_migrations(conn) -> None:
             conn.execute(sql)
         except Exception as e:
             errors.append(f"ALTER error: {e} | SQL: {sql[:80]}")
-            # ROLLBACK imprescindible: sin él la conexión queda en estado abortado
+            # rollback imprescindible: sin él la conexión queda en estado abortado
             # y todas las queries siguientes fallan con InFailedSqlTransaction
             try:
-                conn.execute("ROLLBACK")
+                conn.rollback()
             except Exception:
                 pass
     if errors:

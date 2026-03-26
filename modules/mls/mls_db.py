@@ -849,11 +849,14 @@ def activate_trial(inmo_id: str) -> bool:
     conn = _db.get_conn()
     try:
         row = conn.execute(
-            "SELECT trial_active FROM inmobiliarias WHERE id = ?",
+            "SELECT trial_active, plan_activo FROM inmobiliarias WHERE id = ?",
             (inmo_id,)
         ).fetchone()
+        if row and row["plan_activo"]:
+            # Ya tiene plan de pago — no activar trial
+            return True
         if row and row["trial_active"] == 1:
-            # Ya activo — no reiniciar
+            # Trial ya activo — no reiniciar
             return True
         conn.execute(
             """UPDATE inmobiliarias
