@@ -661,10 +661,16 @@ def ui_portal_operativo(inmo: dict) -> None:
         st.markdown(
             f"<div style='background:linear-gradient(90deg,#16A34A,#22C55E);"
             f"border-radius:8px;padding:10px 18px;color:white;font-weight:600;"
-            f"font-size:0.9em;margin-bottom:10px;'>"
-            f"Trial gratuito activo &mdash; "
+            f"font-size:0.9em;margin-bottom:6px;'>"
+            f"🎁 Trial gratuito activo &mdash; "
             f"<b>{_days_rem} {_dias_label} restantes</b>"
-            f" | Elige tu plan antes de que expire"
+            f" | Explora el portal y prepara tus fincas"
+            f"</div>"
+            f"<div style='background:#f0fdf4;border:1px solid #86efac;border-radius:6px;"
+            f"padding:8px 14px;font-size:0.82em;color:#166534;margin-bottom:10px;'>"
+            f"⚠️ <b>Durante el trial</b> puedes usar todas las herramientas del portal, "
+            f"pero las fincas no se publican en el Mercado MLS hasta que actives un plan de pago. "
+            f"Elige tu plan antes de que expire para empezar a operar."
             f"</div>",
             unsafe_allow_html=True,
         )

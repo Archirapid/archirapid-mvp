@@ -1367,14 +1367,18 @@ Obtén el token creando un bot con @BotFather en Telegram.
                 _sess_mls = _lrs_mls(limit=100)
                 import datetime as _dt_mls
                 _this_month = _dt_mls.datetime.now().replace(day=1, hour=0, minute=0, second=0)
-                for _sm in _sess_mls.data:
-                    if _sm.payment_status == "paid":
-                        _meta_m = _sm.metadata or {}
-                        _prods  = _meta_m.get("products", "")
+                _sess_mls_data = getattr(_sess_mls, "data", None) or list(_sess_mls)
+                for _sm in _sess_mls_data:
+                    if getattr(_sm, "payment_status", None) == "paid":
+                        try:
+                            _meta_m = dict(getattr(_sm, "metadata", None) or {})
+                        except Exception:
+                            _meta_m = {}
+                        _prods = _meta_m.get("products", "")
                         if "mls" in _prods.lower():
-                            _ts = _dt_mls.datetime.fromtimestamp(_sm.created)
+                            _ts = _dt_mls.datetime.fromtimestamp(getattr(_sm, "created", 0))
                             if _ts >= _this_month:
-                                _ingresos_mls += (_sm.amount_total or 0) / 100
+                                _ingresos_mls += (getattr(_sm, "amount_total", 0) or 0) / 100
             except Exception:
                 pass
             _mls_conn2.close()
