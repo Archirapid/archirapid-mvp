@@ -388,15 +388,19 @@ def main():
             from modules.stripe_utils import list_recent_sessions as _lrs3
             _stripe_all = _lrs3(limit=100)
             _rows3 = []
-            for _ss3 in _stripe_all.data:
-                _meta3 = _ss3.metadata or {}
+            _stripe_data3 = getattr(_stripe_all, "data", None) or list(_stripe_all)
+            for _ss3 in _stripe_data3:
+                try:
+                    _meta3 = dict(getattr(_ss3, "metadata", None) or {})
+                except Exception:
+                    _meta3 = {}
                 _rows3.append({
-                    "Fecha":      _pd3.to_datetime(_ss3.created, unit="s").strftime("%d/%m/%Y %H:%M"),
-                    "Email":      _ss3.customer_email or _meta3.get("client_email", "—"),
+                    "Fecha":      _pd3.to_datetime(getattr(_ss3, "created", 0), unit="s").strftime("%d/%m/%Y %H:%M"),
+                    "Email":      getattr(_ss3, "customer_email", None) or _meta3.get("client_email", "—"),
                     "Concepto":   _meta3.get("products", _meta3.get("mode", _meta3.get("project", "—"))),
-                    "Importe (€)": (_ss3.amount_total or 0) / 100,
-                    "Estado":     "✅ Pagado" if _ss3.payment_status == "paid" else "⏳ Pendiente",
-                    "Session ID": _ss3.id[-20:],
+                    "Importe (€)": (getattr(_ss3, "amount_total", 0) or 0) / 100,
+                    "Estado":     "✅ Pagado" if getattr(_ss3, "payment_status", "") == "paid" else "⏳ Pendiente",
+                    "Session ID": (getattr(_ss3, "id", "") or "")[-20:],
                 })
             if _rows3:
                 _df_st3 = _pd3.DataFrame(_rows3)
@@ -1023,15 +1027,19 @@ Obtén el token creando un bot con @BotFather en Telegram.
                 import pandas as _pd_stripe
                 _stripe_sessions = _lrs(limit=50)
                 _stripe_rows = []
-                for _ss in _stripe_sessions.data:
-                    if _ss.payment_status == "paid":
-                        _meta = _ss.metadata or {}
+                _stripe_data = getattr(_stripe_sessions, "data", None) or list(_stripe_sessions)
+                for _ss in _stripe_data:
+                    if getattr(_ss, "payment_status", None) == "paid":
+                        try:
+                            _meta = dict(getattr(_ss, "metadata", None) or {})
+                        except Exception:
+                            _meta = {}
                         _stripe_rows.append({
-                            "Fecha": _pd_stripe.to_datetime(_ss.created, unit="s").strftime("%d/%m/%Y %H:%M"),
-                            "Email": _ss.customer_email or _meta.get("client_email", "—"),
+                            "Fecha": _pd_stripe.to_datetime(getattr(_ss, "created", 0), unit="s").strftime("%d/%m/%Y %H:%M"),
+                            "Email": getattr(_ss, "customer_email", None) or _meta.get("client_email", "—"),
                             "Productos": _meta.get("products", "—"),
                             "Proyecto ID": _meta.get("project_id", "—"),
-                            "Importe (€)": (_ss.amount_total or 0) / 100,
+                            "Importe (€)": (getattr(_ss, "amount_total", 0) or 0) / 100,
                             "Estado": "✅ Pagado",
                         })
                 if _stripe_rows:
@@ -1288,7 +1296,7 @@ Obtén el token creando un bot con @BotFather en Telegram.
                     _df_leads = _read_sql9(
                         _leads_conn,
                         """SELECT id, nombre as Nombre, empresa as Empresa, email as Email,
-                                  telefono as Teléfono, num_fincas as 'Fincas cartera',
+                                  telefono as Telefono, num_fincas as Fincas,
                                   mensaje as Mensaje, origen as Origen,
                                   estado as Estado, created_at as Fecha
                            FROM leads_mls
