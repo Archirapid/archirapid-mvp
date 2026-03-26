@@ -152,7 +152,13 @@ def _handle_pago_ok(inmo: dict) -> None:
                 if row:
                     st.session_state[_SESSION_KEY] = dict(row)
                 try:
-                    mls_notificaciones.notif_pago_suscripcion(dict(row) if row else inmo, plan_key)
+                    _inmo_data = dict(row) if row else inmo
+                    mls_notificaciones.notif_pago_suscripcion(
+                        nombre=_inmo_data.get("nombre_empresa", ""),
+                        email=_inmo_data.get("email", ""),
+                        plan=plan_key,
+                        importe_eur=0.0,
+                    )
                 except Exception:
                     pass
             finally:

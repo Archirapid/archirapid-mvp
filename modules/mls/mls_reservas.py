@@ -63,12 +63,13 @@ def iniciar_reserva_colaboradora(finca_id: str, inmo_id: str) -> str:
     inmo = mls_db.get_inmo_by_id(inmo_id)
     inmo_email = (inmo.get("email") or "") if inmo else ""
 
-    # 4. Generar URLs de retorno
+    # 4. Generar URLs de retorno — {CHECKOUT_SESSION_ID} es template Stripe
     success_params = urlencode({
         "mls_reserva_ok": "1",
         "finca_id":        finca_id,
         "inmo_id":         inmo_id,
         "tipo":            "colaboradora",
+        "session_id":      "{CHECKOUT_SESSION_ID}",
     })
     cancel_params = urlencode({
         "mls_reserva_cancel": "1",
@@ -214,13 +215,14 @@ def iniciar_reserva_cliente_directo(
     if finca is None:
         raise ValueError(f"Finca no encontrada: {finca_id}")
 
-    # 3. Generar URLs de retorno con datos del cliente
+    # 3. Generar URLs de retorno — {CHECKOUT_SESSION_ID} es template Stripe
     success_params = urlencode({
         "mls_reserva_ok": "1",
         "finca_id":        finca_id,
         "tipo":            "cliente_directo",
         "nombre":          nombre_cliente,
         "email":           email_cliente,
+        "session_id":      "{CHECKOUT_SESSION_ID}",
     })
     cancel_params = urlencode({
         "mls_reserva_cancel": "1",
