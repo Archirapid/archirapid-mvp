@@ -137,7 +137,12 @@ def show_ficha_publica(finca_id: str) -> None:
         st.error("Esta finca no está disponible o no existe.")
         return
 
-    estado       = finca.get("estado", "publicada")
+    estado = finca.get("estado", "publicada")
+    _ESTADOS_VISIBLES = {"publicada", "reservada", "reserva_pendiente_confirmacion"}
+    if estado not in _ESTADOS_VISIBLES:
+        st.warning("Esta finca no está disponible en este momento.")
+        return
+
     reservada    = estado in ("reservada", "reserva_pendiente_confirmacion")
     titulo       = finca.get("titulo") or "Finca MLS"
     precio       = float(finca.get("precio") or 0)

@@ -793,9 +793,16 @@ def _ensure_tables_postgres():
     conn.close()
 
 
+_tables_initialized = False
+
+
 def ensure_tables():
+    global _tables_initialized
+    if _tables_initialized:
+        return
     if DB_MODE == 'postgres':
         _ensure_tables_postgres()
+        _tables_initialized = True
         return
     with transaction() as c:
         c.execute("""CREATE TABLE IF NOT EXISTS plots (
@@ -1541,6 +1548,8 @@ def ensure_tables():
                 c.execute(_sql)
             except Exception:
                 pass  # columna ya existe → ignorar
+    _tables_initialized = True
+
 
 def insert_plot(data: Dict):
     ensure_tables()
