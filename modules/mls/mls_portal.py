@@ -59,13 +59,16 @@ def _get_inmo() -> dict | None:
     # Refresca desde DB para tener datos actualizados (plan, activa, firma_hash…)
     try:
         conn = _db.get_conn()
-        row = conn.execute(
-            "SELECT * FROM inmobiliarias WHERE id = ?", (inmo["id"],)
-        ).fetchone()
-        if row:
-            refreshed = dict(row)
-            st.session_state[_SESSION_KEY] = refreshed
-            return refreshed
+        try:
+            row = conn.execute(
+                "SELECT * FROM inmobiliarias WHERE id = ?", (inmo["id"],)
+            ).fetchone()
+            if row:
+                refreshed = dict(row)
+                st.session_state[_SESSION_KEY] = refreshed
+                return refreshed
+        finally:
+            conn.close()
     except Exception:
         pass
     return inmo
@@ -855,10 +858,13 @@ def _ui_mi_cuenta(inmo: dict) -> None:
         with st.expander("🔐 Certificado de integridad SHA-256"):
             st.markdown("**Hash del documento (SHA-256):**")
             _conn_cert = _db.get_conn()
-            _row_cert = _conn_cert.execute(
-                "SELECT documento_hash, ip FROM firmas_colaboracion WHERE inmo_id = ? ORDER BY id DESC LIMIT 1",
-                (inmo["id"],),
-            ).fetchone()
+            try:
+                _row_cert = _conn_cert.execute(
+                    "SELECT documento_hash, ip FROM firmas_colaboracion WHERE inmo_id = ? ORDER BY id DESC LIMIT 1",
+                    (inmo["id"],),
+                ).fetchone()
+            finally:
+                _conn_cert.close()
             _doc_hash = dict(_row_cert)["documento_hash"] if _row_cert else "—"
             _ip_cert  = dict(_row_cert)["ip"] if _row_cert else "—"
             st.code(_doc_hash, language=None)
@@ -1153,7 +1159,10 @@ def main() -> None:
     if inmo:
         try:
             conn = _db.get_conn()
-            mls_db.expire_reservas_vencidas(conn)
+            try:
+                mls_db.expire_reservas_vencidas(conn)
+            finally:
+                conn.close()
         except Exception:
             pass
 

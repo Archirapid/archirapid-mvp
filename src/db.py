@@ -743,45 +743,23 @@ _PG_ALTER_MIGRATIONS = [
 
 
 def _run_postgres_migrations(conn) -> None:
-    """Ejecuta todos los CREATE TABLE, índices y ALTER TABLE en PostgreSQL.
-    Cada sentencia tiene lock_timeout corto para no bloquear la app si hay
-    contención en Supabase (deadlock entre ALTER TABLE y queries concurrentes).
-    """
+    """Ejecuta todos los CREATE TABLE, índices y ALTER TABLE en PostgreSQL."""
     errors = []
-    # lock_timeout: falla rápido si otra query retiene el lock (evita freeze de app)
-    try:
-        conn.execute("SET lock_timeout = '4s'")
-    except Exception:
-        pass
     for sql in _PG_DDL:
         try:
             conn.execute(sql)
         except Exception as e:
             errors.append(f"DDL error: {e} | SQL: {sql[:60]}")
-            try:
-                conn.rollback()
-            except Exception:
-                pass
     for sql in _PG_INDEXES:
         try:
             conn.execute(sql)
         except Exception as e:
             errors.append(f"INDEX error: {e}")
-            try:
-                conn.rollback()
-            except Exception:
-                pass
     for sql in _PG_ALTER_MIGRATIONS:
         try:
             conn.execute(sql)
         except Exception as e:
             errors.append(f"ALTER error: {e} | SQL: {sql[:80]}")
-            # rollback imprescindible: sin él la conexión queda en estado abortado
-            # y todas las queries siguientes fallan con InFailedSqlTransaction
-            try:
-                conn.rollback()
-            except Exception:
-                pass
     if errors:
         for err in errors:
             print(f"[PG migration] {err}")
