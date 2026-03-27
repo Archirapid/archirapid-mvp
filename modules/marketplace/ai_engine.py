@@ -193,7 +193,7 @@ Devuelve solo JSON: {"referencia_catastral":"codigo","superficie_grafica_m2":num
             return {"error": f"Error crítico al procesar el PDF. Detalles técnicos: {str(e)}"}
 
 def _parse_catastral_json(text: str) -> dict:
-    """Limpia y parsea el JSON que devuelve Gemini."""
+    """Limpia y parsea el JSON que devuelve una IA."""
     for prefix in ("```json", "```"):
         if text.startswith(prefix):
             text = text[len(prefix):]
@@ -208,57 +208,108 @@ def _parse_catastral_json(text: str) -> dict:
     }
 
 
+def _extraer_con_regex(text: str) -> dict:
+    """Extrae campos catastrales con regex. Sin API, sin coste."""
+    import re
+    result = {}
+
+    # Referencia catastral: 20 chars alfanuméricos en formato catastro
+    m = re.search(r'\b([0-9]{7}[A-Z]{2}[0-9]{4}[A-Z][0-9]{4}[A-Z]{2})\b', text)
+    if not m:
+        # formato alternativo rústico
+        m = re.search(r'Referencia catastral[:\s]+([A-Z0-9]{14,20})', text, re.IGNORECASE)
+    if m:
+        result["referencia_catastral"] = m.group(1)
+
+    # Superficie gráfica
+    m = re.search(r'Superficie gr[aá]fica[^0-9]*([0-9][0-9.,]*)\s*m', text, re.IGNORECASE)
+    if not m:
+        m = re.search(r'([0-9][0-9.,]*)\s*m[²2]\s*(?:superficie|construida|útil|total)', text, re.IGNORECASE)
+    if m:
+        try:
+            result["superficie_grafica_m2"] = int(float(m.group(1).replace(".", "").replace(",", ".")))
+        except ValueError:
+            pass
+
+    # Municipio
+    m = re.search(r'Municipio[:\s]+([A-ZÁÉÍÓÚÑ][^\n\r,]{2,40})', text, re.IGNORECASE)
+    if not m:
+        m = re.search(r'(?:en|de)\s+([A-ZÁÉÍÓÚÑ][a-záéíóúñ\s]{2,25})[\s,]', text)
+    if m:
+        result["municipio"] = m.group(1).strip()
+
+    return result
+
+
 def extraer_datos_nota_catastral(pdf_path: str) -> dict:
     """
     Extrae datos catastrales de una nota simple.
 
-    Estrategia (por orden, de menor a mayor coste de API):
-    1. Extracción de texto nativa con PyMuPDF (gratis, sin API).
-       Las notas catastrales son PDFs con texto seleccionable → siempre funciona.
-    2. Si el PDF es un escáner (texto < 100 chars), fallback a Gemini Vision.
+    Estrategia (sin coste de API siempre que sea posible):
+    1. PyMuPDF text extraction (gratis, 0 tokens)
+    2. Regex sobre el texto (gratis, 0 tokens) → retorna si completo
+    3. GROQ text (gratis/barato, no Vision) → para texto ambiguo
+    4. Gemini Vision (solo si PDF escaneado sin texto)
     """
+    # Extraer texto del PDF
+    raw_text = ""
     try:
         doc = fitz.open(pdf_path)
-        page = doc.load_page(0)
-        raw_text = page.get_text()
+        for i in range(min(2, len(doc))):
+            raw_text += doc.load_page(i).get_text()
         doc.close()
     except Exception as e:
         return {"error": f"No se pudo abrir el PDF: {e}"}
 
-    # --- VÍA 1: texto nativo (sin API) ---
-    if raw_text and len(raw_text.strip()) >= 100:
+    is_text_pdf = len(raw_text.strip()) >= 100
+
+    # --- VÍA 1: regex (sin API) ---
+    if is_text_pdf:
+        parsed = _extraer_con_regex(raw_text)
+        if all(k in parsed for k in ("referencia_catastral", "superficie_grafica_m2", "municipio")):
+            return parsed   # perfecto, sin ninguna llamada a API
+
+    # --- VÍA 2: GROQ con texto (cuota generosa, sin Vision) ---
+    if is_text_pdf:
         try:
-            api_key = _get_gemini_key()
-            if not api_key:
-                return {"error": "No se encontró GEMINI_API_KEY"}
+            groq_key = os.getenv("GROQ_API_KEY", "")
+            try:
+                import streamlit as _st
+                groq_key = _st.secrets.get("GROQ_API_KEY") or groq_key
+            except Exception:
+                pass
+            if groq_key:
+                import requests as _req
+                prompt = (
+                    "Extrae de este texto de nota catastral española: "
+                    "referencia_catastral, superficie_grafica_m2 (número entero), municipio. "
+                    'Devuelve SOLO JSON válido: {"referencia_catastral":"...","superficie_grafica_m2":123,"municipio":"..."}\n\n'
+                    f"TEXTO:\n{raw_text[:4000]}"
+                )
+                resp = _req.post(
+                    "https://api.groq.com/openai/v1/chat/completions",
+                    headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"},
+                    json={"model": "llama-3.3-70b-versatile", "messages": [{"role": "user", "content": prompt}],
+                          "temperature": 0, "max_tokens": 200},
+                    timeout=30,
+                )
+                if resp.ok:
+                    answer = resp.json()["choices"][0]["message"]["content"].strip()
+                    return _parse_catastral_json(answer)
+        except Exception:
+            pass  # fallthrough a Gemini Vision
 
-            prompt = (
-                "Extrae de este texto de nota catastral: referencia_catastral, "
-                "superficie_grafica_m2 (número entero), municipio.\n"
-                "Devuelve SOLO JSON: "
-                '{"referencia_catastral":"codigo","superficie_grafica_m2":numero,"municipio":"ciudad"}\n\n'
-                f"TEXTO:\n{raw_text[:3000]}"
-            )
-            text = _gemini_rest(api_key, prompt)   # sin imagen → ~500 tokens, gratis
-            return _parse_catastral_json(text)
-        except Exception as e:
-            return {"error": f"Error al procesar la nota catastral: {str(e)}"}
-
-    # --- VÍA 2: PDF escaneado → Gemini Vision (fallback) ---
+    # --- VÍA 3: Gemini Vision (solo PDFs escaneados) ---
     try:
         api_key = _get_gemini_key()
         if not api_key:
-            return {"error": "No se encontró GEMINI_API_KEY"}
-
+            return {"error": "No se encontró GEMINI_API_KEY ni GROQ_API_KEY"}
         doc2 = fitz.open(pdf_path)
-        page2 = doc2.load_page(0)
-        pix = page2.get_pixmap(matrix=fitz.Matrix(1.2, 1.2))
+        pix = doc2.load_page(0).get_pixmap(matrix=fitz.Matrix(1.2, 1.2))
         img_bytes = pix.tobytes("png")
         doc2.close()
-
         prompt = (
-            "Extrae de esta nota catastral: referencia_catastral, "
-            "superficie_grafica_m2, municipio.\n"
+            "Extrae de esta nota catastral: referencia_catastral, superficie_grafica_m2, municipio. "
             'Devuelve solo JSON: {"referencia_catastral":"codigo","superficie_grafica_m2":numero,"municipio":"ciudad"}'
         )
         text = _gemini_rest(api_key, prompt, img_bytes)
