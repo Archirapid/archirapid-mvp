@@ -28,7 +28,8 @@ def _gemini_rest(api_key: str, prompt: str, image_bytes: bytes = None, model: st
             if resp.status_code == 429 and m != models_to_try[-1]:
                 time.sleep(2)
                 continue  # Probar el siguiente modelo
-            resp.raise_for_status()
+            if not resp.ok:
+                raise RuntimeError(f"Gemini {resp.status_code}: {resp.text[:400]}")
             return resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
         except Exception as e:
             last_exc = e
