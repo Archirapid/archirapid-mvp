@@ -772,26 +772,28 @@ def _ensure_tables_postgres():
     Reutiliza _PG_DDL con adapt_sql() via _PostgresConnWrapper.
     """
     conn = get_conn()
-    _run_postgres_migrations(conn)
-    # Seed prefab_catalog si está vacía
     try:
-        cur = conn.execute("SELECT COUNT(*) as n FROM prefab_catalog")
-        row = cur.fetchone()
-        count = row['n'] if row else 0
-        if count == 0:
-            conn.execute(
-                "INSERT INTO prefab_catalog (name,m2,rooms,bathrooms,floors,material,price,description,image_path) VALUES (?,?,?,?,?,?,?,?,?)",
-                _PG_PREFAB_SEED[0]
-            )
-            for seed_row in _PG_PREFAB_SEED[1:]:
+        _run_postgres_migrations(conn)
+        # Seed prefab_catalog si está vacía
+        try:
+            cur = conn.execute("SELECT COUNT(*) as n FROM prefab_catalog")
+            row = cur.fetchone()
+            count = row['n'] if row else 0
+            if count == 0:
                 conn.execute(
                     "INSERT INTO prefab_catalog (name,m2,rooms,bathrooms,floors,material,price,description,image_path) VALUES (?,?,?,?,?,?,?,?,?)",
-                    seed_row
+                    _PG_PREFAB_SEED[0]
                 )
-    except Exception as e:
-        print(f"[PG seed] prefab_catalog: {e}")
-    conn.commit()
-    conn.close()
+                for seed_row in _PG_PREFAB_SEED[1:]:
+                    conn.execute(
+                        "INSERT INTO prefab_catalog (name,m2,rooms,bathrooms,floors,material,price,description,image_path) VALUES (?,?,?,?,?,?,?,?,?)",
+                        seed_row
+                    )
+        except Exception as e:
+            print(f"[PG seed] prefab_catalog: {e}")
+        conn.commit()
+    finally:
+        conn.close()
 
 
 _tables_initialized = False
@@ -1986,8 +1988,14 @@ def verificar_limite_proyectos(arquitecto_id: int) -> bool:
         conn.close()
 
 def get_plot_by_id(pid: str) -> Optional[Dict]:
-    ensure_tables(); conn = get_conn(); c = conn.cursor(); c.execute('SELECT * FROM plots WHERE id=?', (pid,))
-    row = c.fetchone(); conn.close()
+    ensure_tables()
+    conn = get_conn()
+    try:
+        c = conn.cursor()
+        c.execute('SELECT * FROM plots WHERE id=?', (pid,))
+        row = c.fetchone()
+    finally:
+        conn.close()
     if not row:
         return None
     # Gracias a row_factory podemos acceder por nombre
@@ -2012,11 +2020,17 @@ def get_plot_by_id(pid: str) -> Optional[Dict]:
         conn.close()
 
 def counts() -> Dict[str,int]:
-    ensure_tables(); conn = get_conn(); c = conn.cursor()
-    out = {}
-    for table in ['plots','projects','payments']:
-        c.execute(f'SELECT COUNT(*) FROM {table}'); out[table] = c.fetchone()[0]
-    conn.close(); return out
+    ensure_tables()
+    conn = get_conn()
+    try:
+        c = conn.cursor()
+        out = {}
+        for table in ['plots','projects','payments']:
+            c.execute(f'SELECT COUNT(*) FROM {table}')
+            out[table] = c.fetchone()[0]
+        return out
+    finally:
+        conn.close()
 
 def insert_proposal(data: Dict):
     """Inserta propuesta en la tabla proposals."""
