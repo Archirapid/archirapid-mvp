@@ -492,19 +492,23 @@ def show_ficha_publica(finca_id: str) -> None:
         st.info("Déjanos tu contacto por si quedara disponible.")
         _form_contacto(finca)
     else:
-        _precio_reserva = precio * 0.01
+        _precio_reserva = 200.0  # Señal fija — NO un % del precio
         _precio_str  = f"{precio:,.0f}".replace(",", ".")
-        _reserva_str = f"{_precio_reserva:,.0f}".replace(",", ".")
         _stripe_key  = f"mls_stripe_reserva_url_{finca_id}"
 
         if st.session_state.get(_stripe_key):
             _s_url = st.session_state[_stripe_key]
             st.success("✅ Formulario recibido. Completa el pago para confirmar tu reserva.")
+            st.info(
+                "Esta señal de €200 garantiza tu exclusividad de 72h. "
+                "Se descuenta del 1% de comisión de ArchiRapid al cierre. "
+                "No reembolsable si la operación no prospera."
+            )
             st.markdown(
                 f'<a href="{_s_url}" target="_blank" style="display:inline-block;'
                 'background:#1E3A5F;color:#fff;padding:14px 28px;border-radius:8px;'
                 'font-weight:700;font-size:16px;text-decoration:none;margin-top:8px;">'
-                f'💳 Pagar €{_reserva_str} con Tarjeta — Reserva 7 días</a>',
+                '💳 Pagar €200 con Tarjeta — Reserva 72h exclusiva</a>',
                 unsafe_allow_html=True,
             )
             if st.button("✏️ Cambiar datos del formulario", key=f"mls_reset_reserva_{finca_id}"):
@@ -513,13 +517,12 @@ def show_ficha_publica(finca_id: str) -> None:
         else:
             st.markdown(
                 f"Precio de la finca: **€{_precio_str}** · "
-                f"Importe de reserva (1%): **€{_reserva_str}**"
+                "Señal de reserva: **€200 fijos**"
             )
             st.info(
-                "⚠️ **Reserva temporal de 7 días** — Al completar el pago, la finca quedará reservada "
-                "exclusivamente a tu nombre durante 7 días naturales (art. 1454 CC). "
-                "Pasado ese plazo sin escritura, la reserva caduca y el importe queda a favor del vendedor "
-                "como señal de arras.",
+                "Esta señal de €200 garantiza tu exclusividad de 72h. "
+                "Se descuenta del 1% de comisión de ArchiRapid al cierre. "
+                "No reembolsable si la operación no prospera."
             )
 
             with st.form(key=f"mls_form_reservar_{finca_id}"):
@@ -606,7 +609,7 @@ def show_ficha_publica(finca_id: str) -> None:
                             pending_id=_pending_id,
                             buyer_name=buyer_name.strip(),
                             buyer_email=buyer_email.strip().lower(),
-                            amount_cents=max(int(_precio_reserva * 100), 50),
+                            amount_cents=20000,  # €200 fijos — señal de reserva MLS
                             plot_ref=catastro_ref or finca_id,
                             success_url=(
                                 "https://archirapid.streamlit.app/"
