@@ -192,68 +192,77 @@ Devuelve solo JSON: {"referencia_catastral":"codigo","superficie_grafica_m2":num
         else:
             return {"error": f"Error crítico al procesar el PDF. Detalles técnicos: {str(e)}"}
 
+def _parse_catastral_json(text: str) -> dict:
+    """Limpia y parsea el JSON que devuelve Gemini."""
+    for prefix in ("```json", "```"):
+        if text.startswith(prefix):
+            text = text[len(prefix):]
+    if text.endswith("```"):
+        text = text[:-3]
+    text = text.strip()
+    data = json.loads(text)
+    return {
+        "referencia_catastral": data.get("referencia_catastral"),
+        "superficie_grafica_m2": data.get("superficie_grafica_m2"),
+        "municipio": data.get("municipio"),
+    }
+
+
 def extraer_datos_nota_catastral(pdf_path: str) -> dict:
     """
-    Extrae datos catastrales de una nota simple usando Gemini AI.
-    
-    Args:
-        pdf_path (str): Ruta al archivo PDF de la nota catastral
-        
-    Returns:
-        dict: Diccionario con los datos extraídos o error
-            - referencia_catastral (str or None)
-            - superficie_grafica_m2 (int or None) 
-            - municipio (str or None)
-            - O {"error": "mensaje de error"} si falla
+    Extrae datos catastrales de una nota simple.
+
+    Estrategia (por orden, de menor a mayor coste de API):
+    1. Extracción de texto nativa con PyMuPDF (gratis, sin API).
+       Las notas catastrales son PDFs con texto seleccionable → siempre funciona.
+    2. Si el PDF es un escáner (texto < 100 chars), fallback a Gemini Vision.
     """
     try:
-        # Obtener API key
-        api_key = _get_gemini_key()
-        if not api_key:
-            debug = []
-            try:
-                debug = st.session_state.get("_gemini_key_debug", [])
-            except Exception:
-                pass
-            try:
-                secret_keys = list(st.secrets.keys())
-            except Exception as e:
-                secret_keys = [f"error:{type(e).__name__}:{e}"]
-            return {"error": f"No se encontró GEMINI_API_KEY. Keys en st.secrets: {secret_keys}. Debug: {debug}"}
-
-        # Abrir PDF y convertir primera página a imagen
         doc = fitz.open(pdf_path)
         page = doc.load_page(0)
-        pix = page.get_pixmap(matrix=fitz.Matrix(1.5, 1.5))  # Zoom x1.5 — suficiente para OCR, reduce payload
-        img_bytes = pix.tobytes("png")
+        raw_text = page.get_text()
         doc.close()
+    except Exception as e:
+        return {"error": f"No se pudo abrir el PDF: {e}"}
 
-        # Prompt para extraer datos catastrales
-        prompt = """Extrae de esta nota catastral: referencia_catastral, superficie_grafica_m2, municipio.
-Devuelve solo JSON: {"referencia_catastral":"codigo","superficie_grafica_m2":numero,"municipio":"ciudad"}"""
+    # --- VÍA 1: texto nativo (sin API) ---
+    if raw_text and len(raw_text.strip()) >= 100:
+        try:
+            api_key = _get_gemini_key()
+            if not api_key:
+                return {"error": "No se encontró GEMINI_API_KEY"}
 
-        # Llamada directa REST (sin SDK)
+            prompt = (
+                "Extrae de este texto de nota catastral: referencia_catastral, "
+                "superficie_grafica_m2 (número entero), municipio.\n"
+                "Devuelve SOLO JSON: "
+                '{"referencia_catastral":"codigo","superficie_grafica_m2":numero,"municipio":"ciudad"}\n\n'
+                f"TEXTO:\n{raw_text[:3000]}"
+            )
+            text = _gemini_rest(api_key, prompt)   # sin imagen → ~500 tokens, gratis
+            return _parse_catastral_json(text)
+        except Exception as e:
+            return {"error": f"Error al procesar la nota catastral: {str(e)}"}
+
+    # --- VÍA 2: PDF escaneado → Gemini Vision (fallback) ---
+    try:
+        api_key = _get_gemini_key()
+        if not api_key:
+            return {"error": "No se encontró GEMINI_API_KEY"}
+
+        doc2 = fitz.open(pdf_path)
+        page2 = doc2.load_page(0)
+        pix = page2.get_pixmap(matrix=fitz.Matrix(1.2, 1.2))
+        img_bytes = pix.tobytes("png")
+        doc2.close()
+
+        prompt = (
+            "Extrae de esta nota catastral: referencia_catastral, "
+            "superficie_grafica_m2, municipio.\n"
+            'Devuelve solo JSON: {"referencia_catastral":"codigo","superficie_grafica_m2":numero,"municipio":"ciudad"}'
+        )
         text = _gemini_rest(api_key, prompt, img_bytes)
-        
-        # Limpiar respuesta (remover ```json si existe)
-        if text.startswith('```json'):
-            text = text[7:]
-        if text.startswith('```'):
-            text = text[3:]
-        if text.endswith('```'):
-            text = text[:-3]
-        text = text.strip()
-        
-        # Parsear JSON
-        data = json.loads(text)
-
-        # Verificar que tenga los campos esperados (o None)
-        return {
-            "referencia_catastral": data.get("referencia_catastral"),
-            "superficie_grafica_m2": data.get("superficie_grafica_m2"),
-            "municipio": data.get("municipio")
-        }
-
+        return _parse_catastral_json(text)
     except Exception as e:
         return {"error": f"Error al procesar la nota catastral: {str(e)}"}
 
