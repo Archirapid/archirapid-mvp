@@ -14,6 +14,7 @@ try:
 except ImportError:
     _PSYCOPG2_AVAILABLE = False
 
+import streamlit as st
 from src.db_compat import adapt_sql, adapt_params
 
 BASE_PATH = Path.cwd()
@@ -1683,6 +1684,7 @@ def insert_payment(data: Dict):
         (data['payment_id'], data['amount'], data['concept'], data['buyer_name'], data['buyer_email'],
          data['buyer_phone'], data['buyer_nif'], data['method'], data['status'], data['timestamp'], data.get('card_last4')))
 
+@st.cache_data(ttl=60)
 def get_all_plots():
     ensure_tables(); conn = get_conn(); import pandas as pd
     try:
@@ -1744,6 +1746,7 @@ def list_fincas_filtradas(provincia: Optional[str], min_surface: float, max_surf
     finally:
         conn.close()
 
+@st.cache_data(ttl=60)
 def get_all_projects():
     ensure_tables(); conn = get_conn(); import pandas as pd
     try:

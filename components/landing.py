@@ -180,8 +180,6 @@ def render_landing():
     # ===== MAPA Y BUSCADOR (lógica intacta) =====
     st.subheader("🗺️ Explora Fincas Disponibles en España y Portugal")
 
-    from src import db
-
     col_search1, col_search2, col_search3 = st.columns([2, 1, 1])
     with col_search1:
         search_query = st.text_input("🔍 Buscar por dirección, provincia o referencia catastral",
@@ -200,7 +198,6 @@ def render_landing():
         import folium
         import streamlit.components.v1 as components
 
-        db.ensure_tables()
         plots = list_published_plots()
 
         if provincia_filter and provincia_filter != "Todas":

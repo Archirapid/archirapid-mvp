@@ -86,6 +86,7 @@ def _horas_restantes(timestamp_expira: str) -> float:
         return 0.0
 
 
+@st.cache_data(ttl=60)
 def _get_fincas_mercado_visible(exclude_inmo_id: str | None = None) -> list:
     """
     Devuelve fincas visibles para colaboradoras:
