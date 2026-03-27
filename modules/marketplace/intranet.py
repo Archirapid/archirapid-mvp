@@ -3,8 +3,27 @@ import streamlit as st
 from modules.marketplace.utils import db_conn, list_published_plots, list_projects
 import json
 
+def _admin_token(pw: str) -> str:
+    """Token determinista derivado de la contraseña. No expira salvo que cambie ADMIN_PASSWORD."""
+    import hashlib
+    return hashlib.sha256(f"archirapid-admin-salt-{pw}".encode()).hexdigest()[:28]
+
+
 def main():
     st.title("🔐 Intranet — Gestión Interna de ARCHIRAPID")
+
+    # Leer contraseña admin de secrets
+    try:
+        _admin_pw = st.secrets.get("ADMIN_PASSWORD", "admin123")
+    except Exception:
+        _admin_pw = "admin123"
+
+    _valid_token = _admin_token(_admin_pw)
+
+    # Restaurar sesión desde token en URL (sobrevive reinicios del servidor)
+    _url_tok = st.query_params.get("admin_token", "")
+    if _url_tok == _valid_token and st.session_state.get("rol") != "admin":
+        st.session_state["rol"] = "admin"
 
     # Verificar si ya está logueado como admin
     if st.session_state.get("rol") == "admin":
@@ -15,15 +34,14 @@ def main():
             if st.button("🚪 Salir", key="intranet_logout", help="Cerrar sesión Admin"):
                 st.session_state.pop("rol", None)
                 st.session_state.pop("selected_page", None)
+                try:
+                    del st.query_params["admin_token"]
+                except Exception:
+                    pass
                 st.rerun()
     else:
         # SOLO ACCESO CON CONTRASEÑA DE ADMIN
         password = st.text_input("Contraseña de Acceso Administrativo", type="password")
-        _admin_pw = None
-        try:
-            _admin_pw = st.secrets.get("ADMIN_PASSWORD", "admin123")
-        except Exception:
-            _admin_pw = "admin123"
         if password != _admin_pw:
             if password:  # solo mostrar warning si ya escribió algo
                 st.warning("🔒 Contraseña incorrecta.")
@@ -31,6 +49,8 @@ def main():
                 st.info("🔒 Acceso restringido. Solo personal autorizado de ARCHIRAPID.")
             return
         st.session_state["rol"] = "admin"
+        # Inyectar token en URL para que la sesión sobreviva reinicios
+        st.query_params["admin_token"] = _valid_token
         st.rerun()
 
     # PANEL DE GESTIÓN INTERNA
@@ -1166,37 +1186,61 @@ Obtén el token creando un bot con @BotFather en Telegram.
             st.markdown("---")
             st.subheader("🔗 Tracking de Deep Links y Demos")
             try:
+                from datetime import datetime as _dtnow, timedelta as _td
+                import pandas as _pd_trk
+
+                # Filtro de periodo
+                _periodo_opts = {"Hoy": 1, "Últimos 7 días": 7, "Último mes": 30, "Últimos 3 meses": 90, "Todo el histórico": 99999}
+                _periodo_sel = st.selectbox("Periodo", list(_periodo_opts.keys()), index=1, key="trk_periodo")
+                _dias = _periodo_opts[_periodo_sel]
+                _desde_iso = (_dtnow.utcnow() - _td(days=_dias)).isoformat() if _dias < 99999 else "2000-01-01"
+
                 _df_vis = _read_sql9(
                     _db9,
-                    """SELECT origen as Origen,
+                    f"""SELECT origen as Origen,
                               COUNT(*) as Visitas,
                               SUM(convirtio_a_registro) as Registros,
                               ROUND(SUM(convirtio_a_registro)*100.0/COUNT(*),1) as ConvPct
                        FROM visitas_demo
+                       WHERE timestamp >= '{_desde_iso}'
                        GROUP BY origen ORDER BY Visitas DESC"""
                 )
                 if not _df_vis.empty:
                     _kv1, _kv2, _kv3 = st.columns(3)
-                    _kv1.metric("Total visitas demo", int(_df_vis["Visitas"].sum()))
-                    _kv2.metric("Registros generados", int(_df_vis["Registros"].sum()))
                     _total_vis = int(_df_vis["Visitas"].sum())
                     _total_reg = int(_df_vis["Registros"].sum())
                     _conv_global = round(_total_reg * 100.0 / _total_vis, 1) if _total_vis > 0 else 0
-                    _kv3.metric("Conversion global", f"{_conv_global}%")
+                    _kv1.metric("Total visitas demo", _total_vis)
+                    _kv2.metric("Registros generados", _total_reg)
+                    _kv3.metric("Conversión global", f"{_conv_global}%")
                     st.dataframe(_df_vis, use_container_width=True, hide_index=True)
 
-                    # Detalle de visitas recientes
-                    _df_det = _read_sql9(
+                    # Gráfica visitas por día
+                    _df_dia = _read_sql9(
                         _db9,
-                        """SELECT timestamp as Fecha, origen as Origen, nombre_usuario as Usuario,
-                                  accion_realizada as Accion,
-                                  CASE convirtio_a_registro WHEN 1 THEN 'Si' ELSE 'No' END as Registro
-                           FROM visitas_demo ORDER BY timestamp DESC LIMIT 50"""
+                        f"""SELECT SUBSTR(timestamp,1,10) as Dia, COUNT(*) as Visitas
+                            FROM visitas_demo
+                            WHERE timestamp >= '{_desde_iso}'
+                            GROUP BY Dia ORDER BY Dia ASC"""
                     )
-                    st.caption("Ultimas 50 visitas:")
-                    st.dataframe(_df_det, use_container_width=True, hide_index=True)
+                    if not _df_dia.empty and len(_df_dia) > 1:
+                        st.caption("Evolución de visitas por día:")
+                        st.bar_chart(_df_dia.set_index("Dia")["Visitas"])
+
+                    # Detalle histórico completo con scroll
+                    with st.expander(f"📋 Detalle de visitas ({_total_vis} registros)", expanded=False):
+                        _df_det = _read_sql9(
+                            _db9,
+                            f"""SELECT timestamp as Fecha, origen as Origen, nombre_usuario as Usuario,
+                                      accion_realizada as Accion,
+                                      CASE convirtio_a_registro WHEN 1 THEN 'Si' ELSE 'No' END as Registro
+                               FROM visitas_demo
+                               WHERE timestamp >= '{_desde_iso}'
+                               ORDER BY timestamp DESC"""
+                        )
+                        st.dataframe(_df_det, use_container_width=True, hide_index=True, height=400)
                 else:
-                    st.info("Sin visitas registradas todavia. Comparte el enlace demo para empezar a trackear.")
+                    st.info("Sin visitas registradas en este periodo. Comparte el enlace demo para empezar a trackear.")
                     st.code("https://archirapid.streamlit.app/?seccion=arquitecto&demo=true&from=linkedin&user=nombre")
             except Exception as _ev:
                 st.error(f"Error tracking: {_ev}")
