@@ -259,8 +259,8 @@ def _send_urgencia(email: str, nombre: str, trial_start_date: str | None) -> boo
     <td style="padding:12px 14px;border-radius:8px;
                background:rgba(74,144,217,0.15);
                border:1px solid rgba(74,144,217,0.3);">
-      <p style="margin:0;font-weight:700;color:#4A90D9;">STARTER &mdash; 49€/mes</p>
-      <p style="margin:4px 0 0 0;font-size:13px;color:{_TEXT};">Hasta 15 fincas activas</p>
+      <p style="margin:0;font-weight:700;color:#4A90D9;">STARTER &mdash; 39€/mes</p>
+      <p style="margin:4px 0 0 0;font-size:13px;color:{_TEXT};">Hasta 5 fincas activas</p>
     </td>
   </tr>
   <tr><td style="height:8px;"></td></tr>
@@ -268,13 +268,13 @@ def _send_urgencia(email: str, nombre: str, trial_start_date: str | None) -> boo
     <td style="padding:12px 14px;border-radius:8px;
                background:rgba(245,166,35,0.15);
                border:2px solid rgba(245,166,35,0.5);">
-      <p style="margin:0;font-weight:700;color:{_GOLD};">AGENCY &mdash; 149€/mes
+      <p style="margin:0;font-weight:700;color:{_GOLD};">AGENCY &mdash; 99€/mes
         <span style="font-size:11px;font-weight:400;margin-left:8px;
               background:{_GOLD};color:{_BG};padding:2px 8px;border-radius:12px;">
           El más contratado
         </span>
       </p>
-      <p style="margin:4px 0 0 0;font-size:13px;color:{_TEXT};">Hasta 75 fincas + reservas de colaboración</p>
+      <p style="margin:4px 0 0 0;font-size:13px;color:{_TEXT};">Hasta 20 fincas + reservas de colaboración</p>
     </td>
   </tr>
   <tr><td style="height:8px;"></td></tr>
@@ -282,8 +282,8 @@ def _send_urgencia(email: str, nombre: str, trial_start_date: str | None) -> boo
     <td style="padding:12px 14px;border-radius:8px;
                background:rgba(27,42,107,0.4);
                border:1px solid rgba(27,42,107,0.6);">
-      <p style="margin:0;font-weight:700;color:{_TEXT};">ENTERPRISE &mdash; 349€/mes</p>
-      <p style="margin:4px 0 0 0;font-size:13px;color:{_MUTED};">Ilimitadas + soporte prioritario</p>
+      <p style="margin:0;font-weight:700;color:{_TEXT};">PRO &mdash; 199€/mes</p>
+      <p style="margin:4px 0 0 0;font-size:13px;color:{_MUTED};">Hasta 50 fincas + soporte prioritario</p>
     </td>
   </tr>
 </table>

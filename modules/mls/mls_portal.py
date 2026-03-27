@@ -24,26 +24,26 @@ _SESSION_KEY = "mls_inmo"          # st.session_state key — sin colisión con 
 _PLANES = {
     "mls_starter": {
         "nombre": "STARTER",
-        "precio": "€49/mes",
-        "fincas": 15,
+        "precio": "€39/mes",
+        "fincas": 5,
         "reservas": False,
-        "descripcion": "Hasta 15 fincas activas. Acceso al mercado MLS para colaborar.",
+        "descripcion": "Hasta 5 fincas activas. Acceso al mercado MLS para colaborar.",
         "color": "#4A90D9",
     },
     "mls_agency": {
         "nombre": "AGENCY",
-        "precio": "€149/mes",
-        "fincas": 75,
+        "precio": "€99/mes",
+        "fincas": 20,
         "reservas": True,
-        "descripcion": "Hasta 75 fincas. Reservas de colaboración (€200). Panel avanzado.",
+        "descripcion": "Hasta 20 fincas. Reservas de colaboración (€200). Panel avanzado.",
         "color": "#F5A623",
     },
     "mls_enterprise": {
-        "nombre": "ENTERPRISE",
-        "precio": "€349/mes",
-        "fincas": 0,  # 0 = ilimitado
+        "nombre": "PRO",
+        "precio": "€199/mes",
+        "fincas": 50,
         "reservas": True,
-        "descripcion": "Fincas ilimitadas. Todas las funcionalidades. Soporte prioritario.",
+        "descripcion": "Hasta 50 fincas. Todas las funcionalidades. Soporte prioritario.",
         "color": "#1B2A6B",
     },
 }
@@ -221,7 +221,7 @@ def ui_login_registro() -> None:
     1. Rellena el formulario de registro (pestaña <b>Registrarse</b>)<br>
     2. ArchiRapid revisa y aprueba tu solicitud en <b>24–48h hábiles</b> — recibirás un email<br>
     3. Accede con tu email y contraseña. Tu trial de 30 días empieza al ser aprobada<br>
-    4. Cuando quieras continuar, elige tu plan: <b>Starter 49€/mes · Agency 149€ · Enterprise 349€</b>
+    4. Cuando quieras continuar, elige tu plan: <b>Starter 39€/mes · Agency 99€ · PRO 199€</b>
   </div>
 </div>
 """, unsafe_allow_html=True)
@@ -515,41 +515,118 @@ def ui_espera_aprobacion(inmo: dict) -> None:
 # ── UI: Planes de suscripción ─────────────────────────────────────────────────
 
 def ui_planes(inmo: dict) -> None:
-    st.markdown("## 💳 Elige tu plan MLS")
-    st.markdown(
-        "Activa tu suscripción para comenzar a publicar fincas y colaborar en el mercado MLS. "
-        "Pago seguro con Stripe — modo test activo."
-    )
+    st.markdown("""
+    <style>
+    .planes-header { text-align: center; padding: 2rem 0 1rem 0; }
+    .planes-header h1 { font-size: 2.2rem; font-weight: 800; color: #0D1B3E; margin-bottom: 0.3rem; }
+    .planes-header p { color: #666; font-size: 1.05rem; margin-bottom: 0; }
+    .plan-card {
+        background: white; border-radius: 16px; padding: 2rem 1.5rem;
+        border: 2px solid #E8E8E8; text-align: center; position: relative; height: 100%;
+    }
+    .plan-card.featured { border-color: #E8612A; box-shadow: 0 8px 32px rgba(232,97,42,0.18); transform: translateY(-6px); }
+    .plan-badge {
+        position: absolute; top: -14px; left: 50%; transform: translateX(-50%);
+        background: #E8612A; color: white; font-size: 0.75rem; font-weight: 700;
+        padding: 4px 18px; border-radius: 20px; letter-spacing: 0.05em; white-space: nowrap;
+    }
+    .plan-name { font-size: 1rem; font-weight: 700; color: #0D1B3E; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 0.5rem; }
+    .plan-price { font-size: 3rem; font-weight: 900; color: #0D1B3E; line-height: 1; margin: 0.5rem 0 0.2rem 0; }
+    .plan-price span { font-size: 1.1rem; font-weight: 500; color: #888; }
+    .plan-fincas { display: inline-block; background: #F0F4FF; color: #0D1B3E; font-size: 0.85rem; font-weight: 600; padding: 4px 14px; border-radius: 20px; margin: 0.8rem 0; }
+    .plan-card.featured .plan-fincas { background: #FEF0E8; color: #E8612A; }
+    .plan-feature { font-size: 0.88rem; color: #444; padding: 0.35rem 0; border-bottom: 1px solid #F5F5F5; text-align: left; }
+    .plan-feature:last-child { border-bottom: none; }
+    .plan-feature::before { content: "✓ "; color: #2ecc71; font-weight: 700; }
+    .plan-card.featured .plan-feature::before { color: #E8612A; }
+    .plan-ideal { font-size: 0.8rem; color: #999; margin-top: 1rem; font-style: italic; }
+    .garantia-box { background: #F8FFF8; border: 1px solid #2ecc71; border-radius: 12px; padding: 1.2rem 1.5rem; text-align: center; margin: 2rem 0 1rem 0; }
+    </style>
+    """, unsafe_allow_html=True)
 
-    cols = st.columns(3)
-    plan_keys = ["mls_starter", "mls_agency", "mls_enterprise"]
+    st.markdown("""
+    <div class="planes-header">
+        <h1>Elige tu plan MLS</h1>
+        <p>Sin permanencia · Sin letra pequeña · Cancela cuando quieras<br>
+        <strong>30 días gratuitos para que lo compruebes tú mismo</strong></p>
+    </div>
+    """, unsafe_allow_html=True)
 
-    for col, pk in zip(cols, plan_keys):
-        plan = _PLANES[pk]
-        fincas_str = "Ilimitadas" if plan["fincas"] == 0 else str(plan["fincas"])
-        reservas_str = "✅ Incluidas" if plan["reservas"] else "❌ No incluidas"
+    col1, col2, col3 = st.columns(3, gap="large")
 
-        with col:
-            st.markdown(
-                f"""
-                <div style="border:2px solid {plan['color']};border-radius:10px;
-                            padding:20px;text-align:center;min-height:260px;">
-                  <h3 style="color:{plan['color']};margin:0 0 8px 0;">{plan['nombre']}</h3>
-                  <p style="font-size:1.6rem;font-weight:700;margin:0 0 12px 0;">{plan['precio']}</p>
-                  <p style="font-size:0.85rem;color:#555;margin:0 0 12px 0;">{plan['descripcion']}</p>
-                  <p style="margin:4px 0;font-size:0.85rem;">🏠 Fincas: <b>{fincas_str}</b></p>
-                  <p style="margin:4px 0;font-size:0.85rem;">🤝 Reservas: {reservas_str}</p>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-            st.markdown("")
-            if st.button(
-                f"Contratar {plan['nombre']}",
-                key=f"btn_plan_{pk}",
-                use_container_width=True,
-            ):
-                _iniciar_checkout_plan(pk, inmo)
+    with col1:
+        st.markdown("""
+        <div class="plan-card">
+            <div class="plan-name">Starter</div>
+            <div class="plan-price">39€<span>/mes</span></div>
+            <div class="plan-fincas">Hasta 5 fincas activas</div>
+            <div class="plan-feature">Acceso completo al Mercado MLS</div>
+            <div class="plan-feature">Validación catastral IA</div>
+            <div class="plan-feature">Proyectos compatibles por finca</div>
+            <div class="plan-feature">Ficha pública sin login</div>
+            <div class="plan-feature">Soporte por email</div>
+            <div class="plan-ideal">Ideal para autónomos y agencias pequeñas</div>
+        </div>
+        """, unsafe_allow_html=True)
+        st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
+        if st.button("Empezar con Starter", key="btn_plan_starter", use_container_width=True):
+            _iniciar_checkout_plan("mls_starter", inmo)
+
+    with col2:
+        st.markdown("""
+        <div class="plan-card featured">
+            <div class="plan-badge">⭐ MÁS POPULAR</div>
+            <div class="plan-name">Agency</div>
+            <div class="plan-price">99€<span>/mes</span></div>
+            <div class="plan-fincas">Hasta 20 fincas activas</div>
+            <div class="plan-feature">Todo lo de Starter</div>
+            <div class="plan-feature">Reservas de colaboración 72h (€200)</div>
+            <div class="plan-feature">Firma digital del acuerdo MLS</div>
+            <div class="plan-feature">Panel de estadísticas avanzado</div>
+            <div class="plan-feature">Soporte prioritario</div>
+            <div class="plan-ideal">Ideal para agencias con cartera activa de suelo</div>
+        </div>
+        """, unsafe_allow_html=True)
+        st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
+        if st.button("Empezar con Agency", key="btn_plan_agency", use_container_width=True, type="primary"):
+            _iniciar_checkout_plan("mls_agency", inmo)
+
+    with col3:
+        st.markdown("""
+        <div class="plan-card">
+            <div class="plan-name">Pro</div>
+            <div class="plan-price">199€<span>/mes</span></div>
+            <div class="plan-fincas">Hasta 50 fincas activas</div>
+            <div class="plan-feature">Todo lo de Agency</div>
+            <div class="plan-feature">Gestión de múltiples agentes</div>
+            <div class="plan-feature">Redes y franquicias</div>
+            <div class="plan-feature">Informes de mercado mensuales</div>
+            <div class="plan-feature">Soporte telefónico directo</div>
+            <div class="plan-ideal">Ideal para agencias grandes y redes</div>
+        </div>
+        """, unsafe_allow_html=True)
+        st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
+        if st.button("Empezar con Pro", key="btn_plan_pro", use_container_width=True):
+            _iniciar_checkout_plan("mls_enterprise", inmo)
+
+    st.markdown("""
+    <div class="garantia-box">
+        🎁 <strong>30 días gratis al registrarte</strong> — sin tarjeta, sin compromiso.<br>
+        <span style="color:#666;font-size:0.9rem">
+        Si en 30 días no has cerrado ninguna colaboración, te ayudamos a entender por qué.
+        </span>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown("""
+    <div style='text-align:center;margin-top:1.5rem;'>
+        <p style='color:#888;font-size:0.85rem;'>
+        ¿Tienes una red o franquicia con más de 50 fincas?
+        <a href='mailto:hola@archirapid.com' style='color:#E8612A;font-weight:600;'>
+        Escríbenos y diseñamos un plan a medida.</a>
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
 
     st.divider()
     st.caption(

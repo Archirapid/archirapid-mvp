@@ -26,9 +26,9 @@ PRODUCTS = {
     "sub_pro_anual":      {"name": "Suscripción ArchiRapid PRO Anual","amount": 89000},  # €890/año
     "sub_enterprise":     {"name": "Suscripción ArchiRapid ENTERPRISE","amount":29900},  # €299/mes
     # MLS — Suscripciones inmobiliarias y reservas (modo test, pago único)
-    "mls_starter":        {"name": "ArchiRapid MLS STARTER (€49/mes)",    "amount":  4900},  # €49
-    "mls_agency":         {"name": "ArchiRapid MLS AGENCY (€149/mes)",    "amount": 14900},  # €149
-    "mls_enterprise":     {"name": "ArchiRapid MLS ENTERPRISE (€349/mes)","amount": 34900},  # €349
+    "mls_starter":        {"name": "ArchiRapid MLS STARTER (€39/mes)",    "amount":  3900},  # €39
+    "mls_agency":         {"name": "ArchiRapid MLS AGENCY (€99/mes)",     "amount":  9900},  # €99
+    "mls_enterprise":     {"name": "ArchiRapid MLS PRO (€199/mes)",       "amount": 19900},  # €199
     "mls_reserva":        {"name": "Reserva MLS (desc. en comisión final)","amount": 20000},  # €200
 }
 

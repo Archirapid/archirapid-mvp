@@ -360,7 +360,7 @@ def notif_pago_suscripcion(nombre: str, email: str,
     _LIMITES_PLAN = {
         "starter":    "Hasta 5 fincas listadas · Solo rol listante",
         "agency":     "Hasta 20 fincas listadas · Rol listante + colaboradora · Reservas",
-        "enterprise": "Fincas ilimitadas · Todos los roles · Reservas · Soporte prioritario",
+        "enterprise": "Hasta 50 fincas · Todos los roles · Reservas · Soporte prioritario",
     }
     limites = _LIMITES_PLAN.get(plan.lower(), "Consultar condiciones del plan")
 
