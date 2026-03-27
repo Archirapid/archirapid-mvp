@@ -36,7 +36,10 @@ data.db.backup_*
 # Logs
 *.log
 
-# Database demo incluida para Streamlit Cloud
+# Databases — never commit live DB files
+*.db
+database.db
+marketplace.db
 *.db.backup_*
 
 # Environment files with sensitive data
