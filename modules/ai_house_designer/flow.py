@@ -4680,13 +4680,8 @@ def render_step6_pago():
             from modules.marketplace.utils import DB_PATH as _DBP6
             _conn6 = _sq6.connect(_DBP6, timeout=15)
             _conn6.execute("PRAGMA journal_mode=WAL")
-            _conn6.execute("""
-                CREATE TABLE IF NOT EXISTS ai_projects (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    client_email TEXT, project_name TEXT, total_area REAL,
-                    total_cost REAL, services_json TEXT, style TEXT,
-                    energy_label TEXT, created_at TEXT, status TEXT
-                )""")
+            # ensure_tables() in src/db.py already creates ai_projects with req_json column
+            # DO NOT redefine the table here — it would create it without req_json on fresh SQLite
             _req_json_val = _js6.dumps(st.session_state.get("ai_house_requirements") or {})
             _conn6.execute("""
                 INSERT OR REPLACE INTO ai_projects

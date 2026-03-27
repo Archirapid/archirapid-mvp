@@ -34,16 +34,17 @@ try:
             os.environ.setdefault(_sk, _sv)
 except Exception:
     pass
+import json
 import threading
 import http.server
 import socketserver
-import functools
 import time
 from pathlib import Path
 from src import db as _db
 from modules.marketplace.utils import init_db, db_conn
 from modules.marketplace.marketplace import get_project_display_image
 from modules.ai_house_designer import flow as ai_house_flow
+from modules.marketplace.compatibilidad import get_proyectos_compatibles
 
 # Inicializar base de datos — solo UNA VEZ por worker (no en cada rerun)
 @_st_secrets.cache_resource(show_spinner=False)
@@ -1617,17 +1618,17 @@ if st.query_params.get("mls_reserva_ok") == "1" and st.query_params.get("tipo") 
 if st.query_params.get("page") == "👤 Panel de Cliente" and st.session_state.get('selected_page') != "🏠 Propietarios":
     try:
         panel_cliente_v2()
-        st.stop()
     except Exception as e:
-        st.error(f"Error mostrando panel cliente v2: {e}")
+        st.error(f"Error cargando el panel: {e}")
+    else:
         st.stop()
 
 if st.query_params.get("page") == "Registro de Usuario":
     try:
         registro_v2()
-        st.stop()
     except Exception as e:
         st.error(f"Error mostrando registro v2: {e}")
+    st.stop()
 
 
 if st.query_params.get("page") == "Diseñador de Vivienda":
@@ -1752,11 +1753,9 @@ def render_portal_cliente_proyecto():
                 STATIC_URL = globals().get('STATIC_URL', 'http://127.0.0.1:8765/')
                 model_url = f"{STATIC_URL}{rel_path}".replace(" ", "%20")
 
-                try:
-                    html_final = three_html_for(model_url, str(proyecto.get("id")))
-                    st.components.v1.html(html_final, height=700, scrolling=False)
-                except Exception as e:
-                    st.error(f"Error cargando visor 3D: {e}")
+                # three_html_for was removed — use Babylon viewer from flow instead
+                st.info(f"Visor 3D disponible en el Diseñador. Modelo: `{rel_path}`")
+                st.markdown(f"[Abrir en Diseñador 3D →](?page=Diseñador+de+Vivienda)")
             else:
                 st.info("Este proyecto no tiene modelo GLB. Próximamente convertiremos OBJ a GLB automáticamente.")
         else:
