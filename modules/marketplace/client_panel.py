@@ -1379,7 +1379,7 @@ def show_client_transactions(client_email):
                     try:
                         paths = json.loads(photo_paths)
                         if paths and isinstance(paths, list):
-                            image_paths = [(p if isinstance(p, str) and p.startswith("http") else f"uploads/{p}") for p in paths]
+                            image_paths = [(p if isinstance(p, str) and p.startswith(("http", "uploads/", "assets/", "/")) else f"uploads/{p}") for p in paths]
                             st.image(image_paths, caption=["Foto " + str(i+1) for i in range(len(image_paths))], use_container_width=True)
                     except Exception as e:
                         st.warning(f"No se pudo cargar la imagen: {e}")
@@ -1454,7 +1454,7 @@ def show_buyer_panel(client_email):
                         paths = json.loads(photo_paths)
                         if paths and isinstance(paths, list):
                             p0 = paths[0]
-                            img_path = p0 if isinstance(p0, str) and p0.startswith("http") else f"uploads/{p0}"
+                            img_path = p0 if isinstance(p0, str) and p0.startswith(("http", "uploads/", "assets/", "/")) else f"uploads/{p0}"
                             if (isinstance(p0, str) and p0.startswith("http")) or os.path.exists(img_path):
                                 st.image(img_path, width=250)
                             else:
@@ -2582,7 +2582,7 @@ def show_owner_panel_v2(client_email):
                         paths = json.loads(photo_paths)
                         if paths and isinstance(paths, list):
                             p0 = paths[0]
-                            img_path = p0 if isinstance(p0, str) and p0.startswith("http") else f"uploads/{p0}"
+                            img_path = p0 if isinstance(p0, str) and p0.startswith(("http", "uploads/", "assets/", "/")) else f"uploads/{p0}"
                             if (isinstance(p0, str) and p0.startswith("http")) or os.path.exists(img_path):
                                 st.image(img_path, width=200)
                     except:

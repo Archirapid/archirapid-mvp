@@ -52,8 +52,9 @@ def get_plot_image_path(plot):
                 # Supabase Storage URL — devolver directamente
                 if isinstance(paths[0], str) and paths[0].startswith("http"):
                     return paths[0]
-                # Añadir el prefijo uploads/ al nombre del archivo
-                upload_path = f"uploads/{paths[0]}"
+                # Añadir el prefijo uploads/ al nombre del archivo si no lo tiene ya
+                p0 = paths[0]
+                upload_path = p0 if (isinstance(p0, str) and p0.startswith(("uploads/", "assets/", "/"))) else f"uploads/{p0}"
                 # Verificar si el archivo existe
                 if os.path.exists(upload_path):
                     return upload_path

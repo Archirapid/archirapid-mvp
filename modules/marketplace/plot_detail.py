@@ -69,7 +69,7 @@ def get_all_plot_images(plot):
                     if isinstance(path, str) and path.startswith("http"):
                         images.append(path)
                     else:
-                        img_path = f"uploads/{path}"
+                        img_path = path if (isinstance(path, str) and path.startswith(("uploads/", "assets/", "/"))) else f"uploads/{path}"
                         if os.path.exists(img_path):
                             images.append(img_path)
         except (json.JSONDecodeError, TypeError):
