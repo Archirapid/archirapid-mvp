@@ -831,8 +831,9 @@ def show_owner_panel_v2(client_email):
                     try:
                         paths = json.loads(photo_paths)
                         if paths and isinstance(paths, list):
-                            img_path = f"uploads/{paths[0]}"
-                            if os.path.exists(img_path):
+                            p0 = paths[0]
+                            img_path = p0 if isinstance(p0, str) and p0.startswith("http") else f"uploads/{p0}"
+                            if p0.startswith("http") or os.path.exists(img_path):
                                 st.image(img_path, width=200)
                     except:
                         st.image("assets/fincas/image1.jpg", width=200)
@@ -974,7 +975,7 @@ def show_client_transactions_v2(client_email):
                     try:
                         paths = json.loads(photo_paths)
                         if paths and isinstance(paths, list):
-                            image_paths = [f"uploads/{path}" for path in paths]
+                            image_paths = [(p if isinstance(p, str) and p.startswith("http") else f"uploads/{p}") for p in paths]
                             st.image(image_paths, caption=["Foto " + str(i+1) for i in range(len(image_paths))], use_container_width=True)
                     except Exception as e:
                         st.warning(f"No se pudo cargar la imagen: {e}")

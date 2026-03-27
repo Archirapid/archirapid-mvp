@@ -435,6 +435,9 @@ def _get_mls_fincas_for_grid():
             for _p in imgs:
                 if _p:
                     _p = str(_p).replace("\\", "/")
+                    if _p.startswith("http"):
+                        img_path = _p
+                        break
                     if not _p.startswith("uploads/"):
                         _p = "uploads/" + _p
                     if os.path.exists(_p):

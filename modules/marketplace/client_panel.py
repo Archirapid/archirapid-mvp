@@ -359,6 +359,10 @@ def show_buyer_panel_mls(client_email: str, finca_id: str) -> None:
             _shown = False
             for _ip in (_img_paths or []):
                 _norm = str(_ip).replace("\\", "/")
+                if _norm.startswith("http"):
+                    st.image(_norm, width=250)
+                    _shown = True
+                    break
                 _candidates = [_norm, f"uploads/{_norm}"]
                 for _c in _candidates:
                     if os.path.exists(_c):
@@ -1375,7 +1379,7 @@ def show_client_transactions(client_email):
                     try:
                         paths = json.loads(photo_paths)
                         if paths and isinstance(paths, list):
-                            image_paths = [f"uploads/{path}" for path in paths]
+                            image_paths = [(p if isinstance(p, str) and p.startswith("http") else f"uploads/{p}") for p in paths]
                             st.image(image_paths, caption=["Foto " + str(i+1) for i in range(len(image_paths))], use_container_width=True)
                     except Exception as e:
                         st.warning(f"No se pudo cargar la imagen: {e}")
@@ -1449,8 +1453,9 @@ def show_buyer_panel(client_email):
                         import json
                         paths = json.loads(photo_paths)
                         if paths and isinstance(paths, list):
-                            img_path = f"uploads/{paths[0]}"
-                            if os.path.exists(img_path):
+                            p0 = paths[0]
+                            img_path = p0 if isinstance(p0, str) and p0.startswith("http") else f"uploads/{p0}"
+                            if (isinstance(p0, str) and p0.startswith("http")) or os.path.exists(img_path):
                                 st.image(img_path, width=250)
                             else:
                                 _img_finca(width=250)
@@ -2576,8 +2581,9 @@ def show_owner_panel_v2(client_email):
                     try:
                         paths = json.loads(photo_paths)
                         if paths and isinstance(paths, list):
-                            img_path = f"uploads/{paths[0]}"
-                            if os.path.exists(img_path):
+                            p0 = paths[0]
+                            img_path = p0 if isinstance(p0, str) and p0.startswith("http") else f"uploads/{p0}"
+                            if (isinstance(p0, str) and p0.startswith("http")) or os.path.exists(img_path):
                                 st.image(img_path, width=200)
                     except:
                         _img_finca(width=200)

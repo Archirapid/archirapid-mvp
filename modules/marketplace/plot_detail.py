@@ -66,9 +66,12 @@ def get_all_plot_images(plot):
             paths = json.loads(plot['photo_paths']) if isinstance(plot.get('photo_paths'), str) else plot.get('photo_paths')
             if paths and isinstance(paths, list):
                 for path in paths:
-                    img_path = f"uploads/{path}"
-                    if os.path.exists(img_path):
-                        images.append(img_path)
+                    if isinstance(path, str) and path.startswith("http"):
+                        images.append(path)
+                    else:
+                        img_path = f"uploads/{path}"
+                        if os.path.exists(img_path):
+                            images.append(img_path)
         except (json.JSONDecodeError, TypeError):
             pass
 
