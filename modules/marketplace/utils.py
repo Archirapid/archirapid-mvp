@@ -10,18 +10,47 @@ DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "
 UPLOADS.mkdir(parents=True, exist_ok=True)
 
 def save_upload(uploaded_file, prefix="file"):
-    # uploaded_file: Streamlit UploadedFile or werkzeug FileStorage (for API)
-    ext = Path(uploaded_file.name).suffix if hasattr(uploaded_file, "name") else ".bin"
-    fname = f"{prefix}_{uuid.uuid4().hex}{ext}"
-    dest = UPLOADS / fname
-    # if streamlit file-like
+    """Sube archivo a Supabase Storage. Fallback a disco local si falla."""
+    import requests as _req
+    from pathlib import Path as _Path
+    import uuid as _uuid
+
     try:
-        with open(dest, "wb") as f:
-            f.write(uploaded_file.getbuffer())
+        import streamlit as _st
+        _SUPABASE_URL = _st.secrets.get("SUPABASE_URL") or os.getenv("SUPABASE_URL", "")
+        _SUPABASE_KEY = _st.secrets.get("SUPABASE_STORAGE_KEY") or os.getenv("SUPABASE_STORAGE_KEY", "")
     except Exception:
-        # werkzeug or other
-        uploaded_file.save(str(dest))
-    return str(Path("uploads") / fname)  # ruta relativa para uso en st.image y DB
+        _SUPABASE_URL = os.getenv("SUPABASE_URL", "")
+        _SUPABASE_KEY = os.getenv("SUPABASE_STORAGE_KEY", "")
+
+    BUCKET = "archirapid-uploads"
+
+    ext = _Path(uploaded_file.name).suffix.lower() if hasattr(uploaded_file, "name") else ".bin"
+    filename = f"{prefix}_{_uuid.uuid4().hex[:12]}{ext}"
+    file_bytes = uploaded_file.getbuffer()
+
+    # Intentar subir a Supabase Storage
+    if _SUPABASE_URL and _SUPABASE_KEY:
+        try:
+            url = f"{_SUPABASE_URL}/storage/v1/object/{BUCKET}/{filename}"
+            headers = {
+                "Authorization": f"Bearer {_SUPABASE_KEY}",
+                "Content-Type": uploaded_file.type or "application/octet-stream",
+            }
+            resp = _req.post(url, headers=headers, data=file_bytes, timeout=30)
+            if resp.status_code in (200, 201):
+                public_url = f"{_SUPABASE_URL}/storage/v1/object/public/{BUCKET}/{filename}"
+                return public_url
+        except Exception:
+            pass  # Fallback a disco local
+
+    # Fallback: guardar en disco local (comportamiento original)
+    dest_dir = _Path("uploads")
+    dest_dir.mkdir(exist_ok=True)
+    dest = dest_dir / filename
+    with open(dest, "wb") as f:
+        f.write(file_bytes)
+    return str(dest).replace("\\", "/")
 
 def db_conn():
     """Devuelve conexión a BD. En producción (Supabase) usa get_conn() de src.db."""

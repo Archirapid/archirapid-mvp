@@ -38,7 +38,10 @@ def _get_mls_images(finca: dict) -> list:
     result = []
     for p in paths:
         norm = p.replace("\\", "/")
-        if os.path.exists(norm):
+        # Supabase Storage URL — devolver directamente sin verificar disco
+        if norm.startswith("http"):
+            result.append(norm)
+        elif os.path.exists(norm):
             result.append(norm)
         elif os.path.exists(f"uploads/{norm}"):
             result.append(f"uploads/{norm}")
