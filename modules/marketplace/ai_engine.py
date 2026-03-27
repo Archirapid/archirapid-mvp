@@ -223,8 +223,8 @@ def extraer_datos_nota_catastral(pdf_path: str) -> dict:
         # Abrir PDF y convertir primera página a imagen
         doc = fitz.open(pdf_path)
         page = doc.load_page(0)
-        pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))  # Zoom x2
-        img_bytes = pix.tobytes()
+        pix = page.get_pixmap(matrix=fitz.Matrix(1.5, 1.5))  # Zoom x1.5 — suficiente para OCR, reduce payload
+        img_bytes = pix.tobytes("png")
         doc.close()
 
         # Prompt para extraer datos catastrales
@@ -245,14 +245,14 @@ Devuelve solo JSON: {"referencia_catastral":"codigo","superficie_grafica_m2":num
         
         # Parsear JSON
         data = json.loads(text)
-        
+
         # Verificar que tenga los campos esperados (o None)
         return {
             "referencia_catastral": data.get("referencia_catastral"),
-            "superficie_grafica_m2": data.get("superficie_grafica_m2"), 
+            "superficie_grafica_m2": data.get("superficie_grafica_m2"),
             "municipio": data.get("municipio")
         }
-        
+
     except Exception as e:
         return {"error": f"Error al procesar la nota catastral: {str(e)}"}
 
