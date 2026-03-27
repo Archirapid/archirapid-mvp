@@ -105,35 +105,37 @@ def _get_fincas_mercado_visible(exclude_inmo_id: str | None = None) -> list:
     try:
         from src import db as _db
         conn = _db.get_conn()
-        cur  = conn.cursor()
-        if exclude_inmo_id:
-            cur.execute(
-                f"""SELECT {_COLS}
-                    FROM fincas_mls
-                    WHERE catastro_validada = 1
-                      AND inmo_id != ?
-                      AND estado IN (
-                          'publicada',
-                          'reservada',
-                          'reserva_pendiente_confirmacion'
-                      )
-                    ORDER BY created_at DESC""",
-                (exclude_inmo_id,),
-            )
-        else:
-            cur.execute(
-                f"""SELECT {_COLS}
-                    FROM fincas_mls
-                    WHERE catastro_validada = 1
-                      AND estado IN (
-                          'publicada',
-                          'reservada',
-                          'reserva_pendiente_confirmacion'
-                      )
-                    ORDER BY created_at DESC"""
-            )
-        rows = [dict(r) for r in cur.fetchall()]
-        conn.close()
+        try:
+            cur  = conn.cursor()
+            if exclude_inmo_id:
+                cur.execute(
+                    f"""SELECT {_COLS}
+                        FROM fincas_mls
+                        WHERE catastro_validada = 1
+                          AND inmo_id != ?
+                          AND estado IN (
+                              'publicada',
+                              'reservada',
+                              'reserva_pendiente_confirmacion'
+                          )
+                        ORDER BY created_at DESC""",
+                    (exclude_inmo_id,),
+                )
+            else:
+                cur.execute(
+                    f"""SELECT {_COLS}
+                        FROM fincas_mls
+                        WHERE catastro_validada = 1
+                          AND estado IN (
+                              'publicada',
+                              'reservada',
+                              'reserva_pendiente_confirmacion'
+                          )
+                        ORDER BY created_at DESC"""
+                )
+            rows = [dict(r) for r in cur.fetchall()]
+        finally:
+            conn.close()
         # Guardia defensiva
         for row in rows:
             assert "inmo_id" not in row, "SEGURIDAD: inmo_id en mercado visible"
