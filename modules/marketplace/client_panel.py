@@ -1536,8 +1536,8 @@ def show_buyer_panel(client_email):
                 # Consultar DB: ai_verification_cache y plano_catastral_path
                 _plano_path_from_db = None
                 try:
-                    import sqlite3 as _sqlite3, json as _json_cache
-                    _c2 = _sqlite3.connect("database.db", timeout=10)
+                    import json as _json_cache
+                    _c2 = db_conn()
                     _row = _c2.execute(
                         "SELECT ai_verification_cache, plano_catastral_path FROM plots WHERE id=?",
                         (plot_id,)
@@ -1632,9 +1632,8 @@ def show_buyer_panel(client_email):
 
                             # Persistir en DB para evitar re-extracción en futuros renders
                             try:
-                                import sqlite3 as _sq, json as _js
-                                _cc = _sq.connect("database.db", timeout=10)
-                                _cc.execute("PRAGMA journal_mode=WAL")
+                                import json as _js
+                                _cc = db_conn()
                                 _cc.execute(
                                     "UPDATE plots SET ai_verification_cache=? WHERE id=?",
                                     (_js.dumps({
