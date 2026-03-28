@@ -1480,7 +1480,7 @@ if st.query_params.get("stripe_session") and st.query_params.get("payment") == "
             import sqlite3 as _sq3
             _sess = _stripe_verify(_ss_id)
             if _sess.payment_status == "paid":
-                _meta = _sess.metadata or {}
+                _meta = dict(_sess.metadata) if _sess.metadata else {}
                 _proj_id  = _meta.get("project_id", "")
                 _cli_mail = _meta.get("client_email", "") or (_sess.customer_email or "")
                 _prods    = _meta.get("products", "")
