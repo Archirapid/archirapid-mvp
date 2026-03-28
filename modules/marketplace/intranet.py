@@ -628,6 +628,31 @@ def main():
                 st.error(f"Error en resincronización: {e}")
 
         st.markdown("---")
+        st.subheader("🧹 Limpiar Clientes de Prueba")
+        st.write("Elimina **todas las reservas** y **todos los usuarios cliente** (role='client'). Las fincas y el resto de datos NO se tocan.")
+        st.error("⚠️ IRREVERSIBLE — solo para pruebas. No ejecutar en producción real.")
+        _confirm_clean = st.checkbox("Confirmo que quiero borrar todos los clientes y reservas de prueba", key="confirm_clean_clients")
+        if _confirm_clean:
+            if st.button("🗑️ LIMPIAR CLIENTES Y RESERVAS DE PRUEBA", type="primary", key="btn_clean_clients"):
+                try:
+                    from modules.marketplace.utils import db_conn as _db_conn_clean
+                    _cc = _db_conn_clean()
+                    # Contar antes
+                    _n_res = _cc.execute("SELECT COUNT(*) FROM reservations").fetchone()[0]
+                    _n_cli = _cc.execute("SELECT COUNT(*) FROM users WHERE role='client'").fetchone()[0]
+                    # Borrar
+                    _cc.execute("DELETE FROM reservations")
+                    _cc.execute("DELETE FROM users WHERE role='client'")
+                    _cc.commit()
+                    _cc.close()
+                    st.cache_data.clear()
+                    st.cache_resource.clear()
+                    st.success(f"✅ Limpieza completada: {_n_res} reservas y {_n_cli} clientes borrados.")
+                    st.rerun()
+                except Exception as _e:
+                    st.error(f"Error en limpieza: {_e}")
+
+        st.markdown("---")
         st.subheader("🏠 Gestión Catálogo de Prefabricadas")
 
         try:
