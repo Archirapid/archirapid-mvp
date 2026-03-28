@@ -1515,13 +1515,17 @@ if st.query_params.get("stripe_session") and st.query_params.get("payment") == "
                             _notify_res(_plot_id_r, _buyer_name, _buyer_mail, _amount, "reservation")
                         except Exception:
                             pass
-                        st.session_state["logged_in"]       = True
-                        st.session_state["user_email"]      = _buyer_mail
-                        st.session_state["role"]            = "client"
-                        st.session_state["user_name"]       = _buyer_name
-                        st.session_state["auto_owner_email"] = _buyer_mail
-                        st.session_state["selected_page"]  = "👤 Panel de Cliente"
+                        st.session_state["logged_in"]         = True
+                        st.session_state["user_email"]        = _buyer_mail
+                        st.session_state["role"]              = "client"
+                        st.session_state["user_name"]         = _buyer_name
+                        st.session_state["auto_owner_email"]  = _buyer_mail
+                        st.session_state["selected_page"]     = "👤 Panel de Cliente"
                         st.session_state["payment_confirmed"] = True
+                        # client_panel.main() necesita estas keys para mostrar el dashboard
+                        st.session_state["client_logged_in"]  = True
+                        st.session_state["client_email"]      = _buyer_mail
+                        st.session_state["user_role"]         = "buyer"
                         st.toast("🎉 ¡Reserva confirmada! Bienvenido a tu panel de cliente.", icon="✅")
                         try:
                             del st.query_params["stripe_session"]
@@ -1546,6 +1550,14 @@ if st.query_params.get("stripe_session") and st.query_params.get("payment") == "
                     _con3.close()
                     st.session_state[f"stripe_verified_{_ss_id}"] = True
                     st.toast("🎉 Pago completado. Ya puedes descargar tus archivos.", icon="✅")
+                    if _cli_mail:
+                        st.session_state["logged_in"]        = True
+                        st.session_state["user_email"]       = _cli_mail
+                        st.session_state["role"]             = "client"
+                        st.session_state["client_logged_in"] = True
+                        st.session_state["client_email"]     = _cli_mail
+                        st.session_state["user_role"]        = "buyer"
+                        st.session_state["selected_page"]    = "👤 Panel de Cliente"
         except Exception as _se:
             st.toast(f"Error verificando pago Stripe: {_se}", icon="⚠️")
     # Limpiar params de Stripe sin perder el proyecto

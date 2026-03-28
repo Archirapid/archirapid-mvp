@@ -87,18 +87,21 @@ def get_project_images(proyecto):
     """Obtener todas las imágenes válidas de un proyecto"""
     images = []
 
-    # Procesar foto principal
+    def _valid_image(path):
+        if not path or not isinstance(path, str) or not path.strip():
+            return False
+        if path.startswith("http"):
+            return True  # URL Supabase Storage — siempre válida, no usar os.path.exists
+        return os.path.exists(path)
+
     foto_principal = proyecto.get('foto_principal')
-    if foto_principal and os.path.exists(foto_principal):
+    if _valid_image(foto_principal):
         images.append(foto_principal)
 
-    # Procesar galería de fotos
     galeria = proyecto.get('galeria_fotos', [])
-
-    # Validar que galeria sea una lista y no un número
     if galeria and isinstance(galeria, list) and not any(isinstance(item, (int, float)) for item in galeria):
         for img_path in galeria:
-            if img_path and isinstance(img_path, str) and img_path.strip() and img_path not in images and os.path.exists(img_path):
+            if img_path not in images and _valid_image(img_path):
                 images.append(img_path)
 
 def show_plot_detail_page(plot_id: str):

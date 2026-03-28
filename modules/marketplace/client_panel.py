@@ -508,6 +508,10 @@ def show_buyer_panel_mls(client_email: str, finca_id: str) -> None:
 
 def show_full_client_dashboard(client_email):
     """Muestra el panel completo del cliente para usuarios ya logueados"""
+    if st.session_state.pop("payment_confirmed", False):
+        st.success("✅ ¡Pago procesado correctamente! Bienvenido a tu panel de cliente.")
+        st.info("📌 Puedes volver en cualquier momento desde **archirapid.com** con tu email para ver el estado de tu tramitación. Nos pondremos en contacto contigo pronto.")
+
     # Si viene de reserva naranja MLS (sesión activa) → panel completo con 6 botones
     mls_finca_id = st.session_state.get("mls_reserva_finca_id")
 
