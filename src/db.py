@@ -690,6 +690,10 @@ _PG_DDL = [
         id TEXT PRIMARY KEY,
         inmo_id TEXT,
         inmo_nombre TEXT,
+        usuario_tipo TEXT DEFAULT 'inmo',
+        usuario_id TEXT,
+        usuario_nombre TEXT,
+        usuario_email TEXT,
         asunto TEXT,
         mensaje TEXT,
         lola_respuesta TEXT,
@@ -752,6 +756,11 @@ _PG_ALTER_MIGRATIONS = [
     "ALTER TABLE inmobiliarias ADD COLUMN IF NOT EXISTS trial_start_date TEXT DEFAULT NULL",
     "ALTER TABLE inmobiliarias ADD COLUMN IF NOT EXISTS trial_active INTEGER DEFAULT 0",
     "ALTER TABLE inmobiliarias ADD COLUMN IF NOT EXISTS trial_expired INTEGER DEFAULT 0",
+    # tickets_soporte: columnas genéricas multi-usuario
+    "ALTER TABLE tickets_soporte ADD COLUMN IF NOT EXISTS usuario_tipo TEXT DEFAULT 'inmo'",
+    "ALTER TABLE tickets_soporte ADD COLUMN IF NOT EXISTS usuario_id TEXT",
+    "ALTER TABLE tickets_soporte ADD COLUMN IF NOT EXISTS usuario_nombre TEXT",
+    "ALTER TABLE tickets_soporte ADD COLUMN IF NOT EXISTS usuario_email TEXT",
 ]
 
 
@@ -1522,6 +1531,10 @@ def ensure_tables():
             id              TEXT PRIMARY KEY,
             inmo_id         TEXT,
             inmo_nombre     TEXT,
+            usuario_tipo    TEXT DEFAULT 'inmo',
+            usuario_id      TEXT,
+            usuario_nombre  TEXT,
+            usuario_email   TEXT,
             asunto          TEXT,
             mensaje         TEXT,
             lola_respuesta  TEXT,
@@ -1530,6 +1543,16 @@ def ensure_tables():
             created_at      TEXT,
             respondido_at   TEXT
         )""")
+        for _mig_ts in [
+            "ALTER TABLE tickets_soporte ADD COLUMN usuario_tipo TEXT DEFAULT 'inmo'",
+            "ALTER TABLE tickets_soporte ADD COLUMN usuario_id TEXT",
+            "ALTER TABLE tickets_soporte ADD COLUMN usuario_nombre TEXT",
+            "ALTER TABLE tickets_soporte ADD COLUMN usuario_email TEXT",
+        ]:
+            try:
+                c.execute(_mig_ts)
+            except Exception:
+                pass
 
         # Índices MLS (mejoran rendimiento sin afectar tablas existentes)
         try:

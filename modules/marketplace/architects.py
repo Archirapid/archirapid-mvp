@@ -849,3 +849,57 @@ def main():
             finally:
                 if 'conn' in locals(): conn.close()
 
+    # ── SOPORTE (solo cuando hay sesión activa de arquitecto) ─────────────────
+    if st.session_state.get("arch_id") and not _sandbox:
+        st.markdown("---")
+        with st.expander("📞 ¿Necesitas ayuda? Contacta con ArchiRapid", expanded=False):
+            try:
+                from src.db import get_conn as _arch_get_conn
+                from uuid import uuid4 as _uuid4a
+                from datetime import datetime as _dta, timezone as _tza
+                _arch_id    = st.session_state["arch_id"]
+                _arch_email = st.session_state.get("arch_email", "")
+                _arch_name  = st.session_state.get("arch_name", _arch_email)
+                _sopa_conn  = _arch_get_conn()
+                try:
+                    st.markdown("**Envíanos tu consulta** y te respondemos en menos de 24h.")
+                    with st.form("arch_sop_form", clear_on_submit=True):
+                        _a_asunto  = st.text_input("Asunto *", max_chars=100, key="arch_sop_asunto")
+                        _a_mensaje = st.text_area("Mensaje *", max_chars=500, height=100, key="arch_sop_mensaje")
+                        _a_enviar  = st.form_submit_button("Enviar consulta", type="primary")
+                    if _a_enviar:
+                        if _a_asunto.strip() and _a_mensaje.strip():
+                            _sopa_conn.execute(
+                                """INSERT INTO tickets_soporte
+                                       (id, usuario_tipo, usuario_id, usuario_nombre, usuario_email,
+                                        asunto, mensaje, estado, created_at)
+                                   VALUES (?, 'arquitecto', ?, ?, ?, ?, ?, 'pendiente', ?)""",
+                                (str(_uuid4a()), _arch_id, _arch_name, _arch_email,
+                                 _a_asunto.strip(), _a_mensaje.strip(),
+                                 _dta.now(_tza.utc).strftime("%Y-%m-%d %H:%M:%S"))
+                            )
+                            _sopa_conn.commit()
+                            st.success("Consulta enviada. Te responderemos en menos de 24h.")
+                        else:
+                            st.warning("Completa asunto y mensaje.")
+                    _a_tickets = _sopa_conn.execute(
+                        """SELECT asunto, estado, admin_respuesta, created_at
+                           FROM tickets_soporte
+                           WHERE usuario_id = ? AND usuario_tipo = 'arquitecto'
+                           ORDER BY created_at DESC LIMIT 10""",
+                        (_arch_id,)
+                    ).fetchall()
+                    if _a_tickets:
+                        st.markdown("**Mis consultas:**")
+                        for _at in _a_tickets:
+                            _badge = {"pendiente": "🔴", "respondido": "✅", "cerrado": "⚫"}.get(_at[1], "❓")
+                            with st.expander(f"{_badge} {_at[0]} · {str(_at[3] or '')[:10]}", expanded=False):
+                                if _at[2]:
+                                    st.info(f"**Respuesta de ArchiRapid:** {_at[2]}")
+                                else:
+                                    st.caption("Pendiente de respuesta.")
+                finally:
+                    _sopa_conn.close()
+            except Exception as _esop:
+                st.warning(f"Soporte no disponible: {_esop}")
+

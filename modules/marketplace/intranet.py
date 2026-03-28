@@ -457,22 +457,29 @@ def main():
                 _ts_where = f"WHERE estado='{_ts_fil}'" if _ts_fil != "Todos" else ""
 
                 _tickets = _ts_conn.execute(f"""
-                    SELECT id, inmo_nombre, asunto, mensaje, lola_respuesta,
+                    SELECT id,
+                           COALESCE(usuario_nombre, inmo_nombre, '—') as nombre,
+                           COALESCE(usuario_tipo, 'inmo') as tipo,
+                           COALESCE(usuario_email, '') as email,
+                           asunto, mensaje, lola_respuesta,
                            admin_respuesta, estado, created_at
                     FROM tickets_soporte {_ts_where}
                     ORDER BY created_at DESC
                 """).fetchall()
 
                 if not _tickets:
-                    st.info("No hay consultas todavía. Cuando una inmobiliaria envíe una pregunta aparecerá aquí.")
+                    st.info("No hay consultas todavía. Cuando un usuario envíe una pregunta aparecerá aquí.")
                 else:
+                    _tipo_ico = {"inmo": "🏢", "cliente": "👤", "arquitecto": "🏗️"}
                     for _tkt in _tickets:
-                        _tid, _tnom, _tasunto, _tmsg, _tlola, _tadmin, _testado, _tdate = _tkt
+                        _tid, _tnom, _ttipo, _temail, _tasunto, _tmsg, _tlola, _tadmin, _testado, _tdate = _tkt
                         _badge = {"pendiente": "🔴", "respondido": "✅", "cerrado": "⚫"}.get(_testado, "❓")
+                        _ico = _tipo_ico.get(_ttipo, "❓")
                         with st.expander(
-                            f"{_badge} {_tnom or '—'} — {_tasunto or 'Sin asunto'} · {(_tdate or '')[:10]}",
+                            f"{_badge} {_ico} {_tnom} — {_tasunto or 'Sin asunto'} · {(_tdate or '')[:10]}",
                             expanded=(_testado == "pendiente")
                         ):
+                            st.caption(f"Tipo: **{_ttipo}** · {_temail or '—'}")
                             st.markdown(f"**Consulta:**\n\n{_tmsg}")
                             if _tlola:
                                 st.markdown(f"**Lola respondió automáticamente:**\n\n_{_tlola}_")

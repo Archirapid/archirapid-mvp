@@ -1821,6 +1821,52 @@ def show_buyer_panel(client_email):
     # ELIMINAR LAS PESTAÑAS GENÉRICAS - El cliente quiere ver SU finca, no catálogo
     # Las pestañas "🔍 Buscar Proyectos" y "📋 Mis Intereses" se eliminan por completo
 
+    # ── SOPORTE ───────────────────────────────────────────────────────────────
+    st.markdown("---")
+    with st.expander("📞 ¿Necesitas ayuda? Contacta con ArchiRapid", expanded=False):
+        _sop_conn = db_conn()
+        try:
+            from uuid import uuid4 as _uuid4c
+            from datetime import datetime as _dtc, timezone as _tzc
+            st.markdown("**Envíanos tu consulta** y te respondemos en menos de 24h.")
+            with st.form("cli_sop_form", clear_on_submit=True):
+                _c_asunto  = st.text_input("Asunto *", max_chars=100, key="cli_sop_asunto")
+                _c_mensaje = st.text_area("Mensaje *", max_chars=500, height=100, key="cli_sop_mensaje")
+                _c_enviar  = st.form_submit_button("Enviar consulta", type="primary")
+            if _c_enviar:
+                if _c_asunto.strip() and _c_mensaje.strip():
+                    _sop_conn.execute(
+                        """INSERT INTO tickets_soporte
+                               (id, usuario_tipo, usuario_id, usuario_nombre, usuario_email,
+                                asunto, mensaje, estado, created_at)
+                           VALUES (?, 'cliente', ?, ?, ?, ?, ?, 'pendiente', ?)""",
+                        (str(_uuid4c()), client_email, client_email, client_email,
+                         _c_asunto.strip(), _c_mensaje.strip(),
+                         _dtc.now(_tzc.utc).strftime("%Y-%m-%d %H:%M:%S"))
+                    )
+                    _sop_conn.commit()
+                    st.success("Consulta enviada. Te responderemos en menos de 24h.")
+                else:
+                    st.warning("Completa asunto y mensaje.")
+            # Historial
+            _c_tickets = _sop_conn.execute(
+                """SELECT asunto, estado, admin_respuesta, created_at
+                   FROM tickets_soporte
+                   WHERE usuario_id = ? AND usuario_tipo = 'cliente'
+                   ORDER BY created_at DESC LIMIT 10""",
+                (client_email,)
+            ).fetchall()
+            if _c_tickets:
+                st.markdown("**Mis consultas:**")
+                for _ct in _c_tickets:
+                    _badge = {"pendiente": "🔴", "respondido": "✅", "cerrado": "⚫"}.get(_ct[1], "❓")
+                    with st.expander(f"{_badge} {_ct[0]} · {str(_ct[3] or '')[:10]}", expanded=False):
+                        if _ct[2]:
+                            st.info(f"**Respuesta de ArchiRapid:** {_ct[2]}")
+                        else:
+                            st.caption("Pendiente de respuesta.")
+        finally:
+            _sop_conn.close()
 
 
 def show_mis_transacciones(client_email: str, plot_data):

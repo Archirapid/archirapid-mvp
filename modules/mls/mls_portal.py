@@ -774,10 +774,14 @@ def _ui_soporte(inmo: dict) -> None:
                     _tid = str(uuid4())
                     conn.execute(
                         """INSERT INTO tickets_soporte
-                               (id, inmo_id, inmo_nombre, asunto, mensaje,
+                               (id, inmo_id, inmo_nombre,
+                                usuario_tipo, usuario_id, usuario_nombre, usuario_email,
+                                asunto, mensaje,
                                 lola_respuesta, admin_respuesta, estado, created_at, respondido_at)
-                           VALUES (?, ?, ?, ?, ?, NULL, NULL, 'pendiente', ?, NULL)""",
-                        (_tid, inmo_id, inmo_nombre, _asunto, _mensaje, _now),
+                           VALUES (?, ?, ?, 'inmo', ?, ?, ?, ?, ?, NULL, NULL, 'pendiente', ?, NULL)""",
+                        (_tid, inmo_id, inmo_nombre,
+                         inmo_id, inmo_nombre, inmo.get("email", ""),
+                         _asunto, _mensaje, _now),
                     )
                     conn.commit()
                     _ok = True
@@ -810,7 +814,7 @@ def _ui_soporte(inmo: dict) -> None:
         _rows = conn.execute(
             """SELECT id, asunto, mensaje, admin_respuesta, estado, created_at, respondido_at
                  FROM tickets_soporte
-                WHERE inmo_id = ?
+                WHERE usuario_id = ? AND usuario_tipo = 'inmo'
                 ORDER BY created_at DESC""",
             (inmo_id,),
         ).fetchall()
