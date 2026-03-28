@@ -1891,6 +1891,14 @@ def show_buyer_panel(client_email):
         finally:
             _sop_conn.close()
 
+    # BOTÓN SALIR — siempre visible al final del panel
+    st.markdown("---")
+    st.info("ℹ️ Puedes volver a acceder a tu portal en cualquier momento desde la página principal, pulsando el botón **Acceso**.")
+    if st.button("🚪 Cerrar sesión", key="buyer_panel_logout", type="secondary"):
+        for _k in list(st.session_state.keys()):
+            del st.session_state[_k]
+        st.rerun()
+
 
 def show_mis_transacciones(client_email: str, plot_data):
     """Historial de transacciones del cliente con recibo descargable."""

@@ -104,6 +104,8 @@ def get_project_images(proyecto):
             if img_path not in images and _valid_image(img_path):
                 images.append(img_path)
 
+    return images
+
 def show_plot_detail_page(plot_id: str):
     """Muestra la página completa de detalles de una finca"""
 
