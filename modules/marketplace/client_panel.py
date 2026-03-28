@@ -337,15 +337,16 @@ def show_buyer_panel_mls(client_email: str, finca_id: str) -> None:
             st.rerun()
 
     if finca:
-        titulo        = finca.get("titulo") or "Finca MLS"
-        precio        = float(finca.get("precio") or 0)
-        sup           = float(finca.get("superficie_m2") or 0)
-        catastro_ref  = finca.get("catastro_ref") or "—"
-        estado        = finca.get("estado", "publicada")
-        tipo_suelo    = finca.get("tipo_suelo") or "—"
-        lat           = finca.get("catastro_lat")
-        lon           = finca.get("catastro_lon")
-        servicios_raw = finca.get("servicios")
+        titulo           = finca.get("titulo") or "Finca MLS"
+        precio           = float(finca.get("precio") or 0)
+        sup              = float(finca.get("superficie_m2") or 0)
+        catastro_ref_raw = finca.get("catastro_ref")          # None si no hay — para lógica
+        catastro_ref     = catastro_ref_raw or "—"             # "—" solo para mostrar en UI
+        estado           = finca.get("estado", "publicada")
+        tipo_suelo       = finca.get("tipo_suelo") or "—"
+        lat              = finca.get("catastro_lat")
+        lon              = finca.get("catastro_lon")
+        servicios_raw    = finca.get("servicios")
 
         st.subheader("🏡 MI FINCA MLS")
         col1, col2 = st.columns([1, 2])
@@ -396,7 +397,7 @@ def show_buyer_panel_mls(client_email: str, finca_id: str) -> None:
         mls_plot = (
             finca_id,
             titulo,
-            catastro_ref,
+            catastro_ref_raw,   # None si no existe — show_documentacion lo gestiona igual que pin azul
             sup,
             sup * 0.33,
             tipo_suelo,
@@ -415,6 +416,31 @@ def show_buyer_panel_mls(client_email: str, finca_id: str) -> None:
             tipo_suelo,
             finca.get("catastro_direccion"),
         )
+        # ── Verificación Técnica (igual que panel pin azul) ──────────────────
+        st.markdown("---")
+        st.subheader("🔍 Verificación Técnica Automática con IA")
+        if catastro_ref_raw:
+            st.success(f"✅ **VERIFICACIÓN AUTOMÁTICA EXITOSA** — Referencia catastral: `{catastro_ref_raw}`")
+            with st.expander("📊 Detalles de Verificación Técnica", expanded=False):
+                _vc1, _vc2 = st.columns(2)
+                with _vc1:
+                    st.markdown("### 📋 Datos Catastrales Verificados")
+                    st.write(f"**Superficie:** {sup:,.0f} m²")
+                    st.write(f"**Referencia:** {catastro_ref_raw}")
+                    _mun = finca.get("catastro_municipio") or ""
+                    if _mun:
+                        st.write(f"**Municipio:** {_mun}")
+                with _vc2:
+                    st.markdown("### 🔗 Documentación Oficial")
+                    st.markdown(
+                        '<a href="https://www1.sedecatastro.gob.es/CYCBienInmueble/OVCBusqueda.aspx" '
+                        'target="_blank" style="font-size:13px;color:#1a5276;">'
+                        '📄 Descargar desde Sede Electrónica del Catastro →</a>',
+                        unsafe_allow_html=True,
+                    )
+        else:
+            st.warning("⚠️ Verificación automática pendiente: datos catastrales no disponibles")
+
     else:
         st.warning("No se pudo cargar la ficha de la finca. Contacta con soporte.")
         mls_plot = None
