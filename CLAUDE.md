@@ -44,11 +44,13 @@ SaaS PropTech español para diseño arquitectónico con IA. Stack: Streamlit + B
 - `@agent-budget-calculator` — CTE HS-5, fosa séptica, presupuesto
 - `@agent-svg-floor-plan` — planos 2D, capas saneamiento/agua/eléctrico
 - `@agent-code-reviewer` — revisar antes de commit
+- `@agent-stripe-specialist` — stripe_utils.py, webhooks, success_url, Stripe Connect, planes, comisiones, split de pagos
 
 ## Reglas de delegación
 **Delegar a babylon-editor:** cualquier cambio en editor 3D, meshes, materiales, layers
 **Delegar a db-migrations:** cambios en src/db.py, nuevas columnas, ALTER TABLE
 **Delegar a mls-specialist:** cualquier cambio en modules/mls/ o flujos de inmo
+**Delegar a stripe-specialist:** cualquier cambio en stripe_utils.py, success_url, webhooks, Stripe Connect
 **Delegar en paralelo:** Babylon + DB no comparten archivos → paralelo OK
 **Siempre secuencial:** DB migration ANTES de feature que dependa de esos datos
 
