@@ -1576,7 +1576,7 @@ def show_buyer_panel(client_email):
 
                 # Si no hay cache o expiró, ejecutar verificación
                 try:
-                    from modules.marketplace.ai_engine import extraer_datos_catastral_completo
+                    from modules.marketplace.ai_engine import extraer_datos_nota_catastral
 
                     # Buscar archivos PDF catastrales
                     pdf_paths = [
@@ -1584,10 +1584,11 @@ def show_buyer_panel(client_email):
                         Path("uploads/nota_catastral.pdf"),
                         Path("catastro_output/nota_catastral.pdf")
                     ]
-                    # Añadir PDF específico de la finca si existe en DB
+                    # Añadir PDF específico de la finca si existe en DB (primero)
                     if _plano_path_from_db:
                         _p = Path(_plano_path_from_db.replace("\\", "/"))
-                        if _p not in pdf_paths:
+                        # Solo añadir si es ruta relativa válida (evitar rutas absolutas Windows en Cloud)
+                        if not _p.is_absolute() and _p not in pdf_paths:
                             pdf_paths.insert(0, _p)
 
                     pdf_encontrado = None
@@ -1597,11 +1598,12 @@ def show_buyer_panel(client_email):
                             break
 
                     if pdf_encontrado:
-                        datos_extraidos = extraer_datos_catastral_completo(str(pdf_encontrado))
+                        datos_extraidos = extraer_datos_nota_catastral(str(pdf_encontrado))
 
                         if datos_extraidos and "error" not in datos_extraidos:
                             # Comparar datos extraídos con datos de la finca
-                            superficie_pdf = datos_extraidos.get("superficie_m2", 0)
+                            # extraer_datos_nota_catastral usa "superficie_grafica_m2"
+                            superficie_pdf = float(datos_extraidos.get("superficie_grafica_m2") or datos_extraidos.get("superficie_m2") or 0)
                             ref_catastral_pdf = datos_extraidos.get("referencia_catastral", "")
 
                             superficie_finca = plot_data[3] or 0  # m2
@@ -1627,6 +1629,24 @@ def show_buyer_panel(client_email):
                             # Guardar en cache y session state
                             st.session_state[cache_key] = verification_data
                             st.session_state[cache_time_key] = current_time
+
+                            # Persistir en DB para evitar re-extracción en futuros renders
+                            try:
+                                import sqlite3 as _sq, json as _js
+                                _cc = _sq.connect("database.db", timeout=10)
+                                _cc.execute("PRAGMA journal_mode=WAL")
+                                _cc.execute(
+                                    "UPDATE plots SET ai_verification_cache=? WHERE id=?",
+                                    (_js.dumps({
+                                        "superficie_m2": superficie_pdf,
+                                        "referencia_catastral": ref_catastral_pdf,
+                                        "municipio": datos_extraidos.get("municipio", ""),
+                                    }), plot_id)
+                                )
+                                _cc.commit()
+                                _cc.close()
+                            except Exception:
+                                pass  # cache DB no crítico
 
                             # Guardar m² verificados para uso futuro
                             if superficie_ok:
