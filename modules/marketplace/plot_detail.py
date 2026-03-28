@@ -81,7 +81,7 @@ def get_all_plot_images(plot):
         if single_img and os.path.exists(single_img):
             images.append(single_img)
 
-    return images if images else ['assets/fincas/image1.jpg']
+    return images  # empty list → caller shows nothing (no broken fallback)
 
 def get_project_images(proyecto):
     """Obtener todas las imágenes válidas de un proyecto"""
@@ -149,6 +149,21 @@ def show_plot_detail_page(plot_id: str):
         if 'selected_plot' in st.session_state:
             del st.session_state['selected_plot']
         st.rerun()
+
+    # Banner de pago pendiente — mostrar ANTES del contenido si hay Stripe URL
+    _stripe_url_key_banner = f"stripe_reserva_url_{plot_id}"
+    if st.session_state.get(_stripe_url_key_banner):
+        _precio_banner = float(plot.get("price", 0) or 0)
+        _reserva_banner = _precio_banner * 0.01
+        st.success("✅ ¡Registro completado! Completa el pago para confirmar tu reserva de 7 días.")
+        st.markdown(
+            f'<a href="{st.session_state[_stripe_url_key_banner]}" target="_blank" '
+            'style="display:inline-block;background:#1E3A5F;color:#fff;padding:14px 28px;'
+            'border-radius:8px;font-weight:700;font-size:16px;text-decoration:none;margin:8px 0;">'
+            f'💳 Pagar €{_reserva_banner:,.0f} con Tarjeta — Reserva 7 días</a>',
+            unsafe_allow_html=True,
+        )
+        st.markdown("---")
 
     st.markdown("---")
 
