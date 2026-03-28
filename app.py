@@ -1480,7 +1480,14 @@ if st.query_params.get("stripe_session") and st.query_params.get("payment") == "
             import sqlite3 as _sq3
             _sess = _stripe_verify(_ss_id)
             if _sess.payment_status == "paid":
-                _meta = dict(_sess.metadata) if _sess.metadata else {}
+                # StripeObject en SDK antiguo es dict-subclass; en SDK nuevo (Py3.14) usa _data
+                _raw_meta = _sess.metadata
+                if not _raw_meta:
+                    _meta = {}
+                elif isinstance(_raw_meta, dict):
+                    _meta = dict(_raw_meta)
+                else:
+                    _meta = dict(getattr(_raw_meta, '_data', {}))
                 _proj_id  = _meta.get("project_id", "")
                 _cli_mail = _meta.get("client_email", "") or (_sess.customer_email or "")
                 _prods    = _meta.get("products", "")
@@ -1559,9 +1566,6 @@ if st.query_params.get("stripe_session") and st.query_params.get("payment") == "
                         st.session_state["user_role"]        = "buyer"
                         st.session_state["selected_page"]    = "👤 Panel de Cliente"
         except Exception as _se:
-            import traceback as _tb
-            _full_tb = _tb.format_exc()
-            st.error(f"Error verificando pago Stripe: {type(_se).__name__}: {_se}\n\n```\n{_full_tb}\n```")
             st.toast(f"Error verificando pago Stripe: {_se}", icon="⚠️")
     # Limpiar params de Stripe sin perder el proyecto
     try:
