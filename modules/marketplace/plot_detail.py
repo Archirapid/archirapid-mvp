@@ -150,6 +150,8 @@ def show_plot_detail_page(plot_id: str):
     if st.button("← Volver al mapa", key="back_to_map"):
         if 'selected_plot' in st.session_state:
             del st.session_state['selected_plot']
+        if 'selected_plot' in st.query_params:
+            del st.query_params['selected_plot']
         st.rerun()
 
     # Banner de pago pendiente — mostrar ANTES del contenido si hay Stripe URL
