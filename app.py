@@ -1559,6 +1559,9 @@ if st.query_params.get("stripe_session") and st.query_params.get("payment") == "
                         st.session_state["user_role"]        = "buyer"
                         st.session_state["selected_page"]    = "👤 Panel de Cliente"
         except Exception as _se:
+            import traceback as _tb
+            _full_tb = _tb.format_exc()
+            st.error(f"Error verificando pago Stripe: {type(_se).__name__}: {_se}\n\n```\n{_full_tb}\n```")
             st.toast(f"Error verificando pago Stripe: {_se}", icon="⚠️")
     # Limpiar params de Stripe sin perder el proyecto
     try:
