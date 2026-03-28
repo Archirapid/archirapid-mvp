@@ -440,9 +440,70 @@ def main():
 
     with tab4:
         try:
-            st.header("Consultas y Soporte")
-            st.info("📊 Módulo de analítica en preparación. Próximamente verás aquí el flujo de caja.")
-            st.info("Próximamente. Panel de consultas y soporte.")
+            st.header("📞 Consultas y Soporte")
+            _ts_conn = db_conn()
+            try:
+                # ── KPIs ─────────────────────────────────────────────────────
+                _n_pend  = _ts_conn.execute("SELECT COUNT(*) FROM tickets_soporte WHERE estado='pendiente'").fetchone()[0]
+                _n_resp  = _ts_conn.execute("SELECT COUNT(*) FROM tickets_soporte WHERE estado='respondido'").fetchone()[0]
+                _n_total = _ts_conn.execute("SELECT COUNT(*) FROM tickets_soporte").fetchone()[0]
+                _tc1, _tc2, _tc3 = st.columns(3)
+                _tc1.metric("Total consultas", _n_total)
+                _tc2.metric("⏳ Pendientes", _n_pend)
+                _tc3.metric("✅ Respondidas", _n_resp)
+
+                # ── Filtro estado ─────────────────────────────────────────────
+                _ts_fil = st.selectbox("Estado", ["Todos", "pendiente", "respondido", "cerrado"], key="ts_estado_fil")
+                _ts_where = f"WHERE estado='{_ts_fil}'" if _ts_fil != "Todos" else ""
+
+                _tickets = _ts_conn.execute(f"""
+                    SELECT id, inmo_nombre, asunto, mensaje, lola_respuesta,
+                           admin_respuesta, estado, created_at
+                    FROM tickets_soporte {_ts_where}
+                    ORDER BY created_at DESC
+                """).fetchall()
+
+                if not _tickets:
+                    st.info("No hay consultas todavía. Cuando una inmobiliaria envíe una pregunta aparecerá aquí.")
+                else:
+                    for _tkt in _tickets:
+                        _tid, _tnom, _tasunto, _tmsg, _tlola, _tadmin, _testado, _tdate = _tkt
+                        _badge = {"pendiente": "🔴", "respondido": "✅", "cerrado": "⚫"}.get(_testado, "❓")
+                        with st.expander(
+                            f"{_badge} {_tnom or '—'} — {_tasunto or 'Sin asunto'} · {(_tdate or '')[:10]}",
+                            expanded=(_testado == "pendiente")
+                        ):
+                            st.markdown(f"**Consulta:**\n\n{_tmsg}")
+                            if _tlola:
+                                st.markdown(f"**Lola respondió automáticamente:**\n\n_{_tlola}_")
+                            if _tadmin:
+                                st.markdown(f"**Tu respuesta:**\n\n{_tadmin}")
+
+                            if _testado == "pendiente":
+                                _resp_txt = st.text_area("Escribe tu respuesta:", key=f"ts_resp_{_tid}", height=120)
+                                _rb1, _rb2 = st.columns([2, 1])
+                                if _rb1.button("Enviar respuesta", key=f"ts_send_{_tid}", type="primary"):
+                                    if _resp_txt.strip():
+                                        _ts_conn.execute(
+                                            """UPDATE tickets_soporte
+                                               SET admin_respuesta=?, estado='respondido',
+                                                   respondido_at=datetime('now')
+                                               WHERE id=?""",
+                                            (_resp_txt.strip(), _tid)
+                                        )
+                                        _ts_conn.commit()
+                                        st.success("Respuesta enviada.")
+                                        st.rerun()
+                                    else:
+                                        st.warning("Escribe una respuesta antes de enviar.")
+                                if _rb2.button("Cerrar ticket", key=f"ts_close_{_tid}"):
+                                    _ts_conn.execute(
+                                        "UPDATE tickets_soporte SET estado='cerrado' WHERE id=?", (_tid,)
+                                    )
+                                    _ts_conn.commit()
+                                    st.rerun()
+            finally:
+                _ts_conn.close()
         except Exception as e:
             st.error(f"Error en Consultas y Soporte: {e}")
 
@@ -1190,10 +1251,18 @@ Obtén el token creando un bot con @BotFather en Telegram.
                 import pandas as _pd_trk
 
                 # Filtro de periodo
-                _periodo_opts = {"Hoy": 1, "Últimos 7 días": 7, "Último mes": 30, "Últimos 3 meses": 90, "Todo el histórico": 99999}
+                _periodo_opts = {"Hoy": 1, "Últimos 7 días": 7, "Último mes": 30, "Últimos 3 meses": 90, "Todo el histórico": 99999, "Personalizado": 0}
                 _periodo_sel = st.selectbox("Periodo", list(_periodo_opts.keys()), index=1, key="trk_periodo")
-                _dias = _periodo_opts[_periodo_sel]
-                _desde_iso = (_dtnow.utcnow() - _td(days=_dias)).isoformat() if _dias < 99999 else "2000-01-01"
+                if _periodo_sel == "Personalizado":
+                    _pc1, _pc2 = st.columns(2)
+                    _fecha_desde = _pc1.date_input("Desde", value=_dtnow.utcnow().date() - _td(days=30), key="trk_desde")
+                    _fecha_hasta = _pc2.date_input("Hasta", value=_dtnow.utcnow().date(), key="trk_hasta")
+                    _desde_iso = _fecha_desde.isoformat()
+                    _hasta_iso = (_fecha_hasta + _td(days=1)).isoformat()
+                else:
+                    _dias = _periodo_opts[_periodo_sel]
+                    _desde_iso = (_dtnow.utcnow() - _td(days=_dias)).isoformat() if _dias < 99999 else "2000-01-01"
+                    _hasta_iso = "2099-12-31"
 
                 _df_vis = _read_sql9(
                     _db9,
@@ -1202,7 +1271,7 @@ Obtén el token creando un bot con @BotFather en Telegram.
                               SUM(convirtio_a_registro) as Registros,
                               ROUND(SUM(convirtio_a_registro)*100.0/COUNT(*),1) as ConvPct
                        FROM visitas_demo
-                       WHERE timestamp >= '{_desde_iso}'
+                       WHERE timestamp >= '{_desde_iso}' AND timestamp < '{_hasta_iso}'
                        GROUP BY origen ORDER BY Visitas DESC"""
                 )
                 if not _df_vis.empty:
@@ -1220,7 +1289,7 @@ Obtén el token creando un bot con @BotFather en Telegram.
                         _db9,
                         f"""SELECT SUBSTR(timestamp,1,10) as Dia, COUNT(*) as Visitas
                             FROM visitas_demo
-                            WHERE timestamp >= '{_desde_iso}'
+                            WHERE timestamp >= '{_desde_iso}' AND timestamp < '{_hasta_iso}'
                             GROUP BY Dia ORDER BY Dia ASC"""
                     )
                     if not _df_dia.empty and len(_df_dia) > 1:
@@ -1235,7 +1304,7 @@ Obtén el token creando un bot con @BotFather en Telegram.
                                       accion_realizada as Accion,
                                       CASE convirtio_a_registro WHEN 1 THEN 'Si' ELSE 'No' END as Registro
                                FROM visitas_demo
-                               WHERE timestamp >= '{_desde_iso}'
+                               WHERE timestamp >= '{_desde_iso}' AND timestamp < '{_hasta_iso}'
                                ORDER BY timestamp DESC"""
                         )
                         st.dataframe(_df_det, use_container_width=True, hide_index=True, height=400)

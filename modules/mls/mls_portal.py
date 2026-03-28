@@ -723,8 +723,132 @@ def _ui_contacto_archirapid_btn(inmo: dict) -> None:
                     st.error(f"Error al enviar: {exc}")
 
 
+def _ui_soporte(inmo: dict) -> None:
+    """Tab Soporte — historial de tickets + formulario nuevo ticket."""
+    from uuid import uuid4
+
+    inmo_id     = inmo["id"]
+    inmo_nombre = inmo.get("nombre_comercial") or inmo.get("nombre", "")
+
+    st.markdown("### 📞 Consultas y Soporte")
+    st.caption(
+        "Envíanos tu consulta, incidencia o sugerencia. "
+        "Te responderemos en menos de 24 horas hábiles."
+    )
+
+    # ── Formulario nuevo ticket ────────────────────────────────────────────────
+    with st.expander("✉️ Enviar nueva consulta", expanded=True):
+        with st.form("mls_sop_nuevo_ticket_form", clear_on_submit=True):
+            asunto  = st.text_input(
+                "Asunto *",
+                placeholder="Resume tu consulta en pocas palabras",
+                max_chars=100,
+                key="mls_sop_asunto",
+            )
+            mensaje = st.text_area(
+                "Mensaje *",
+                placeholder="Detalla tu consulta, incidencia o sugerencia…",
+                max_chars=500,
+                height=130,
+                key="mls_sop_mensaje",
+            )
+            enviar = st.form_submit_button("Enviar consulta", use_container_width=True, type="primary")
+
+        if enviar:
+            _asunto  = asunto.strip()
+            _mensaje = mensaje.strip()
+            _errores = []
+            if not _asunto:
+                _errores.append("El asunto es obligatorio.")
+            if not _mensaje:
+                _errores.append("El mensaje es obligatorio.")
+            if _errores:
+                for _e in _errores:
+                    st.error(_e)
+            else:
+                _ok = False
+                conn = _db.get_conn()
+                try:
+                    from datetime import datetime, timezone as _tz
+                    _now = datetime.now(_tz.utc).strftime("%Y-%m-%d %H:%M:%S")
+                    _tid = str(uuid4())
+                    conn.execute(
+                        """INSERT INTO tickets_soporte
+                               (id, inmo_id, inmo_nombre, asunto, mensaje,
+                                lola_respuesta, admin_respuesta, estado, created_at, respondido_at)
+                           VALUES (?, ?, ?, ?, ?, NULL, NULL, 'pendiente', ?, NULL)""",
+                        (_tid, inmo_id, inmo_nombre, _asunto, _mensaje, _now),
+                    )
+                    conn.commit()
+                    _ok = True
+                except Exception as _exc:
+                    st.error(f"Error al guardar el ticket: {_exc}")
+                finally:
+                    conn.close()
+                if _ok:
+                    # Notificar al admin por Telegram
+                    try:
+                        from modules.marketplace.email_notify import _send as _tg_send
+                        _tg_send(
+                            f"📞 <b>Nuevo ticket soporte MLS</b>\n"
+                            f"Inmo: {inmo_nombre}\n"
+                            f"Asunto: {_asunto}\n"
+                            f"Mensaje: {_mensaje[:200]}"
+                        )
+                    except Exception:
+                        pass
+                    st.success("Consulta enviada. Te responderemos en menos de 24h.")
+
+    st.divider()
+
+    # ── Historial de tickets ───────────────────────────────────────────────────
+    st.markdown("#### Mis consultas anteriores")
+
+    _tickets = []
+    conn = _db.get_conn()
+    try:
+        _rows = conn.execute(
+            """SELECT id, asunto, mensaje, admin_respuesta, estado, created_at, respondido_at
+                 FROM tickets_soporte
+                WHERE inmo_id = ?
+                ORDER BY created_at DESC""",
+            (inmo_id,),
+        ).fetchall()
+        _tickets = [dict(r) for r in _rows]
+    except Exception as _exc:
+        st.warning(f"No se pudieron cargar los tickets: {_exc}")
+    finally:
+        conn.close()
+
+    if not _tickets:
+        st.info("No tienes ninguna consulta enviada todavía.")
+        return
+
+    _BADGE = {
+        "pendiente":  "🔴 Pendiente",
+        "respondido": "✅ Respondido",
+        "cerrado":    "⚫ Cerrado",
+    }
+
+    for _t in _tickets:
+        _estado_label = _BADGE.get(_t.get("estado", "pendiente"), _t.get("estado", ""))
+        _fecha        = (_t.get("created_at") or "")[:10]
+        _titulo_exp   = f"{_estado_label} — {_t['asunto']} ({_fecha})"
+        with st.expander(_titulo_exp, expanded=False):
+            st.markdown(f"**Tu consulta:**")
+            st.write(_t["mensaje"])
+            if _t.get("admin_respuesta"):
+                st.markdown("---")
+                st.markdown("**Respuesta de ArchiRapid:**")
+                st.info(_t["admin_respuesta"])
+                if _t.get("respondido_at"):
+                    st.caption(f"Respondido el {str(_t['respondido_at'])[:10]}")
+            else:
+                st.caption("Pendiente de respuesta.")
+
+
 def ui_portal_operativo(inmo: dict) -> None:
-    """Portal completo — 8 tabs para inmobiliaria con plan activo y firma."""
+    """Portal completo — 9 tabs para inmobiliaria con plan activo y firma."""
     # ── Banner modo demo ──────────────────────────────────────────────────────
     if st.session_state.get("mls_demo_mode"):
         st.markdown(
@@ -846,7 +970,7 @@ def ui_portal_operativo(inmo: dict) -> None:
 """
         )
 
-    tab_fincas, tab_mercado, tab_reservas, tab_solicitudes, tab_proyectos, tab_prefab, tab_stats, tab_cuenta = st.tabs([
+    tab_fincas, tab_mercado, tab_reservas, tab_solicitudes, tab_proyectos, tab_prefab, tab_stats, tab_cuenta, tab_soporte = st.tabs([
         "🏠 Mis Fincas",
         "🌐 Mercado MLS",
         "📋 Mis Reservas",
@@ -855,6 +979,7 @@ def ui_portal_operativo(inmo: dict) -> None:
         "🏡 Prefabricadas",
         "📊 Estadísticas",
         "⚙️ Mi Cuenta",
+        "📞 Soporte",
     ])
 
     with tab_fincas:
@@ -912,6 +1037,12 @@ def ui_portal_operativo(inmo: dict) -> None:
 
     with tab_cuenta:
         _ui_mi_cuenta(inmo)
+
+    with tab_soporte:
+        try:
+            _ui_soporte(inmo)
+        except Exception as exc:
+            st.error(f"Error en Soporte: {exc}")
 
 
 def _ui_mi_cuenta(inmo: dict) -> None:

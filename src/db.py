@@ -686,6 +686,18 @@ _PG_DDL = [
         estado TEXT DEFAULT 'nuevo',
         created_at TEXT
     )""",
+    """CREATE TABLE IF NOT EXISTS tickets_soporte (
+        id TEXT PRIMARY KEY,
+        inmo_id TEXT,
+        inmo_nombre TEXT,
+        asunto TEXT,
+        mensaje TEXT,
+        lola_respuesta TEXT,
+        admin_respuesta TEXT,
+        estado TEXT DEFAULT 'pendiente',
+        created_at TEXT,
+        respondido_at TEXT
+    )""",
 ]
 
 _PG_INDEXES = [
@@ -1504,6 +1516,19 @@ def ensure_tables():
             origen     TEXT DEFAULT 'web',
             estado     TEXT DEFAULT 'nuevo',
             created_at TEXT
+        )""")
+
+        c.execute("""CREATE TABLE IF NOT EXISTS tickets_soporte (
+            id              TEXT PRIMARY KEY,
+            inmo_id         TEXT,
+            inmo_nombre     TEXT,
+            asunto          TEXT,
+            mensaje         TEXT,
+            lola_respuesta  TEXT,
+            admin_respuesta TEXT,
+            estado          TEXT DEFAULT 'pendiente',
+            created_at      TEXT,
+            respondido_at   TEXT
         )""")
 
         # Índices MLS (mejoran rendimiento sin afectar tablas existentes)
