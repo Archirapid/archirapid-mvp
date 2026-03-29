@@ -675,7 +675,7 @@ def show_selected_project_panel_v2(client_email: str, project_id: str):
     with col1:
         if st.button("📋 Ver Más Proyectos", width="stretch"):
             st.query_params.clear()
-            st.query_params["page"] = "🏠 HOME"
+            st.query_params["page"] = "home"
             st.rerun()
 
     with col2:
@@ -760,7 +760,7 @@ def registro_v2():
                             st.session_state["selected_project_for_panel"] = project_id
 
                     # Redirigir de vuelta al Marketplace con sesión activa
-                    st.query_params["page"] = "🏠 Inicio / Marketplace"
+                    st.query_params["page"] = "home"
                     st.rerun()
 
                 except Exception as e:
@@ -1423,17 +1423,47 @@ if _qp_seccion == "mls" and not st.session_state.get("_deep_link_routed"):
     if _qp_demo == "true":
         st.session_state["mls_demo_mode"] = True
 
-# === RESTAURAR selected_page DESDE SLUG ?page=X (deep-link / refresh) ===
+# === SYNC URL ↔ session_state — bidireccional, siempre activo (habilita browser back/forward) ===
 _SLUG_TO_PAGE = {
-    "admin":        "Intranet",
-    "propietarios": "🏠 Propietarios",
-    "gemelo":       "Propietario (Gemelo Digital)",
-    "lola":         "💬 Lola",
-    "login":        "Iniciar Sesión",
+    "home":          "🏠 Inicio / Marketplace",
+    "admin":         "Intranet",
+    "propietarios":  "🏠 Propietarios",
+    "gemelo":        "Propietario (Gemelo Digital)",
+    "lola":          "💬 Lola",
+    "login":         "Iniciar Sesión",
+    "registro":      "Registro de Usuario",
+    "cliente":       "👤 Panel de Cliente",
+    "disenador":     "Diseñador de Vivienda",
+    "arquitectos":   "Arquitectos (Marketplace)",
+    "proveedor":     "👤 Panel de Proveedor",
+    "registro-pro":  "📝 Registro de Proveedor de Servicios",
+    "mls":           "🏢 Inmobiliarias MLS",
 }
 _url_slug = st.query_params.get("page", "")
-if _url_slug in _SLUG_TO_PAGE and "selected_page" not in st.session_state:
-    st.session_state["selected_page"] = _SLUG_TO_PAGE[_url_slug]
+# ?page=acceso → mostrar selector de perfil en home (sin cambiar selected_page)
+if _url_slug == "acceso":
+    st.session_state["selected_page"] = "🏠 Inicio / Marketplace"
+    st.session_state["show_role_selector"] = True
+    st.session_state["viewing_login"] = False
+elif _url_slug in _SLUG_TO_PAGE:
+    # Siempre sincronizar desde URL — permite que el botón atrás del navegador funcione
+    _target_page = _SLUG_TO_PAGE[_url_slug]
+    if st.session_state.get("selected_page") != _target_page:
+        st.session_state["selected_page"] = _target_page
+        st.session_state["show_role_selector"] = False
+        st.session_state["viewing_login"] = False
+elif _url_slug == "":
+    # URL limpia (sin ?page=) y sin params especiales → volver a home
+    _keep_params = {"selected_plot", "selected_project_v2", "selected_prefab",
+                    "mls_ficha", "mls_reservar", "mls_contacto", "seccion",
+                    "stripe_session", "payment", "sp_pago_ok", "sp_comision_ok",
+                    "mls_pago", "mls_reserva_ok", "mls_goto_finca", "mls_reset_token",
+                    "mls_reservar", "reset_token"}
+    if not any(p in st.query_params for p in _keep_params):
+        if st.session_state.get("selected_page") not in ("🏠 Inicio / Marketplace", None):
+            st.session_state["selected_page"] = "🏠 Inicio / Marketplace"
+            st.session_state["show_role_selector"] = False
+            st.session_state["viewing_login"] = False
 
 # === RUTA PÚBLICA: ?page=stats (sin login) ===
 if st.query_params.get("page") == "stats":
@@ -1951,19 +1981,31 @@ _PAGE_TO_SLUG = {
     "Propietario (Gemelo Digital)":          "gemelo",
     "💬 Lola":                               "lola",
     "Iniciar Sesión":                        "login",
-    "Registro de Usuario":                   "Registro de Usuario",
-    "👤 Panel de Cliente":                   "👤 Panel de Cliente",
-    "Diseñador de Vivienda":                 "Diseñador de Vivienda",
-    "Arquitectos (Marketplace)":             "Arquitectos (Marketplace)",
-    "👤 Panel de Proveedor":                 "👤 Panel de Proveedor",
-    "📝 Registro de Proveedor de Servicios": "📝 Registro de Proveedor de Servicios",
+    "Registro de Usuario":                   "registro",
+    "👤 Panel de Cliente":                   "cliente",
+    "Diseñador de Vivienda":                 "disenador",
+    "Arquitectos (Marketplace)":             "arquitectos",
+    "👤 Panel de Proveedor":                 "proveedor",
+    "📝 Registro de Proveedor de Servicios": "registro-pro",
+    "🏢 Inmobiliarias MLS":                  "mls",
 }
 _cur_page = st.session_state.get('selected_page', '')
+_keep_nav_params = {"selected_plot", "selected_project_v2", "selected_prefab"}
 if _cur_page == "🏠 Inicio / Marketplace":
-    if "selected_plot" not in st.query_params and "selected_project_v2" not in st.query_params and "selected_prefab" not in st.query_params:
-        st.query_params.clear()
+    if not any(p in st.query_params for p in _keep_nav_params):
+        # ?page=acceso si estamos en el selector de perfil (para que back button funcione)
+        if st.session_state.get("show_role_selector") or st.session_state.get("viewing_login"):
+            if st.query_params.get("page") != "acceso":
+                st.query_params.clear()
+                st.query_params["page"] = "acceso"
+        else:
+            if st.query_params.get("page") != "home":
+                st.query_params.clear()
+                st.query_params["page"] = "home"
 elif _cur_page in _PAGE_TO_SLUG:
-    st.query_params["page"] = _PAGE_TO_SLUG[_cur_page]
+    _target_slug = _PAGE_TO_SLUG[_cur_page]
+    if st.query_params.get("page") != _target_slug:
+        st.query_params["page"] = _target_slug
 
 # Inicializar vista_actual si no existe (no altera comportamiento por defecto)
 if "vista_actual" not in st.session_state:
@@ -2033,9 +2075,11 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
             if st.button("🔑 Acceder", key="btn_acceder"):
                 if st.session_state.get('role') == 'admin':
                     st.session_state['selected_page'] = 'Intranet'
+                    st.query_params["page"] = "admin"
                     st.rerun()
                 else:
                     st.session_state['show_role_selector'] = True
+                    st.query_params["page"] = "acceso"
                     st.rerun()
 
 # ========== HOME: LANDING + MARKETPLACE + PROYECTOS ==========
@@ -2364,7 +2408,8 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
 </div>""", unsafe_allow_html=True)
             if st.button("Subir Mi Finca →", key="hp_btn_prop", use_container_width=True):
                 if st.session_state.get("logged_in") and st.session_state.get("role") == "owner":
-                    st.query_params["page"] = "🏠 Propietarios"
+                    st.session_state['selected_page'] = "🏠 Propietarios"
+                    st.query_params["page"] = "propietarios"
                     st.rerun()
                 else:
                     st.session_state['login_role'] = 'owner'
@@ -2386,7 +2431,7 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
 </div>""", unsafe_allow_html=True)
             if st.button("Acceso Arquitectos →", key="hp_btn_arq", use_container_width=True):
                 st.session_state['selected_page'] = "Arquitectos (Marketplace)"
-                st.query_params["page"] = "Arquitectos (Marketplace)"
+                st.query_params["page"] = "arquitectos"
                 st.rerun()
 
         with _hc3:
@@ -2404,6 +2449,7 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
 </div>""", unsafe_allow_html=True)
             if st.button("Registrarme como Profesional →", key="hp_btn_pro", use_container_width=True):
                 st.session_state['selected_page'] = "📝 Registro de Proveedor de Servicios"
+                st.query_params["page"] = "registro-pro"
                 st.rerun()
 
         with _hc4:
@@ -2421,6 +2467,7 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
 </div>""", unsafe_allow_html=True)
             if st.button("Acceder a ArchiRapid MLS →", key="hp_btn_mls", use_container_width=True):
                 st.session_state["selected_page"] = "🏢 Inmobiliarias MLS"
+                st.query_params["page"] = "mls"
                 st.rerun()
 
         # PASO 1: Renderizar MARKETPLACE (mapa, fincas y proyectos)
