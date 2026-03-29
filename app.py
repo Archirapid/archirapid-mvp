@@ -1440,11 +1440,13 @@ _SLUG_TO_PAGE = {
     "mls":           "🏢 Inmobiliarias MLS",
 }
 _url_slug = st.query_params.get("page", "")
-# ?page=acceso → mostrar selector de perfil en home (sin cambiar selected_page)
-if _url_slug == "acceso":
+# ?page=login → mostrar formulario de login genérico en home
+if _url_slug == "login":
     st.session_state["selected_page"] = "🏠 Inicio / Marketplace"
-    st.session_state["show_role_selector"] = True
-    st.session_state["viewing_login"] = False
+    st.session_state["viewing_login"] = True
+    st.session_state["show_role_selector"] = False
+    if st.session_state.get("login_role") is None:
+        st.session_state["login_role"] = None
 elif _url_slug in _SLUG_TO_PAGE:
     # Siempre sincronizar desde URL — permite que el botón atrás del navegador funcione
     _target_page = _SLUG_TO_PAGE[_url_slug]
@@ -1993,11 +1995,11 @@ _cur_page = st.session_state.get('selected_page', '')
 _keep_nav_params = {"selected_plot", "selected_project_v2", "selected_prefab"}
 if _cur_page == "🏠 Inicio / Marketplace":
     if not any(p in st.query_params for p in _keep_nav_params):
-        # ?page=acceso si estamos en el selector de perfil (para que back button funcione)
-        if st.session_state.get("show_role_selector") or st.session_state.get("viewing_login"):
-            if st.query_params.get("page") != "acceso":
+        # ?page=login si está abierto el formulario de login (para que back button funcione)
+        if st.session_state.get("viewing_login"):
+            if st.query_params.get("page") != "login":
                 st.query_params.clear()
-                st.query_params["page"] = "acceso"
+                st.query_params["page"] = "login"
         else:
             if st.query_params.get("page") != "home":
                 st.query_params.clear()
@@ -2072,14 +2074,18 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
             access_col = cols[2]
 
         with access_col:
-            if st.button("🔑 Acceder", key="btn_acceder"):
-                if st.session_state.get('role') == 'admin':
+            _btn_col1, _btn_col2 = st.columns([3, 1], gap="small")
+            with _btn_col1:
+                if st.button("Iniciar sesión", key="btn_acceder", use_container_width=True):
+                    st.session_state['login_role'] = None
+                    st.session_state['viewing_login'] = True
+                    st.session_state['show_role_selector'] = False
+                    st.query_params["page"] = "login"
+                    st.rerun()
+            with _btn_col2:
+                if st.button("🔐", key="btn_admin", help="Acceso administrador"):
                     st.session_state['selected_page'] = 'Intranet'
                     st.query_params["page"] = "admin"
-                    st.rerun()
-                else:
-                    st.session_state['show_role_selector'] = True
-                    st.query_params["page"] = "acceso"
                     st.rerun()
 
 # ========== HOME: LANDING + MARKETPLACE + PROYECTOS ==========
@@ -2087,8 +2093,10 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
     # Mostrar formulario de login si viewing_login es True
     if st.session_state.get('viewing_login', False):
         st.markdown("---")
-        login_role_label = st.session_state.get('login_role', '').title()
-        st.header(f"🔐 Iniciar Sesión - {login_role_label}")
+        _login_role = st.session_state.get('login_role')
+        _login_role_label = _login_role.title() if _login_role else ""
+        _login_header = f"🔐 Iniciar Sesión — {_login_role_label}" if _login_role_label else "🔐 Iniciar Sesión"
+        st.header(_login_header)
         
         modo_registro = st.checkbox("¿Es tu primera vez? Activa el modo registro", key="modo_registro")
         
@@ -2178,9 +2186,9 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
                 with col1:
                     submitted = st.form_submit_button("🚀 Entrar", type="primary")
                 with col2:
-                    if st.form_submit_button("⬅️ Volver al selector"):
+                    if st.form_submit_button("⬅️ Volver"):
                         st.session_state['viewing_login'] = False
-                        st.session_state['show_role_selector'] = True
+                        st.session_state['show_role_selector'] = False
                         st.rerun()
                 
                 if submitted:
@@ -2191,8 +2199,10 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
                         from modules.marketplace.auth import authenticate_user
                         user_data = authenticate_user(email, password)
                         
-                        if user_data and user_data.get('role') == st.session_state.get('login_role'):
-                            # Login exitoso
+                        _expected_role = st.session_state.get('login_role')
+                        _role_ok = (user_data and (_expected_role is None or user_data.get('role') == _expected_role))
+                        if _role_ok:
+                            # Login exitoso — enrutar automáticamente por rol desde BD
                             st.session_state['user_id'] = user_data['id']
                             st.session_state['user_email'] = user_data['email']
                             st.session_state['role'] = user_data['role']
@@ -2200,7 +2210,7 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
                             st.session_state['logged_in'] = True
                             st.session_state['viewing_login'] = False
                             st.session_state['show_role_selector'] = False
-                            
+
                             # Redirigir según el rol
                             if st.session_state['role'] == 'client':
                                 st.session_state['selected_page'] = "👤 Panel de Cliente"
@@ -2212,70 +2222,18 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
                                 st.session_state['selected_page'] = "🏠 Propietarios"
                             elif st.session_state['role'] == 'admin':
                                 st.session_state['selected_page'] = "Intranet"
-                            
+
                             st.success(f"¡Bienvenido {st.session_state['user_name']}!")
                             st.rerun()
                         else:
-                            st.error("Credenciales incorrectas o rol no coincide.")
+                            st.error("Credenciales incorrectas.")
         
         st.stop()  # Detener el resto de la Home
 
     if st.session_state.get('show_role_selector', False):
-        # Pantalla de Selector de Rol
-        st.markdown("---")
-        st.header("🔐 Selecciona tu Perfil de Acceso")
-        st.markdown("Elige el tipo de usuario que eres para acceder a las funcionalidades correspondientes.")
-
-        col1, col2, col3, col4 = st.columns(4)
-
-        with col1:
-            st.markdown("### 🏠 Cliente")
-            st.markdown("Accede a tus proyectos y compras.")
-            if st.button("🔑 Acceso Cliente", key="select_client", use_container_width=True):
-                st.session_state['login_role'] = 'client'
-                st.session_state['viewing_login'] = True
-                st.rerun()
-
-        with col2:
-            st.markdown("### 🏗️ Arquitecto")
-            st.markdown("Gestiona tus diseños y fincas.")
-            if st.button("🔑 Acceso Arquitecto", key="select_architect", use_container_width=True):
-                st.session_state['login_role'] = 'architect'
-                st.session_state['viewing_login'] = True
-                st.rerun()
-
-        with col3:
-            st.markdown("### 🏡 Propietario")
-            st.markdown("Administra tus propiedades.")
-            if st.button("🔑 Acceso Propietario", key="select_owner", use_container_width=True):
-                st.session_state['login_role'] = 'owner'
-                st.session_state['viewing_login'] = True
-                st.rerun()
-
-        with col4:
-            st.markdown("### 🛠️ Servicios")
-            st.markdown("Gestiona tus servicios profesionales.")
-            if st.button("🔑 Acceso Servicios", key="select_services", use_container_width=True):
-                st.session_state['login_role'] = 'services'
-                st.session_state['viewing_login'] = True
-                st.rerun()
-
-        # Botón discreto para admin
-        st.markdown("---")
-        col_admin = st.columns([10, 1])[1]
-        with col_admin:
-            if st.button("🔐 Admin", key="admin_access"):
-                st.session_state['selected_page'] = "Intranet"
-                st.session_state['show_role_selector'] = False
-                st.session_state['viewing_login'] = False
-                st.rerun()
-
-        # Botón para volver
-        st.markdown("---")
-        if st.button("⬅️ Volver", key="back_to_home"):
-            st.session_state['show_role_selector'] = False
-            st.rerun()
-        st.stop()  # Detenemos el resto de la Home
+        # Eliminado — el selector de rol ya no existe como página separada
+        st.session_state['show_role_selector'] = False
+        st.rerun()
 
     else:
         # ── MURO DE INVITACIÓN ──────────────────────────────────────────────────
