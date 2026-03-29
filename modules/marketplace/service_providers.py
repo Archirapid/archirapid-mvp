@@ -91,6 +91,8 @@ def _init_sp_tables():
     """Crea/migra tablas de constructores. Siempre seguro."""
     conn = db_conn()
     # Nuevas columnas en service_providers
+    # Usamos SAVEPOINT para que un ALTER TABLE fallido (columna ya existe)
+    # no deje la conexión PostgreSQL en estado InFailedSqlTransaction.
     for col, typedef in [
         ("specialties",           "TEXT"),
         ("price_per_m2_no_mat",   "REAL DEFAULT 0"),
@@ -102,10 +104,14 @@ def _init_sp_tables():
         ("featured_plan",         "TEXT DEFAULT 'free'"),
     ]:
         try:
+            conn.execute("SAVEPOINT _sp_col")
             conn.execute(f"ALTER TABLE service_providers ADD COLUMN {col} {typedef}")
-            conn.commit()
+            conn.execute("RELEASE SAVEPOINT _sp_col")
         except Exception:
-            pass  # ya existe
+            try:
+                conn.execute("ROLLBACK TO SAVEPOINT _sp_col")
+            except Exception:
+                pass  # SQLite no necesita rollback explícito
 
     # Tablón de obras (proyectos que buscan constructor)
     conn.execute("""

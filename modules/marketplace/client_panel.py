@@ -328,9 +328,9 @@ def show_buyer_panel_mls(client_email: str, finca_id: str) -> None:
             unsafe_allow_html=True,
         )
     with _back_col:
-        if st.button("← Volver al mapa", key="mls_back_to_map", use_container_width=True):
-            st.session_state.pop("mls_reserva_finca_id", None)
-            for _k in ["mls_show_project_search", "mls_show_prefab_config",
+        if st.button("🚪 Cerrar Sesión", key="mls_back_to_map", use_container_width=True):
+            for _k in ["logged_in", "user_email", "role", "user_name", "mls_reserva_finca_id",
+                       "mls_show_project_search", "mls_show_prefab_config",
                        "mls_show_transacciones", "mls_show_documentacion",
                        "mls_show_construccion_offers"]:
                 st.session_state.pop(_k, None)

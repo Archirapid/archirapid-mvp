@@ -358,8 +358,6 @@ def show_ficha_publica(finca_id: str) -> None:
                     except Exception as _e_cat:
                         st.error(f"Error al consultar el Catastro: {_e_cat}")
 
-    st.markdown("---")
-
     # ── Alertas de fincas similares — igual que pin azul ─────────────────────
     import sqlite3 as _sq_al
     import datetime as _dt_al
@@ -421,7 +419,6 @@ def show_ficha_publica(finca_id: str) -> None:
                     st.info("✅ Petición recibida. Te contactaremos en hola@archirapid.com")
 
     # ── Calculadora de financiación — igual que pin azul ─────────────────────
-    st.markdown("---")
     try:
         from modules.marketplace.hipoteca import render_calculadora
         with st.expander("🏦 Calculadora de Financiación — ¿Cuánto pagaría al mes?", expanded=False):
@@ -628,6 +625,10 @@ def show_ficha_publica(finca_id: str) -> None:
                         st.session_state["role"]                   = "client"
                         st.session_state["user_name"]              = buyer_name.strip()
                         st.session_state["mls_reserva_finca_id"]   = finca_id
+                        st.session_state["selected_page"]          = "👤 Panel de Cliente"
+                        # Limpiar ?mls_ficha= de la URL para que app.py enrute al panel cliente
+                        if "mls_ficha" in st.query_params:
+                            del st.query_params["mls_ficha"]
                         st.rerun()
                     except Exception as _e:
                         st.error(f"Error al procesar la reserva: {_e}")
