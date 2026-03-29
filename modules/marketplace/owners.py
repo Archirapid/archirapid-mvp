@@ -551,6 +551,15 @@ def main():
                 finca.calcular_superficie_edificable()
                 # 4. Geocodificar si no hay lat/lon
                 finca = geocode_finca_mvp(finca)
+                # Auto-clasificación de suelo via Catastro INSPIRE
+                if lat and lon and (not finca_type or finca_type == "Desconocida"):
+                    try:
+                        from modules.marketplace.catastro_api import get_tipo_suelo_desde_coordenadas
+                        tipo_auto = get_tipo_suelo_desde_coordenadas(float(lat), float(lon))
+                        if tipo_auto != "Desconocida":
+                            finca_type = tipo_auto
+                    except Exception:
+                        pass  # Fallback al valor manual introducido por el usuario
                 # 5. Guardar en BD
                 db.insert_plot(finca.a_dict())
                 # 6. Feedback y recarga

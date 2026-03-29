@@ -425,6 +425,16 @@ def ui_subir_finca(inmo: dict) -> None:
             colab_pct_final    = colaboradora_pct
             listante_pct_final = round(comision_total_pct - 1.0 - colaboradora_pct, 2)
 
+        # Auto-clasificación de suelo via Catastro INSPIRE
+        if lat and lng and (not tipo_suelo or tipo_suelo == "Desconocida"):
+            try:
+                from modules.marketplace.catastro_api import get_tipo_suelo_desde_coordenadas
+                tipo_auto = get_tipo_suelo_desde_coordenadas(float(lat), float(lng))
+                if tipo_auto != "Desconocida":
+                    tipo_suelo = tipo_auto
+            except Exception:
+                pass  # Fallback al valor manual introducido por el usuario
+
         datos = {
             "catastro_ref":             ref_catastral.strip().upper(),
             "titulo":                   titulo.strip(),
