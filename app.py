@@ -2074,19 +2074,10 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
             access_col = cols[2]
 
         with access_col:
-            _btn_col1, _btn_col2 = st.columns([3, 1], gap="small")
-            with _btn_col1:
-                if st.button("Iniciar sesión", key="btn_acceder", use_container_width=True):
-                    st.session_state['login_role'] = None
-                    st.session_state['viewing_login'] = True
-                    st.session_state['show_role_selector'] = False
-                    st.query_params["page"] = "login"
-                    st.rerun()
-            with _btn_col2:
-                if st.button("🔐", key="btn_admin", help="Acceso administrador"):
-                    st.session_state['selected_page'] = 'Intranet'
-                    st.query_params["page"] = "admin"
-                    st.rerun()
+            if st.button("🔐 Admin", key="btn_admin", help="Acceso administrador"):
+                st.session_state['selected_page'] = 'Intranet'
+                st.query_params["page"] = "admin"
+                st.rerun()
 
 # ========== HOME: LANDING + MARKETPLACE + PROYECTOS ==========
 

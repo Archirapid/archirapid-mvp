@@ -623,6 +623,7 @@ def render_map_navigation(plots):
         if selected_option and selected_option in plot_options:
             selected_id = plot_options[selected_option]
             set_query_param("selected_plot", selected_id)
+            st.rerun()
 
 def render_client_panel():
     """Renderiza el panel de cliente cuando hay una transacción completada."""
@@ -721,17 +722,7 @@ def render_projects_section():
         pass
 
 def main():
-    # 1. Verificar si hay una finca seleccionada en la URL
-    params = get_query_params() or {}
-    selected_plot_local = None
-    if params.get("selected_plot"):
-        selected_plot_local = params["selected_plot"][0] if isinstance(params["selected_plot"], list) else params["selected_plot"]
-
-    # Si hay una finca seleccionada, mostrar página de detalles y salir
-    if selected_plot_local:
-        from modules.marketplace.plot_detail import show_plot_detail_page
-        show_plot_detail_page(selected_plot_local)
-        return
+    # selected_plot es manejado en app.py antes de llamar a main() — no duplicar aquí
 
     # Mensaje de bienvenida si está logueado
     if st.session_state.get('logged_in'):
