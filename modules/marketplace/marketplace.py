@@ -544,18 +544,20 @@ def render_map(plots):
     m = folium.Map(location=[center_lat, center_lon], zoom_start=zoom_level, tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', attr='Esri')
 
     # ── Overlay WMS Catastro (clasificación suelo urbano/rústico) ──────────
+    # Nota: los colores catastrales son visibles a partir de zoom 14
     try:
         folium.WmsTileLayer(
             url="https://ovc.catastro.meh.es/Cartografia/WMS/ServidorWMS.aspx",
-            name="Clasificación Catastral",
+            name="Catastro (zoom ≥ 14)",
             fmt="image/png",
             layers="Catastro",
+            version="1.1.1",
             transparent=True,
-            opacity=0.35,
+            opacity=0.55,
             attr="© Dirección General del Catastro",
             show=True,
         ).add_to(m)
-        folium.LayerControl(position="topright", collapsed=True).add_to(m)
+        folium.LayerControl(position="topright", collapsed=False).add_to(m)
     except Exception:
         pass  # Si WMS falla, el mapa sigue funcionando sin overlay
 
