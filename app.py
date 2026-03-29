@@ -2099,11 +2099,20 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
                 st.rerun()
 
         # Toggle login ↔ registro — fuera del form para evitar conflicto con session_state de widgets
+        # Servicios usan su propio flujo de registro dedicado
         _show_registro = st.session_state.get('_login_show_registro', False)
-        _toggle_label = "← Ya tengo cuenta" if _show_registro else "¿Primera vez? → Crear cuenta nueva"
-        if st.button(_toggle_label, key="btn_toggle_registro"):
-            st.session_state['_login_show_registro'] = not _show_registro
-            st.rerun()
+        if _login_role == 'services' and not _show_registro:
+            if st.button("¿Primera vez? → Registrarme como Profesional", key="btn_toggle_registro"):
+                st.session_state['viewing_login'] = False
+                st.session_state['_login_show_registro'] = False
+                st.session_state['selected_page'] = "📝 Registro de Proveedor de Servicios"
+                st.query_params["page"] = "registro-pro"
+                st.rerun()
+        else:
+            _toggle_label = "← Ya tengo cuenta" if _show_registro else "¿Primera vez? → Crear cuenta nueva"
+            if st.button(_toggle_label, key="btn_toggle_registro"):
+                st.session_state['_login_show_registro'] = not _show_registro
+                st.rerun()
 
         with st.form("login_form"):
             if st.session_state.get('_login_show_registro', False):
@@ -2398,9 +2407,15 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
     </div>
   </div>
 </div>""", unsafe_allow_html=True)
-            if st.button("Registrarme como Profesional →", key="hp_btn_pro", use_container_width=True):
-                st.session_state['selected_page'] = "📝 Registro de Proveedor de Servicios"
-                st.query_params["page"] = "registro-pro"
+            if st.button("Acceder / Registrarse →", key="hp_btn_pro", use_container_width=True):
+                if st.session_state.get("logged_in") and st.session_state.get("role") == "services":
+                    st.session_state['selected_page'] = "👤 Panel de Proveedor"
+                    st.query_params["page"] = "proveedor"
+                else:
+                    st.session_state['login_role'] = 'services'
+                    st.session_state['viewing_login'] = True
+                    st.session_state['_login_show_registro'] = False
+                    st.query_params["page"] = "login"
                 st.rerun()
 
         with _hc4:
