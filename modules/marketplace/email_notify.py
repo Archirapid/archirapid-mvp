@@ -219,3 +219,184 @@ def notify_lead_mls(nombre: str, empresa: str, email: str,
         )
     except Exception:
         pass
+
+
+# ─── Notificaciones constructores / profesionales ────────────────────────────
+
+def notify_constructor_new_project(email: str, name: str, project_name: str,
+                                    province: str, area: float, total_cost: float) -> None:
+    """Email al constructor Destacado cuando hay un proyecto nuevo en su zona."""
+    import os
+    _send(
+        f"🏗️ <b>Nuevo proyecto en tablón — {province}</b>\n"
+        f"Constructor: {name} ({email})\n"
+        f"Proyecto: {project_name} · {area:.0f} m² · €{total_cost:,.0f}\n"
+        f"Provincia: {province}"
+    )
+    try:
+        try:
+            import streamlit as _st
+            _rkey = str(_st.secrets.get("RESEND_API_KEY", "")).strip()
+        except Exception:
+            _rkey = os.getenv("RESEND_API_KEY", "").strip()
+        if not _rkey:
+            return
+        _html = f"""<!DOCTYPE html>
+<html><body style="font-family:Arial,sans-serif;background:#f8fafc;padding:32px;margin:0;">
+  <div style="max-width:520px;margin:0 auto;background:white;border-radius:12px;
+              padding:32px;border:1px solid #e2e8f0;">
+    <div style="font-size:1.1rem;font-weight:900;color:#1E3A5F;margin-bottom:4px;">
+      🏗️ Nuevo proyecto en tu zona — ArchiRapid
+    </div>
+    <div style="color:#64748b;font-size:13px;margin-bottom:24px;">
+      Como constructor <b>⭐ Destacado</b> eres el primero en verlo
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:14px;">
+      <tr><td style="padding:8px 0;color:#64748b;width:140px;">Proyecto</td>
+          <td style="padding:8px 0;font-weight:700;color:#0f172a;">{project_name}</td></tr>
+      <tr style="background:#f8fafc;"><td style="padding:8px 4px;color:#64748b;">Provincia</td>
+          <td style="padding:8px 4px;color:#0f172a;">{province}</td></tr>
+      <tr><td style="padding:8px 0;color:#64748b;">Superficie</td>
+          <td style="padding:8px 0;color:#0f172a;">{area:.0f} m²</td></tr>
+      <tr style="background:#f8fafc;"><td style="padding:8px 4px;color:#64748b;">Presupuesto ref.</td>
+          <td style="padding:8px 4px;font-weight:700;color:#0f172a;">€{total_cost:,.0f}</td></tr>
+    </table>
+    <div style="margin-top:24px;text-align:center;">
+      <a href="https://archirapid.streamlit.app" style="display:inline-block;background:#1E3A5F;
+         color:white;padding:12px 28px;border-radius:8px;text-decoration:none;
+         font-weight:700;font-size:14px;">Ver proyecto y enviar oferta →</a>
+    </div>
+    <p style="color:#94a3b8;font-size:11px;margin-top:24px;text-align:center;">
+      ArchiRapid · Panel constructor: archirapid.streamlit.app → Acceso → Servicios
+    </p>
+  </div>
+</body></html>"""
+        _requests.post(
+            "https://api.resend.com/emails",
+            headers={"Authorization": f"Bearer {_rkey}", "Content-Type": "application/json"},
+            json={
+                "from": "ArchiRapid Obras <noreply@archirapid.com>",
+                "to": [email],
+                "subject": f"🏗️ Nuevo proyecto en {province} — {area:.0f} m² · €{total_cost:,.0f}",
+                "html": _html,
+            },
+            timeout=10,
+        )
+    except Exception:
+        pass
+
+
+def notify_constructor_offer_accepted(email: str, name: str, project_name: str,
+                                       amount: float, comision_eur: float) -> None:
+    """Email al constructor cuando el cliente acepta su oferta."""
+    _send(
+        f"✅ <b>¡Oferta ACEPTADA!</b>\n"
+        f"Constructor: {name} ({email})\n"
+        f"Proyecto: {project_name}\n"
+        f"Importe: €{amount:,.0f} · Comisión pendiente: €{comision_eur:,.0f}\n"
+        f"Accede a tu panel para pagar la comisión y ver el contacto del cliente."
+    )
+    try:
+        try:
+            import streamlit as _st
+            _rkey = str(_st.secrets.get("RESEND_API_KEY", "")).strip()
+        except Exception:
+            import os
+            _rkey = os.getenv("RESEND_API_KEY", "").strip()
+        if not _rkey:
+            return
+        _html = f"""<!DOCTYPE html>
+<html><body style="font-family:Arial,sans-serif;background:#f8fafc;padding:32px;margin:0;">
+  <div style="max-width:520px;margin:0 auto;background:white;border-radius:12px;
+              padding:32px;border:1px solid #e2e8f0;">
+    <div style="font-size:1.1rem;font-weight:900;color:#16a34a;margin-bottom:4px;">
+      ✅ ¡Tu oferta fue aceptada! — ArchiRapid
+    </div>
+    <div style="color:#64748b;font-size:13px;margin-bottom:24px;">
+      El cliente ha elegido tu propuesta para el proyecto <b>{project_name}</b>
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:14px;">
+      <tr><td style="padding:8px 0;color:#64748b;width:160px;">Proyecto</td>
+          <td style="padding:8px 0;font-weight:700;color:#0f172a;">{project_name}</td></tr>
+      <tr style="background:#f8fafc;"><td style="padding:8px 4px;color:#64748b;">Tu oferta</td>
+          <td style="padding:8px 4px;font-weight:700;color:#16a34a;">€{amount:,.0f}</td></tr>
+      <tr><td style="padding:8px 0;color:#64748b;">Comisión ArchiRapid (3%)</td>
+          <td style="padding:8px 0;font-weight:700;color:#dc2626;">€{comision_eur:,.0f}</td></tr>
+    </table>
+    <div style="margin-top:16px;padding:12px 16px;background:#fef3c7;border-radius:8px;
+                border-left:4px solid #f59e0b;font-size:13px;color:#92400e;">
+      ⚡ Accede a tu panel → "Mis Ofertas" → paga la comisión para ver el contacto del cliente e iniciar la obra.
+    </div>
+    <div style="margin-top:24px;text-align:center;">
+      <a href="https://archirapid.streamlit.app" style="display:inline-block;background:#16a34a;
+         color:white;padding:12px 28px;border-radius:8px;text-decoration:none;
+         font-weight:700;font-size:14px;">Ir a mi panel →</a>
+    </div>
+  </div>
+</body></html>"""
+        _requests.post(
+            "https://api.resend.com/emails",
+            headers={"Authorization": f"Bearer {_rkey}", "Content-Type": "application/json"},
+            json={
+                "from": "ArchiRapid Obras <noreply@archirapid.com>",
+                "to": [email],
+                "subject": f"✅ Tu oferta fue aceptada — {project_name}",
+                "html": _html,
+            },
+            timeout=10,
+        )
+    except Exception:
+        pass
+
+
+def notify_client_offer_received(email: str, client_name: str,
+                                  project_name: str, n_offers: int) -> None:
+    """Email al cliente cuando recibe nuevas ofertas de constructores."""
+    _send(
+        f"📨 <b>Nuevas ofertas de construcción</b>\n"
+        f"Cliente: {client_name} ({email})\n"
+        f"Proyecto: {project_name}\n"
+        f"Ofertas recibidas: {n_offers}"
+    )
+    try:
+        try:
+            import streamlit as _st
+            _rkey = str(_st.secrets.get("RESEND_API_KEY", "")).strip()
+        except Exception:
+            import os
+            _rkey = os.getenv("RESEND_API_KEY", "").strip()
+        if not _rkey:
+            return
+        _html = f"""<!DOCTYPE html>
+<html><body style="font-family:Arial,sans-serif;background:#f8fafc;padding:32px;margin:0;">
+  <div style="max-width:520px;margin:0 auto;background:white;border-radius:12px;
+              padding:32px;border:1px solid #e2e8f0;">
+    <div style="font-size:1.1rem;font-weight:900;color:#1E3A5F;margin-bottom:4px;">
+      📨 Tienes {n_offers} oferta(s) para tu proyecto — ArchiRapid
+    </div>
+    <div style="color:#64748b;font-size:13px;margin-bottom:24px;">
+      Constructores de tu zona han enviado propuestas para <b>{project_name}</b>
+    </div>
+    <div style="padding:16px;background:#eff6ff;border-radius:8px;font-size:14px;color:#1e40af;">
+      Accede a tu panel de cliente → "🏗️ OFERTAS" para comparar y aceptar la que más te convenga.
+    </div>
+    <div style="margin-top:24px;text-align:center;">
+      <a href="https://archirapid.streamlit.app" style="display:inline-block;background:#1E3A5F;
+         color:white;padding:12px 28px;border-radius:8px;text-decoration:none;
+         font-weight:700;font-size:14px;">Ver mis ofertas →</a>
+    </div>
+  </div>
+</body></html>"""
+        _requests.post(
+            "https://api.resend.com/emails",
+            headers={"Authorization": f"Bearer {_rkey}", "Content-Type": "application/json"},
+            json={
+                "from": "ArchiRapid Obras <noreply@archirapid.com>",
+                "to": [email],
+                "subject": f"📨 {n_offers} oferta(s) para tu proyecto — {project_name}",
+                "html": _html,
+            },
+            timeout=10,
+        )
+    except Exception:
+        pass

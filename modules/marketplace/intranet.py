@@ -604,6 +604,78 @@ def main():
         except Exception as e:
             st.error(f"Error en Gestión de Profesionales: {e}")
 
+        # ── Tablón de obras + comisiones ─────────────────────────────────────
+        st.markdown("---")
+        st.markdown("### 🏗️ Tablón de Obras y Comisiones")
+        try:
+            from modules.marketplace.utils import db_conn as _dc_tab
+            _ct = _dc_tab()
+            # KPIs
+            _n_tab   = (_ct.execute("SELECT COUNT(*) FROM project_tablon WHERE active=1").fetchone() or [0])[0]
+            _n_of    = (_ct.execute("SELECT COUNT(*) FROM construction_offers").fetchone() or [0])[0]
+            _n_acep  = (_ct.execute("SELECT COUNT(*) FROM construction_offers WHERE estado='aceptada'").fetchone() or [0])[0]
+            _n_com   = (_ct.execute("SELECT COUNT(*) FROM construction_offers WHERE estado='aceptada' AND comision_pagada=1").fetchone() or [0])[0]
+            _n_pend  = _n_acep - _n_com
+            # Ingresos comisiones
+            _ing_com = _ct.execute("""
+                SELECT COALESCE(SUM(CASE WHEN includes_materials=1 THEN price_with_mat ELSE price_no_mat END * 0.03),0)
+                FROM construction_offers WHERE estado='aceptada' AND comision_pagada=1
+            """).fetchone()
+            _ing_eur = float((_ing_com or [0])[0] or 0)
+            _ct.close()
+
+            _ki1, _ki2, _ki3, _ki4, _ki5 = st.columns(5)
+            _ki1.metric("📋 Proyectos activos", _n_tab)
+            _ki2.metric("📨 Ofertas enviadas", _n_of)
+            _ki3.metric("✅ Ofertas aceptadas", _n_acep)
+            _ki4.metric("💳 Comisiones pendientes", _n_pend,
+                        delta=f"€{_n_pend * 0:.0f}" if _n_pend == 0 else None)
+            _ki5.metric("💰 Ingresos comisiones", f"€{_ing_eur:,.0f}")
+
+            # Proyectos activos
+            st.markdown("**Proyectos en el tablón:**")
+            _ct2 = _dc_tab()
+            _tabs_rows = _ct2.execute("""
+                SELECT id,client_email,project_name,province,total_area,total_cost,created_at,
+                       (SELECT COUNT(*) FROM construction_offers co WHERE co.tablon_id=pt.id) as n_ofertas
+                FROM project_tablon pt WHERE active=1 ORDER BY created_at DESC LIMIT 20
+            """).fetchall()
+            _ct2.close()
+            if _tabs_rows:
+                for _tr in _tabs_rows:
+                    _tid_a, _cemail_a, _pname_a, _prov_a, _area_a, _cost_a, _cat_a, _nof_a = _tr
+                    st.markdown(
+                        f"• **{_pname_a or '—'}** · {_prov_a} · {_area_a:.0f} m² · €{_cost_a:,.0f} "
+                        f"· {_nof_a} oferta(s) · `{(_cat_a or '')[:10]}`",
+                    )
+            else:
+                st.info("No hay proyectos activos en el tablón.")
+
+            # Comisiones pendientes de pago
+            if _n_pend > 0:
+                st.markdown("**⚠️ Comisiones pendientes de cobro:**")
+                _ct3 = _dc_tab()
+                _pend_rows = _ct3.execute("""
+                    SELECT co.id, co.provider_name, co.provider_email,
+                           co.project_name, co.client_email,
+                           CASE WHEN co.includes_materials=1 THEN co.price_with_mat ELSE co.price_no_mat END as precio,
+                           co.created_at
+                    FROM construction_offers co
+                    WHERE co.estado='aceptada' AND COALESCE(co.comision_pagada,0)=0
+                    ORDER BY co.created_at DESC
+                """).fetchall()
+                _ct3.close()
+                for _pr in _pend_rows:
+                    _oid_p, _prov_n, _prov_e, _pname_p, _cemail_p, _precio_p, _cat_p = _pr
+                    _com_p = float(_precio_p or 0) * 0.03
+                    st.warning(
+                        f"💳 Constructor: **{_prov_n}** ({_prov_e}) · "
+                        f"Proyecto: {_pname_p} · Precio oferta: €{float(_precio_p or 0):,.0f} · "
+                        f"Comisión pendiente: **€{_com_p:,.0f}**"
+                    )
+        except Exception as _eit:
+            st.error(f"Error cargando tablón/comisiones: {_eit}")
+
     with tab6:
         st.header("⚙️ Herramientas de Administración")
         st.warning("Estas acciones afectan a datos reales. Úsalas solo si sabes lo que haces.")

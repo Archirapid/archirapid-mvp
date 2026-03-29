@@ -30,6 +30,8 @@ PRODUCTS = {
     "mls_agency":         {"name": "ArchiRapid MLS AGENCY (€99/mes)",     "amount":  9900},  # €99
     "mls_enterprise":     {"name": "ArchiRapid MLS PRO (€199/mes)",       "amount": 19900},  # €199
     "mls_reserva":        {"name": "Reserva MLS (desc. en comisión final)","amount": 20000},  # €200
+    # Constructores / Profesionales
+    "sp_destacado":       {"name": "Plan Destacado Constructor (€99/30 días)", "amount": 9900},  # €99
 }
 
 
@@ -145,6 +147,77 @@ def create_reservation_checkout(plot_id: str, pending_id: str, buyer_name: str,
             "buyer_name": str(buyer_name)[:100],
             "buyer_email": str(buyer_email)[:100],
             "plot_ref": str(plot_ref)[:100],
+        },
+    )
+    return session.url, session.id
+
+
+def create_destacado_checkout(provider_id: str, provider_name: str,
+                              provider_email: str, cancel_url: str) -> tuple:
+    """
+    Crea sesión Stripe Checkout para activar Plan Destacado (€99/30 días).
+    Devuelve (checkout_url, session_id).
+    """
+    _stripe.api_key = _get_key()
+    session = _stripe.checkout.Session.create(
+        payment_method_types=["card"],
+        line_items=[{
+            "price_data": {
+                "currency": "eur",
+                "product_data": {"name": PRODUCTS["sp_destacado"]["name"]},
+                "unit_amount": PRODUCTS["sp_destacado"]["amount"],
+            },
+            "quantity": 1,
+        }],
+        mode="payment",
+        customer_email=provider_email or None,
+        success_url=(
+            "https://archirapid.streamlit.app/"
+            "?sp_pago_ok=1&sp_sess={CHECKOUT_SESSION_ID}"
+            f"&sp_pid={provider_id}"
+        ),
+        cancel_url=cancel_url,
+        metadata={
+            "type": "sp_destacado",
+            "provider_id": str(provider_id)[:100],
+            "provider_name": str(provider_name)[:100],
+            "provider_email": str(provider_email)[:100],
+        },
+    )
+    return session.url, session.id
+
+
+def create_comision_checkout(offer_id: str, constructor_email: str,
+                              amount_cents: int, project_name: str,
+                              cancel_url: str) -> tuple:
+    """
+    Crea sesión Stripe Checkout para pago de comisión ArchiRapid (3% obra adjudicada).
+    Devuelve (checkout_url, session_id).
+    """
+    _stripe.api_key = _get_key()
+    session = _stripe.checkout.Session.create(
+        payment_method_types=["card"],
+        line_items=[{
+            "price_data": {
+                "currency": "eur",
+                "product_data": {"name": f"Comisión ArchiRapid — {project_name[:60]}"},
+                "unit_amount": max(amount_cents, 50),
+            },
+            "quantity": 1,
+        }],
+        mode="payment",
+        customer_email=constructor_email or None,
+        success_url=(
+            "https://archirapid.streamlit.app/"
+            "?sp_comision_ok=1&sp_sess={CHECKOUT_SESSION_ID}"
+            f"&offer_id={offer_id}"
+        ),
+        cancel_url=cancel_url,
+        metadata={
+            "type": "sp_comision",
+            "offer_id": str(offer_id)[:100],
+            "constructor_email": str(constructor_email)[:100],
+            "project_name": str(project_name)[:100],
         },
     )
     return session.url, session.id

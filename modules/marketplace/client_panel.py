@@ -2490,9 +2490,41 @@ def show_construccion_offers(client_email: str):
                             if st.button("✅ Aceptar", key=f"ac_{oid}", type="primary", use_container_width=True):
                                 try:
                                     conn3 = db_conn()
-                                    # Aceptar esta
+                                    # Generar contrato PDF + SHA-256
+                                    _sha256 = ""
+                                    _pdf_b64 = ""
+                                    try:
+                                        from modules.marketplace.contrato_obra import generar_contrato as _gc
+                                        import base64 as _b64
+                                        from modules.marketplace.service_providers import _build_breakdown as _bb
+                                        _bd = _json.loads(breakdown_json) if breakdown_json else _bb(
+                                            area, float(p_nm or 0), float(p_wm or 0), bool(incl_mat)
+                                        )
+                                        _pdf_bytes, _sha256 = _gc(
+                                            project_name=pname or "Proyecto",
+                                            province=province or "",
+                                            area=area,
+                                            client_name=st.session_state.get("user_name", client_email),
+                                            client_email=client_email,
+                                            provider_name=prov_name or "",
+                                            provider_email=prov_email or "",
+                                            provider_company=sp_area or "",
+                                            price=precio_show,
+                                            includes_materials=bool(incl_mat),
+                                            plazo_semanas=plazo,
+                                            garantia_anos=garantia,
+                                            nota_tecnica=nota or "",
+                                            breakdown=_bd,
+                                        )
+                                        _pdf_b64 = _b64.b64encode(_pdf_bytes).decode()
+                                    except Exception:
+                                        pass
+
+                                    # Aceptar esta oferta + guardar contrato
                                     conn3.execute(
-                                        "UPDATE construction_offers SET estado='aceptada' WHERE id=?", (oid,)
+                                        "UPDATE construction_offers SET estado='aceptada', "
+                                        "contrato_sha256=?, contrato_pdf_b64=? WHERE id=?",
+                                        (_sha256 or None, _pdf_b64 or None, oid)
                                     )
                                     # Rechazar las demás del mismo proyecto
                                     conn3.execute(
@@ -2500,17 +2532,40 @@ def show_construccion_offers(client_email: str):
                                         (tid, oid)
                                     )
                                     conn3.commit(); conn3.close()
+
+                                    # Notificaciones
                                     try:
-                                        from modules.marketplace.email_notify import _send
+                                        from modules.marketplace.email_notify import (
+                                            _send,
+                                            notify_constructor_offer_accepted as _ncoa,
+                                        )
+                                        _comision_eur = round(precio_show * 0.03, 2)
                                         _send(
                                             f"✅ <b>Oferta ACEPTADA</b>\n"
                                             f"Constructor: {prov_name} ({prov_email})\n"
                                             f"Proyecto: {pname} · €{precio_show:,.0f} · {plazo} sem\n"
-                                            f"Cliente: {client_email}"
+                                            f"Comisión pendiente: €{_comision_eur:,.0f}\n"
+                                            f"Cliente: {client_email}\n"
+                                            f"SHA-256 contrato: {_sha256[:20] if _sha256 else '—'}…"
                                         )
+                                        if prov_email:
+                                            _ncoa(prov_email, prov_name or "", pname or "", precio_show, _comision_eur)
                                     except Exception:
                                         pass
-                                    st.success(f"✅ Oferta de {prov_name} aceptada. Le contactaremos para iniciar el proceso.")
+
+                                    # Botón descarga PDF si se generó
+                                    if _pdf_bytes:
+                                        st.download_button(
+                                            "📄 Descargar precontrato PDF",
+                                            data=_pdf_bytes,
+                                            file_name=f"precontrato_{pname or 'obra'}_{_sha256[:8]}.pdf",
+                                            mime="application/pdf",
+                                            key=f"dl_{oid}",
+                                        )
+
+                                    st.success(f"✅ Oferta de {prov_name} aceptada. El constructor recibirá notificación para confirmar la obra.")
+                                    if _sha256:
+                                        st.caption(f"🔐 Contrato registrado · SHA-256: {_sha256[:32]}…")
                                     st.rerun()
                                 except Exception as ex:
                                     st.error(f"Error: {ex}")

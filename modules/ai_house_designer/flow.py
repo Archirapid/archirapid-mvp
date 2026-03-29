@@ -3562,6 +3562,17 @@ def render_step3():
                     _cname_tab  = (st.session_state.get("user_name") or
                                    st.session_state.get("client_name") or "Cliente")
 
+                    # Selector de partidas a contratar (Fase 2 discriminación por especialidad)
+                    from modules.marketplace.service_providers import _ESP_LABELS as _ESP_L
+                    _partidas_opts = list(_ESP_L.keys())
+                    _partidas_sel = st.multiselect(
+                        "¿Qué partidas quieres contratar? (deja vacío = obra completa)",
+                        options=_partidas_opts,
+                        format_func=lambda x: _ESP_L.get(x, x),
+                        key="tablon_partidas_sel",
+                        help="Solo recibirás ofertas de profesionales con esas especialidades."
+                    )
+
                     if st.button("🏗️ Publicar en Tablón de Obras — Recibir ofertas",
                                  type="primary", use_container_width=True, key="btn_tablon"):
                         try:
@@ -3575,15 +3586,18 @@ def render_step3():
                                 total_area=float(total_area),
                                 total_cost=float(total_cost),
                                 partidas_list=[(p[0], p[1], p[2], p[3]) for p in partidas],
+                                partidas_solicitadas=_partidas_sel if _partidas_sel else None,
                             )
                             st.session_state[_tab_key] = True
                             try:
                                 from modules.marketplace.email_notify import _send
+                                _parts_str = ", ".join(_partidas_sel) if _partidas_sel else "obra completa"
                                 _send(
                                     f"🏗️ <b>Nuevo proyecto en Tablón</b>\n"
                                     f"ID: {_tid}\nCliente: {_cname_tab} ({_cemail_tab})\n"
                                     f"Proyecto: {_name_tab} · {total_area:.0f} m²\n"
-                                    f"Provincia: {_prov_tab} · Coste: €{total_cost:,}"
+                                    f"Provincia: {_prov_tab} · Coste: €{total_cost:,}\n"
+                                    f"Partidas: {_parts_str}"
                                 )
                             except Exception:
                                 pass
@@ -4829,6 +4843,14 @@ def render_step6_pago():
             _cname   = (st.session_state.get("user_name") or
                         st.session_state.get("client_name") or "Cliente")
             _pname_t = req.get("nombre_proyecto") or "Mi proyecto ArchiRapid"
+            from modules.marketplace.service_providers import _ESP_LABELS as _ESP_L6
+            _parts_sel6 = st.multiselect(
+                "¿Qué partidas quieres contratar? (deja vacío = obra completa)",
+                options=list(_ESP_L6.keys()),
+                format_func=lambda x: _ESP_L6.get(x, x),
+                key="tablon_partidas_sel_s6",
+                help="Solo recibirás ofertas de profesionales con esas especialidades.",
+            )
             if st.button("🏗️ Publicar en Tablón de Obras — Recibir ofertas",
                          type="primary", use_container_width=True, key="btn_tablon_s6"):
                 try:
@@ -4838,12 +4860,14 @@ def render_step6_pago():
                         project_name=_pname_t, province=_prov_t, style=style,
                         total_area=float(total_area), total_cost=float(total_cost),
                         partidas_list=[(p[0], p[1], p[2], p[3]) for p in partidas],
+                        partidas_solicitadas=_parts_sel6 if _parts_sel6 else None,
                     )
                     st.session_state[_tab_key] = True
                     try:
                         from modules.marketplace.email_notify import _send
+                        _parts_s = ", ".join(_parts_sel6) if _parts_sel6 else "obra completa"
                         _send(f"🏗️ Nuevo Tablón\nID:{_tid}\n{_cname} ({_cmail})\n"
-                              f"{_pname_t} · {total_area:.0f}m² · €{total_cost:,}")
+                              f"{_pname_t} · {total_area:.0f}m² · €{total_cost:,}\nPartidas: {_parts_s}")
                     except Exception:
                         pass
                     st.success("✅ Publicado. Los constructores ya pueden enviarte ofertas.")

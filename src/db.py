@@ -571,7 +571,8 @@ _PG_DDL = [
         id TEXT PRIMARY KEY, client_email TEXT, client_name TEXT,
         project_name TEXT, province TEXT, style TEXT,
         total_area REAL, total_cost REAL, coste_m2 REAL,
-        budget_json TEXT, created_at TEXT, active INTEGER DEFAULT 1
+        budget_json TEXT, created_at TEXT, active INTEGER DEFAULT 1,
+        partidas_solicitadas TEXT DEFAULT '["todos"]'
     )""",
     """CREATE TABLE IF NOT EXISTS construction_offers (
         id TEXT PRIMARY KEY, tablon_id TEXT, provider_id TEXT,
@@ -580,7 +581,11 @@ _PG_DDL = [
         price_with_mat REAL, includes_materials INTEGER DEFAULT 0,
         plazo_semanas INTEGER, garantia_anos INTEGER DEFAULT 5,
         nota_tecnica TEXT, breakdown_json TEXT,
-        estado TEXT DEFAULT 'enviada', created_at TEXT
+        estado TEXT DEFAULT 'enviada', created_at TEXT,
+        comision_pagada INTEGER DEFAULT 0,
+        comision_stripe_session TEXT,
+        contrato_sha256 TEXT,
+        contrato_pdf_b64 TEXT
     )""",
     """CREATE TABLE IF NOT EXISTS service_assignments (
         id TEXT PRIMARY KEY, venta_id TEXT, proveedor_id TEXT,
@@ -1583,6 +1588,20 @@ def ensure_tables():
             c.execute("CREATE INDEX IF NOT EXISTS idx_firmas_inmo ON firmas_colaboracion(inmo_id)")
         except Exception:
             pass
+
+        # Migraciones service_providers (constructores) — añadir columnas nuevas
+        _sp_migrations = [
+            "ALTER TABLE project_tablon ADD COLUMN partidas_solicitadas TEXT DEFAULT '[\"todos\"]'",
+            "ALTER TABLE construction_offers ADD COLUMN comision_pagada INTEGER DEFAULT 0",
+            "ALTER TABLE construction_offers ADD COLUMN comision_stripe_session TEXT",
+            "ALTER TABLE construction_offers ADD COLUMN contrato_sha256 TEXT",
+            "ALTER TABLE construction_offers ADD COLUMN contrato_pdf_b64 TEXT",
+        ]
+        for _sql in _sp_migrations:
+            try:
+                c.execute(_sql)
+            except Exception:
+                pass  # columna ya existe → ignorar
 
         # ── Migraciones aditivas fincas_mls (safe ALTER TABLE) ───────────────
         _mls_migrations = [

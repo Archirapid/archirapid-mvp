@@ -153,6 +153,24 @@ def _init_sp_tables():
             created_at        TEXT
         )
     """)
+    # Migraciones de columnas nuevas en tablas existentes (SAVEPOINT — seguro en pgbouncer)
+    for _tbl, _col, _typedef in [
+        ("project_tablon",     "partidas_solicitadas",    "TEXT DEFAULT '[\"todos\"]'"),
+        ("construction_offers","comision_pagada",          "INTEGER DEFAULT 0"),
+        ("construction_offers","comision_stripe_session",  "TEXT"),
+        ("construction_offers","contrato_sha256",          "TEXT"),
+        ("construction_offers","contrato_pdf_b64",         "TEXT"),
+    ]:
+        try:
+            conn.execute("SAVEPOINT _sp_mgr")
+            conn.execute(f"ALTER TABLE {_tbl} ADD COLUMN {_col} {_typedef}")
+            conn.execute("RELEASE SAVEPOINT _sp_mgr")
+        except Exception:
+            try:
+                conn.execute("ROLLBACK TO SAVEPOINT _sp_mgr")
+            except Exception:
+                pass
+
     conn.commit()
     conn.close()
 
@@ -296,8 +314,27 @@ def show_service_provider_registration():
                 except Exception:
                     pass
                 if _plan == "destacado":
-                    st.success("✅ ¡Registro completado! Tu plan Destacado está **pendiente de activación**.")
-                    st.info("💳 El equipo ArchiRapid se pondrá en contacto en las próximas horas para confirmar el pago y activar tu badge ⭐.")
+                    # Crear checkout Stripe directamente
+                    try:
+                        from modules.stripe_utils import create_destacado_checkout as _cdc
+                        _s_url, _ = _cdc(
+                            provider_id=pid,
+                            provider_name=name,
+                            provider_email=email,
+                            cancel_url="https://archirapid.streamlit.app/?page=registro_profesional",
+                        )
+                        st.success("✅ ¡Registro completado! Completa el pago para activar tu badge ⭐ DESTACADO.")
+                        st.markdown(
+                            f'<a href="{_s_url}" target="_blank" style="display:inline-block;'
+                            'background:#F59E0B;color:#000;padding:14px 28px;border-radius:8px;'
+                            'font-weight:800;font-size:15px;text-decoration:none;margin-top:8px;">'
+                            '⭐ Pagar Plan Destacado — €99</a>',
+                            unsafe_allow_html=True,
+                        )
+                        st.caption("Pago seguro con Stripe. Activación inmediata al confirmar el pago.")
+                    except Exception as _ep:
+                        st.success("✅ ¡Registro completado! Tu plan Destacado está pendiente de activación.")
+                        st.info(f"💳 Contacta con hola@archirapid.com para confirmar el pago. Error Stripe: {_ep}")
                 else:
                     st.success("✅ ¡Registro completado! Accede desde Home → Acceso → Servicios.")
                 st.balloons()
@@ -405,30 +442,68 @@ def show_service_provider_panel():
         st.markdown("#### Proyectos que buscan constructor en tu zona")
         st.caption("Estos proyectos han sido diseñados en ArchiRapid y sus propietarios buscan constructor.")
 
+        # ── Fase 3: retraso 24h para plan gratuito ────────────────────────────
+        if not featured:
+            st.markdown("""
+<div style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.3);
+            border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12px;">
+  ⏳ <b>Estás viendo proyectos con 24h de retraso.</b>
+  Con el Plan Destacado los ves en tiempo real y llegas primero.<br>
+  <span style="color:#F59E0B;">⭐ Actualiza a Destacado (€99/mes) desde tu registro o contacta hola@archirapid.com</span>
+</div>""", unsafe_allow_html=True)
+
         conn = db_conn()
         # Filtrar por provincia (match parcial en service_area del constructor)
         areas = [a.strip().lower() for a in service_area.split(",") if a.strip()]
-        tablon_rows = conn.execute("""
-            SELECT id,client_name,project_name,province,style,total_area,total_cost,coste_m2,budget_json,created_at
-            FROM project_tablon WHERE active=1
-            ORDER BY created_at DESC
-        """).fetchall()
+
+        # Fase 3: Gratuito solo ve proyectos de más de 24h; Destacado ve todos
+        if featured:
+            tablon_rows = conn.execute("""
+                SELECT id,client_name,project_name,province,style,total_area,total_cost,
+                       coste_m2,budget_json,created_at,
+                       COALESCE(partidas_solicitadas,'["todos"]') as partidas_solicitadas,
+                       client_email
+                FROM project_tablon WHERE active=1
+                ORDER BY created_at DESC
+            """).fetchall()
+        else:
+            tablon_rows = conn.execute("""
+                SELECT id,client_name,project_name,province,style,total_area,total_cost,
+                       coste_m2,budget_json,created_at,
+                       COALESCE(partidas_solicitadas,'["todos"]') as partidas_solicitadas,
+                       client_email
+                FROM project_tablon WHERE active=1
+                  AND created_at <= datetime('now','-24 hours')
+                ORDER BY created_at DESC
+            """).fetchall()
         conn.close()
 
-        # Filtro local por provincia
+        # Filtro local por provincia + especialidad (Fase 2)
         def _match_area(prov):
             if not prov:
                 return True
             prov_l = prov.lower()
             return any(a in prov_l or prov_l in a for a in areas) if areas else True
 
-        visible = [r for r in tablon_rows if _match_area(r[3])]
+        def _match_specialty(partidas_json):
+            """True si las partidas solicitadas incluyen 'todos' o alguna especialidad del constructor."""
+            try:
+                partidas = json.loads(partidas_json) if partidas_json else ["todos"]
+            except Exception:
+                partidas = ["todos"]
+            if "todos" in partidas:
+                return True
+            # Match: alguna especialidad del constructor está en partidas solicitadas
+            return any(s in partidas for s in specialties)
+
+        visible = [r for r in tablon_rows if _match_area(r[3]) and _match_specialty(r[10])]
 
         if not visible:
             st.info("No hay proyectos disponibles en tu área ahora mismo. Te notificaremos cuando haya nuevos.")
         else:
             for r in visible:
-                (tid, cname, pname, province, style, area, total_cost, coste_m2, budget_json, created_at) = r
+                (tid, cname, pname, province, style, area, total_cost, coste_m2,
+                 budget_json, created_at, _partidas_sol, client_email_tbl) = r
 
                 # ¿Ya hice oferta?
                 conn2 = db_conn()
@@ -535,7 +610,7 @@ def show_service_provider_panel():
                                              breakdown_json,estado,created_at)
                                         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'enviada',?)
                                     """, (oid, tid, pid, name, user_email,
-                                          cname, pname, area,
+                                          client_email_tbl, pname, area,
                                           _precio_nm, _precio_wm, int(_incl_mat),
                                           _plazo, _garantia, _nota,
                                           json.dumps(_breakdown),
@@ -544,7 +619,10 @@ def show_service_provider_panel():
                                     conn4.close()
                                     # Notificar admin
                                     try:
-                                        from modules.marketplace.email_notify import _send
+                                        from modules.marketplace.email_notify import (
+                                            _send,
+                                            notify_client_offer_received as _ncor,
+                                        )
                                         _precio_show = _precio_wm if _incl_mat else _precio_nm
                                         _send(
                                             f"🏗️ <b>Nueva oferta de construcción</b>\n"
@@ -552,6 +630,17 @@ def show_service_provider_panel():
                                             f"Proyecto: {pname} · {area:.0f} m² · {province}\n"
                                             f"Precio: €{_precio_show:,.0f} · Plazo: {_plazo} sem."
                                         )
+                                        # Contar total de ofertas para ese proyecto y notificar al cliente
+                                        if cname:
+                                            try:
+                                                _conn_cnt = db_conn()
+                                                _n_of_tot = _conn_cnt.execute(
+                                                    "SELECT COUNT(*) FROM construction_offers WHERE tablon_id=?", (tid,)
+                                                ).fetchone()[0]
+                                                _conn_cnt.close()
+                                                _ncor(client_email_tbl, cname, pname or "Tu proyecto", _n_of_tot)
+                                            except Exception:
+                                                pass
                                     except Exception:
                                         pass
                                     st.success("✅ Oferta enviada. El cliente recibirá notificación.")
@@ -566,7 +655,9 @@ def show_service_provider_panel():
         ofertas = conn.execute("""
             SELECT id,project_name,total_area,price_no_mat,price_with_mat,
                    includes_materials,plazo_semanas,garantia_anos,nota_tecnica,
-                   estado,created_at,client_email
+                   estado,created_at,client_email,
+                   COALESCE(comision_pagada,0) as comision_pagada,
+                   COALESCE(contrato_sha256,'') as contrato_sha256
             FROM construction_offers WHERE provider_id=?
             ORDER BY created_at DESC
         """, (pid,)).fetchall()
@@ -583,13 +674,17 @@ def show_service_provider_panel():
             }
             for of in ofertas:
                 (oid, pname, area, pnm, pwm, incl_mat,
-                 plazo, garantia, nota, estado, created_at, cemail) = of
+                 plazo, garantia, nota, estado, created_at, cemail,
+                 comision_pagada, contrato_sha256) = of
                 precio_show = float(pwm or 0) if incl_mat else float(pnm or 0)
                 mat_label = "con materiales" if incl_mat else "sin materiales"
+                comision_eur = round(precio_show * 0.03, 2)
                 color = _estado_color.get(estado, "#94A3B8")
+                _icon = "✅" if estado == "aceptada" else "📨"
+                _comision_str = f" · 💳 Comisión pendiente €{comision_eur:,.0f}" if estado == "aceptada" and not comision_pagada else ""
                 with st.expander(
-                    f"{'✅' if estado=='aceptada' else '📨'} {pname or 'Proyecto'} — "
-                    f"€{precio_show:,.0f} · {plazo} sem · Estado: {estado.upper()}"
+                    f"{_icon} {pname or 'Proyecto'} — "
+                    f"€{precio_show:,.0f} · {plazo} sem · Estado: {estado.upper()}{_comision_str}"
                 ):
                     c1, c2 = st.columns(2)
                     with c1:
@@ -602,9 +697,49 @@ def show_service_provider_panel():
   <b>Estado:</b> <span style="color:{color};font-weight:700;">{estado.upper()}</span>
 </div>""", unsafe_allow_html=True)
                     with c2:
-                        st.markdown(f"""
-<div style="font-size:12px;color:#CBD5E1;line-height:2;">
+                        if estado == "aceptada" and comision_pagada:
+                            # Comisión pagada → mostrar contacto del cliente
+                            st.markdown(f"""
+<div style="background:rgba(74,222,128,0.1);border:1px solid #4ADE80;border-radius:8px;
+            padding:10px 14px;font-size:12px;color:#CBD5E1;line-height:2;">
+  ✅ <b style="color:#4ADE80">Comisión pagada — Obra confirmada</b><br>
   <b>Cliente:</b> {cemail or '—'}<br>
+  <b>Superficie:</b> {area:.0f} m²<br>
+  <b>Enviada:</b> {created_at[:10] if created_at else '—'}<br>
+  <b>Nota:</b> {(nota or '—')[:80]}
+  {f'<br><b>Hash contrato:</b> <span style="font-size:9px;color:#64748B">{contrato_sha256[:32]}…</span>' if contrato_sha256 else ''}
+</div>""", unsafe_allow_html=True)
+                        elif estado == "aceptada" and not comision_pagada:
+                            # Pendiente de pago de comisión
+                            st.markdown(f"""
+<div style="background:rgba(245,158,11,0.1);border:1px solid #F59E0B;border-radius:8px;
+            padding:10px 14px;font-size:12px;color:#CBD5E1;margin-bottom:10px;">
+  ⭐ <b style="color:#F59E0B">¡Tu oferta fue aceptada!</b><br>
+  Paga la comisión de intermediación para confirmar la obra y ver el contacto del cliente.
+  <br><b>Comisión ArchiRapid (3%):</b> <span style="color:#F59E0B;font-weight:700;">€{comision_eur:,.0f}</span>
+</div>""", unsafe_allow_html=True)
+                            try:
+                                from modules.stripe_utils import create_comision_checkout as _ccc
+                                _cc_url, _ = _ccc(
+                                    offer_id=oid,
+                                    constructor_email=user_email,
+                                    amount_cents=int(comision_eur * 100),
+                                    project_name=pname or "Proyecto",
+                                    cancel_url="https://archirapid.streamlit.app/",
+                                )
+                                st.markdown(
+                                    f'<a href="{_cc_url}" target="_blank" style="display:inline-block;'
+                                    'background:#F59E0B;color:#000;padding:10px 20px;border-radius:8px;'
+                                    'font-weight:800;font-size:13px;text-decoration:none;">'
+                                    f'💳 Pagar comisión — €{comision_eur:,.0f}</a>',
+                                    unsafe_allow_html=True,
+                                )
+                            except Exception:
+                                st.info(f"Para pagar la comisión contacta hola@archirapid.com · Referencia oferta: {oid}")
+                        else:
+                            st.markdown(f"""
+<div style="font-size:12px;color:#CBD5E1;line-height:2;">
+  <b>Cliente:</b> {'*****@***' if estado == 'enviada' else (cemail or '—')}<br>
   <b>Superficie:</b> {area:.0f} m²<br>
   <b>Enviada:</b> {created_at[:10] if created_at else '—'}<br>
   <b>Nota:</b> {(nota or '—')[:80]}
@@ -723,10 +858,14 @@ def _build_breakdown(area: float, price_nm: float, price_wm: float, with_mat: bo
 
 def publish_to_tablon(client_email: str, client_name: str, project_name: str,
                       province: str, style: str, total_area: float,
-                      total_cost: float, partidas_list: list) -> str:
+                      total_cost: float, partidas_list: list,
+                      partidas_solicitadas: list = None) -> str:
     """
     Publica un proyecto en el Tablón de Obras.
     Llamado desde flow.py paso 5.
+    partidas_solicitadas: lista de especialidades que el cliente quiere contratar,
+                          p.ej. ["instalaciones_electricas", "instalaciones_fontaneria"].
+                          None o vacío = ["todos"] (obra completa).
     Devuelve el ID del tablón creado.
     """
     _init_sp_tables()
@@ -737,18 +876,55 @@ def publish_to_tablon(client_email: str, client_name: str, project_name: str,
             for p in partidas_list
         ]
     }
+    _parts_json = json.dumps(partidas_solicitadas if partidas_solicitadas else ["todos"])
     tid = f"tab_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}"
     conn = db_conn()
     conn.execute("""
         INSERT INTO project_tablon
             (id,client_email,client_name,project_name,province,style,
-             total_area,total_cost,coste_m2,budget_json,created_at,active)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,1)
+             total_area,total_cost,coste_m2,budget_json,created_at,active,partidas_solicitadas)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,1,?)
     """, (tid, client_email, client_name, project_name, province, style,
           total_area, total_cost, coste_m2, json.dumps(budget),
-          datetime.utcnow().isoformat()))
+          datetime.utcnow().isoformat(), _parts_json))
     conn.commit()
-    conn.close()
+
+    # Fase 4: Notificar a constructores Destacados de la zona (solo ellos reciben aviso inmediato)
+    try:
+        _prov_l = (province or "").lower()
+        destacados = conn.execute("""
+            SELECT name, email, service_area, specialties
+            FROM service_providers
+            WHERE is_featured=1 AND active=1
+        """).fetchall()
+        conn.close()
+        from modules.marketplace.email_notify import notify_constructor_new_project as _ncnp
+        _parts_list = partidas_solicitadas or ["todos"]
+        for _d in destacados:
+            _dname, _demail, _darea, _dspecs_json = _d
+            # Verificar provincia
+            _areas = [a.strip().lower() for a in (_darea or "").split(",") if a.strip()]
+            _area_ok = any(a in _prov_l or _prov_l in a for a in _areas) if _areas else True
+            if not _area_ok:
+                continue
+            # Verificar especialidad
+            try:
+                _dspecs = json.loads(_dspecs_json) if _dspecs_json else []
+            except Exception:
+                _dspecs = []
+            _spec_ok = "todos" in _parts_list or any(s in _parts_list for s in _dspecs)
+            if not _spec_ok:
+                continue
+            try:
+                _ncnp(_demail, _dname, project_name, province, total_area, total_cost)
+            except Exception:
+                pass
+    except Exception:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
     return tid
 
 

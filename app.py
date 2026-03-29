@@ -1574,6 +1574,75 @@ if st.query_params.get("stripe_session") and st.query_params.get("payment") == "
     except Exception:
         pass
 
+# === STRIPE: pago Plan Destacado constructor ===
+if st.query_params.get("sp_pago_ok") == "1" and st.query_params.get("sp_sess"):
+    _sp_sess = st.query_params["sp_sess"]
+    _sp_pid  = st.query_params.get("sp_pid", "")
+    if not st.session_state.get(f"sp_dest_verified_{_sp_sess}"):
+        try:
+            from modules.stripe_utils import verify_session as _sv2
+            from datetime import datetime as _dt2, timedelta as _td2, timezone as _tz2
+            _sess2 = _sv2(_sp_sess)
+            if _sess2.payment_status == "paid":
+                _meta2 = dict(_sess2.metadata or {})
+                _pid2  = _meta2.get("provider_id") or _sp_pid
+                if _pid2:
+                    from modules.marketplace.utils import db_conn as _dc2
+                    _cn2 = _dc2()
+                    _until2 = (_dt2.now(_tz2.utc) + _td2(days=30)).strftime("%Y-%m-%d")
+                    _cn2.execute(
+                        "UPDATE service_providers SET is_featured=1, featured_until=?, featured_plan='destacado' WHERE id=?",
+                        (_until2, _pid2)
+                    )
+                    _cn2.commit(); _cn2.close()
+                    st.session_state[f"sp_dest_verified_{_sp_sess}"] = True
+                    try:
+                        from modules.marketplace.email_notify import _send as _s2
+                        _s2(f"⭐ <b>Plan Destacado ACTIVADO (Stripe)</b>\nConstructor ID: {_pid2}\nVálido hasta: {_until2}")
+                    except Exception:
+                        pass
+                    st.toast("⭐ ¡Plan Destacado activado! Ya apareces primero en las comparativas.", icon="⭐")
+        except Exception:
+            pass
+    try:
+        del st.query_params["sp_pago_ok"]
+        del st.query_params["sp_sess"]
+        del st.query_params["sp_pid"]
+    except Exception:
+        pass
+
+# === STRIPE: pago comisión obra adjudicada ===
+if st.query_params.get("sp_comision_ok") == "1" and st.query_params.get("sp_sess"):
+    _sc_sess  = st.query_params["sp_sess"]
+    _sc_offer = st.query_params.get("offer_id", "")
+    if not st.session_state.get(f"sp_com_verified_{_sc_sess}"):
+        try:
+            from modules.stripe_utils import verify_session as _sv3
+            _sess3 = _sv3(_sc_sess)
+            if _sess3.payment_status == "paid" and _sc_offer:
+                from modules.marketplace.utils import db_conn as _dc3
+                _cn3 = _dc3()
+                _cn3.execute(
+                    "UPDATE construction_offers SET comision_pagada=1, comision_stripe_session=? WHERE id=?",
+                    (_sc_sess, _sc_offer)
+                )
+                _cn3.commit(); _cn3.close()
+                st.session_state[f"sp_com_verified_{_sc_sess}"] = True
+                try:
+                    from modules.marketplace.email_notify import _send as _s3
+                    _s3(f"💰 <b>Comisión obra pagada (Stripe)</b>\nOferta ID: {_sc_offer}\nSesión: {_sc_sess}")
+                except Exception:
+                    pass
+                st.toast("✅ Comisión pagada. Ya puedes ver el contacto del cliente.", icon="✅")
+        except Exception:
+            pass
+    try:
+        del st.query_params["sp_comision_ok"]
+        del st.query_params["sp_sess"]
+        del st.query_params["offer_id"]
+    except Exception:
+        pass
+
 # === NUEVAS RUTAS V2 (BORRÓN Y CUENTA NUEVA) ===
 page_from_query = False  # Variable para controlar si la página viene de query params
 if "selected_prefab" in st.query_params and not page_from_query:
