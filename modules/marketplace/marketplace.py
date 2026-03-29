@@ -543,6 +543,22 @@ def render_map(plots):
     # Crear mapa con Folium
     m = folium.Map(location=[center_lat, center_lon], zoom_start=zoom_level, tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', attr='Esri')
 
+    # ── Overlay WMS Catastro (clasificación suelo urbano/rústico) ──────────
+    try:
+        folium.WmsTileLayer(
+            url="https://ovc.catastro.meh.es/Cartografia/WMS/ServidorWMS.aspx",
+            name="Clasificación Catastral",
+            fmt="image/png",
+            layers="Catastro",
+            transparent=True,
+            opacity=0.35,
+            attr="© Dirección General del Catastro",
+            show=True,
+        ).add_to(m)
+        folium.LayerControl(position="topright", collapsed=True).add_to(m)
+    except Exception:
+        pass  # Si WMS falla, el mapa sigue funcionando sin overlay
+
     for plot in plots_processed:
         lat = float(plot['lat'])
         lon = float(plot['lon'])
