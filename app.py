@@ -2096,25 +2096,33 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
         _login_role = st.session_state.get('login_role')
         _login_role_label = _login_role.title() if _login_role else ""
         _login_header = f"🔐 Iniciar Sesión — {_login_role_label}" if _login_role_label else "🔐 Iniciar Sesión"
-        st.header(_login_header)
-        
-        modo_registro = st.checkbox("¿Es tu primera vez? Activa el modo registro", key="modo_registro")
-        
+
+        _hcol1, _hcol2 = st.columns([6, 1])
+        with _hcol1:
+            st.header(_login_header)
+        with _hcol2:
+            if st.button("✕ Cerrar", key="btn_close_login"):
+                st.session_state['viewing_login'] = False
+                st.session_state['login_role'] = None
+                st.session_state['_login_show_registro'] = False
+                st.rerun()
+
+        # Toggle login ↔ registro — fuera del form para evitar conflicto con session_state de widgets
+        _show_registro = st.session_state.get('_login_show_registro', False)
+        _toggle_label = "← Ya tengo cuenta" if _show_registro else "¿Primera vez? → Crear cuenta nueva"
+        if st.button(_toggle_label, key="btn_toggle_registro"):
+            st.session_state['_login_show_registro'] = not _show_registro
+            st.rerun()
+
         with st.form("login_form"):
-            if modo_registro:
+            if st.session_state.get('_login_show_registro', False):
                 st.subheader("📝 Registro de Nuevo Usuario")
                 name = st.text_input("Nombre completo *", placeholder="Tu nombre completo")
                 email = st.text_input("Email *", placeholder="tu@email.com")
                 password = st.text_input("Contraseña *", type="password", placeholder="Mínimo 6 caracteres")
                 password_confirm = st.text_input("Confirmar contraseña *", type="password", placeholder="Repite tu contraseña")
-                
-                col1, col2 = st.columns(2)
-                with col1:
-                    submitted = st.form_submit_button("🚀 Registrarme y Acceder", type="primary")
-                with col2:
-                    if st.form_submit_button("⬅️ Volver al login"):
-                        st.session_state['modo_registro'] = False
-                        st.rerun()
+
+                submitted = st.form_submit_button("🚀 Registrarme y Acceder", type="primary", use_container_width=True)
                 
                 if submitted:
                     if not name or not email or not password:
@@ -2160,7 +2168,8 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
                             st.session_state['logged_in'] = True
                             st.session_state['viewing_login'] = False
                             st.session_state['show_role_selector'] = False
-                            
+                            st.session_state['_login_show_registro'] = False
+
                             # Redirigir según el rol (owner va al portal de propietarios)
                             if st.session_state['role'] == 'client':
                                 st.session_state['selected_page'] = "👤 Panel de Cliente"
@@ -2182,14 +2191,7 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
                 email = st.text_input("📧 Email", key="login_email")
                 password = st.text_input("🔒 Contraseña", type="password", key="login_password")
                 
-                col1, col2 = st.columns(2)
-                with col1:
-                    submitted = st.form_submit_button("🚀 Entrar", type="primary")
-                with col2:
-                    if st.form_submit_button("⬅️ Volver"):
-                        st.session_state['viewing_login'] = False
-                        st.session_state['show_role_selector'] = False
-                        st.rerun()
+                submitted = st.form_submit_button("🚀 Entrar", type="primary", use_container_width=True)
                 
                 if submitted:
                     if not email or not password:
