@@ -74,6 +74,21 @@ archirapid_extract/catastro_output/
 archirapid_extract/test_catastral.pdf
 ARCHIRAPID_PIPELINE_DUAL_VIZ_*.pdf
 
+# Internal docs / business docs — not code
+MODELOS/
+SESSION_NOTES_*.md
+ARCHIRAPID_INFORME_ESTRATEGICO.md
+ESTADO_ACTUAL.md
+INVESTOR_REPORT.md
+MONETIZACION_SERVICIOS.md
+MONETIZATION_PRICES.md
+ONBOARDING_PROGRAMADOR.md
+PROJECT_SUMMARY.md
+PROPUESTA_MLS.md
+
+# Accidental files
+=*
+
 # OS
 .DS_Store
 
