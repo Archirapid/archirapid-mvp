@@ -597,11 +597,6 @@ def render_map(plots):
             ).add_to(m)
         except Exception:
             pass
-    folium.LayerControl(
-        position="topright",
-        collapsed=True,
-        autoZIndex=True,
-    ).add_to(m)
     # ─────────────────────────────────────────────────────────────────────────
 
     # ── ArchiRapid MLS: pins naranjas ─────────────────────────────────────────
@@ -616,22 +611,6 @@ def render_map(plots):
     # ──────────────────────────────────────────────────────────────────────────
 
     # Renderizar con st_folium — soporta LayerControl nativamente
-    st.markdown("""
-    <style>
-    .leaflet-control-layers {
-        font-size: 11px !important;
-        min-width: 32px !important;
-        max-width: 180px !important;
-    }
-    .leaflet-control-layers-expanded {
-        padding: 4px 8px !important;
-    }
-    .leaflet-control-layers label {
-        font-size: 11px !important;
-        margin: 2px 0 !important;
-    }
-    </style>
-    """, unsafe_allow_html=True)
     try:
         from streamlit_folium import st_folium
         st_folium(m, height=600, width=None, returned_objects=[])
