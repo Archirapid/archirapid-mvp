@@ -570,24 +570,32 @@ def render_map(plots):
                                tooltip=plot['title'])
         marker.add_to(m)
 
-    # ── Overlay WMS Catastro ──────────────────────────────────────────────────
-    try:
-        folium.WmsTileLayer(
-            url="https://ovc.catastro.meh.es/Cartografia/WMS/ServidorWMS.aspx",
-            name="Catastro",
-            fmt="image/png",
-            layers="Catastro",
-            version="1.1.1",
-            transparent=True,
-            opacity=0.85,
-            attr="© Dirección General del Catastro",
-            show=False,
-            overlay=True,
-            control=True,
-        ).add_to(m)
-        folium.LayerControl(position="topright", collapsed=False).add_to(m)
-    except Exception:
-        pass
+    # ── WMS Catastro — lazy load con toggle ──────────────────────────────────
+    _mostrar_catastro = st.toggle(
+        "🗺️ Ver clasificación catastral",
+        value=False,
+        key="toggle_catastro_wms",
+        help="Muestra las delimitaciones de parcelas del Catastro",
+    )
+    if _mostrar_catastro:
+        try:
+            folium.WmsTileLayer(
+                url="https://ovc.catastro.meh.es/Cartografia/WMS/ServidorWMS.aspx",
+                name="Catastro",
+                fmt="image/png",
+                layers="Catastro",
+                transparent=True,
+                opacity=0.35,
+                attr="© Catastro",
+                show=True,
+            ).add_to(m)
+        except Exception:
+            pass
+    folium.LayerControl(
+        position="topright",
+        collapsed=True,
+        autoZIndex=True,
+    ).add_to(m)
     # ─────────────────────────────────────────────────────────────────────────
 
     # ── ArchiRapid MLS: pins naranjas ─────────────────────────────────────────
@@ -602,7 +610,22 @@ def render_map(plots):
     # ──────────────────────────────────────────────────────────────────────────
 
     # Renderizar con st_folium — soporta LayerControl nativamente
-    st.caption("🗂️ Activa la capa **Catastro** (arriba derecha) y haz zoom para ver parcelas.")
+    st.markdown("""
+    <style>
+    .leaflet-control-layers {
+        font-size: 11px !important;
+        min-width: 32px !important;
+        max-width: 180px !important;
+    }
+    .leaflet-control-layers-expanded {
+        padding: 4px 8px !important;
+    }
+    .leaflet-control-layers label {
+        font-size: 11px !important;
+        margin: 2px 0 !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
     try:
         from streamlit_folium import st_folium
         st_folium(m, height=600, width=None, returned_objects=[])
