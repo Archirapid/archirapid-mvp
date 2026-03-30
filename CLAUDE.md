@@ -11,20 +11,26 @@ SaaS PropTech español para diseño arquitectónico con IA. Stack: Streamlit + B
 ## Archivos clave
 | Archivo | Propósito |
 |---------|-----------|
-| `app.py` | Router principal (~2500 líneas) |
+| `app.py` | Router principal (~2500 líneas) + navegación bidireccional URL↔session_state |
 | `src/db.py` | DB layer — schema en línea ~613 Y ~1352 (actualizado tras trial MLS) |
 | `src/db_compat.py` | Adaptadores SQL SQLite↔PostgreSQL |
 | `flow.py` | Flujo diseñador IA — único INSERT ai_projects en línea 4641 |
 | `floor_plan_svg.py` | Generador SVG planta arquitectónica |
+| `modules/marketplace/marketplace.py` | Mapa Folium con pins azules + WMS Catastro inyectado vía JS |
+| `modules/marketplace/catastro_api.py` | API Catastro + `get_tipo_suelo_desde_coordenadas(lat, lon)` |
+| `modules/marketplace/owners.py` | Subida fincas propietario — auto-clasifica suelo al subir |
 | `modules/marketplace/intranet.py` | Admin (10 tabs + sección G trial MLS) |
 | `modules/marketplace/client_panel.py` | Panel cliente pin azul + pin naranja MLS |
+| `modules/marketplace/service_providers.py` | Portal constructor completo (plan Destacado, filtrado, comisión 3%) |
+| `modules/marketplace/contrato_obra.py` | Generador PDF contrato obra con SHA-256 |
+| `modules/marketplace/email_notify.py` | Notificaciones email a constructores |
 | `modules/mls/` | Todo el sistema MLS |
 | `modules/mls/mls_db.py` | DB layer MLS + funciones trial (activate_trial, check_trial_status...) |
 | `modules/mls/mls_trial_emails.py` | Emails ciclo trial (bienvenida/checkin/urgencia) vía Resend |
 | `modules/mls/mls_publico.py` | Fichas públicas + capa profesional inmo + form reserva pin naranja |
 | `modules/mls/mls_portal.py` | Portal inmo: login, registro, banner trial verde/rojo |
 | `modules/mls/mls_mercado.py` | Portal inmo: mercado, reservas, guía 5 pasos |
-| `modules/mls/mls_fincas.py` | Portal inmo: mis fincas, solicitudes, notificaciones |
+| `modules/mls/mls_fincas.py` | Portal inmo: mis fincas, solicitudes, notificaciones + auto-clasifica suelo |
 | `modules/mls/mls_mapa.py` | Pins naranjas en mapa home |
 | `modules/mls/mls_reservas.py` | Lógica Stripe reservas MLS |
 
@@ -36,6 +42,8 @@ SaaS PropTech español para diseño arquitectónico con IA. Stack: Streamlit + B
 - Supabase usa pooler IPv4 — no direct connection
 - `ensure_tables()` wrapeado en `@st.cache_resource`
 - Schema de inmobiliarias incluye ahora: `trial_start_date`, `trial_active`, `trial_expired`
+- **Folium en Streamlit:** usar `m.get_root().render()` — NO `m._repr_html_()`. El `_repr_html_()` envuelve en srcdoc iframe con HTML-encoding, `</body>` no existe en el string externo → scripts inyectados no llegan al iframe
+- **Navegación app.py:** sync URL↔session_state corre en CADA rerun (no solo primera vez). `_SLUG_TO_PAGE` y `_PAGE_TO_SLUG` cubren todos los roles
 
 ## Subagentes disponibles
 - `@agent-babylon-editor` — editor 3D, meshes, layers, instalaciones MEP
@@ -53,6 +61,23 @@ SaaS PropTech español para diseño arquitectónico con IA. Stack: Streamlit + B
 **Delegar a stripe-specialist:** cualquier cambio en stripe_utils.py, success_url, webhooks, Stripe Connect
 **Delegar en paralelo:** Babylon + DB no comparten archivos → paralelo OK
 **Siempre secuencial:** DB migration ANTES de feature que dependa de esos datos
+
+## Estado actual — Módulo Profesionales/Constructores
+### Implementado (commit 35b5896, 2026-03-29)
+- Plan Destacado €99/30 días — Stripe checkout al registrarse
+- Filtrado proyectos por especialidad/partidas del constructor
+- Delay 24h proyectos para plan gratuito (Destacado ve en tiempo real)
+- Email notificación al constructor cuando se publica proyecto compatible
+- Comisión 3% — Stripe checkout + PDF contrato (reportlab + SHA-256)
+
+### Pendiente (revisar con Raul)
+- Flujo end-to-end completo: registro → pago → oferta → cliente acepta → comisión → PDF
+
+## Estado actual — GIS
+### Implementado
+- **GIS Fase 1:** `get_tipo_suelo_desde_coordenadas(lat, lon)` en `catastro_api.py` — auto-clasifica Urbana/Rústica al subir finca (owners.py + mls_fincas.py)
+### Pendiente
+- **GIS Fase 2:** Overlay WMS Catastro en mapa — botón de capa no aparece. Investigar: script se inyecta correctamente con `get_root().render()` pero LayerControl no visible. Pendiente de resolver.
 
 ## Estado actual del sistema MLS
 ### Implementado y en producción
