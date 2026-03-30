@@ -543,25 +543,6 @@ def render_map(plots):
     # Crear mapa con Folium
     m = folium.Map(location=[center_lat, center_lon], zoom_start=zoom_level, tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', attr='Esri')
 
-    # ── Overlay WMS Catastro (parcelas — visible al hacer zoom sobre España) ──
-    try:
-        folium.WmsTileLayer(
-            url="https://ovc.catastro.meh.es/Cartografia/WMS/ServidorWMS.aspx",
-            name="Catastro",
-            fmt="image/png",
-            layers="Catastro",
-            version="1.1.1",
-            transparent=True,
-            opacity=0.85,
-            attr="© Dirección General del Catastro",
-            show=True,
-            overlay=True,
-            control=True,
-        ).add_to(m)
-        folium.LayerControl(position="topleft", collapsed=False).add_to(m)
-    except Exception:
-        pass  # Si WMS falla, el mapa sigue funcionando sin overlay
-
     for plot in plots_processed:
         lat = float(plot['lat'])
         lon = float(plot['lon'])
@@ -589,6 +570,26 @@ def render_map(plots):
                                tooltip=plot['title'])
         marker.add_to(m)
 
+    # ── Overlay WMS Catastro ──────────────────────────────────────────────────
+    try:
+        folium.WmsTileLayer(
+            url="https://ovc.catastro.meh.es/Cartografia/WMS/ServidorWMS.aspx",
+            name="Catastro",
+            fmt="image/png",
+            layers="Catastro",
+            version="1.1.1",
+            transparent=True,
+            opacity=0.85,
+            attr="© Dirección General del Catastro",
+            show=False,
+            overlay=True,
+            control=True,
+        ).add_to(m)
+        folium.LayerControl(position="topright", collapsed=False).add_to(m)
+    except Exception:
+        pass
+    # ─────────────────────────────────────────────────────────────────────────
+
     # ── ArchiRapid MLS: pins naranjas ─────────────────────────────────────────
     try:
         from modules.mls.mls_mapa import (
@@ -600,10 +601,11 @@ def render_map(plots):
         pass  # MLS nunca interrumpe el mapa azul
     # ──────────────────────────────────────────────────────────────────────────
 
-    # Renderizar mapa (srcdoc iframe: URLs relativas resuelven contra el dominio padre)
-    st.caption("🗂️ Activa la capa **Catastro** (arriba izquierda) y haz zoom para ver la clasificación de parcelas.")
+    # Renderizar con st_folium — soporta LayerControl nativamente
+    st.caption("🗂️ Activa la capa **Catastro** (arriba derecha) y haz zoom para ver parcelas.")
     try:
-        st.components.v1.html(m._repr_html_(), height=600)
+        from streamlit_folium import st_folium
+        st_folium(m, height=600, width=None, returned_objects=[])
     except Exception as e:
         st.error(f"No fue posible renderizar el mapa interactivo: {str(e)}")
 
