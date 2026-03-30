@@ -541,7 +541,13 @@ def render_map(plots):
     zoom_level = 6 if len(plots_processed) > 1 else 12
 
     # Crear mapa con Folium
-    m = folium.Map(location=[center_lat, center_lon], zoom_start=zoom_level, tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', attr='Esri')
+    m = folium.Map(
+        location=[center_lat, center_lon],
+        zoom_start=zoom_level,
+        tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+        attr='Esri World Imagery',
+        name='🛰️ Vista Satélite',
+    )
 
     for plot in plots_processed:
         lat = float(plot['lat'])
@@ -572,10 +578,10 @@ def render_map(plots):
 
     # ── WMS Catastro — lazy load con toggle ──────────────────────────────────
     _mostrar_catastro = st.toggle(
-        "🗺️ Ver clasificación catastral",
+        "Ver delimitaciones de parcelas",
         value=False,
         key="toggle_catastro_wms",
-        help="Muestra las delimitaciones de parcelas del Catastro",
+        help="Activa para ver los límites oficiales de cada parcela según el Catastro",
     )
     if _mostrar_catastro:
         try:
