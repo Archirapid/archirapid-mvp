@@ -246,7 +246,7 @@ html,body{{background:transparent;overflow:hidden;font-family:-apple-system,Blin
       panel.classList.add('open');
       if (!initialized) {{
         initialized = true;
-        appendMsg('bot', '\u00a1Hola! Soy Lola \ud83d\udc4b Tu asistente de ArchiRapid.\n\n\u00bfTienes preguntas sobre fincas, precios, el dise\u00f1o 3D o c\u00f3mo funciona la plataforma? Estoy aqu\u00ed para ayudarte. \ud83d\ude0a');
+        appendMsg('bot', '\u00a1Hola! Soy Lola \\ud83d\\udc4b Tu asistente de ArchiRapid.\\n\\n\u00bfTienes preguntas sobre fincas, precios, el dise\u00f1o 3D o c\u00f3mo funciona la plataforma? Estoy aqu\u00ed para ayudarte. \\ud83d\\ude0a');
       }}
       setTimeout(function() {{ var i = el('lola-input'); if(i) i.focus(); }}, 150);
     }} else {{
@@ -295,7 +295,7 @@ html,body{{background:transparent;overflow:hidden;font-family:-apple-system,Blin
       appendMsg('bot', reply);
     }} catch(e) {{
       typing.remove();
-      appendMsg('bot', 'En este momento no puedo responderte. Escr\u00edbenos a hola@archirapid.com \ud83d\ude4f');
+      appendMsg('bot', 'En este momento no puedo responderte. Escr\u00edbenos a hola@archirapid.com \\ud83d\\ude4f');
     }}
     if (sendBtn) sendBtn.disabled = false;
     inp.disabled = false;
