@@ -1878,15 +1878,20 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
                             # Redirigir según el rol (owner va al portal de propietarios)
                             if st.session_state['role'] == 'client':
                                 st.session_state['selected_page'] = "👤 Panel de Cliente"
+                                st.query_params["page"] = "cliente"
                             elif st.session_state['role'] == 'architect':
                                 st.session_state['selected_page'] = "Arquitectos (Marketplace)"
+                                st.query_params["page"] = "arquitectos"
                             elif st.session_state['role'] == 'services':
                                 st.session_state['selected_page'] = "👤 Panel de Proveedor"
+                                st.query_params["page"] = "proveedor"
                             elif st.session_state['role'] == 'admin':
                                 st.session_state['selected_page'] = "Intranet"
+                                st.query_params["page"] = "admin"
                             elif st.session_state['role'] == 'owner':
                                 st.session_state['selected_page'] = "🏠 Propietarios"
-                            
+                                st.query_params["page"] = "propietarios"
+
                             st.success(f"¡Bienvenido {name}!")
                             st.rerun()
                             
@@ -1921,14 +1926,19 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
                             # Redirigir según el rol
                             if st.session_state['role'] == 'client':
                                 st.session_state['selected_page'] = "👤 Panel de Cliente"
+                                st.query_params["page"] = "cliente"
                             elif st.session_state['role'] == 'architect':
                                 st.session_state['selected_page'] = "Arquitectos (Marketplace)"
+                                st.query_params["page"] = "arquitectos"
                             elif st.session_state['role'] == 'services':
                                 st.session_state['selected_page'] = "👤 Panel de Proveedor"
+                                st.query_params["page"] = "proveedor"
                             elif st.session_state['role'] == 'owner':
                                 st.session_state['selected_page'] = "🏠 Propietarios"
+                                st.query_params["page"] = "propietarios"
                             elif st.session_state['role'] == 'admin':
                                 st.session_state['selected_page'] = "Intranet"
+                                st.query_params["page"] = "admin"
 
                             st.success(f"¡Bienvenido {st.session_state['user_name']}!")
                             st.rerun()

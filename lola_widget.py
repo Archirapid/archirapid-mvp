@@ -82,7 +82,6 @@ def render_lola():
     """Renderizar Lola con técnica de Contenedor Inyección Directa - Preciso"""
 
     # 1. CSS DE NIVEL SUPERIOR (Fuera del iframe, fija el componente)
-    # Selector agresivo: div[data-testid="stHtml"] iframe para garantizar que se detecte
     st.markdown("""
         <style>
             /* Fijar el iframe de Lola en la esquina inferior derecha */
@@ -95,6 +94,23 @@ def render_lola():
                 z-index: 2147483647 !important;
                 border: none !important;
                 background: transparent !important;
+                pointer-events: none !important;
+            }
+
+            /* Solo el contenido visible (botón y panel) recibe clicks */
+            iframe[srcdoc*="lola-fab"]:hover {
+                pointer-events: auto !important;
+            }
+
+            /* En móvil: reducir tamaño para no bloquear scroll */
+            @media (max-width: 768px) {
+                iframe[srcdoc*="lola-fab"] {
+                    width: 60px !important;
+                    height: 60px !important;
+                    bottom: 12px !important;
+                    right: 12px !important;
+                    pointer-events: auto !important;
+                }
             }
         </style>
     """, unsafe_allow_html=True)
