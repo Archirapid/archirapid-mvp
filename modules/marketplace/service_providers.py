@@ -12,6 +12,19 @@ from datetime import datetime, timedelta
 from .utils import db_conn
 from werkzeug.security import generate_password_hash
 
+# ── Provincias de cobertura para matching ─────────────────────────────────────
+_PROVINCIAS_ESPAÑA = [
+    "Álava", "Albacete", "Alicante", "Almería", "Asturias", "Ávila",
+    "Badajoz", "Barcelona", "Burgos", "Cáceres", "Cádiz", "Cantabria",
+    "Castellón", "Ciudad Real", "Córdoba", "Cuenca", "Girona", "Granada",
+    "Guadalajara", "Guipúzcoa", "Huelva", "Huesca", "Islas Baleares",
+    "Jaén", "La Coruña", "La Rioja", "Las Palmas", "León", "Lérida",
+    "Lugo", "Madrid", "Málaga", "Murcia", "Navarra", "Ourense", "Palencia",
+    "Pontevedra", "Salamanca", "Santa Cruz de Tenerife", "Segovia",
+    "Sevilla", "Soria", "Tarragona", "Teruel", "Toledo", "Valencia",
+    "Valladolid", "Vizcaya", "Zamora", "Zaragoza", "Ceuta", "Melilla",
+]
+
 # ── Especialidades disponibles ─────────────────────────────────────────────────
 _ESPECIALIDADES = [
     "constructor",
@@ -773,13 +786,33 @@ def show_service_provider_panel():
     # ── TAB 3: MI PERFIL ──────────────────────────────────────────────────────
     with tab3:
         st.markdown("#### Editar perfil y tarifas")
+
+        # Cargar provincias de cobertura actuales (fuera del form para usar como default)
+        _prov_conn = db_conn()
+        try:
+            _prov_row = _prov_conn.execute(
+                "SELECT provincias_cobertura FROM service_providers WHERE id = ?", (pid,)
+            ).fetchone()
+            _provincias_actuales = json.loads(_prov_row[0] or "[]") if _prov_row and _prov_row[0] else []
+        except Exception:
+            _provincias_actuales = []
+        finally:
+            _prov_conn.close()
+
         with st.form("edit_sp_profile"):
             ec1, ec2 = st.columns(2)
             with ec1:
                 new_desc     = st.text_area("Descripción profesional", value=description or "", height=100, key="ep_desc")
-                new_area     = st.text_input("Provincias donde trabajas", value=service_area or "", key="ep_area")
+                new_area     = st.text_input("Provincias donde trabajas (texto libre)", value=service_area or "", key="ep_area")
                 new_phone    = st.text_input("Teléfono", value=phone or "", key="ep_phone")
                 new_certs    = st.text_area("Certificaciones", value=certifications or "", key="ep_certs")
+                new_provincias = st.multiselect(
+                    "Provincias de cobertura (matching automático)",
+                    options=_PROVINCIAS_ESPAÑA,
+                    default=[p for p in _provincias_actuales if p in _PROVINCIAS_ESPAÑA],
+                    key="ep_provincias",
+                    help="Los clientes de estas provincias te verán automáticamente en su panel.",
+                )
             with ec2:
                 new_nm = st.number_input("€/m² SIN materiales",  0.0, 5000.0, float(p_nm),  50.0, key="ep_nm")
                 new_wm = st.number_input("€/m² CON materiales",  0.0, 5000.0, float(p_wm),  50.0, key="ep_wm")
@@ -800,10 +833,11 @@ def show_service_provider_panel():
                         UPDATE service_providers
                         SET specialty=?, specialties=?, price_per_m2_no_mat=?,
                             price_per_m2_with_mat=?, description=?, service_area=?,
-                            phone=?, address=?, certifications=?
+                            phone=?, address=?, certifications=?, provincias_cobertura=?
                         WHERE id=?
                     """, (sp_new, json.dumps(new_esp), new_nm, new_wm,
-                          new_desc, new_area, new_phone, new_addr, new_certs, pid))
+                          new_desc, new_area, new_phone, new_addr, new_certs,
+                          json.dumps(new_provincias), pid))
                     conn.commit()
                     conn.close()
                     st.success("✅ Perfil actualizado.")

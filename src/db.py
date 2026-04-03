@@ -778,6 +778,16 @@ _PG_DDL = [
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )""",
+    # ── Matching engine ────────────────────────────────────────────────────────
+    """CREATE TABLE IF NOT EXISTS ofertas_matching (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        plot_id INTEGER,
+        email_profesional TEXT NOT NULL,
+        provincia TEXT,
+        timestamp_generacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        contactado INTEGER DEFAULT 0,
+        contratado INTEGER DEFAULT 0
+    )""",
 ]
 
 _PG_INDEXES = [
@@ -812,6 +822,9 @@ _PG_INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_proyectos_tfg_activo ON proyectos_tfg(activo)",
     "CREATE INDEX IF NOT EXISTS idx_tarifas_email ON tarifas_profesionales(email)",
     "CREATE INDEX IF NOT EXISTS idx_tarifas_servicio ON tarifas_profesionales(servicio)",
+    # ── Matching engine ────────────────────────────────────────────────────────
+    "CREATE INDEX IF NOT EXISTS idx_ofertas_plot ON ofertas_matching(plot_id)",
+    "CREATE INDEX IF NOT EXISTS idx_ofertas_profesional ON ofertas_matching(email_profesional)",
 ]
 
 _PG_PREFAB_SEED = [
@@ -1814,6 +1827,25 @@ def ensure_tables():
         # service_providers: cobertura por provincias
         try:
             c.execute("ALTER TABLE service_providers ADD COLUMN provincias_cobertura TEXT DEFAULT '[]'")
+        except Exception:
+            pass
+
+        # ── Matching engine ────────────────────────────────────────────────
+        c.execute("""CREATE TABLE IF NOT EXISTS ofertas_matching (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            plot_id INTEGER,
+            email_profesional TEXT NOT NULL,
+            provincia TEXT,
+            timestamp_generacion TEXT DEFAULT (datetime('now')),
+            contactado INTEGER DEFAULT 0,
+            contratado INTEGER DEFAULT 0
+        )""")
+        try:
+            c.execute("CREATE INDEX IF NOT EXISTS idx_ofertas_plot ON ofertas_matching(plot_id)")
+        except Exception:
+            pass
+        try:
+            c.execute("CREATE INDEX IF NOT EXISTS idx_ofertas_profesional ON ofertas_matching(email_profesional)")
         except Exception:
             pass
 

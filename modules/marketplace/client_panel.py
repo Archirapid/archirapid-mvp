@@ -15,6 +15,10 @@ except ImportError:
         return db_module.get_conn()
 from modules.marketplace.compatibilidad import get_proyectos_compatibles
 from modules.ai_house_designer import flow as ai_house_flow
+try:
+    from matching_engine import get_ofertas_para_proyecto as _get_ofertas_matching
+except ImportError:
+    _get_ofertas_matching = None
 
 
 def _img_finca(width=250, caption=None):
@@ -204,6 +208,92 @@ def generate_3d_viewer_html(model_url: str, fmt: str = "glb") -> str:
 </script>
 </body>
 </html>'''
+
+def _mostrar_ofertas_profesionales(plot_id: int, provincia: str):
+    """Sección de profesionales disponibles en la zona de la finca del cliente."""
+    if _get_ofertas_matching is None:
+        return
+
+    st.markdown("---")
+    st.subheader("👷 Profesionales disponibles en tu zona")
+    st.caption(
+        "Basado en la ubicación de tu proyecto, estos profesionales "
+        "pueden ayudarte con el visado, dirección de obra o supervisión."
+    )
+
+    if not provincia:
+        st.info("Añade la provincia de tu finca para ver profesionales disponibles.")
+        return
+
+    with st.spinner("Buscando profesionales en tu zona..."):
+        ofertas = _get_ofertas_matching(plot_id, provincia)
+
+    if not ofertas:
+        st.info(
+            f"Aún no hay profesionales registrados en {provincia}. "
+            "Próximamente ampliaremos la red."
+        )
+        return
+
+    for oferta in ofertas:
+        prof   = oferta["profesional"]
+        tarifas = oferta["servicios_disponibles"]
+
+        with st.container():
+            col1, col2 = st.columns([1, 3])
+            with col1:
+                foto = prof.get("foto_url")
+                if foto and isinstance(foto, str) and foto.startswith("http"):
+                    st.image(foto, width=80)
+                elif foto and os.path.exists(foto):
+                    st.image(foto, width=80)
+                else:
+                    st.markdown("👤")
+            with col2:
+                st.markdown(f"**{prof['nombre']}**")
+                if prof.get("especialidad"):
+                    st.caption(prof["especialidad"])
+                if prof.get("ciudad"):
+                    st.caption(f"📍 {prof['ciudad']}")
+
+            if tarifas:
+                st.markdown("**Servicios y tarifas:**")
+                for t in tarifas:
+                    linea = f"- {t['label']}: **{t['precio']}€**"
+                    if t.get("descripcion"):
+                        linea += f" — {t['descripcion']}"
+                    st.markdown(linea)
+            else:
+                st.caption("Consultar tarifas directamente.")
+
+            if st.button(
+                f"📩 Contactar con {prof['nombre'].split()[0]}",
+                key=f"match_contactar_{prof['id']}_{plot_id}",
+            ):
+                _registrar_contacto_matching(prof["email"], plot_id)
+                st.success(
+                    f"Solicitud enviada a {prof['nombre']}. Te contactará en breve."
+                )
+
+            st.markdown("---")
+
+
+def _registrar_contacto_matching(email_profesional: str, plot_id: int):
+    """Marca en BD que el cliente contactó con este profesional vía matching."""
+    try:
+        conn = db_conn()
+        try:
+            conn.execute("""
+                UPDATE ofertas_matching
+                SET contactado = 1
+                WHERE plot_id = ? AND email_profesional = ?
+            """, (plot_id, email_profesional))
+            conn.commit()
+        finally:
+            conn.close()
+    except Exception:
+        pass
+
 
 def _show_mls_reserva_panel(client_email: str, finca_id: str) -> None:
     """Panel post-reserva para clientes que vienen del pin naranja MLS."""
@@ -1856,6 +1946,19 @@ def show_buyer_panel(client_email):
                 show_mis_transacciones(client_email, plot_data)
             elif st.session_state.get('show_documentacion', False):
                 show_documentacion(client_email, plot_data, reservation)
+
+            # ── Profesionales disponibles en tu zona (matching automático) ──
+            _prov_conn = db_conn()
+            try:
+                _prov_row = _prov_conn.execute(
+                    "SELECT province FROM plots WHERE id = ?", (plot_data[0],)
+                ).fetchone()
+                _provincia_finca = (_prov_row[0] or "") if _prov_row else ""
+            except Exception:
+                _provincia_finca = ""
+            finally:
+                _prov_conn.close()
+            _mostrar_ofertas_profesionales(plot_id=plot_data[0], provincia=_provincia_finca)
 
     # Si no tiene finca adquirida, mostrar mensaje
     else:
