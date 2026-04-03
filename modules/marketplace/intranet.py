@@ -70,11 +70,11 @@ def main():
     except Exception:
         pass
 
-    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10, tab11 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10, tab11, tab12 = st.tabs([
         "📋 Gestión de Fincas", "🏗️ Gestión de Proyectos", "💰 Ventas y Transacciones",
         "📞 Consultas", "🛠️ Profesionales", "⚙️ Admin", "🎯 Waitlist", "📬 Actividad",
         f"📊 Analytics{_leads_nuevos_badge}", "🏢 MLS — Inmobiliarias",
-        "⚖️ Disclaimers Legales",
+        "⚖️ Disclaimers Legales", "🎓 Estudiantes",
     ])
 
     with tab1:
@@ -2403,3 +2403,144 @@ Obtén el token creando un bot con @BotFather en Telegram.
 
         except Exception as _eh:
             st.warning(f"Error sección Disclaimers: {_eh}")
+
+    with tab12:
+        try:
+            _admin_estudiantes_tab()
+        except Exception as _eh12:
+            st.warning(f"Error sección Estudiantes: {_eh12}")
+
+# ─── ADMIN ESTUDIANTES ────────────────────────────────────────────────────────
+
+def _admin_estudiantes_tab():
+    st.header("🎓 Gestión de Estudiantes")
+
+    tab_reg, tab_proy = st.tabs(["Solicitudes de registro", "Proyectos pendientes"])
+
+    with tab_reg:
+        _admin_solicitudes_estudiantes()
+
+    with tab_proy:
+        _admin_proyectos_tfg()
+
+
+def _admin_solicitudes_estudiantes():
+    conn = db_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT id, email, nombre_completo, universidad, año_tfg,
+                   ciudad, estado, hash_autorizacion, pdf_autorizacion_url, created_at
+            FROM estudiantes
+            ORDER BY
+                CASE estado WHEN 'pendiente' THEN 0 WHEN 'aprobado' THEN 1 ELSE 2 END,
+                created_at DESC
+        """)
+        rows = cur.fetchall()
+    finally:
+        conn.close()
+
+    pendientes = [r for r in rows if r[6] == "pendiente"]
+    st.metric("Pendientes de revisión", len(pendientes))
+
+    for r in rows:
+        id_, email, nombre, uni, año, ciudad, estado, hash_val, pdf_url, fecha = (
+            r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], r[8], r[9]
+        )
+        icono = "⏳" if estado == "pendiente" else ("✅" if estado == "aprobado" else "❌")
+        with st.expander(f"{icono} {nombre} — {uni} ({estado})"):
+            st.write(f"**Email:** {email}")
+            st.write(f"**Universidad:** {uni} | **Año TFG:** {año} | **Ciudad:** {ciudad}")
+            st.write(f"**Registrado:** {str(fecha)[:10]}")
+            if hash_val:
+                st.caption(f"SHA-256: {str(hash_val)[:32]}...")
+            if pdf_url:
+                st.markdown(f"[📄 Ver autorización firmada]({pdf_url})")
+
+            if estado == "pendiente":
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.button("✅ Aprobar", key=f"apr_est_{id_}"):
+                        _cambiar_estado_estudiante(id_, "aprobado")
+                        st.rerun()
+                with col2:
+                    if st.button("❌ Rechazar", key=f"rec_est_{id_}"):
+                        _cambiar_estado_estudiante(id_, "rechazado")
+                        st.rerun()
+
+
+def _admin_proyectos_tfg():
+    conn = db_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT p.id, p.titulo, p.email_estudiante, p.precio_venta,
+                   p.modalidad_venta, p.tipologia, p.provincia,
+                   p.estado, p.archivo_planos_url, p.imagen_portada_url,
+                   p.hash_documento, p.created_at
+            FROM proyectos_tfg p
+            ORDER BY
+                CASE p.estado WHEN 'pendiente' THEN 0 WHEN 'aprobado' THEN 1 ELSE 2 END,
+                p.created_at DESC
+        """)
+        rows = cur.fetchall()
+    finally:
+        conn.close()
+
+    pendientes = [r for r in rows if r[7] == "pendiente"]
+    st.metric("Proyectos pendientes", len(pendientes))
+
+    for r in rows:
+        id_, titulo, email, precio, modalidad, tipologia, provincia, estado, \
+            url_planos, url_portada, hash_doc, fecha = (
+                r[0], r[1], r[2], r[3], r[4], r[5], r[6],
+                r[7], r[8], r[9], r[10], r[11]
+            )
+        icono = "⏳" if estado == "pendiente" else ("✅" if estado == "aprobado" else "❌")
+        with st.expander(f"{icono} {titulo} — {precio}€ ({estado})"):
+            st.write(f"**Estudiante:** {email}")
+            st.write(f"**Tipología:** {tipologia} | **Provincia:** {provincia}")
+            st.write(f"**Modalidad:** {modalidad} | **Precio:** {precio}€")
+            st.write(f"**Subido:** {str(fecha)[:10]}")
+            if hash_doc:
+                st.caption(f"SHA-256: {str(hash_doc)[:32]}...")
+            if url_planos:
+                st.markdown(f"[📐 Ver planos]({url_planos})")
+
+            if estado == "pendiente":
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.button("✅ Aprobar y publicar", key=f"apr_proy_{id_}"):
+                        _cambiar_estado_proyecto(id_, "aprobado")
+                        st.rerun()
+                with col2:
+                    if st.button("❌ Rechazar", key=f"rec_proy_{id_}"):
+                        _cambiar_estado_proyecto(id_, "rechazado")
+                        st.rerun()
+
+
+def _cambiar_estado_estudiante(id_: int, nuevo_estado: str):
+    conn = db_conn()
+    try:
+        conn.execute("""
+            UPDATE estudiantes
+            SET estado = ?, approved_at = datetime('now')
+            WHERE id = ?
+        """, (nuevo_estado, id_))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def _cambiar_estado_proyecto(id_: int, nuevo_estado: str):
+    activo = 1 if nuevo_estado == "aprobado" else 0
+    conn = db_conn()
+    try:
+        conn.execute("""
+            UPDATE proyectos_tfg
+            SET estado = ?, activo = ?, approved_at = datetime('now')
+            WHERE id = ?
+        """, (nuevo_estado, activo, id_))
+        conn.commit()
+    finally:
+        conn.close()

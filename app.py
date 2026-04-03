@@ -1148,6 +1148,7 @@ _SLUG_TO_PAGE = {
     "proveedor":     "👤 Panel de Proveedor",
     "registro-pro":  "📝 Registro de Proveedor de Servicios",
     "mls":           "🏢 Inmobiliarias MLS",
+    "estudiantes":   "🎓 Estudiantes",
 }
 _url_slug = st.query_params.get("page", "")
 # ?page=login → mostrar formulario de login genérico en home
@@ -1504,6 +1505,7 @@ PAGES = {
     "Iniciar Sesión": ("modules.marketplace.auth", "show_login"),
     "Registro de Usuario": ("modules.marketplace.auth", "show_registration"),
     "💬 Lola": ("modules.marketplace.virtual_assistant", "main"),
+    "🎓 Estudiantes": ("estudiantes", "mostrar_modulo_estudiantes"),
 }
 PAGES = list(PAGES.keys())
 
@@ -1708,6 +1710,7 @@ _PAGE_TO_SLUG = {
     "👤 Panel de Proveedor":                 "proveedor",
     "📝 Registro de Proveedor de Servicios": "registro-pro",
     "🏢 Inmobiliarias MLS":                  "mls",
+    "🎓 Estudiantes":                        "estudiantes",
 }
 _cur_page = st.session_state.get('selected_page', '')
 _keep_nav_params = {"selected_plot", "selected_project_v2", "selected_prefab"}
@@ -2473,5 +2476,14 @@ elif st.session_state.get('selected_page') == "_mls_reset_password":
     with st.container():
         from modules.mls.mls_portal import show_mls_reset_password
         show_mls_reset_password(st.session_state.get("mls_reset_token", ""))
+
+elif st.session_state.get('selected_page') == "🎓 Estudiantes":
+    st.components.v1.html(
+        "<script>window.parent.document.querySelector('section.main').scrollTo(0,0);</script>",
+        height=0,
+    )
+    with st.container():
+        from estudiantes import mostrar_modulo_estudiantes
+        mostrar_modulo_estudiantes()
 
 
