@@ -42,16 +42,16 @@ def main():
     else:
         # SOLO ACCESO CON CONTRASEÑA DE ADMIN
         password = st.text_input("Contraseña de Acceso Administrativo", type="password")
-        if password != _admin_pw:
-            if password:  # solo mostrar warning si ya escribió algo
-                st.warning("🔒 Contraseña incorrecta.")
+        if st.button("🔐 Acceder", key="admin_login_btn", type="primary", use_container_width=True):
+            if password == _admin_pw:
+                st.session_state["rol"] = "admin"
+                st.query_params["admin_token"] = _valid_token
+                st.rerun()
             else:
-                st.info("🔒 Acceso restringido. Solo personal autorizado de ARCHIRAPID.")
-            return
-        st.session_state["rol"] = "admin"
-        # Inyectar token en URL para que la sesión sobreviva reinicios
-        st.query_params["admin_token"] = _valid_token
-        st.rerun()
+                st.error("🔒 Contraseña incorrecta.")
+        elif not password:
+            st.info("🔒 Acceso restringido. Solo personal autorizado de ARCHIRAPID.")
+        return
 
     # PANEL DE GESTIÓN INTERNA
     # Badge en Analytics: cuenta leads MLS nuevos para alertar al admin
@@ -535,7 +535,7 @@ def main():
             _providers5 = _conn5.execute("""
                 SELECT id, name, email, company, specialty, experience_years,
                        service_area, is_featured, featured_until, featured_plan,
-                       created_at
+                       created_at, active
                 FROM service_providers ORDER BY is_featured DESC, name
             """).fetchall()
             _conn5.close()
@@ -546,20 +546,23 @@ def main():
                 # KPIs
                 _n_feat = sum(1 for p in _providers5 if p[7])
                 _n_free = len(_providers5) - _n_feat
-                _k1, _k2, _k3 = st.columns(3)
+                _n_blocked = sum(1 for p in _providers5 if not p[11])
+                _k1, _k2, _k3, _k4 = st.columns(4)
                 _k1.metric("👷 Total constructores", len(_providers5))
                 _k2.metric("⭐ Destacados (€99/mes)", _n_feat,
                            delta=f"€{_n_feat*99}/mes MRR")
                 _k3.metric("🆓 Plan gratuito", _n_free)
+                _k4.metric("🚫 Bloqueados", _n_blocked)
 
                 st.markdown("---")
-                st.markdown("**Gestionar planes Destacado:**")
+                st.caption("Gestiona el estado de cada profesional: activar Destacado, aprobar, bloquear o eliminar.")
 
                 for _p5 in _providers5:
                     (_pid5, _name5, _email5, _comp5, _spec5, _exp5,
-                     _area5, _feat5, _funtil5, _fplan5, _cat5) = _p5
+                     _area5, _feat5, _funtil5, _fplan5, _cat5, _active5) = _p5
+                    _status_icon = "🟢" if _active5 else "🔴"
                     _badge = "⭐ DESTACADO" if _feat5 else "🆓 Gratuito"
-                    with st.expander(f"{_badge} · {_name5} ({_email5}) — {_area5}"):
+                    with st.expander(f"{_status_icon} {_badge} · {_name5} ({_email5}) — {_area5}"):
                         _ci1, _ci2 = st.columns(2)
                         with _ci1:
                             st.markdown(f"""
@@ -569,11 +572,14 @@ def main():
   <b>Experiencia:</b> {_exp5} años<br>
   <b>Zona:</b> {_area5 or '—'}<br>
   <b>Plan solicitado:</b> {_fplan5 or 'free'}<br>
-  <b>Registrado:</b> {(_cat5 or '')[:10]}
+  <b>Registrado:</b> {(_cat5 or '')[:10]}<br>
+  <b>Estado:</b> {'✅ Activo' if _active5 else '🚫 Bloqueado'}
 </div>""", unsafe_allow_html=True)
                         with _ci2:
+                            # ── Destacado ──
+                            st.markdown("**Plan Destacado**", help="Marca esta casilla para conceder acceso Destacado (pagado o cortesía)")
                             _new_feat = st.checkbox(
-                                "⭐ Activar/desactivar Destacado",
+                                "Activar Destacado (€99/mes o cortesía)",
                                 value=bool(_feat5),
                                 key=f"feat_{_pid5}"
                             )
@@ -581,25 +587,73 @@ def main():
                                 "Válido hasta (YYYY-MM-DD)",
                                 value=_funtil5 or "",
                                 key=f"until_{_pid5}",
-                                placeholder="2026-04-09"
+                                placeholder="2026-12-31"
                             )
-                            if st.button(f"💾 Guardar plan", key=f"savefeat_{_pid5}",
-                                         type="primary", use_container_width=True):
+                            if st.button("💾 Guardar Destacado", key=f"savefeat_{_pid5}",
+                                         type="primary", use_container_width=True,
+                                         help="Guarda el estado Destacado y la fecha de validez para este profesional"):
                                 _conn_upd = db_conn()
                                 _conn_upd.execute(
                                     "UPDATE service_providers SET is_featured=?, featured_until=? WHERE id=?",
                                     (int(_new_feat), _new_until or None, _pid5)
                                 )
                                 _conn_upd.commit(); _conn_upd.close()
-                                # Notificar al constructor
                                 try:
                                     from modules.marketplace.email_notify import _send
                                     _status = "ACTIVADO ⭐" if _new_feat else "desactivado"
                                     _send(f"⭐ <b>Plan Destacado {_status}</b>\n{_name5} ({_email5})\nVálido hasta: {_new_until or 'indefinido'}")
                                 except Exception:
                                     pass
-                                st.success(f"✅ Plan de {_name5} actualizado.")
+                                st.success(f"✅ Destacado de {_name5} actualizado.")
                                 st.rerun()
+
+                            st.markdown("---")
+                            # ── Aprobar / Bloquear ──
+                            _bc1, _bc2 = st.columns(2)
+                            with _bc1:
+                                if _active5:
+                                    if st.button("🚫 Bloquear", key=f"block_{_pid5}",
+                                                 use_container_width=True,
+                                                 help="Bloquear acceso — el profesional no podrá entrar a su panel"):
+                                        _cb = db_conn()
+                                        _cb.execute("UPDATE service_providers SET active=0, is_featured=0 WHERE id=?", (_pid5,))
+                                        _cb.commit(); _cb.close()
+                                        st.warning(f"🚫 {_name5} bloqueado.")
+                                        st.rerun()
+                                else:
+                                    if st.button("✅ Aprobar", key=f"approve_{_pid5}",
+                                                 use_container_width=True,
+                                                 help="Aprobar acceso — el profesional podrá usar su panel"):
+                                        _ca = db_conn()
+                                        _ca.execute("UPDATE service_providers SET active=1 WHERE id=?", (_pid5,))
+                                        _ca.commit(); _ca.close()
+                                        st.success(f"✅ {_name5} aprobado.")
+                                        st.rerun()
+                            with _bc2:
+                                if st.button("🗑️ Eliminar", key=f"del_{_pid5}",
+                                             use_container_width=True, type="secondary",
+                                             help="Eliminar permanentemente este profesional y su cuenta de usuario"):
+                                    st.session_state[f"confirm_del_{_pid5}"] = True
+
+                            # Confirmación de eliminación
+                            if st.session_state.get(f"confirm_del_{_pid5}"):
+                                st.error(f"¿Seguro que quieres eliminar a **{_name5}** ({_email5})? Esta acción no se puede deshacer.")
+                                _dc1, _dc2 = st.columns(2)
+                                with _dc1:
+                                    if st.button("❌ Sí, eliminar", key=f"confirm_yes_{_pid5}",
+                                                 type="primary", use_container_width=True):
+                                        _cd = db_conn()
+                                        _cd.execute("DELETE FROM service_providers WHERE id=?", (_pid5,))
+                                        _cd.execute("DELETE FROM users WHERE email=?", (_email5,))
+                                        _cd.commit(); _cd.close()
+                                        st.session_state.pop(f"confirm_del_{_pid5}", None)
+                                        st.success(f"🗑️ {_name5} eliminado.")
+                                        st.rerun()
+                                with _dc2:
+                                    if st.button("↩️ Cancelar", key=f"confirm_no_{_pid5}",
+                                                 use_container_width=True):
+                                        st.session_state.pop(f"confirm_del_{_pid5}", None)
+                                        st.rerun()
 
         except Exception as e:
             st.error(f"Error en Gestión de Profesionales: {e}")

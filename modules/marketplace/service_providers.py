@@ -55,25 +55,19 @@ _ESP_LABELS = {
 # ── DB init (seguro — ALTER TABLE si columna no existe) ────────────────────────
 
 def _is_featured(provider_id: str) -> bool:
-    """True si el constructor tiene plan Destacado vigente."""
+    """True si el constructor tiene plan Destacado vigente (activado por admin o Stripe)."""
     try:
         conn = db_conn()
         row = conn.execute(
-            "SELECT is_featured, featured_until, featured_plan FROM service_providers WHERE id=?",
+            "SELECT is_featured, featured_until FROM service_providers WHERE id=?",
             (provider_id,)
         ).fetchone()
         conn.close()
-        if not row:
+        if not row or not row[0]:
             return False
-        is_feat_flag = row[0]
-        feat_until = row[1]
-        feat_plan = row[2]
-        # featured_plan='destacado' → pagó o seleccionó plan de pago
-        if feat_plan == 'destacado' or is_feat_flag:
-            if feat_until:
-                return datetime.utcnow().isoformat() < feat_until
-            return True
-        return False
+        if row[1]:  # fecha de caducidad
+            return datetime.utcnow().isoformat() < row[1]
+        return bool(row[0])
     except Exception:
         return False
 
@@ -363,7 +357,7 @@ def show_service_provider_panel():
         SELECT id,name,specialty,specialties,company,phone,address,certifications,
                experience_years,service_area,
                price_per_m2_no_mat,price_per_m2_with_mat,description,
-               is_featured,featured_until,featured_plan
+               is_featured,featured_until,featured_plan,active
         FROM service_providers WHERE email=?
     """, (user_email,)).fetchone()
     conn.close()
@@ -376,7 +370,11 @@ def show_service_provider_panel():
      company, phone, address, certifications,
      exp_years, service_area,
      p_nm, p_wm, description,
-     is_feat_db, featured_until, featured_plan) = row
+     is_feat_db, featured_until, featured_plan, sp_active) = row
+
+    if not sp_active:
+        st.error("🚫 Tu cuenta ha sido desactivada. Contacta con hola@archirapid.com para más información.")
+        return
 
     try:
         specialties = json.loads(specialties_json) if specialties_json else [specialty_old]
@@ -400,6 +398,18 @@ def show_service_provider_panel():
   <div>
     <div style="font-weight:800;color:#F59E0B;font-size:13px;">PLAN DESTACADO ACTIVO — €99/mes</div>
     <div style="color:#CBD5E1;font-size:11px;">Bienvenido al plan profesional. Acceso a subastas en tiempo real, solicitudes ilimitadas y presentar ofertas a clientes. Válido hasta {feat_exp}</div>
+  </div>
+</div>""", unsafe_allow_html=True)
+    elif featured_plan == 'destacado':
+        # Seleccionó plan de pago pero admin aún no ha activado
+        st.markdown("""
+<div style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.3);
+            border-radius:10px;padding:10px 16px;margin-bottom:12px;
+            display:flex;align-items:center;gap:10px;">
+  <div style="font-size:1.4rem;">⏳</div>
+  <div>
+    <div style="font-weight:800;color:#F59E0B;font-size:13px;">PLAN DESTACADO — Pendiente de activación</div>
+    <div style="color:#94A3B8;font-size:11px;">Tu plan Destacado está siendo verificado por el equipo de ArchiRapid. Contacta hola@archirapid.com si tienes dudas.</div>
   </div>
 </div>""", unsafe_allow_html=True)
     else:
