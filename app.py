@@ -1276,6 +1276,7 @@ if st.query_params.get("stripe_session") and st.query_params.get("payment") == "
                             del st.query_params["payment"]
                         except Exception:
                             pass
+                        st.query_params["page"] = "cliente"
                         st.rerun()
                 else:
                     _con3 = _sq3.connect("database.db", timeout=15)
