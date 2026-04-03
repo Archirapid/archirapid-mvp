@@ -59,15 +59,21 @@ def _is_featured(provider_id: str) -> bool:
     try:
         conn = db_conn()
         row = conn.execute(
-            "SELECT is_featured, featured_until FROM service_providers WHERE id=?",
+            "SELECT is_featured, featured_until, featured_plan FROM service_providers WHERE id=?",
             (provider_id,)
         ).fetchone()
         conn.close()
-        if not row or not row[0]:
+        if not row:
             return False
-        if row[1]:  # fecha de caducidad
-            return datetime.utcnow().isoformat() < row[1]
-        return bool(row[0])
+        is_feat_flag = row[0]
+        feat_until = row[1]
+        feat_plan = row[2]
+        # featured_plan='destacado' → pagó o seleccionó plan de pago
+        if feat_plan == 'destacado' or is_feat_flag:
+            if feat_until:
+                return datetime.utcnow().isoformat() < feat_until
+            return True
+        return False
     except Exception:
         return False
 
@@ -392,8 +398,8 @@ def show_service_provider_panel():
             display:flex;align-items:center;gap:10px;">
   <div style="font-size:1.4rem;">⭐</div>
   <div>
-    <div style="font-weight:800;color:#F59E0B;font-size:13px;">PLAN DESTACADO ACTIVO</div>
-    <div style="color:#94A3B8;font-size:11px;">Ofertas ilimitadas · Primera posición · Válido hasta {feat_exp}</div>
+    <div style="font-weight:800;color:#F59E0B;font-size:13px;">PLAN DESTACADO ACTIVO — €99/mes</div>
+    <div style="color:#CBD5E1;font-size:11px;">Bienvenido al plan profesional. Acceso a subastas en tiempo real, solicitudes ilimitadas y presentar ofertas a clientes. Válido hasta {feat_exp}</div>
   </div>
 </div>""", unsafe_allow_html=True)
     else:
@@ -434,6 +440,14 @@ def show_service_provider_panel():
   </div>
 </div>
 """, unsafe_allow_html=True)
+
+    # ── Botón cerrar sesión ──────────────────────────────────────────────────
+    if st.button("🚪 Cerrar sesión", key="sp_logout"):
+        for k in ['logged_in', 'user_id', 'user_email', 'role', 'user_name',
+                   'viewing_login', 'login_role', 'selected_page']:
+            st.session_state.pop(k, None)
+        st.query_params.clear()
+        st.rerun()
 
     tab1, tab2, tab3 = st.tabs(["📋 Tablón de Obras", "📨 Mis Ofertas", "👤 Mi Perfil"])
 

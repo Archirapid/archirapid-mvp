@@ -1922,6 +1922,8 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
                             st.session_state['logged_in'] = True
                             st.session_state['viewing_login'] = False
                             st.session_state['show_role_selector'] = False
+                            st.session_state.pop('login_role', None)
+                            st.session_state.pop('_login_show_registro', None)
 
                             # Redirigir según el rol
                             if st.session_state['role'] == 'client':
@@ -1940,7 +1942,6 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
                                 st.session_state['selected_page'] = "Intranet"
                                 st.query_params["page"] = "admin"
 
-                            st.success(f"¡Bienvenido {st.session_state['user_name']}!")
                             st.rerun()
                         else:
                             st.error("Credenciales incorrectas.")
