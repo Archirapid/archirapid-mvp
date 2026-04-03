@@ -94,22 +94,15 @@ def render_lola():
                 z-index: 2147483647 !important;
                 border: none !important;
                 background: transparent !important;
-                pointer-events: none !important;
             }
 
-            /* Solo el contenido visible (botón y panel) recibe clicks */
-            iframe[srcdoc*="lola-fab"]:hover {
-                pointer-events: auto !important;
-            }
-
-            /* En móvil: reducir tamaño para no bloquear scroll */
+            /* Móvil: botón compacto pero visible y tocable */
             @media (max-width: 768px) {
                 iframe[srcdoc*="lola-fab"] {
-                    width: 60px !important;
-                    height: 60px !important;
+                    width: 140px !important;
+                    height: 52px !important;
                     bottom: 12px !important;
                     right: 12px !important;
-                    pointer-events: auto !important;
                 }
             }
         </style>
@@ -183,7 +176,7 @@ INSTRUCCIONES:
                 right: 0;
                 width: auto;
                 height: 50px;
-                border-radius: 50px 0 0 0;
+                border-radius: 25px;
                 background: linear-gradient(135deg, #1E3A5F, #2563EB);
                 border: 1px solid rgba(255,255,255,.18);
                 cursor: pointer;
