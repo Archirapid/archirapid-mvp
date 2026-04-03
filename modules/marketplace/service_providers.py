@@ -8,7 +8,7 @@ Panel de Proveedores / Constructores — ArchiRapid
 import streamlit as st
 import sqlite3
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from .utils import db_conn
 from werkzeug.security import generate_password_hash
 
@@ -467,15 +467,16 @@ def show_service_provider_panel():
                 ORDER BY created_at DESC
             """).fetchall()
         else:
+            cutoff_24h = (datetime.utcnow() - timedelta(hours=24)).strftime('%Y-%m-%d %H:%M:%S')
             tablon_rows = conn.execute("""
                 SELECT id,client_name,project_name,province,style,total_area,total_cost,
                        coste_m2,budget_json,created_at,
                        COALESCE(partidas_solicitadas,'["todos"]') as partidas_solicitadas,
                        client_email
                 FROM project_tablon WHERE active=1
-                  AND created_at <= datetime('now','-24 hours')
+                  AND created_at <= ?
                 ORDER BY created_at DESC
-            """).fetchall()
+            """, (cutoff_24h,)).fetchall()
         conn.close()
 
         # Filtro local por provincia + especialidad (Fase 2)
