@@ -548,12 +548,26 @@ def main():
                 _n_feat = sum(1 for p in _providers5 if p[7])
                 _n_free = len(_providers5) - _n_feat
                 _n_blocked = sum(1 for p in _providers5 if not p[11])
-                _k1, _k2, _k3, _k4 = st.columns(4)
+                def _kpi_tarifas_activas() -> int:
+                    try:
+                        _tc = db_conn()
+                        try:
+                            _tr = _tc.execute(
+                                "SELECT COUNT(*) FROM tarifas_profesionales WHERE activo = 1"
+                            ).fetchone()
+                            return _tr[0] if _tr else 0
+                        finally:
+                            _tc.close()
+                    except Exception:
+                        return 0
+
+                _k1, _k2, _k3, _k4, _k5 = st.columns(5)
                 _k1.metric("👷 Total constructores", len(_providers5))
                 _k2.metric("⭐ Destacados (€99/mes)", _n_feat,
                            delta=f"€{_n_feat*99}/mes MRR")
                 _k3.metric("🆓 Plan gratuito", _n_free)
                 _k4.metric("🚫 Bloqueados", _n_blocked)
+                _k5.metric("💶 Tarifas activas", _kpi_tarifas_activas())
 
                 st.markdown("---")
                 st.caption("Gestiona el estado de cada profesional: activar Destacado, aprobar, bloquear o eliminar.")

@@ -472,7 +472,7 @@ def show_service_provider_panel():
         st.query_params.clear()
         st.rerun()
 
-    tab1, tab2, tab3 = st.tabs(["📋 Tablón de Obras", "📨 Mis Ofertas", "👤 Mi Perfil"])
+    tab1, tab2, tab3, tab4 = st.tabs(["📋 Tablón de Obras", "📨 Mis Ofertas", "👤 Mi Perfil", "💶 Mis tarifas"])
 
     # ── TAB 1: TABLÓN DE OBRAS ────────────────────────────────────────────────
     with tab1:
@@ -893,6 +893,15 @@ def show_service_provider_panel():
                     pass
                 st.success("✅ Solicitud enviada. El equipo ArchiRapid te contactará en menos de 24h para activar tu plan.")
                 st.balloons()
+
+    # ── TAB 4: MIS TARIFAS ────────────────────────────────────────────────────
+    with tab4:
+        try:
+            from estudiantes import _mostrar_tarifas_profesional as _mtf
+        except ImportError:
+            st.error("No se pudo cargar el módulo de tarifas.")
+        else:
+            _mtf(email=user_email, proveedor_id=pid, tipo="arquitecto")
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────

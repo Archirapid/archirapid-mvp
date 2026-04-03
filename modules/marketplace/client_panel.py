@@ -209,6 +209,39 @@ def generate_3d_viewer_html(model_url: str, fmt: str = "glb") -> str:
 </body>
 </html>'''
 
+def _mostrar_servicios_recomendados(provincia: str):
+    """
+    Muestra servicios profesionales disponibles en la provincia del cliente
+    antes del pago — momento de máxima intención.
+    Nunca bloquea el flujo de pago: try/except total.
+    """
+    if not provincia:
+        return
+    try:
+        from matching_engine import get_profesionales_por_provincia as _gpp
+        profesionales = _gpp(provincia)
+        con_tarifas = [p for p in profesionales if p.get("tarifas")]
+        if not con_tarifas:
+            return
+        st.markdown("---")
+        st.markdown("### 👷 ¿Necesitas validar este proyecto con un arquitecto?")
+        st.caption(
+            f"Profesionales disponibles en {provincia} que trabajan con ArchiRapid. "
+            "Puedes contratarlos directamente desde tu panel."
+        )
+        for prof in con_tarifas[:2]:
+            with st.expander(
+                f"📋 {prof['nombre']} — {prof.get('especialidad', 'Arquitecto')}",
+                expanded=False,
+            ):
+                for t in prof["tarifas"][:3]:
+                    st.markdown(f"- **{t['label']}**: {t['precio']}€")
+                st.caption(f"📍 {prof.get('ciudad', provincia)}")
+        st.markdown("---")
+    except Exception:
+        pass  # Nunca romper el flujo de pago
+
+
 def _mostrar_ofertas_profesionales(plot_id: int, provincia: str):
     """Sección de profesionales disponibles en la zona de la finca del cliente."""
     if _get_ofertas_matching is None:
@@ -1244,6 +1277,24 @@ def show_selected_project_panel(client_email, project_id):
             _success_url = (f"{_base_url}/?selected_project_v2={project_id}"
                             f"&payment=success&stripe_session={{CHECKOUT_SESSION_ID}}")
             _cancel_url  = f"{_base_url}/?selected_project_v2={project_id}"
+
+            # ── Profesionales recomendados antes del pago ─────────────────────
+            _prov_sp = ""
+            try:
+                _pc_sp = db_conn()
+                try:
+                    _pr_sp = _pc_sp.execute("""
+                        SELECT p.province FROM plots p
+                        JOIN reservations r ON r.plot_id = p.id
+                        WHERE r.buyer_email = ? AND r.kind != 'pending'
+                        ORDER BY r.created_at DESC LIMIT 1
+                    """, (client_email,)).fetchone()
+                    _prov_sp = (_pr_sp[0] or "") if _pr_sp else ""
+                finally:
+                    _pc_sp.close()
+            except Exception:
+                _prov_sp = ""
+            _mostrar_servicios_recomendados(_prov_sp)
 
             col1, col2 = st.columns(2)
             with col1:
