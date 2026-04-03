@@ -2604,7 +2604,7 @@ def render_step3():
                         'font-size:12px;color:#1A5276;margin:6px 0;">💡 Planos, memoria técnica y CAD listos para descargar.</div>',
                         unsafe_allow_html=True
                     )
-                    if st.button("Ver proyecto completo →", key="wow_ver_proyecto", type="primary", use_container_width=True):
+                    if st.button("Ver prefiguración completa →", key="wow_ver_proyecto", type="primary", use_container_width=True):
                         st.query_params["selected_project_v2"] = str(_pid)
                         st.rerun()
                 else:
@@ -4096,7 +4096,7 @@ def render_step5_docs():
                  caption=_plan_label_p5, use_container_width=True)
     elif st.session_state.get("current_floor_plan"):
         st.image(st.session_state["current_floor_plan"],
-                 caption="Plano del Paso 2 (pulsa 'Generar' para actualizarlo con tu diseño final)",
+                 caption="Plano del Paso 2 (pulsa 'Generar' para actualizarlo con tu diseño orientativo)",
                  use_container_width=True)
     else:
         st.info("Pulsa 'Generar Plano de Planta' para ver la distribución de tu casa")

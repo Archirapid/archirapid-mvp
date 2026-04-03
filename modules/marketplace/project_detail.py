@@ -246,7 +246,7 @@ def show_project_detail_page(project_id: str):
         st.subheader("💰 Información Económica")
         if project_data['estimated_cost']:
             st.write(f"**Coste de ejecución aproximado:** €{project_data['estimated_cost']:,.0f}")
-        st.write("**Precio descarga proyecto completo:**")
+        st.write("**Precio descarga prefiguración arquitectónica:**")
         st.write(f"• PDF (Memoria completa): €{project_data['price_memoria']}")
         st.write(f"• CAD (Planos editables): €{project_data['price_cad']}")
 
@@ -623,7 +623,7 @@ def show_advanced_project_search(client_email=None):
                 min_value=0, 
                 value=0, 
                 step=10000,
-                help="Precio máximo que estás dispuesto a pagar por el proyecto completo"
+                help="Precio máximo que estás dispuesto a pagar por la prefiguración arquitectónica"
             )
             
             area_deseada = st.number_input(

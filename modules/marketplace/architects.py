@@ -376,7 +376,7 @@ def main():
 
     with tab_estudio:
         st.subheader("🏠 Modo Estudio — Diseño IA para Cualquier Solar")
-        st.write("Genera un proyecto completo con IA para cualquier parcela, sin necesidad de que esté en el marketplace.")
+        st.write("Genera una prefiguración arquitectónica con IA para cualquier parcela, sin necesidad de que esté en el marketplace.")
 
         # Nota de precio contextual (no pricing cards duplicadas)
         if sub_status["active"] and sub_status.get("plan") in ("PRO", "PRO_ANUAL", "ENTERPRISE"):

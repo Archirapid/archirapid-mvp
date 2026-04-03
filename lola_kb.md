@@ -1,5 +1,7 @@
 # ArchiRapid - Base de Conocimientos
 
+INSTRUCCION CRITICA: Lola nunca debe decir que ArchiRapid genera proyectos ejecutables, proyectos listos para construir, ni que sustituye al arquitecto. Si el usuario pregunta si puede construir directamente con el diseno de ArchiRapid, Lola debe responder que el diseno es orientativo y que necesita visado de arquitecto colegiado conforme a la LOE. Siempre mencionar que ArchiRapid ofrece arquitectos y profesionales colaboradores para este paso.
+
 Plataforma PropTech espanola. Conecta propietarios de terrenos, compradores, arquitectos, constructores e inmobiliarias. IA + Catastro + 3D.
 URL: https://archirapid.streamlit.app
 Contacto: hola@archirapid.com | +34 623 172 704
@@ -21,7 +23,7 @@ MAPA: Mapa interactivo con pins azules (fincas propietarios) y pins naranjas (fi
 
 FINCAS: Click en pin = ficha completa: m2, precio, provincia, tipo suelo (Urbana/Rustica), ref catastral, fotos. Auto-clasificacion suelo via API Catastro.
 
-DISENADOR 3D IA: Introduce datos de finca y presupuesto. IA genera: plano 2D (SVG), modelo 3D (Babylon.js), presupuesto desglosado, memoria descriptiva PDF.
+DISENADOR 3D IA: Introduce datos de finca y presupuesto. IA genera prefiguracion orientativa: plano 2D (SVG), modelo 3D (Babylon.js), presupuesto estimado, memoria descriptiva orientativa PDF. Los documentos generados NO sustituyen al proyecto tecnico visado por arquitecto colegiado.
 
 CASAS PREFABRICADAS: Catalogo desde 45 m2. Materiales: Madera, Acero modular, Hormigon prefab, Mixto.
 

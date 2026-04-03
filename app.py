@@ -246,7 +246,7 @@ def show_selected_project_panel_v2(client_email: str, project_id: str):
         st.subheader("💰 Información Económica")
         if project_data['estimated_cost']:
             st.write(f"**Coste de ejecución aproximado:** €{project_data['estimated_cost']:,.0f}")
-        st.write("**Precio descarga proyecto completo:**")
+        st.write("**Precio descarga prefiguración arquitectónica:**")
         st.write(f"• 📄 PDF (Memoria completa): €{project_data['price_memoria']}")
         st.write(f"• 🖥️ CAD (Planos editables): €{project_data['price_cad']}")
         total_price = project_data['price_memoria'] + project_data['price_cad']
@@ -779,7 +779,7 @@ def show_advanced_project_search_v2(client_email):
                 min_value=0,
                 value=0,
                 step=10000,
-                help="Precio máximo que estás dispuesto a pagar por el proyecto completo"
+                help="Precio máximo que estás dispuesto a pagar por la prefiguración arquitectónica"
             )
 
             area_deseada = st.number_input(
@@ -840,7 +840,7 @@ def show_advanced_project_search_v2(client_email):
                     min_value=0,
                     value=0,
                     step=10000,
-                    help="Precio máximo que estás dispuesto a pagar por el proyecto completo"
+                    help="Precio máximo que estás dispuesto a pagar por la prefiguración arquitectónica"
                 )
 
                 area_deseada = st.number_input(
@@ -2117,7 +2117,7 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
     <span style="font-size:22px;">📐</span>
     <div>
       <div style="font-weight:800;color:#0D1B2A;font-size:0.95em;">Soy Arquitecto</div>
-      <div style="color:#64748B;font-size:0.78em;">Comparte proyectos ejecutables y conecta con clientes reales.</div>
+      <div style="color:#64748B;font-size:0.78em;">Comparte propuestas de diseño y conecta con clientes reales.</div>
     </div>
   </div>
 </div>""", unsafe_allow_html=True)

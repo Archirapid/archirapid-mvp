@@ -129,7 +129,7 @@ def render_landing():
         <div class="ar-card ar-card-arch">
             <div class="ar-icon ar-icon-arch">📐</div>
             <div class="ar-card-title">Soy Arquitecto</div>
-            <div class="ar-card-text">Comparte proyectos ejecutables y conecta con clientes reales de forma profesional.</div>
+            <div class="ar-card-text">Comparte propuestas de diseño y conecta con clientes reales de forma profesional.</div>
         </div>
         """, unsafe_allow_html=True)
         st.markdown('<div class="ar-btn-arch">', unsafe_allow_html=True)

@@ -89,7 +89,8 @@ def mostrar_modulo_estudiantes():
     registrado o nuevo y muestra la pantalla correspondiente.
     """
     st.title("🎓 Portal de Estudiantes — Proyectos TFG/TFM")
-    st.caption("Publica tu proyecto final y recibe el 60% de cada venta.")
+    st.caption("Publica tu propuesta final orientativa y recibe el 60% de cada venta.")
+    st.caption("Los proyectos TFG/TFM son trabajos académicos orientativos — cualquier uso constructivo requiere visado colegial.")
 
     email = st.session_state.get("user_email", "") or st.session_state.get("client_email", "")
 
@@ -272,7 +273,8 @@ def _mostrar_form_subir_proyecto(estudiante: dict):
     st.subheader("➕ Subir proyecto TFG/TFM")
     st.caption(
         "Solo se acepta UN proyecto activo por estudiante. "
-        "Debe ser ejecutable y haber sido presentado en tu universidad."
+        "Debe haber sido presentado y evaluado favorablemente en tu universidad "
+        "(trabajo académico orientativo — requiere visado colegial para uso constructivo)."
     )
 
     with st.form("form_subir_proyecto"):
