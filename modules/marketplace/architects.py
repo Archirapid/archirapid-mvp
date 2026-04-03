@@ -749,10 +749,14 @@ def main():
      with tab_proyectos:
         st.subheader("Tu Catálogo")
         # Query simple manual
-        conn = db.get_conn()
+        conn = db_conn()
         import pandas as pd
         try:
-            df = pd.read_sql_query("SELECT id, title, area_m2, price, m2_parcela_minima FROM projects WHERE architect_id=?", conn, params=(st.session_state["arch_id"],))
+            cur = conn.cursor()
+            cur.execute("SELECT id, title, area_m2, price, m2_parcela_minima FROM projects WHERE architect_id=?", (st.session_state["arch_id"],))
+            rows = cur.fetchall()
+            cols = [d[0] for d in cur.description] if cur.description else []
+            df = pd.DataFrame(rows, columns=cols) if rows else pd.DataFrame(columns=cols)
             if not df.empty:
                 st.dataframe(df)
             else:
@@ -771,12 +775,20 @@ def main():
             from modules.marketplace import ai_engine as _ai_eng_match
             # 1. Traer mis proyectos
             try:
-                conn = db.get_conn()
-                my_projects = pd.read_sql_query("SELECT id, title, m2_parcela_minima FROM projects WHERE architect_id=?", conn, params=(st.session_state["arch_id"],))
-                
+                import pandas as pd
+                conn = db_conn()
+                cur = conn.cursor()
+                cur.execute("SELECT id, title, m2_parcela_minima FROM projects WHERE architect_id=?", (st.session_state["arch_id"],))
+                rows_p = cur.fetchall()
+                cols_p = [d[0] for d in cur.description] if cur.description else []
+                my_projects = pd.DataFrame(rows_p, columns=cols_p) if rows_p else pd.DataFrame(columns=cols_p)
+
                 # 2. Traer todos los solares
                 # Nota: En prod, hacer esto con SQL join espacial o filtros más inteligentes
-                all_plots = pd.read_sql_query("SELECT id, title, m2, province, price, description FROM plots", conn)
+                cur.execute("SELECT id, title, m2, province, price, description FROM plots")
+                rows_pl = cur.fetchall()
+                cols_pl = [d[0] for d in cur.description] if cur.description else []
+                all_plots = pd.DataFrame(rows_pl, columns=cols_pl) if rows_pl else pd.DataFrame(columns=cols_pl)
                 
                 if my_projects.empty:
                     st.info("Sube proyectos primero para encontrar solares compatibles.")

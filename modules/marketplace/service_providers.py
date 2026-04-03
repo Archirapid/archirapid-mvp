@@ -329,12 +329,12 @@ def show_service_provider_registration():
                 if _plan == "destacado":
                     # Crear checkout Stripe directamente
                     try:
-                        from modules.stripe_utils import create_destacado_checkout as _cdc
+                        from modules.stripe_utils import create_destacado_checkout as _cdc, _get_base_url as _gbu
                         _s_url, _ = _cdc(
                             provider_id=pid,
                             provider_name=name,
                             provider_email=email,
-                            cancel_url="https://archirapid.streamlit.app/?page=registro_profesional",
+                            cancel_url=_gbu() + "/?page=registro_profesional",
                         )
                         st.success("✅ ¡Registro completado! Completa el pago para activar tu badge ⭐ DESTACADO.")
                         st.markdown(
@@ -757,13 +757,13 @@ def show_service_provider_panel():
   <br><b>Comisión ArchiRapid (3%):</b> <span style="color:#F59E0B;font-weight:700;">€{comision_eur:,.0f}</span>
 </div>""", unsafe_allow_html=True)
                             try:
-                                from modules.stripe_utils import create_comision_checkout as _ccc
+                                from modules.stripe_utils import create_comision_checkout as _ccc, _get_base_url as _gbu2
                                 _cc_url, _ = _ccc(
                                     offer_id=oid,
                                     constructor_email=user_email,
                                     amount_cents=int(comision_eur * 100),
                                     project_name=pname or "Proyecto",
-                                    cancel_url="https://archirapid.streamlit.app/",
+                                    cancel_url=_gbu2() + "/",
                                 )
                                 st.markdown(
                                     f'<a href="{_cc_url}" target="_blank" style="display:inline-block;'

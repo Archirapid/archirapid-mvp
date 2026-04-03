@@ -177,8 +177,13 @@ def get_plot_detail_url(plot_id):
     Construye la URL completa para ver detalles de la finca.
     Apunta a la app Streamlit principal para abrir página completa.
     """
-    # Base URL de Streamlit (ajusta si es diferente)
-    base_url = "http://localhost:8501"
+    try:
+        import streamlit as st
+        host = st.context.headers.get("host", "localhost:8501")
+        is_cloud = "streamlit.app" in host or ("localhost" not in host and "127.0.0.1" not in host)
+        base_url = f"https://{host}" if is_cloud else f"http://{host}"
+    except Exception:
+        base_url = "https://archirapid.streamlit.app"
     return f"{base_url}/?selected_plot={plot_id}"
 
 def extract_cadastral_data(plot):

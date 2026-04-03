@@ -258,14 +258,14 @@ def render_landing():
 
                 folium.Marker([finca.lat, finca.lon], icon=icon).add_to(m_finca)
                 st.markdown(f"### {finca.titulo if hasattr(finca, 'titulo') else p.get('title', 'Finca')}")
-                components.html(m_finca._repr_html_(), height=300)
+                components.html(m_finca.get_root().render(), height=300)
                 st.write(f"**Superficie edificable:** {finca.superficie_edificable:.2f} m²")
                 st.write(f"**Solar virtual:** {finca.solar_virtual}")
                 mostrar_solar_virtual_svg(finca)
                 st.markdown("---")
         else:
             m = folium.Map(location=[40.0, -4.0], zoom_start=5, tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', attr='Esri')
-            components.html(m._repr_html_(), height=700)
+            components.html(m.get_root().render(), height=700)
             st.info("📍 No se encontraron fincas con los filtros seleccionados. Intenta cambiar los criterios de búsqueda.")
     except Exception as e:
         try:
@@ -280,7 +280,7 @@ def render_landing():
         import folium
         import streamlit.components.v1 as components
         m = folium.Map(location=[40.0, -4.0], zoom_start=5, tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', attr='Esri')
-        components.html(m._repr_html_(), height=700)
+        components.html(m.get_root().render(), height=700)
         st.warning("⚠️ Error cargando el mapa. Por favor, recarga la página.")
 
     st.markdown("<hr style='margin:24px 0 16px;border:none;border-top:1px solid #E2E8F0'>", unsafe_allow_html=True)

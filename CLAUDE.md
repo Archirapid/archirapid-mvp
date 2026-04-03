@@ -37,13 +37,15 @@ SaaS PropTech español para diseño arquitectónico con IA. Stack: Streamlit + B
 ## Reglas críticas — NUNCA ignorar
 - Schema de BD en DOS sitios: db.py línea ~613 Y línea ~1352
 - Placeholders: `%s` en PostgreSQL, `?` en SQLite — nunca mezclar
-- NUNCA usar `pd.read_sql_query()` directamente — usar helpers `_read_sql9`, `_read3`, `_read_tab8`
+- NUNCA usar `pd.read_sql_query()` directamente — usar `conn.execute(sql, params)` + construir DataFrame manual con `cur.fetchall()` + `cur.description`. Los helpers `_read_sql9/_read3/_read_tab8` son locales de intranet.py
 - `st.stop()` NUNCA dentro de `try/except Exception`
 - Supabase usa pooler IPv4 — no direct connection
 - `ensure_tables()` wrapeado en `@st.cache_resource`
 - Schema de inmobiliarias incluye ahora: `trial_start_date`, `trial_active`, `trial_expired`
 - **Folium en Streamlit:** usar `m.get_root().render()` — NO `m._repr_html_()`. El `_repr_html_()` envuelve en srcdoc iframe con HTML-encoding, `</body>` no existe en el string externo → scripts inyectados no llegan al iframe
-- **Navegación app.py:** sync URL↔session_state corre en CADA rerun (no solo primera vez). `_SLUG_TO_PAGE` y `_PAGE_TO_SLUG` cubren todos los roles
+- **Navegación app.py:** sync URL↔session_state corre en CADA rerun (no solo primera vez). `_SLUG_TO_PAGE` y `_PAGE_TO_SLUG` cubren todos los roles. "Diseñador de Vivienda" y "Propietario (Gemelo Digital)" son páginas de entrada programática (no sidebar) — intencional
+- **Stripe URLs dinámicas:** usar `_get_base_url()` de `modules/stripe_utils.py` para success_url/cancel_url. NUNCA hardcodear `archirapid.streamlit.app` en Stripe checkouts — rompe local
+- **Conexiones DB:** `conn.execute(sql_con_?)` funciona en ambos entornos: SQLite nativo + PostgreSQL vía `_PostgresConnWrapper.execute()` que adapta `?`→`%s` automáticamente
 
 ## Subagentes disponibles
 - `@agent-babylon-editor` — editor 3D, meshes, layers, instalaciones MEP

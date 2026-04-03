@@ -2882,7 +2882,7 @@ def render_step3():
         ).add_to(_m_map)
 
         st.markdown("### Ubicación de tu proyecto")
-        _cmp.html(_m_map._repr_html_(), height=420)
+        _cmp.html(_m_map.get_root().render(), height=420)
         st.caption(f"Huella {_dim_source} de la casa ({_tw:.1f}m × {_td:.1f}m) sobre imagen satélite de la parcela.")
         st.markdown("---")
 
@@ -3919,7 +3919,7 @@ def render_step4_resumen():
                         icon=_fol.Icon(color="red", icon="home", prefix="fa"),
                         tooltip=_pd.get("title", "Tu parcela")).add_to(_mm)
             st.markdown("### 📍 Ubicación del proyecto")
-            _cv.html(_mm._repr_html_(), height=380)
+            _cv.html(_mm.get_root().render(), height=380)
             st.caption(f"Parcela: {_pd.get('title', '')} · Huella aproximada {_tw:.1f}m × {_td:.1f}m")
             st.markdown("---")
     except Exception:
@@ -4406,12 +4406,13 @@ def _render_estudio_download():
 
     if _stripe_ok and not st.session_state.get("stripe_session_id_estudio"):
         try:
-            from modules.stripe_utils import create_custom_session as _ccs_est
+            from modules.stripe_utils import create_custom_session as _ccs_est, _get_base_url as _gbu_est
+            _base_est = _gbu_est()
             _url_est, _sid_est = _ccs_est(
                 line_items=[{"name": "Descarga Proyecto Modo Estudio", "amount_cents": 1900, "quantity": 1}],
                 client_email=st.session_state.get("arch_email", ""),
-                success_url="https://archirapid.streamlit.app/?estudio_pago=ok",
-                cancel_url="https://archirapid.streamlit.app/?estudio_pago=cancel",
+                success_url=_base_est + "/?estudio_pago=ok",
+                cancel_url=_base_est + "/?estudio_pago=cancel",
                 metadata={"arch_id": arch_id, "mode": "estudio"},
             )
             st.session_state["stripe_session_id_estudio"] = _sid_est
@@ -4622,7 +4623,8 @@ def render_step6_pago():
         # Crear sesión Stripe sólo una vez (almacenada en session_state)
         if _stripe_key_ok and _all_items_6 and not st.session_state.get("stripe_session_id_s6"):
             try:
-                from modules.stripe_utils import create_custom_session as _ccs6
+                from modules.stripe_utils import create_custom_session as _ccs6, _get_base_url as _gbu6
+                _base6 = _gbu6()
                 _stripe_items_6 = [
                     {"name": it["label"][:80], "amount_cents": int(it["precio"] * 100), "quantity": 1}
                     for it in _all_items_6
@@ -4630,8 +4632,8 @@ def render_step6_pago():
                 _s6_url, _s6_sid = _ccs6(
                     line_items=_stripe_items_6,
                     client_email=_client_email_6,
-                    success_url="https://archirapid.streamlit.app/?pago=ok",
-                    cancel_url="https://archirapid.streamlit.app/?pago=cancel",
+                    success_url=_base6 + "/?pago=ok",
+                    cancel_url=_base6 + "/?pago=cancel",
                     metadata={
                         "project": req.get("nombre_proyecto", "ArchiRapid Project"),
                         "total_eur": str(_total_iva_6),

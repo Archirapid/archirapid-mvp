@@ -1988,7 +1988,10 @@ def insert_payment(data: Dict):
 def get_all_plots():
     ensure_tables(); conn = get_conn(); import pandas as pd
     try:
-        df = pd.read_sql_query('SELECT * FROM plots', conn)
+        cur = conn.execute('SELECT * FROM plots')
+        rows = cur.fetchall()
+        cols = [d[0] for d in cur.description] if cur.description else []
+        df = pd.DataFrame(rows, columns=cols) if rows else pd.DataFrame(columns=cols)
     finally:
         conn.close()
     return df
@@ -1998,8 +2001,10 @@ def get_plots_by_owner(email: str):
     conn = get_conn()
     import pandas as pd
     try:
-        # Usamos parameter binding para seguridad
-        df = pd.read_sql_query('SELECT * FROM plots WHERE owner_email = ?', conn, params=(email,))
+        cur = conn.execute('SELECT * FROM plots WHERE owner_email = ?', (email,))
+        rows = cur.fetchall()
+        cols = [d[0] for d in cur.description] if cur.description else []
+        df = pd.DataFrame(rows, columns=cols) if rows else pd.DataFrame(columns=cols)
     finally:
         conn.close()
     return df
@@ -2050,7 +2055,10 @@ def list_fincas_filtradas(provincia: Optional[str], min_surface: float, max_surf
 def get_all_projects():
     ensure_tables(); conn = get_conn(); import pandas as pd
     try:
-        df = pd.read_sql_query('SELECT * FROM projects', conn)
+        cur = conn.execute('SELECT * FROM projects')
+        rows = cur.fetchall()
+        cols = [d[0] for d in cur.description] if cur.description else []
+        df = pd.DataFrame(rows, columns=cols) if rows else pd.DataFrame(columns=cols)
     finally:
         conn.close()
     return df
@@ -2364,7 +2372,10 @@ def insert_proposal(data: Dict):
 def get_proposals_for_plot(plot_id: str):
     ensure_tables(); conn = get_conn(); import pandas as pd
     try:
-        df = pd.read_sql_query('SELECT * FROM proposals WHERE plot_id = ?', conn, params=(plot_id,))
+        cur = conn.execute('SELECT * FROM proposals WHERE plot_id = ?', (plot_id,))
+        rows = cur.fetchall()
+        cols = [d[0] for d in cur.description] if cur.description else []
+        df = pd.DataFrame(rows, columns=cols) if rows else pd.DataFrame(columns=cols)
     finally:
         conn.close()
     return df
@@ -2452,13 +2463,16 @@ def get_additional_services_by_client(client_id: str):
     conn = get_conn()
     import pandas as pd
     try:
-        df = pd.read_sql_query("""
+        cur = conn.execute("""
             SELECT s.*, a.name as architect_name, a.email as architect_email
             FROM additional_services s
             LEFT JOIN architects a ON s.architect_id = a.id
             WHERE s.client_id = ?
             ORDER BY s.created_at DESC
-        """, conn, params=(client_id,))
+        """, (client_id,))
+        rows = cur.fetchall()
+        cols = [d[0] for d in cur.description] if cur.description else []
+        df = pd.DataFrame(rows, columns=cols) if rows else pd.DataFrame(columns=cols)
     finally:
         conn.close()
     return df
@@ -2469,13 +2483,16 @@ def get_additional_services_by_architect(architect_id: str):
     conn = get_conn()
     import pandas as pd
     try:
-        df = pd.read_sql_query("""
+        cur = conn.execute("""
             SELECT s.*, c.name as client_name, c.email as client_email
             FROM additional_services s
             LEFT JOIN clients c ON s.client_id = c.id
             WHERE s.architect_id = ?
             ORDER BY s.created_at DESC
-        """, conn, params=(architect_id,))
+        """, (architect_id,))
+        rows = cur.fetchall()
+        cols = [d[0] for d in cur.description] if cur.description else []
+        df = pd.DataFrame(rows, columns=cols) if rows else pd.DataFrame(columns=cols)
     finally:
         conn.close()
     return df

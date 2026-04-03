@@ -40,9 +40,8 @@ def get_profesionales_por_provincia(provincia: str, servicio: str = None) -> lis
                     sp.name,
                     sp.email,
                     sp.specialty,
-                    sp.city,
+                    sp.address,
                     sp.service_area,
-                    sp.photo_url,
                     t.servicio,
                     t.precio,
                     t.descripcion
@@ -64,10 +63,10 @@ def get_profesionales_por_provincia(provincia: str, servicio: str = None) -> lis
         # Agrupar por profesional con todas sus tarifas
         profesionales: dict = {}
         for row in rows:
-            sp_id, nombre, email, especialidad, ciudad, area, foto, \
+            sp_id, nombre, email, especialidad, direccion, area, \
                 serv, precio, desc_tarifa = (
                     row[0], row[1], row[2], row[3], row[4],
-                    row[5], row[6], row[7], row[8], row[9]
+                    row[5], row[6], row[7], row[8]
                 )
 
             if sp_id not in profesionales:
@@ -76,9 +75,9 @@ def get_profesionales_por_provincia(provincia: str, servicio: str = None) -> lis
                     "nombre":       nombre or "Profesional ArchiRapid",
                     "email":        email,
                     "especialidad": especialidad,
-                    "ciudad":       ciudad,
+                    "ciudad":       direccion,
                     "service_area": area,
-                    "foto_url":     foto,
+                    "foto_url":     None,
                     "tarifas":      [],
                 }
 

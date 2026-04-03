@@ -248,7 +248,7 @@ def show_plot_detail_page(plot_id: str):
                 popup=plot.get('title', 'Finca'),
                 icon=icon
             ).add_to(m)
-            components.html(m._repr_html_(), height=300)
+            components.html(m.get_root().render(), height=300)
         except Exception as e:
             st.error(f"Error mostrando mapa: {e}")
 

@@ -1588,27 +1588,29 @@ def show_buyer_panel(client_email):
     st.header("🛒 Panel de Comprador")
 
     # PRIORIDAD: Buscar finca adquirida por el cliente
+    reservation = None
+    plot_data = None
+    plot_id = None
     conn = db_conn()
-    cursor = conn.cursor()
-
-    # Buscar la finca que el cliente ha comprado/reservado
-    cursor.execute("SELECT * FROM reservations WHERE buyer_email=? AND kind != 'pending' ORDER BY created_at DESC LIMIT 1", (client_email,))
-    reservation = cursor.fetchone()
-
-    if reservation:
-        plot_id = reservation[1]  # plot_id desde reservations
-
-        # Obtener datos completos de la finca
-        cursor.execute("""
-            SELECT id, title, catastral_ref, m2, superficie_edificable, type, vertices_coordenadas,
-                   registry_note_path, price, lat, lon, status, created_at, photo_paths,
-                   owner_name, owner_email, owner_phone, services, type, address
-            FROM plots WHERE id = ?
-        """, (plot_id,))
-
-        plot_data = cursor.fetchone()
+    try:
+        cursor = conn.cursor()
+        # Buscar la finca que el cliente ha comprado/reservado
+        cursor.execute("SELECT * FROM reservations WHERE buyer_email=? AND kind != 'pending' ORDER BY created_at DESC LIMIT 1", (client_email,))
+        reservation = cursor.fetchone()
+        if reservation:
+            plot_id = reservation[1]  # plot_id desde reservations
+            # Obtener datos completos de la finca
+            cursor.execute("""
+                SELECT id, title, catastral_ref, m2, superficie_edificable, type, vertices_coordenadas,
+                       registry_note_path, price, lat, lon, status, created_at, photo_paths,
+                       owner_name, owner_email, owner_phone, services, type, address
+                FROM plots WHERE id = ?
+            """, (plot_id,))
+            plot_data = cursor.fetchone()
+    finally:
         conn.close()
 
+    if reservation:
         if plot_data:
             # SECCIÓN PRINCIPAL: MI PROPIEDAD ADQUIRIDA
             st.subheader("🏡 MI PROPIEDAD ADQUIRIDA")
@@ -2013,7 +2015,6 @@ def show_buyer_panel(client_email):
 
     # Si no tiene finca adquirida, mostrar mensaje
     else:
-        conn.close()
         st.info("🏠 No tienes propiedades adquiridas aún.")
         st.markdown("💡 **¿Quieres comprar una finca?**")
         st.markdown("• Explora el marketplace principal")

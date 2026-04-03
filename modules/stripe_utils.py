@@ -46,6 +46,17 @@ def _get_key():
     return key
 
 
+def _get_base_url() -> str:
+    """Devuelve la URL base de la app (localhost en dev, producción en cloud)."""
+    try:
+        import streamlit as st
+        host = st.context.headers.get("host", "localhost:8501")
+        is_cloud = "streamlit.app" in host or ("localhost" not in host and "127.0.0.1" not in host)
+        return f"https://{host}" if is_cloud else f"http://{host}"
+    except Exception:
+        return "https://archirapid.streamlit.app"
+
+
 def create_checkout_session(product_keys: list, project_id: str, client_email: str,
                              success_url: str, cancel_url: str,
                              extra_quantities: dict = None) -> tuple:
@@ -172,9 +183,9 @@ def create_destacado_checkout(provider_id: str, provider_name: str,
         mode="payment",
         customer_email=provider_email or None,
         success_url=(
-            "https://archirapid.streamlit.app/"
-            "?sp_pago_ok=1&sp_sess={CHECKOUT_SESSION_ID}"
-            f"&sp_pid={provider_id}"
+            _get_base_url()
+            + "/?sp_pago_ok=1&sp_sess={CHECKOUT_SESSION_ID}"
+            + f"&sp_pid={provider_id}"
         ),
         cancel_url=cancel_url,
         metadata={
@@ -208,9 +219,9 @@ def create_comision_checkout(offer_id: str, constructor_email: str,
         mode="payment",
         customer_email=constructor_email or None,
         success_url=(
-            "https://archirapid.streamlit.app/"
-            "?sp_comision_ok=1&sp_sess={CHECKOUT_SESSION_ID}"
-            f"&offer_id={offer_id}"
+            _get_base_url()
+            + "/?sp_comision_ok=1&sp_sess={CHECKOUT_SESSION_ID}"
+            + f"&offer_id={offer_id}"
         ),
         cancel_url=cancel_url,
         metadata={

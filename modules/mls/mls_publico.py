@@ -243,7 +243,7 @@ def show_ficha_publica(finca_id: str) -> None:
                     icon=folium.Icon(color="orange", icon="home", prefix="fa", icon_color="white"),
                     tooltip=titulo,
                 ).add_to(_m)
-                _stc.html(_m._repr_html_(), height=300)
+                _stc.html(_m.get_root().render(), height=300)
                 st.caption("Ubicación aproximada — dirección exacta disponible tras reserva")
             except Exception:
                 st.info("Mapa no disponible.")
@@ -603,7 +603,8 @@ def show_ficha_publica(finca_id: str) -> None:
                             _conn_r.close()
 
                         # 3. Stripe checkout
-                        from modules.stripe_utils import create_reservation_checkout as _crc
+                        from modules.stripe_utils import create_reservation_checkout as _crc, _get_base_url as _gbu_mls
+                        _base_url = _gbu_mls()
                         _s_url, _s_id = _crc(
                             plot_id=finca_id,
                             pending_id=_pending_id,
@@ -612,11 +613,11 @@ def show_ficha_publica(finca_id: str) -> None:
                             amount_cents=20000,  # €200 fijos — señal de reserva MLS
                             plot_ref=catastro_ref or finca_id,
                             success_url=(
-                                "https://archirapid.streamlit.app/"
-                                "?stripe_session={CHECKOUT_SESSION_ID}&payment=success"
-                                f"&mls_finca={finca_id}"
+                                _base_url
+                                + "/?stripe_session={CHECKOUT_SESSION_ID}&payment=success"
+                                + f"&mls_finca={finca_id}"
                             ),
-                            cancel_url=f"https://archirapid.streamlit.app/?mls_ficha={finca_id}",
+                            cancel_url=f"{_base_url}/?mls_ficha={finca_id}",
                         )
                         # Guardar URL Stripe y sesión de cliente
                         st.session_state[_stripe_key]              = _s_url
