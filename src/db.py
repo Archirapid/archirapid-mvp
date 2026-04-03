@@ -707,6 +707,18 @@ _PG_DDL = [
         created_at TEXT,
         respondido_at TEXT
     )""",
+    """CREATE TABLE IF NOT EXISTS disclaimers_aceptados (
+        id SERIAL PRIMARY KEY,
+        user_id TEXT,
+        email TEXT NOT NULL,
+        nombre_completo TEXT NOT NULL,
+        tipo_disclaimer TEXT NOT NULL,
+        timestamp_utc TEXT NOT NULL,
+        hash_sha256 TEXT NOT NULL,
+        pdf_url TEXT,
+        version_texto TEXT NOT NULL DEFAULT 'v1.0-2026',
+        created_at TIMESTAMP DEFAULT NOW()
+    )""",
 ]
 
 _PG_INDEXES = [
@@ -731,6 +743,8 @@ _PG_INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_reservas_mls_finca ON reservas_mls(finca_id)",
     "CREATE INDEX IF NOT EXISTS idx_reservas_mls_estado ON reservas_mls(estado)",
     "CREATE INDEX IF NOT EXISTS idx_firmas_inmo ON firmas_colaboracion(inmo_id)",
+    "CREATE INDEX IF NOT EXISTS idx_disclaimers_email ON disclaimers_aceptados(email)",
+    "CREATE INDEX IF NOT EXISTS idx_disclaimers_tipo ON disclaimers_aceptados(tipo_disclaimer)",
 ]
 
 _PG_PREFAB_SEED = [
@@ -1618,6 +1632,28 @@ def ensure_tables():
                 c.execute(_sql)
             except Exception:
                 pass  # columna ya existe → ignorar
+
+        # Tabla disclaimers legales
+        c.execute("""CREATE TABLE IF NOT EXISTS disclaimers_aceptados (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT,
+            email TEXT NOT NULL,
+            nombre_completo TEXT NOT NULL,
+            tipo_disclaimer TEXT NOT NULL,
+            timestamp_utc TEXT NOT NULL,
+            hash_sha256 TEXT NOT NULL,
+            pdf_url TEXT,
+            version_texto TEXT NOT NULL DEFAULT 'v1.0-2026',
+            created_at TEXT
+        )""")
+        try:
+            c.execute("CREATE INDEX IF NOT EXISTS idx_disclaimers_email ON disclaimers_aceptados(email)")
+        except Exception:
+            pass
+        try:
+            c.execute("CREATE INDEX IF NOT EXISTS idx_disclaimers_tipo ON disclaimers_aceptados(tipo_disclaimer)")
+        except Exception:
+            pass
     _tables_initialized = True
 
 

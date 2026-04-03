@@ -70,10 +70,11 @@ def main():
     except Exception:
         pass
 
-    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10, tab11 = st.tabs([
         "📋 Gestión de Fincas", "🏗️ Gestión de Proyectos", "💰 Ventas y Transacciones",
         "📞 Consultas", "🛠️ Profesionales", "⚙️ Admin", "🎯 Waitlist", "📬 Actividad",
         f"📊 Analytics{_leads_nuevos_badge}", "🏢 MLS — Inmobiliarias",
+        "⚖️ Disclaimers Legales",
     ])
 
     with tab1:
@@ -2354,3 +2355,51 @@ Obtén el token creando un bot con @BotFather en Telegram.
                 st.info("No hay inmobiliarias con trial activo.")
         except Exception as _eg:
             st.warning(f"Error sección G: {_eg}")
+
+    with tab11:
+        try:
+            import pandas as pd
+            from modules.marketplace.utils import db_conn as _dc11
+
+            st.subheader("⚖️ Registro de Disclaimers Aceptados")
+
+            _conn11 = _dc11()
+            try:
+                _rows11 = _conn11.execute("""
+                    SELECT email, nombre_completo, tipo_disclaimer,
+                           timestamp_utc, hash_sha256, pdf_url, version_texto
+                    FROM disclaimers_aceptados
+                    ORDER BY timestamp_utc DESC
+                    LIMIT 200
+                """).fetchall()
+            finally:
+                _conn11.close()
+
+            if _rows11:
+                _df11 = pd.DataFrame(
+                    [tuple(r) for r in _rows11],
+                    columns=["Email", "Nombre", "Tipo", "Fecha UTC", "Hash SHA-256", "PDF", "Versión"]
+                )
+                _df11["Hash SHA-256"] = _df11["Hash SHA-256"].str[:20] + "..."
+
+                st.metric("Total aceptaciones registradas", len(_df11))
+
+                _col_a, _col_b = st.columns(2)
+                _col_a.metric("Diseño IA", int((_df11["Tipo"] == "diseno_ia").sum()))
+                _col_b.metric("Documentación/Pago", int((_df11["Tipo"] == "documentacion_pago").sum()))
+
+                st.dataframe(_df11, use_container_width=True)
+
+                _csv11 = _df11.to_csv(index=False).encode("utf-8")
+                st.download_button(
+                    "⬇️ Exportar CSV completo",
+                    _csv11,
+                    "disclaimers_archirapid.csv",
+                    "text/csv",
+                    key="dl_disclaimers_csv"
+                )
+            else:
+                st.info("No hay disclaimers registrados aún.")
+
+        except Exception as _eh:
+            st.warning(f"Error sección Disclaimers: {_eh}")

@@ -2280,7 +2280,14 @@ def render_step3_editor():
             st.session_state["ai_house_step"] = 2
             st.rerun()
         return
-    
+
+    # Disclaimer legal obligatorio antes de acceder al editor 3D
+    from disclaimer_legal import mostrar_disclaimer_y_bloquear as _disclaimer
+    _disc_email = st.session_state.get("user_email") or st.session_state.get("client_email") or ""
+    _disc_uid   = str(st.session_state.get("user_id", ""))
+    if not _disclaimer("diseno_ia", _disc_email, _disc_uid):
+        return
+
     # Botón volver arriba
     if st.button("← Volver al Paso 2", key="back_to_2_top", use_container_width=True):
         st.session_state["ai_house_step"] = 2
@@ -4480,6 +4487,13 @@ def render_step6_pago():
         if st.button("← Inicio"):
             st.session_state["ai_house_step"] = 1
             st.rerun()
+        return
+
+    # Disclaimer legal obligatorio antes de acceder al pago
+    from disclaimer_legal import mostrar_disclaimer_y_bloquear as _disclaimer6
+    _disc_email6 = st.session_state.get("user_email") or st.session_state.get("client_email") or ""
+    _disc_uid6   = str(st.session_state.get("user_id", ""))
+    if not _disclaimer6("documentacion_pago", _disc_email6, _disc_uid6):
         return
 
     st.markdown("## 🛒 Pago y Descarga")
