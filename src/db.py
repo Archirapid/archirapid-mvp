@@ -719,6 +719,65 @@ _PG_DDL = [
         version_texto TEXT NOT NULL DEFAULT 'v1.0-2026',
         created_at TIMESTAMP DEFAULT NOW()
     )""",
+
+    # ── Módulo Estudiantes TFG ────────────────────────────────────────────────
+    """CREATE TABLE IF NOT EXISTS estudiantes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        email TEXT UNIQUE NOT NULL,
+        nombre_completo TEXT NOT NULL,
+        universidad TEXT NOT NULL,
+        año_tfg INTEGER,
+        ciudad TEXT,
+        bio TEXT,
+        portfolio_url TEXT,
+        estado TEXT DEFAULT 'pendiente',
+        hash_autorizacion TEXT,
+        pdf_autorizacion_url TEXT,
+        stripe_account_id TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        approved_at TIMESTAMP,
+        approved_by TEXT
+    )""",
+
+    """CREATE TABLE IF NOT EXISTS proyectos_tfg (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        estudiante_id INTEGER,
+        email_estudiante TEXT NOT NULL,
+        titulo TEXT NOT NULL,
+        descripcion TEXT,
+        superficie_m2 REAL,
+        tipologia TEXT,
+        precio_venta REAL NOT NULL,
+        modalidad_venta TEXT DEFAULT 'exclusivo',
+        veces_vendido INTEGER DEFAULT 0,
+        activo INTEGER DEFAULT 0,
+        archivo_planos_url TEXT,
+        archivo_memoria_url TEXT,
+        archivo_renders_url TEXT,
+        imagen_portada_url TEXT,
+        provincia TEXT,
+        ciudad TEXT,
+        hash_documento TEXT,
+        estado TEXT DEFAULT 'pendiente',
+        comision_archirapid REAL DEFAULT 40.0,
+        comision_estudiante REAL DEFAULT 60.0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        approved_at TIMESTAMP
+    )""",
+
+    """CREATE TABLE IF NOT EXISTS tarifas_profesionales (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        proveedor_id INTEGER,
+        email TEXT NOT NULL,
+        tipo_profesional TEXT DEFAULT 'arquitecto',
+        servicio TEXT NOT NULL,
+        precio REAL NOT NULL,
+        precio_minimo REAL NOT NULL,
+        descripcion TEXT,
+        activo INTEGER DEFAULT 1,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )""",
 ]
 
 _PG_INDEXES = [
@@ -745,6 +804,14 @@ _PG_INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_firmas_inmo ON firmas_colaboracion(inmo_id)",
     "CREATE INDEX IF NOT EXISTS idx_disclaimers_email ON disclaimers_aceptados(email)",
     "CREATE INDEX IF NOT EXISTS idx_disclaimers_tipo ON disclaimers_aceptados(tipo_disclaimer)",
+    # ── Índices módulo Estudiantes TFG ─────────────────────────────────────────
+    "CREATE INDEX IF NOT EXISTS idx_estudiantes_email ON estudiantes(email)",
+    "CREATE INDEX IF NOT EXISTS idx_estudiantes_estado ON estudiantes(estado)",
+    "CREATE INDEX IF NOT EXISTS idx_proyectos_tfg_estado ON proyectos_tfg(estado)",
+    "CREATE INDEX IF NOT EXISTS idx_proyectos_tfg_provincia ON proyectos_tfg(provincia)",
+    "CREATE INDEX IF NOT EXISTS idx_proyectos_tfg_activo ON proyectos_tfg(activo)",
+    "CREATE INDEX IF NOT EXISTS idx_tarifas_email ON tarifas_profesionales(email)",
+    "CREATE INDEX IF NOT EXISTS idx_tarifas_servicio ON tarifas_profesionales(servicio)",
 ]
 
 _PG_PREFAB_SEED = [
@@ -780,6 +847,8 @@ _PG_ALTER_MIGRATIONS = [
     "ALTER TABLE tickets_soporte ADD COLUMN IF NOT EXISTS usuario_id TEXT",
     "ALTER TABLE tickets_soporte ADD COLUMN IF NOT EXISTS usuario_nombre TEXT",
     "ALTER TABLE tickets_soporte ADD COLUMN IF NOT EXISTS usuario_email TEXT",
+    # service_providers: cobertura por provincias (JSON array como TEXT)
+    "ALTER TABLE service_providers ADD COLUMN IF NOT EXISTS provincias_cobertura TEXT DEFAULT '[]'",
 ]
 
 
@@ -1654,6 +1723,100 @@ def ensure_tables():
             c.execute("CREATE INDEX IF NOT EXISTS idx_disclaimers_tipo ON disclaimers_aceptados(tipo_disclaimer)")
         except Exception:
             pass
+
+        # ── Módulo Estudiantes TFG ────────────────────────────────────────────
+        c.execute("""CREATE TABLE IF NOT EXISTS estudiantes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT UNIQUE NOT NULL,
+            nombre_completo TEXT NOT NULL,
+            universidad TEXT NOT NULL,
+            año_tfg INTEGER,
+            ciudad TEXT,
+            bio TEXT,
+            portfolio_url TEXT,
+            estado TEXT DEFAULT 'pendiente',
+            hash_autorizacion TEXT,
+            pdf_autorizacion_url TEXT,
+            stripe_account_id TEXT,
+            created_at TEXT,
+            approved_at TEXT,
+            approved_by TEXT
+        )""")
+        try:
+            c.execute("CREATE INDEX IF NOT EXISTS idx_estudiantes_email ON estudiantes(email)")
+        except Exception:
+            pass
+        try:
+            c.execute("CREATE INDEX IF NOT EXISTS idx_estudiantes_estado ON estudiantes(estado)")
+        except Exception:
+            pass
+
+        c.execute("""CREATE TABLE IF NOT EXISTS proyectos_tfg (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            estudiante_id INTEGER,
+            email_estudiante TEXT NOT NULL,
+            titulo TEXT NOT NULL,
+            descripcion TEXT,
+            superficie_m2 REAL,
+            tipologia TEXT,
+            precio_venta REAL NOT NULL,
+            modalidad_venta TEXT DEFAULT 'exclusivo',
+            veces_vendido INTEGER DEFAULT 0,
+            activo INTEGER DEFAULT 0,
+            archivo_planos_url TEXT,
+            archivo_memoria_url TEXT,
+            archivo_renders_url TEXT,
+            imagen_portada_url TEXT,
+            provincia TEXT,
+            ciudad TEXT,
+            hash_documento TEXT,
+            estado TEXT DEFAULT 'pendiente',
+            comision_archirapid REAL DEFAULT 40.0,
+            comision_estudiante REAL DEFAULT 60.0,
+            created_at TEXT,
+            approved_at TEXT
+        )""")
+        try:
+            c.execute("CREATE INDEX IF NOT EXISTS idx_proyectos_tfg_estado ON proyectos_tfg(estado)")
+        except Exception:
+            pass
+        try:
+            c.execute("CREATE INDEX IF NOT EXISTS idx_proyectos_tfg_provincia ON proyectos_tfg(provincia)")
+        except Exception:
+            pass
+        try:
+            c.execute("CREATE INDEX IF NOT EXISTS idx_proyectos_tfg_activo ON proyectos_tfg(activo)")
+        except Exception:
+            pass
+
+        c.execute("""CREATE TABLE IF NOT EXISTS tarifas_profesionales (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            proveedor_id INTEGER,
+            email TEXT NOT NULL,
+            tipo_profesional TEXT DEFAULT 'arquitecto',
+            servicio TEXT NOT NULL,
+            precio REAL NOT NULL,
+            precio_minimo REAL NOT NULL,
+            descripcion TEXT,
+            activo INTEGER DEFAULT 1,
+            created_at TEXT,
+            updated_at TEXT
+        )""")
+        try:
+            c.execute("CREATE INDEX IF NOT EXISTS idx_tarifas_email ON tarifas_profesionales(email)")
+        except Exception:
+            pass
+        try:
+            c.execute("CREATE INDEX IF NOT EXISTS idx_tarifas_servicio ON tarifas_profesionales(servicio)")
+        except Exception:
+            pass
+
+        # service_providers: cobertura por provincias
+        try:
+            c.execute("ALTER TABLE service_providers ADD COLUMN provincias_cobertura TEXT DEFAULT '[]'")
+        except Exception:
+            pass
+
     _tables_initialized = True
 
 
