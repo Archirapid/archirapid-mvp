@@ -457,7 +457,7 @@ def show_buyer_panel_mls(client_email: str, finca_id: str) -> None:
             st.session_state["ai_house_step"]   = 1
             st.session_state.pop("mls_show_project_search", None)
             st.session_state.pop("mls_show_prefab_config", None)
-            st.query_params["page"] = "Diseñador de Vivienda"
+            st.query_params["page"] = "disenador"
             st.rerun()
 
     with _col2:
@@ -669,48 +669,47 @@ def main():
     
     if not st.session_state["client_logged_in"]:
         st.subheader("🔐 Acceso al Panel de Cliente")
-        st.info("Introduce el email que usaste al realizar tu compra/reserva")
-        
-        email = st.text_input("Email de cliente", placeholder="tu@email.com")
-        
-        if st.button("Acceder", type="primary"):
-            if email:
-                # Verificar si el email tiene transacciones, propiedades O está registrado como cliente
-                conn = db_conn()
-                cursor = conn.cursor()
-                
-                # Verificar si el email tiene transacciones de COMPRA O RESERVA (clientes que han comprado o reservado)
-                cursor.execute("SELECT * FROM reservations WHERE buyer_email=?", (email,))
-                transactions = cursor.fetchall()
-                
-                # NO permitir acceso a propietarios aquí - ellos tienen su propio panel
-                owner_plots = []  # No buscar propiedades de propietario
-                
-                # NO verificar registro como cliente genérico - solo compras reales
-                is_registered_client = False
-                
-                conn.close()
-                
-                # Permitir acceso SOLO si tiene transacciones de COMPRA verificadas
-                if transactions:
+        st.info("Introduce tus credenciales para acceder a tu panel de comprador.")
+
+        with st.form("client_login_form"):
+            email = st.text_input("Email", placeholder="tu@email.com")
+            password = st.text_input("Contraseña", type="password")
+            submitted = st.form_submit_button("🚀 Acceder", type="primary", use_container_width=True)
+
+        if submitted:
+            if not email or not password:
+                st.error("Por favor introduce email y contraseña.")
+            else:
+                from modules.marketplace.auth import authenticate_user
+                user_data = authenticate_user(email, password)
+                if user_data and user_data.get('role') == 'client':
+                    st.session_state['logged_in'] = True
+                    st.session_state['role'] = 'client'
+                    st.session_state['user_email'] = email
+                    st.session_state['user_name'] = user_data.get('full_name') or email
+                    st.session_state['user_id'] = user_data.get('id')
                     st.session_state["client_logged_in"] = True
                     st.session_state["client_email"] = email
-                    # st.session_state["user_role"] = "buyer"  # DESACTIVADO: Asignación ilegal
-                    st.session_state["has_transactions"] = len(transactions) > 0
-                    st.session_state["has_properties"] = False  # No es propietario en este panel
-                    
-                    st.success(f"✅ Acceso concedido como cliente para {email}")
                     st.rerun()
+                elif user_data:
+                    st.error("Esta cuenta no es de tipo comprador. Usa el acceso correspondiente a tu rol.")
                 else:
-                    st.error("❌ Acceso denegado. Este panel es exclusivo para clientes que han realizado compras o reservas.")
-                    st.info("Si eres propietario, accede desde la página principal. Si has comprado o reservado un proyecto, verifica tu email.")
-            else:
-                st.error("Por favor introduce tu email")
-        
+                    # Fallback: check reservations for legacy clients without password
+                    conn = db_conn()
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT id FROM reservations WHERE buyer_email=?", (email,))
+                    has_reservations = cursor.fetchone()
+                    conn.close()
+                    if has_reservations:
+                        st.session_state["client_logged_in"] = True
+                        st.session_state["client_email"] = email
+                        st.session_state['user_email'] = email
+                        st.rerun()
+                    else:
+                        st.error("Credenciales incorrectas.")
+
         st.markdown("---")
-        st.info("💡 **Nota:** Si acabas de realizar una compra, usa el email que proporcionaste en el formulario de datos personales.")
-        st.info("Por favor inicia sesión para acceder al panel.")
-        # st.stop()  # Comentado para permitir que la página se cargue
+        st.caption("Si acabas de realizar una compra, usa el email y contraseña que configuraste durante el pago.")
 
 def show_selected_project_panel(client_email, project_id):
     """Panel completo para mostrar proyecto seleccionado con todos los detalles"""
@@ -1791,7 +1790,7 @@ def show_buyer_panel(client_email):
                     st.session_state["ai_house_step"] = 1
                     st.session_state['show_project_search'] = False
                     st.session_state['show_prefab_config'] = False
-                    st.query_params["page"] = "Diseñador de Vivienda"
+                    st.query_params["page"] = "disenador"
                     st.rerun()
 
             with col2:

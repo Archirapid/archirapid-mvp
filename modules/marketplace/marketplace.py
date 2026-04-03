@@ -758,16 +758,14 @@ def main():
     if st.session_state.get('logged_in'):
         user_name = st.session_state.get('user_name', st.session_state.get('email', 'Usuario'))
         role = st.session_state.get('role', '')
-        if role == 'services':
-            panel_name = "Panel de Proveedor"
-        elif role == 'architect':
-            panel_name = "Panel de Arquitecto"
-        elif role == 'admin':
-            panel_name = "Intranet"
-        else:
-            panel_name = "Panel de Cliente"
-        
-        st.success(f"👋 ¡Hola, {user_name}! | [Ir a Mi {panel_name}](?page={panel_name.replace(' ', '%20')})")
+        _role_slug_map = {
+            'services': ('Panel de Proveedor', 'proveedor'),
+            'architect': ('Panel de Arquitecto', 'arquitectos'),
+            'admin': ('Intranet', 'admin'),
+        }
+        panel_name, panel_slug = _role_slug_map.get(role, ('Panel de Cliente', 'cliente'))
+
+        st.success(f"👋 ¡Hola, {user_name}! | [Ir a Mi {panel_name}](?page={panel_slug})")
 
     # 4. Marketplace de proyectos (siempre visible debajo)
     st.markdown("---")

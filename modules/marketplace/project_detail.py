@@ -550,7 +550,7 @@ def show_project_detail_page(project_id: str):
             with col1:
                 if st.button("👤 Ir a Mi Panel de Cliente", type="primary", width='stretch'):
                     st.query_params.update({
-                        "page": "👤 Panel de Cliente",
+                        "page": "cliente",
                         "selected_project": project_id
                     })
                     st.rerun()
@@ -558,7 +558,7 @@ def show_project_detail_page(project_id: str):
             with col2:
                 if st.button("🔍 Seguir Explorando Proyectos", width='stretch'):
                     st.query_params.clear()
-                    st.query_params["page"] = "Home"
+                    st.query_params["page"] = "home"
                     st.rerun()
             
             st.markdown("---")

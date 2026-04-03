@@ -208,7 +208,7 @@ def lanzar_disenador_desde_mls(finca: dict) -> None:
     st.session_state["ai_house_step"] = 1
 
     # 6. Navegar al diseñador 6-step (app.py L1475) — NUNCA disenador_vivienda.main()
-    st.query_params["page"] = "Diseñador de Vivienda"
+    st.query_params["page"] = "disenador"
     st.rerun()
 
 

@@ -134,7 +134,7 @@ def render_landing():
         """, unsafe_allow_html=True)
         st.markdown('<div class="ar-btn-arch">', unsafe_allow_html=True)
         if st.button("Acceso Arquitectos →", key="btn_arq", use_container_width=True):
-            st.query_params["page"] = "Arquitectos (Marketplace)"
+            st.query_params["page"] = "arquitectos"
             st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
 
@@ -148,7 +148,7 @@ def render_landing():
         """, unsafe_allow_html=True)
         st.markdown('<div class="ar-btn-client">', unsafe_allow_html=True)
         if st.button("Ver Proyectos →", key="btn_cli", use_container_width=True):
-            st.query_params["page"] = "👤 Panel de Cliente"
+            st.query_params["page"] = "cliente"
             st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
 

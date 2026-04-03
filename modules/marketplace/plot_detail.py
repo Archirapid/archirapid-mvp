@@ -524,6 +524,13 @@ def show_plot_detail_page(plot_id: str):
                     # 3. Crear sesión Stripe y mostrar botón de pago
                     from modules.stripe_utils import create_reservation_checkout as _crc
                     _plot_ref = plot.get("catastral_ref") or plot.get("ref_catastral") or str(plot_id)
+                    # URL dinámica: localhost en dev, producción en cloud
+                    try:
+                        _host = st.context.headers.get("host", "localhost:8501")
+                        _scheme = "https" if "." in _host and "localhost" not in _host else "http"
+                        _base = f"{_scheme}://{_host}"
+                    except Exception:
+                        _base = "https://archirapid.streamlit.app"
                     _s_url, _s_id = _crc(
                         plot_id=str(plot_id),
                         pending_id=_pending_id,
@@ -532,10 +539,10 @@ def show_plot_detail_page(plot_id: str):
                         amount_cents=max(int(_precio_reserva * 100), 50),
                         plot_ref=_plot_ref,
                         success_url=(
-                            "https://archirapid.streamlit.app/"
-                            "?stripe_session={CHECKOUT_SESSION_ID}&payment=success"
+                            f"{_base}"
+                            "/?stripe_session={CHECKOUT_SESSION_ID}&payment=success"
                         ),
-                        cancel_url=f"https://archirapid.streamlit.app/?selected_plot={plot_id}",
+                        cancel_url=f"{_base}/?selected_plot={plot_id}",
                     )
                     st.session_state[_stripe_url_key] = _s_url
                     st.rerun()

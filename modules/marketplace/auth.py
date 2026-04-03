@@ -4,13 +4,23 @@ from modules.marketplace.utils import get_user_by_email, db_conn
 from werkzeug.security import check_password_hash
 
 # Función de navegación unificada
+_PAGE_NAME_TO_SLUG = {
+    "🏠 Propietarios": "propietarios",
+    "👤 Panel de Cliente": "cliente",
+    "Registro de Usuario": "registro",
+    "Arquitectos (Marketplace)": "arquitectos",
+    "Intranet": "admin",
+    "👤 Panel de Proveedor": "proveedor",
+}
+
 def navigate_to(page_name):
     st.session_state["selected_page"] = page_name
     if page_name == "🏠 Propietarios":
         st.session_state['role'] = "owner"
         st.session_state['logged_in'] = True
-    elif page_name in ["👤 Panel de Cliente", "Registro de Usuario", "Arquitectos (Marketplace)", "Intranet"]:
-        st.query_params["page"] = page_name
+    slug = _PAGE_NAME_TO_SLUG.get(page_name)
+    if slug:
+        st.query_params["page"] = slug
     st.rerun()
 
 def show_login():
@@ -60,22 +70,22 @@ def show_login():
 
                 user_role = user.get('role')
                 if user_role == 'admin':
-                    st.query_params["page"] = "Intranet"
+                    st.query_params["page"] = "admin"
                     st.session_state['selected_page'] = "Intranet"
                 elif user_role == 'architect':
-                    st.query_params["page"] = "Arquitectos (Marketplace)"
+                    st.query_params["page"] = "arquitectos"
                     st.session_state['selected_page'] = "Arquitectos (Marketplace)"
                 elif user_role == 'owner':
-                    st.query_params["page"] = "🏠 Propietarios"
+                    st.query_params["page"] = "propietarios"
                     st.session_state['selected_page'] = "🏠 Propietarios"
                 elif user_role == 'services':
-                    st.query_params["page"] = "👤 Panel de Proveedor"
+                    st.query_params["page"] = "proveedor"
                     st.session_state['selected_page'] = "👤 Panel de Proveedor"
                 elif user_role == 'client':
-                    st.query_params["page"] = "👤 Panel de Cliente"
+                    st.query_params["page"] = "cliente"
                     st.session_state['selected_page'] = "👤 Panel de Cliente"
                 else:
-                    st.query_params["page"] = "👤 Panel de Cliente"
+                    st.query_params["page"] = "cliente"
                     st.session_state['selected_page'] = "👤 Panel de Cliente"
                 st.rerun()
             else:
@@ -247,14 +257,14 @@ def show_registration():
 
                 if role == 'owner':
                     st.session_state['selected_page'] = "🏠 Propietarios"
-                    st.query_params["page"] = "🏠 Propietarios"
+                    st.query_params["page"] = "propietarios"
                 elif role == 'architect':
                     st.session_state['arquitecto_id'] = email
                     st.session_state['selected_page'] = "Arquitectos (Marketplace)"
-                    st.query_params["page"] = "Arquitectos (Marketplace)"
+                    st.query_params["page"] = "arquitectos"
                 else:
                     st.session_state['selected_page'] = "👤 Panel de Cliente"
-                    st.query_params["page"] = "👤 Panel de Cliente"
+                    st.query_params["page"] = "cliente"
                 st.rerun()
 
             except Exception as e:

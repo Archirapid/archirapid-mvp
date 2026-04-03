@@ -1042,6 +1042,7 @@ _qp_mls_reservar   = st.query_params.get("mls_reservar", "")
 _qp_mls_contacto = st.query_params.get("mls_contacto", "")
 if _qp_mls_pago == "ok":
     st.session_state["selected_page"] = "🏢 Inmobiliarias MLS"
+    st.session_state["_nav_radio"] = "🏢 Inmobiliarias MLS"
     st.session_state["mls_verificar_pago"] = True
 
 if _qp_mls_reserva == "1":
@@ -1051,6 +1052,7 @@ if _qp_mls_reserva == "1":
     else:
         # Retorno Stripe inmo colaboradora → portal MLS (lo gestiona internamente)
         st.session_state["selected_page"] = "🏢 Inmobiliarias MLS"
+        st.session_state["_nav_radio"] = "🏢 Inmobiliarias MLS"
 
 if _qp_mls_reset_tok:
     # Enlace de reset contraseña MLS — sin login requerido
@@ -1069,6 +1071,7 @@ if _qp_mls_goto:
         else:
             st.session_state["mls_goto_finca_pending"] = _qp_mls_goto
     st.session_state["selected_page"] = "🏢 Inmobiliarias MLS"
+    st.session_state["_nav_radio"] = "🏢 Inmobiliarias MLS"
 
 if _qp_mls_ficha:
     # Ficha pública — sin login requerido
@@ -1116,6 +1119,7 @@ if _qp_demo == "true" and not st.session_state.get("sandbox_mode"):
 # Navegar directo al portal del arquitecto si ?seccion=arquitecto
 if _qp_seccion == "arquitecto" and not st.session_state.get("_deep_link_routed"):
     st.session_state["selected_page"] = "Arquitectos (Marketplace)"
+    st.session_state["_nav_radio"] = "Arquitectos (Marketplace)"
     st.session_state["_deep_link_routed"] = True
     # Si sandbox + modo estudio, marcar para abrir esa pestaña al entrar
     if _qp_modo == "estudio" or _qp_demo == "true":
@@ -1124,6 +1128,7 @@ if _qp_seccion == "arquitecto" and not st.session_state.get("_deep_link_routed")
 # Navegar directo al portal MLS si ?seccion=mls
 if _qp_seccion == "mls" and not st.session_state.get("_deep_link_routed"):
     st.session_state["selected_page"] = "🏢 Inmobiliarias MLS"
+    st.session_state["_nav_radio"] = "🏢 Inmobiliarias MLS"
     st.session_state["_deep_link_routed"] = True
     if _qp_demo == "true":
         st.session_state["mls_demo_mode"] = True
@@ -1148,6 +1153,7 @@ _url_slug = st.query_params.get("page", "")
 # ?page=login → mostrar formulario de login genérico en home
 if _url_slug == "login":
     st.session_state["selected_page"] = "🏠 Inicio / Marketplace"
+    st.session_state["_nav_radio"] = "🏠 Inicio / Marketplace"
     st.session_state["viewing_login"] = True
     st.session_state["show_role_selector"] = False
     if st.session_state.get("login_role") is None:
@@ -1159,6 +1165,8 @@ elif _url_slug in _SLUG_TO_PAGE:
         st.session_state["selected_page"] = _target_page
         st.session_state["show_role_selector"] = False
         st.session_state["viewing_login"] = False
+    # Pre-configurar sidebar radio para que no sobreescriba con su estado previo
+    st.session_state["_nav_radio"] = _target_page
 elif _url_slug == "":
     # URL limpia (sin ?page=) y sin params especiales → volver a home
     _keep_params = {"selected_plot", "selected_project_v2", "selected_prefab",
@@ -1169,6 +1177,7 @@ elif _url_slug == "":
     if not any(p in st.query_params for p in _keep_params):
         if st.session_state.get("selected_page") not in ("🏠 Inicio / Marketplace", None):
             st.session_state["selected_page"] = "🏠 Inicio / Marketplace"
+            st.session_state["_nav_radio"] = "🏠 Inicio / Marketplace"
             st.session_state["show_role_selector"] = False
             st.session_state["viewing_login"] = False
 
@@ -1265,6 +1274,7 @@ if st.query_params.get("stripe_session") and st.query_params.get("payment") == "
                         st.session_state["user_name"]         = _buyer_name
                         st.session_state["auto_owner_email"]  = _buyer_mail
                         st.session_state["selected_page"]     = "👤 Panel de Cliente"
+                        st.session_state["_nav_radio"]        = "👤 Panel de Cliente"
                         st.session_state["payment_confirmed"] = True
                         # client_panel.main() necesita estas keys para mostrar el dashboard
                         st.session_state["client_logged_in"]  = True
@@ -1303,6 +1313,7 @@ if st.query_params.get("stripe_session") and st.query_params.get("payment") == "
                         st.session_state["client_email"]     = _cli_mail
                         st.session_state["user_role"]        = "buyer"
                         st.session_state["selected_page"]    = "👤 Panel de Cliente"
+                        st.session_state["_nav_radio"]       = "👤 Panel de Cliente"
         except Exception as _se:
             st.toast(f"Error verificando pago Stripe: {_se}", icon="⚠️")
     # Limpiar params de Stripe sin perder el proyecto
@@ -1442,23 +1453,18 @@ if st.query_params.get("mls_reserva_ok") == "1" and st.query_params.get("tipo") 
     st.stop()
 # ────────────────────────────────────────────────────────────────────────────
 
-if st.query_params.get("page") == "👤 Panel de Cliente" and st.session_state.get('selected_page') != "🏠 Propietarios":
+# Intercept directo: ?page=cliente → panel de cliente sin pasar por sidebar radio
+# (Mismo patrón que commit a7e1fd9 que funcionaba: intercept + st.stop())
+if st.query_params.get("page") == "cliente" and st.session_state.get('selected_page') != "🏠 Propietarios":
     try:
-        panel_cliente_v2()
-    except Exception as e:
-        st.error(f"Error cargando el panel: {e}")
-    else:
+        from modules.marketplace import client_panel
+        client_panel.main()
         st.stop()
-
-if st.query_params.get("page") == "Registro de Usuario":
-    try:
-        registro_v2()
     except Exception as e:
-        st.error(f"Error mostrando registro v2: {e}")
-    st.stop()
+        st.error(f"Error mostrando panel cliente: {e}")
 
 
-if st.query_params.get("page") == "Diseñador de Vivienda":
+if st.query_params.get("page") in ("Diseñador de Vivienda", "disenador"):
     try:
         if st.session_state.get("mls_origin"):
             if st.button("← Volver al portal MLS", key="diseñador_back_mls"):
@@ -1475,7 +1481,7 @@ if st.query_params.get("page") == "Diseñador de Vivienda":
     except Exception as e:
         st.error(f"Error mostrando diseñador de vivienda: {e}")
 
-if st.query_params.get("page") == "Arquitectos (Marketplace)":
+if st.query_params.get("page") in ("Arquitectos (Marketplace)", "arquitectos"):
     try:
         from modules.marketplace import architects as _arch_mod
         _arch_mod.main()
@@ -1672,11 +1678,17 @@ def render_portal_cliente_proyecto():
 
 # Lógica de navegación robusta
 
-# El sidebar DEBE leer de session_state obligatoriamente
+# Pre-configurar la key del radio si no existe o si su valor no está en PAGES
+_nav_val = st.session_state.get("_nav_radio")
+if _nav_val is None or _nav_val not in PAGES:
+    _init_page = st.session_state.get('selected_page', "🏠 Inicio / Marketplace")
+    st.session_state["_nav_radio"] = _init_page if _init_page in PAGES else "🏠 Inicio / Marketplace"
+
+# El sidebar DEBE leer de session_state vía key — así el URL sync puede forzar el valor
 selected_page = st.sidebar.radio(
     "Navegación",
     options=PAGES,
-    index=PAGES.index(st.session_state.get('selected_page', "🏠 Inicio / Marketplace")) if st.session_state.get('selected_page', "🏠 Inicio / Marketplace") in PAGES else 0
+    key="_nav_radio",
 )
 
 # Sincronizamos por si el usuario cambia el radio manualmente
@@ -2067,8 +2079,8 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
             # ── Acceso directo al portal MLS — 30 días free trial ────────────
             st.link_button("🎁 30 días Free Trial — Acceder al portal MLS →", "/?seccion=mls", use_container_width=True, type="primary")
 
-        # ── 4 tarjetas de acceso en columnas iguales ─────────────────────────
-        _hc1, _hc2, _hc3, _hc4 = st.columns(4, gap="small")
+        # ── 5 tarjetas de acceso en columnas iguales ─────────────────────────
+        _hc1, _hc2, _hc2b, _hc3, _hc4 = st.columns(5, gap="small")
 
         with _hc1:
             st.markdown("""
@@ -2109,6 +2121,30 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
             if st.button("Acceso Arquitectos →", key="hp_btn_arq", use_container_width=True):
                 st.session_state['selected_page'] = "Arquitectos (Marketplace)"
                 st.query_params["page"] = "arquitectos"
+                st.rerun()
+
+        with _hc2b:
+            st.markdown("""
+<div style="background:white;border-radius:10px;padding:14px 16px;
+            border-top:3px solid #10B981;box-shadow:0 2px 8px rgba(0,0,0,0.07);
+            margin-bottom:4px;">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
+    <span style="font-size:22px;">🏡</span>
+    <div>
+      <div style="font-weight:800;color:#0D1B2A;font-size:0.95em;">Comprador</div>
+      <div style="color:#64748B;font-size:0.78em;">Accede a tu panel, proyectos y transacciones.</div>
+    </div>
+  </div>
+</div>""", unsafe_allow_html=True)
+            if st.button("Mi Panel →", key="hp_btn_cli", use_container_width=True):
+                if st.session_state.get("logged_in") and st.session_state.get("role") == "client":
+                    st.session_state['selected_page'] = "👤 Panel de Cliente"
+                    st.query_params["page"] = "cliente"
+                else:
+                    st.session_state['login_role'] = 'client'
+                    st.session_state['viewing_login'] = True
+                    st.session_state['_login_show_registro'] = False
+                    st.query_params["page"] = "login"
                 st.rerun()
 
         with _hc3:

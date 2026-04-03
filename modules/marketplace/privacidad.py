@@ -126,7 +126,7 @@ por email si los cambios son significativos.
 
     st.markdown("---")
     if st.button("← Volver al inicio", use_container_width=False):
-        st.query_params["page"] = "🏠 Inicio / Marketplace"
+        st.query_params["page"] = "home"
         st.rerun()
 
     st.markdown("</div>", unsafe_allow_html=True)
