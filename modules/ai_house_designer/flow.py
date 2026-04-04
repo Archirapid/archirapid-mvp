@@ -1766,6 +1766,23 @@ def render_step2():
             st.rerun()
     with col2:
         if st.button("Paso 3: Editor 3D →", key="go_to_3", type="primary", use_container_width=True):
+            # ── Constraint Solver S1 ──────────────────────────────────────────
+            try:
+                from modules.ai_house_designer.constraint_solver import validate_design, show_constraint_results
+                _rooms_cs = st.session_state.get("ai_house_requirements", {}).get("room_layout") or []
+                if not _rooms_cs:
+                    _rooms_cs = [
+                        {"code": k, "name": k, "area_m2": float(v)}
+                        for k, v in st.session_state.get("ai_house_requirements", {})
+                                                      .get("ai_room_proposal", {}).items()
+                        if isinstance(v, (int, float))
+                    ]
+                _plot_cs = st.session_state.get("design_plot_data", {})
+                _cs_result = validate_design(_rooms_cs, _plot_cs)
+                if not show_constraint_results(_cs_result):
+                    st.stop()
+            except Exception:
+                pass  # constraint solver nunca bloquea por error técnico
             st.session_state["ai_house_step"] = 3
             st.rerun()
     
@@ -2150,6 +2167,23 @@ def render_step2():
                 st.rerun()
         with col2:
             if st.button("Paso 3 →", type="primary", use_container_width=True):
+                # ── Constraint Solver S1 ──────────────────────────────────────
+                try:
+                    from modules.ai_house_designer.constraint_solver import validate_design, show_constraint_results
+                    _rooms_cs2 = st.session_state.get("ai_house_requirements", {}).get("room_layout") or []
+                    if not _rooms_cs2:
+                        _rooms_cs2 = [
+                            {"code": k, "name": k, "area_m2": float(v)}
+                            for k, v in st.session_state.get("ai_house_requirements", {})
+                                                          .get("ai_room_proposal", {}).items()
+                            if isinstance(v, (int, float))
+                        ]
+                    _plot_cs2 = st.session_state.get("design_plot_data", {})
+                    _cs_result2 = validate_design(_rooms_cs2, _plot_cs2)
+                    if not show_constraint_results(_cs_result2):
+                        st.stop()
+                except Exception:
+                    pass  # constraint solver nunca bloquea por error técnico
                 st.session_state["ai_house_step"] = 3
                 st.rerun()
     
