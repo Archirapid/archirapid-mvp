@@ -1175,7 +1175,7 @@ def _send_mls_reset_email(email: str, token: str) -> bool:
         if not key:
             return False
 
-        reset_url = f"https://archirapid.streamlit.app/?mls_reset_token={token}"
+        reset_url = f"https://archirapid.com/?mls_reset_token={token}"
         html = f"""<!DOCTYPE html>
 <html><body style="background:#0D1B2A;font-family:Arial,sans-serif;margin:0;padding:32px;">
   <div style="max-width:520px;margin:0 auto;background:#162241;border-radius:16px;

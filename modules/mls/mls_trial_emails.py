@@ -26,7 +26,7 @@ _URGENCIA_DAY  = 25   # día del trial en que enviamos urgencia  (days_remaining
 
 _CONTACT_EMAIL = "hola@archirapid.com"
 _CONTACT_PHONE = "+34 623 172 704"
-_PORTAL_URL    = "https://archirapid.streamlit.app"
+_PORTAL_URL    = "https://archirapid.com"
 
 # Colores ArchiRapid MLS (consistentes con mls_notificaciones.py)
 _NAVY  = "#1B2A6B"
@@ -388,7 +388,7 @@ def check_and_send_trial_emails() -> list[str]:
                     <p>La inmobiliaria <b>{nombre}</b> ({email}) tiene su trial de 30 días a punto de vencer.</p>
                     <p><b>Días restantes:</b> 5</p>
                     <p>Considera contactarla para ayudarla a elegir un plan antes de que expire.</p>
-                    <p style="color:#64748b;font-size:0.85em;">Panel admin: archirapid.streamlit.app → Intranet → MLS → Trial</p>
+                    <p style="color:#64748b;font-size:0.85em;">Panel admin: archirapid.com → Intranet → MLS → Trial</p>
                     """,
                 )
                 enviados.append(f"admin-aviso → {nombre} trial expira en 5 días")
