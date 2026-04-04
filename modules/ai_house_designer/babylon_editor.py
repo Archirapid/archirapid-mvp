@@ -269,6 +269,22 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
         <button class="tool-btn" onclick="undoLastAction()">⬅️ Deshacer</button>
         <button class="tool-btn" id="btn-delete" onclick="deleteSelected()" style="background:rgba(231,76,60,0.25);border-color:#E74C3C;">🗑️ Borrar seleccionado</button>
         <hr class="divider">
+        <div style="font-size:10px;color:#F5A623;font-weight:700;letter-spacing:1px;margin-bottom:5px;">📍 POSICIÓN EN PARCELA</div>
+        <div style="display:flex;align-items:center;gap:4px;margin-bottom:3px;">
+          <span style="font-size:9px;color:#94a3b8;width:14px;">X</span>
+          <input type="range" id="slider-offset-x" min="0" max="0" step="0.5" value="0"
+                 style="flex:1;accent-color:#F5A623;height:14px;" oninput="onPlotOffsetChange()">
+          <span id="offset-x-val" style="font-size:9px;color:white;width:26px;text-align:right;">0m</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:4px;margin-bottom:4px;">
+          <span style="font-size:9px;color:#94a3b8;width:14px;">Z</span>
+          <input type="range" id="slider-offset-z" min="0" max="0" step="0.5" value="0"
+                 style="flex:1;accent-color:#F5A623;height:14px;" oninput="onPlotOffsetChange()">
+          <span id="offset-z-val" style="font-size:9px;color:white;width:26px;text-align:right;">0m</span>
+        </div>
+        <div id="retranqueo-ok"   style="font-size:9px;color:#10B981;margin-bottom:3px;">✅ Retranqueo 3m OK</div>
+        <div id="retranqueo-warn" style="display:none;font-size:9px;color:#EF4444;margin-bottom:3px;">⚠️ Fuera de retranqueo</div>
+        <hr class="divider">
         <button class="tool-btn green" onclick="saveChanges()">💾 Guardar JSON</button>
         <button class="tool-btn green" id="btn-glb" onclick="exportGLB()">📦 Exportar 3D (.glb)</button>
     </div>
@@ -1129,6 +1145,7 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                 const newLayout = generateLayoutJS(roomsData);
                 rebuildScene(newLayout);
             }}
+            _resetPosSliders();   // reset posición parcela tras cambio de dimensión
             checkCTE(selectedIndex, newW, newD);
             updateBudget();
         }}
@@ -1323,6 +1340,11 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
         // ================================================
         window.customWalls = [];
         let fenceActive = false;
+        // ── Posición casa en parcela (S7) ────────────────────────────────────
+        const RETRANQUEO = 3.0;       // retranqueo legal estándar (m)
+        let _houseOffsetX = 0;
+        let _houseOffsetZ = 0;
+        let _basePosData  = null;     // posiciones de habitaciones SIN offset
         let fenceMeshes = [];
 
         // ─── MEP Layer Manager ────────────────────────────────────────────────────
@@ -1786,6 +1808,7 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                 // Redistribuir layout completo
                 const newLayout = generateLayoutJS(roomsData);
                 rebuildScene(newLayout);
+                _resetPosSliders();   // resetear offsets tras borrado
                 showToast(`🗑️ "${{deletedName}}" eliminada — planta redistribuida`);
                 return;
             }}
@@ -1810,6 +1833,53 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
         window.addEventListener('keydown', (e) => {{
             if (e.key === 'Delete' || e.key === 'Backspace') deleteSelected();
         }});
+
+        // ================================================
+        // POSICIÓN DE LA CASA EN LA PARCELA (S7)
+        // ================================================
+        function _resetPosSliders() {{
+            _basePosData = null;
+            _houseOffsetX = 0;
+            _houseOffsetZ = 0;
+            const slX = document.getElementById('slider-offset-x');
+            const slZ = document.getElementById('slider-offset-z');
+            if (slX) {{ slX.value = 0; }}
+            if (slZ) {{ slZ.value = 0; }}
+            const vX = document.getElementById('offset-x-val');
+            const vZ = document.getElementById('offset-z-val');
+            if (vX) vX.textContent = '0m';
+            if (vZ) vZ.textContent = '0m';
+        }}
+
+        function onPlotOffsetChange() {{
+            const ox = parseFloat(document.getElementById('slider-offset-x').value) || 0;
+            const oz = parseFloat(document.getElementById('slider-offset-z').value) || 0;
+            document.getElementById('offset-x-val').textContent = ox.toFixed(1) + 'm';
+            document.getElementById('offset-z-val').textContent = oz.toFixed(1) + 'm';
+            _houseOffsetX = ox;
+            _houseOffsetZ = oz;
+
+            // Verificar retranqueo en los cuatro lados
+            const leftOK  = (ox - plotX) >= RETRANQUEO - 0.05;
+            const rightOK = (plotX + plotW - (ox + totalWidth)) >= RETRANQUEO - 0.05;
+            const frontOK = (oz - plotZ) >= RETRANQUEO - 0.05;
+            const backOK  = (plotZ + plotD - (oz + totalDepth)) >= RETRANQUEO - 0.05;
+            const allOK   = leftOK && rightOK && frontOK && backOK;
+            document.getElementById('retranqueo-ok').style.display   = allOK ? 'block' : 'none';
+            document.getElementById('retranqueo-warn').style.display  = allOK ? 'none'  : 'block';
+
+            // Guardar posiciones base la primera vez (antes de aplicar ningún offset)
+            if (!_basePosData || _basePosData.length !== roomsData.length) {{
+                _basePosData = roomsData.map(r => ({{ x: r.x, z: r.z }}));
+            }}
+
+            // Desplazar todas las habitaciones
+            roomsData.forEach((r, i) => {{
+                r.x = _basePosData[i].x + ox;
+                r.z = _basePosData[i].z + oz;
+            }});
+            rebuildScene(roomsData);
+        }}
 
         // ================================================
         function showToast(msg) {{
@@ -1957,8 +2027,9 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
         function buildStyleExtras(overrideStyle) {{
             clearStyleExtras();
             const conf = STYLE_3D_CONFIG[overrideStyle || houseStyle] || STYLE_3D_CONFIG['Moderno'];
-            const hX = totalWidth / 2;
-            const hZ = totalDepth / 2;
+            // Centro real de la casa — desplazado si el usuario ha movido la vivienda en parcela
+            const hX = totalWidth / 2 + _houseOffsetX;
+            const hZ = totalDepth / 2 + _houseOffsetZ;
             const wallH = 2.7;
 
             // --- CHIMENEA — centrada sobre la casa, visible desde cámara NE ---
@@ -2665,6 +2736,31 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
         rebuildScene(initialLayout);
         // Aplicar automáticamente el estilo elegido en el Paso 1
         applyStyleUI(houseStyle);
+
+        // ── Inicializar sliders de posición en parcela ────────────────────────
+        (function initPlotSliders() {{
+            const margin = RETRANQUEO;
+            const minOX = plotX + margin;
+            const maxOX = plotX + plotW - totalWidth - margin;
+            const minOZ = plotZ + margin;
+            const maxOZ = plotZ + plotD - totalDepth - margin;
+            const slX = document.getElementById('slider-offset-x');
+            const slZ = document.getElementById('slider-offset-z');
+            if (slX) {{
+                slX.min   = minOX.toFixed(1);
+                slX.max   = (maxOX > minOX ? maxOX : minOX).toFixed(1);
+                slX.value = 0;
+                slX.disabled = maxOX <= minOX;
+            }}
+            if (slZ) {{
+                slZ.min   = minOZ.toFixed(1);
+                slZ.max   = (maxOZ > minOZ ? maxOZ : minOZ).toFixed(1);
+                slZ.value = 0;
+                slZ.disabled = maxOZ <= minOZ;
+            }}
+            // Guardar posiciones base al inicio
+            _basePosData = roomsData.map(r => ({{ x: r.x, z: r.z }}));
+        }})();
 
         setMode('select');
         console.log('ArchiRapid Editor 3D v3.0 —', roomsData.length, 'habitaciones cargadas');
