@@ -2380,7 +2380,7 @@ def render_step2():
         
         st.markdown("---")
 
-        # Plano 2D preliminar (sin pestañas)
+        # Plano 2D — modo dual: SVG clásico + Sección desde editor 3D
         st.subheader("📐 Plano 2D Preliminar")
 
         # Firma del diseño actual — detecta si el plano está desactualizado
@@ -2389,32 +2389,83 @@ def render_step2():
             for r in sorted(design.rooms, key=lambda x: x.room_type.code)
         )
 
-        if st.button("Generar Plano 2D", type="primary", use_container_width=True):
-            try:
-                from .floor_plan_svg import FloorPlanSVG
-                planner = FloorPlanSVG(design)
-                img_bytes = planner.generate()
-                st.session_state['current_floor_plan'] = img_bytes
-                st.session_state['current_design'] = design
-                st.session_state['floor_plan_signature'] = _cur_sig
-                st.success("Plano generado correctamente")
-                st.rerun()
-            except Exception as e:
-                st.error(f"Error generando plano: {e}")
-                import traceback
-                st.code(traceback.format_exc())
+        _tab_svg, _tab_3d = st.tabs(["📐 Plano SVG", "🏗️ Sección desde Editor 3D"])
 
-        if 'current_floor_plan' in st.session_state:
-            _saved_sig = st.session_state.get('floor_plan_signature', '')
-            if _saved_sig != _cur_sig:
-                st.warning("⚠️ Has modificado habitaciones o superficies. Pulsa **Generar Plano 2D** para actualizar el plano.")
-            st.image(
-                st.session_state['current_floor_plan'],
-                caption="Plano profesional con medidas reales",
-                use_container_width=True
-            )
-        else:
-            st.info("Pulsa 'Generar Plano 2D' para ver tu distribución")
+        with _tab_svg:
+            if st.button("Generar Plano 2D", type="primary", use_container_width=True, key="gen_plan_svg"):
+                try:
+                    from .floor_plan_svg import FloorPlanSVG
+                    planner = FloorPlanSVG(design)
+                    img_bytes = planner.generate()
+                    st.session_state['current_floor_plan'] = img_bytes
+                    st.session_state['current_design'] = design
+                    st.session_state['floor_plan_signature'] = _cur_sig
+                    st.success("Plano generado correctamente")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error generando plano: {e}")
+                    import traceback
+                    st.code(traceback.format_exc())
+
+            if 'current_floor_plan' in st.session_state:
+                _saved_sig = st.session_state.get('floor_plan_signature', '')
+                if _saved_sig != _cur_sig:
+                    st.warning("⚠️ Has modificado habitaciones o superficies. Pulsa **Generar Plano 2D** para actualizar el plano.")
+                st.image(
+                    st.session_state['current_floor_plan'],
+                    caption="Plano profesional con medidas reales",
+                    use_container_width=True
+                )
+            else:
+                st.info("Pulsa 'Generar Plano 2D' para ver tu distribución")
+
+        with _tab_3d:
+            _s3_layout = (st.session_state.get("babylon_modified_layout")
+                          or st.session_state.get("babylon_initial_layout"))
+            if _s3_layout:
+                st.caption(
+                    "Plano generado directamente desde las coordenadas reales del editor 3D. "
+                    "Las dimensiones coinciden exactamente con la escena Babylon."
+                )
+                if st.button("Generar Sección desde 3D", type="primary", use_container_width=True, key="gen_plan_3d"):
+                    try:
+                        from .floor_plan_svg import generate_section_plan_png as _gen_sec
+                        import json as _json
+                        _rooms = _s3_layout if isinstance(_s3_layout, list) else _json.loads(_s3_layout)
+                        _tw = st.session_state.get("babylon_total_width")
+                        _td = st.session_state.get("babylon_total_depth")
+                        _sec_png = _gen_sec(_rooms, _tw, _td)
+                        if _sec_png:
+                            st.session_state['section_plan_3d'] = _sec_png
+                            st.success("Sección generada desde layout 3D")
+                            st.rerun()
+                        else:
+                            st.error("No se pudo generar la sección — layout vacío")
+                    except Exception as _s3e:
+                        st.error(f"Error sección 3D: {_s3e}")
+
+                if 'section_plan_3d' in st.session_state:
+                    _s3_col1, _s3_col2 = st.columns([3, 1])
+                    with _s3_col1:
+                        st.image(
+                            st.session_state['section_plan_3d'],
+                            caption="Sección real 1.20m — posiciones exactas del editor 3D",
+                            use_container_width=True,
+                        )
+                    with _s3_col2:
+                        st.download_button(
+                            "⬇️ Descargar PNG",
+                            st.session_state['section_plan_3d'],
+                            file_name="planta_seccion_3d.png",
+                            mime="image/png",
+                            key="dl_section_3d",
+                            use_container_width=True,
+                        )
+            else:
+                st.info(
+                    "Aún no has usado el Editor 3D (Paso 3). "
+                    "Completa el Paso 3 y vuelve aquí para generar la sección real."
+                )
         
         st.markdown("---")
         

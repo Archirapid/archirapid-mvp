@@ -927,3 +927,215 @@ def generate_cimentacion_plan_png(
     plt.close(fig)
     buf.seek(0)
     return buf.read()
+
+
+# ─── Sección arquitectónica desde layout 3D (S3) ─────────────────────────────
+
+def generate_section_plan_png(
+    rooms_layout,
+    total_width=None,
+    total_depth=None,
+    cut_height: float = 1.20,
+) -> bytes | None:
+    """
+    Genera plano de planta arquitectónico (sección horizontal a cut_height metros)
+    a partir del layout de habitaciones exportado por el editor 3D Babylon.
+
+    A diferencia de FloorPlanSVG (que usa el DesignData abstracto), esta función
+    toma coordenadas reales X/Z/width/depth tal como las produce generateLayoutJS.
+
+    Args:
+        rooms_layout : lista de dicts {x, z, width, depth, name, code, zone, area_m2}
+        total_width/depth : bounding box de la casa (se calcula si None)
+        cut_height  : altura de sección (por defecto 1.20m — CTE DB-SU)
+
+    Returns:
+        PNG bytes o None si hay error.
+    """
+    import json
+    import math
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+    import matplotlib.patches as mpatches
+    import matplotlib.patheffects as pe
+    import io as _io
+
+    if isinstance(rooms_layout, str):
+        try:
+            rooms_layout = json.loads(rooms_layout)
+        except Exception:
+            return None
+    if not rooms_layout:
+        return None
+
+    SCALE  = 60   # px / metro — más grande que MEP para leer bien medidas
+    MARGIN = 90
+    WALL_T = 0.15  # grosor muro (m)
+    BG     = '#FFFFFF'
+    WALL_C = '#2C2C2C'
+    DIM_C  = '#1565C0'
+
+    ZONE_FILL = {
+        'day':        '#FFF9E6',
+        'night':      '#EDE7F6',
+        'wet':        '#E0F7FA',
+        'service':    '#ECEFF1',
+        'garden':     '#E8F5E9',
+        'exterior':   '#E8F5E9',
+        'circulation':'#F5F5F5',
+    }
+
+    if total_width is None:
+        total_width  = max(r['x'] + r['width']  for r in rooms_layout)
+    if total_depth is None:
+        total_depth  = max(r['z'] + r['depth']  for r in rooms_layout)
+
+    house_min_x = min(r['x']               for r in rooms_layout)
+    house_min_z = min(r['z']               for r in rooms_layout)
+    house_max_x = max(r['x'] + r['width']  for r in rooms_layout)
+    house_max_z = max(r['z'] + r['depth']  for r in rooms_layout)
+
+    # Canvas — margen extra para cotas
+    svg_w = int(total_width  * SCALE + MARGIN * 3 + 80)
+    svg_h = int(total_depth  * SCALE + MARGIN * 4 + 90)
+
+    fig, ax = plt.subplots(figsize=(svg_w / 100, svg_h / 100), facecolor=BG)
+    ax.set_xlim(0, svg_w)
+    ax.set_ylim(0, svg_h)
+    ax.set_aspect('equal')
+    ax.axis('off')
+    fig.patch.set_facecolor(BG)
+
+    def to_px(x_m, z_m):
+        return MARGIN + x_m * SCALE, MARGIN + (total_depth - z_m) * SCALE
+
+    def m2px(m):
+        return m * SCALE
+
+    # ── Habitaciones ──────────────────────────────────────────────────────────
+    for r in rooms_layout:
+        code = (r.get('code') or r.get('name') or '').lower()
+        zone = (r.get('zone') or '').lower()
+
+        if any(c in code for c in ['bano', 'aseo', 'cocina', 'wc']):
+            fill = ZONE_FILL['wet']
+        else:
+            fill = ZONE_FILL.get(zone, '#F8F8F8')
+
+        px, py = to_px(r['x'], r['z'] + r['depth'])
+        pw, ph = m2px(r['width']), m2px(r['depth'])
+
+        # Relleno zona
+        ax.add_patch(mpatches.Rectangle((px, py), pw, ph,
+                                         linewidth=0, facecolor=fill, zorder=2))
+
+        # Muros (línea gruesa alrededor de cada habitación)
+        wt = max(2.5, WALL_T * SCALE)  # grosor muro en px
+        for (x0, y0, dx, dy) in [
+            (px, py + ph - wt/2,   pw, wt),    # norte
+            (px, py,               pw, wt),    # sur
+            (px, py,               wt, ph),    # oeste
+            (px + pw - wt, py,     wt, ph),    # este
+        ]:
+            ax.add_patch(mpatches.Rectangle((x0, y0), dx, dy,
+                                             linewidth=0, facecolor=WALL_C, zorder=3))
+
+        # Etiqueta: nombre + área
+        cx, cy = px + pw / 2, py + ph / 2
+        area   = r.get('area_m2') or round(r['width'] * r['depth'], 1)
+        ax.text(cx, cy + 6, r.get('name', code.upper()),
+                ha='center', va='center', fontsize=6.5,
+                color='#333333', fontweight='bold', zorder=5)
+        ax.text(cx, cy - 7, f"{area:.1f} m²",
+                ha='center', va='center', fontsize=5.5, color='#666666', zorder=5)
+
+        # Dimensiones interiores (ancho × fondo)
+        ax.text(cx, py + 10, f"{r['width']:.1f}",
+                ha='center', va='bottom', fontsize=5, color=DIM_C, zorder=5)
+        ax.text(px + 8, cy, f"{r['depth']:.1f}",
+                ha='left', va='center', fontsize=5, color=DIM_C,
+                rotation=90, zorder=5)
+
+    # ── Cota total Ancho ─────────────────────────────────────────────────────
+    dim_z_top = house_min_z - 0.8
+    px_l, py_dim = to_px(house_min_x, dim_z_top)
+    px_r, _      = to_px(house_max_x, dim_z_top)
+    ax.annotate('', xy=(px_r, py_dim), xytext=(px_l, py_dim),
+                arrowprops=dict(arrowstyle='<->', color=DIM_C, lw=1.2), zorder=9)
+    ax.text((px_l + px_r) / 2, py_dim - 10,
+            f'{(house_max_x - house_min_x):.2f} m',
+            ha='center', va='top', fontsize=7, color=DIM_C, fontweight='bold')
+
+    # ── Cota total Fondo ─────────────────────────────────────────────────────
+    dim_x_right = house_max_x + 0.8
+    px_dim, py_b = to_px(dim_x_right, house_min_z)
+    _,      py_t = to_px(dim_x_right, house_max_z)
+    ax.annotate('', xy=(px_dim, py_t), xytext=(px_dim, py_b),
+                arrowprops=dict(arrowstyle='<->', color=DIM_C, lw=1.2), zorder=9)
+    ax.text(px_dim + 10, (py_b + py_t) / 2,
+            f'{(house_max_z - house_min_z):.2f} m',
+            ha='left', va='center', fontsize=7, color=DIM_C,
+            fontweight='bold', rotation=90)
+
+    # ── Contorno exterior grueso ──────────────────────────────────────────────
+    out_px, out_py = to_px(house_min_x, house_max_z)
+    out_w  = (house_max_x - house_min_x) * SCALE
+    out_h  = (house_max_z - house_min_z) * SCALE
+    ax.add_patch(mpatches.Rectangle((out_px, out_py), out_w, out_h,
+                                     linewidth=3.0, edgecolor=WALL_C,
+                                     facecolor='none', zorder=7))
+
+    # ── Escala gráfica ────────────────────────────────────────────────────────
+    sc_x0, sc_y = to_px(house_min_x, house_min_z - 1.6)
+    sc_x1 = sc_x0 + 5 * SCALE
+    ax.plot([sc_x0, sc_x1], [sc_y, sc_y], color='#333', lw=2.5, zorder=9)
+    for xsc in [sc_x0, sc_x1]:
+        ax.plot([xsc, xsc], [sc_y - 5, sc_y + 5], color='#333', lw=2.0, zorder=9)
+    ax.text((sc_x0 + sc_x1) / 2, sc_y - 10, '5 m',
+            ha='center', va='top', fontsize=7, color='#333', fontweight='bold')
+    ax.text(sc_x0, sc_y - 10, '0', ha='center', va='top', fontsize=6, color='#333')
+
+    # ── Norte ────────────────────────────────────────────────────────────────
+    npx, npy = svg_w - MARGIN + 10, svg_h - MARGIN - 15
+    ax.annotate('N', xy=(npx, npy + 22), xytext=(npx, npy),
+                fontsize=9, color='#1A237E', ha='center', va='bottom',
+                fontweight='bold',
+                arrowprops=dict(arrowstyle='->', color='#1A237E', lw=2.0))
+
+    # ── Leyenda zona ─────────────────────────────────────────────────────────
+    leg_items = [
+        ('#FFF9E6', 'Zona día'),
+        ('#EDE7F6', 'Zona noche'),
+        ('#E0F7FA', 'Zona húmeda'),
+        ('#E8F5E9', 'Exterior'),
+    ]
+    leg_x0, leg_y0 = MARGIN, 14
+    for idx_l, (fc, lbl) in enumerate(leg_items):
+        rx = leg_x0 + idx_l * (svg_w // len(leg_items))
+        ax.add_patch(mpatches.Rectangle((rx, leg_y0), 18, 10,
+                                         linewidth=0.8, edgecolor='#999',
+                                         facecolor=fc, zorder=8))
+        ax.text(rx + 22, leg_y0 + 5, lbl, va='center', fontsize=6, color='#555')
+
+    # ── Título y nota de sección ──────────────────────────────────────────────
+    title_h = 48
+    ax.add_patch(mpatches.Rectangle((0, svg_h - title_h), svg_w, title_h,
+                                     facecolor='#1A237E', zorder=10))
+    ax.text(svg_w / 2, svg_h - title_h / 2,
+            f'PLANTA ARQUITECTÓNICA — Sección a {cut_height:.2f}m  ·  Escala 1:100',
+            ha='center', va='center', fontsize=10, fontweight='bold',
+            color='white', fontfamily='monospace', zorder=11)
+
+    ax.text(MARGIN, svg_h - title_h + 6,
+            f'ArchiRapid AI  ·  Sección real desde editor 3D  ·  Sup. construida: '
+            f'{sum((r.get("area_m2") or r["width"] * r["depth"]) for r in rooms_layout):.1f} m²',
+            fontsize=6, color='#90CAF9', va='bottom', zorder=11)
+
+    buf = _io.BytesIO()
+    plt.tight_layout(pad=0)
+    plt.savefig(buf, format='png', dpi=130, bbox_inches='tight',
+                facecolor=BG, edgecolor='none')
+    plt.close(fig)
+    buf.seek(0)
+    return buf.read()
