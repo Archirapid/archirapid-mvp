@@ -2149,8 +2149,21 @@ def render_step2():
                 f"⚠️ El diseño actual supera ligeramente tu presupuesto en **€{exceso:,}**. "                f"Ajusta alguna habitación con los sliders."
             )
         
+        # ── CTE Check en tiempo real ─────────────────────────────────────────
+        try:
+            from modules.ai_house_designer.cte_checker import render_cte_panel
+            _rooms_cte = [
+                {"code": k, "name": k, "area_m2": float(v)}
+                for k, v in proposal.items()
+                if isinstance(v, (int, float))
+            ]
+            _budget_m2_cte = float(req.get("total_m2") or req.get("m2_construidos") or 0)
+            render_cte_panel(_rooms_cte, _budget_m2_cte if _budget_m2_cte > 0 else None)
+        except Exception:
+            pass  # CTE panel nunca interrumpe el flujo
+
         st.markdown("---")
-        
+
         if 'current_floor_plan' in st.session_state:
             st.download_button(
                 label="Descargar Plano PNG",
