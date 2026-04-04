@@ -1732,6 +1732,45 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
                 st.query_params["page"] = "mls"
                 st.rerun()
 
+        # ── FRANJA PORTALES EMPRESA ──────────────────────────────────────────────
+        st.markdown("""
+<div style="background:#F1F5F9;border-radius:10px;padding:10px 16px;
+            margin:4px 0 8px 0;border:1px solid #E2E8F0;
+            display:flex;align-items:center;flex-wrap:wrap;gap:8px;">
+  <span style="font-size:0.78em;font-weight:700;color:#64748B;
+               letter-spacing:1.5px;text-transform:uppercase;white-space:nowrap;">
+    🏭 Portales empresa:
+  </span>
+  <a href="/?page=proveedor"
+     style="display:inline-flex;align-items:center;gap:5px;padding:5px 14px;
+            background:white;border:1px solid #CBD5E1;border-radius:6px;
+            color:#0D1B2A;font-size:0.82em;font-weight:600;text-decoration:none;">
+    🏗️ Constructores &amp; Profesionales
+    <span style="font-size:0.75em;color:#64748B;font-weight:400;">· desde gratis</span>
+  </a>
+  <a href="/?page=prefabricadas"
+     style="display:inline-flex;align-items:center;gap:5px;padding:5px 14px;
+            background:white;border:1px solid #CBD5E1;border-radius:6px;
+            color:#0D1B2A;font-size:0.82em;font-weight:600;text-decoration:none;">
+    🏠 Casas Prefabricadas
+    <span style="font-size:0.75em;color:#64748B;font-weight:400;">· planes desde 49€/mes</span>
+  </a>
+  <a href="/?seccion=mls"
+     style="display:inline-flex;align-items:center;gap:5px;padding:5px 14px;
+            background:white;border:1px solid #CBD5E1;border-radius:6px;
+            color:#0D1B2A;font-size:0.82em;font-weight:600;text-decoration:none;">
+    🏢 Inmobiliarias MLS
+    <span style="font-size:0.75em;color:#64748B;font-weight:400;">· 30 días gratis</span>
+  </a>
+  <a href="/?page=arquitectos"
+     style="display:inline-flex;align-items:center;gap:5px;padding:5px 14px;
+            background:white;border:1px solid #CBD5E1;border-radius:6px;
+            color:#0D1B2A;font-size:0.82em;font-weight:600;text-decoration:none;">
+    📐 Arquitectos
+    <span style="font-size:0.75em;color:#64748B;font-weight:400;">· desde 29€/mes</span>
+  </a>
+</div>""", unsafe_allow_html=True)
+
         # PASO 1: Renderizar MARKETPLACE (mapa, fincas y proyectos)
         try:
             from modules.marketplace import marketplace

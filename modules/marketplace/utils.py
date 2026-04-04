@@ -248,7 +248,8 @@ def list_published_plots():
         SELECT id, title, m2 AS surface_m2, price, lat, lon,
                registry_note_path, status, tour_360_b64,
                owner_name, owner_email, owner_phone,
-               address, created_at, catastral_ref
+               address, created_at, catastral_ref,
+               plano_catastral_path
         FROM plots
         WHERE lat IS NOT NULL AND lon IS NOT NULL
     """)
@@ -258,10 +259,14 @@ def list_published_plots():
         "registry_note_path","status","tour_360_b64",
         "owner_name","owner_email","owner_phone",
         "address","created_at","catastral_ref",
+        "plano_catastral_path",
     ]
     result = []
     for r in rows:
         plot_dict = dict(zip(cols, r))
+        # Si registry_note_path está vacío, usar plano_catastral_path (uploads vía portal propietario)
+        if not plot_dict.get("registry_note_path") and plot_dict.get("plano_catastral_path"):
+            plot_dict["registry_note_path"] = plot_dict["plano_catastral_path"]
         result.append(plot_dict)
     return result
 
