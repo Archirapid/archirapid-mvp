@@ -148,18 +148,28 @@ def get_user_by_email(email):
 
 def list_projects():
     conn = db_conn(); c=conn.cursor()
-    # Join with architects table instead of users
     c.execute("""
-        SELECT p.id, p.title, p.description, p.area_m2, p.price, p.foto_principal, p.galeria_fotos, p.created_at,
-               a.name as architect_name, a.company
+        SELECT p.id, p.title, p.description, p.area_m2, p.price,
+               p.foto_principal, p.galeria_fotos, p.created_at,
+               p.is_active,
+               COALESCE(a.name, u.name, 'Sin nombre') AS architect_name,
+               COALESCE(a.company, '') AS company,
+               COALESCE(a.email, u.email, '') AS architect_email,
+               COALESCE(a.phone, '') AS architect_phone,
+               p.architect_id
         FROM projects p
         LEFT JOIN architects a ON p.architect_id = a.id
+        LEFT JOIN users u ON p.architect_id = u.id
         ORDER BY p.created_at DESC
     """)
     rows = c.fetchall(); conn.close()
-    cols = ["id","title","description","area_m2","price","foto_principal","galeria_fotos","created_at","architect_name","company"]
+    cols = [
+        "id","title","description","area_m2","price",
+        "foto_principal","galeria_fotos","created_at",
+        "is_active","architect_name","company",
+        "architect_email","architect_phone","architect_id",
+    ]
     projects = [dict(zip(cols,r)) for r in rows]
-    # galeria_fotos puede ser None o JSON
     for proj in projects:
         if proj['galeria_fotos']:
             try:
@@ -234,17 +244,24 @@ def create_plot_record(plot):
 
 def list_published_plots():
     conn = db_conn(); c=conn.cursor()
-    # Traer todas las filas de plots con coordenadas (lat/lon son críticos para el mapa)
-    # Usar m2 como alias de surface_m2 para compatibilidad
-    c.execute("SELECT id,title,m2 as surface_m2,price,lat,lon,registry_note_path,status,tour_360_b64 FROM plots WHERE lat IS NOT NULL AND lon IS NOT NULL")
+    c.execute("""
+        SELECT id, title, m2 AS surface_m2, price, lat, lon,
+               registry_note_path, status, tour_360_b64,
+               owner_name, owner_email, owner_phone,
+               address, created_at, catastral_ref
+        FROM plots
+        WHERE lat IS NOT NULL AND lon IS NOT NULL
+    """)
     rows = c.fetchall(); conn.close()
-    cols = ["id","title","surface_m2","price","lat","lon","registry_note_path","status","tour_360_b64"]
+    cols = [
+        "id","title","surface_m2","price","lat","lon",
+        "registry_note_path","status","tour_360_b64",
+        "owner_name","owner_email","owner_phone",
+        "address","created_at","catastral_ref",
+    ]
     result = []
     for r in rows:
         plot_dict = dict(zip(cols, r))
-        # Asegurar que surface_m2 tenga un valor (usar m2 como fallback)
-        if not plot_dict.get('surface_m2') and plot_dict.get('m2'):
-            plot_dict['surface_m2'] = plot_dict['m2']
         result.append(plot_dict)
     return result
 

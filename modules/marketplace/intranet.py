@@ -70,49 +70,128 @@ def main():
     except Exception:
         pass
 
-    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10, tab11, tab12 = st.tabs([
-        "📋 Gestión de Fincas", "🏗️ Gestión de Proyectos", "💰 Ventas y Transacciones",
-        "📞 Consultas", "🛠️ Profesionales", "⚙️ Admin", "🎯 Waitlist", "📬 Actividad",
-        f"📊 Analytics{_leads_nuevos_badge}", "🏢 MLS — Inmobiliarias",
-        "⚖️ Disclaimers Legales", "🎓 Estudiantes",
-    ])
+    _ADMIN_SECCIONES = [
+        "📋 Gestión de Fincas",
+        "🏗️ Gestión de Proyectos",
+        "💰 Ventas y Transacciones",
+        "📞 Consultas y Soporte",
+        "🛠️ Profesionales",
+        "⚙️ Admin",
+        "🎯 Waitlist",
+        "📬 Actividad",
+        "📊 Analytics",
+        "🏢 MLS — Inmobiliarias",
+        "⚖️ Disclaimers Legales",
+        "🎓 Estudiantes",
+        "🏠 Prefabricadas",
+    ]
+    # Badge de leads MLS en la opción Analytics
+    _analytics_label = f"📊 Analytics{_leads_nuevos_badge}" if _leads_nuevos_badge else "📊 Analytics"
+    _ADMIN_DISPLAY_MAP = {s: s for s in _ADMIN_SECCIONES}
+    _ADMIN_DISPLAY_MAP["📊 Analytics"] = _analytics_label
 
-    with tab1:
+    _nav_c1, _nav_c2, _nav_c3 = st.columns([3, 1, 1])
+    with _nav_c1:
+        _admin_seccion = st.selectbox(
+            "🗂️ Sección del panel",
+            _ADMIN_SECCIONES,
+            format_func=lambda s: _ADMIN_DISPLAY_MAP[s],
+            key="admin_nav_select",
+            label_visibility="collapsed",
+        )
+    st.markdown("---")
+
+    if _admin_seccion == "📋 Gestión de Fincas":
         try:
             st.header("Gestión de Fincas Publicadas")
             plots = list_published_plots()
             if plots:
+                _STATUS_ICONS = {
+                    "disponible": "🟢", "published": "🟢",
+                    "reserved": "🟡", "reservada": "🟡",
+                    "sold": "🔵", "vendida": "🔵",
+                    "no_disponible": "⚫", "suspended": "🔴", "suspendida": "🔴",
+                }
                 for p in plots:
-                    with st.expander(f"Finca: {p['title']}"):
-                        st.write(f"**ID:** {p['id']}")
-                        st.write(f"**Superficie:** {p['surface_m2']} m²")
-                        st.write(f"**Precio:** €{p['price']}")
-                        st.write(f"**Status:** {p.get('status', 'Pendiente')}")
-                        col1, col2, col3 = st.columns(3)
-                        with col1:
-                            if st.button(f"Aprobar {p['id']}", key=f"approve_plot_{p['id']}"):
-                                st.success("Finca aprobada (Admin)")
-                        with col2:
-                            if st.button(f"Rechazar {p['id']}", key=f"reject_plot_{p['id']}"):
-                                st.info("Funcionalidad próximamente")
-                        with col3:
-                            if st.button(f"📢 Alertar suscriptores", key=f"alert_plot_{p['id']}"):
-                                try:
-                                    from modules.marketplace.alertas import notify_new_plot
-                                    n = notify_new_plot(dict(p))
-                                    if n > 0:
-                                        st.success(f"✅ {n} email(s) enviados.")
-                                    else:
-                                        st.info("Sin suscriptores coincidentes o RESEND_API_KEY no configurada.")
-                                except Exception as _ae:
-                                    st.error(f"Error alertas: {_ae}")
+                    _icon = _STATUS_ICONS.get(p.get("status",""), "⚪")
+                    with st.expander(f"{_icon} {p['title']} — {p.get('status','?')} | {p.get('owner_name','Sin propietario')}"):
+                        _fi1, _fi2 = st.columns([3, 2])
+                        with _fi1:
+                            st.markdown("**📋 Datos de la finca**")
+                            st.markdown(f"""
+| Campo | Valor |
+|---|---|
+| ID | `{p['id'][:16]}…` |
+| Superficie | {p.get('surface_m2', '—')} m² |
+| Precio | €{p.get('price', 0):,.0f} |
+| Estado | **{p.get('status','—')}** |
+| Dirección | {p.get('address') or '—'} |
+| Ref. catastral | `{p.get('catastral_ref') or '—'}` |
+| Fecha subida | {(p.get('created_at') or '—')[:10]} |
+""")
+                            st.markdown("**👤 Propietario**")
+                            st.markdown(f"""
+| Campo | Valor |
+|---|---|
+| Nombre | {p.get('owner_name') or '—'} |
+| Email | {p.get('owner_email') or '—'} |
+| Teléfono | {p.get('owner_phone') or '—'} |
+""")
+                            # Nota catastral
+                            _reg = p.get("registry_note_path")
+                            if _reg:
+                                st.markdown(f"📄 **Nota catastral:** `{_reg}`")
+                            else:
+                                st.caption("📄 Sin nota catastral adjunta")
+
+                        with _fi2:
+                            st.markdown("**⚙️ Cambiar estado**")
+                            _btn_col1, _btn_col2 = st.columns(2)
+                            with _btn_col1:
+                                if st.button("✅ Aprobar", key=f"plot_apro_{p['id']}",
+                                             use_container_width=True, type="primary"):
+                                    _uc = db_conn()
+                                    _uc.execute("UPDATE plots SET status='disponible' WHERE id=?", (p["id"],))
+                                    _uc.commit(); _uc.close()
+                                    st.success("Finca aprobada ✅"); st.rerun()
+                                if st.button("🚫 Suspender", key=f"plot_sus_{p['id']}",
+                                             use_container_width=True):
+                                    _uc = db_conn()
+                                    _uc.execute("UPDATE plots SET status='suspended' WHERE id=?", (p["id"],))
+                                    _uc.commit(); _uc.close()
+                                    st.warning("Finca suspendida"); st.rerun()
+                                if st.button("🔵 Vendida", key=f"plot_sold_{p['id']}",
+                                             use_container_width=True):
+                                    _uc = db_conn()
+                                    _uc.execute("UPDATE plots SET status='sold' WHERE id=?", (p["id"],))
+                                    _uc.commit(); _uc.close()
+                                    st.info("Marcada como vendida"); st.rerun()
+                            with _btn_col2:
+                                if st.button("🟡 Reservada", key=f"plot_res_{p['id']}",
+                                             use_container_width=True):
+                                    _uc = db_conn()
+                                    _uc.execute("UPDATE plots SET status='reserved' WHERE id=?", (p["id"],))
+                                    _uc.commit(); _uc.close()
+                                    st.info("Marcada como reservada"); st.rerun()
+                                if st.button("⚫ No disponible", key=f"plot_nd_{p['id']}",
+                                             use_container_width=True):
+                                    _uc = db_conn()
+                                    _uc.execute("UPDATE plots SET status='no_disponible' WHERE id=?", (p["id"],))
+                                    _uc.commit(); _uc.close()
+                                    st.warning("No disponible"); st.rerun()
+                                if st.button("📢 Alertar", key=f"alert_plot_{p['id']}",
+                                             use_container_width=True):
+                                    try:
+                                        from modules.marketplace.alertas import notify_new_plot
+                                        _n = notify_new_plot(dict(p))
+                                        st.success(f"✅ {_n} email(s)" if _n > 0 else "Sin suscriptores")
+                                    except Exception as _ae:
+                                        st.error(f"Error alertas: {_ae}")
 
                         # ── Tour 360° ──────────────────────────────────────────
                         st.markdown("---")
                         _has_360 = bool(p.get("tour_360_b64", ""))
-                        st.markdown(
-                            f"**🔭 Tour Virtual 360°:** {'✅ Activo' if _has_360 else '⬜ Sin tour'}"
-                        )
+                        st.markdown(f"**🔭 Tour Virtual 360°:** {'✅ Activo' if _has_360 else '⬜ Sin tour'}")
                         _up360 = st.file_uploader(
                             "Subir foto equirectangular (JPG/PNG — cualquier móvil en modo 360°)",
                             type=["jpg", "jpeg", "png"],
@@ -139,13 +218,16 @@ def main():
                                     _conn360.commit()
                                 except Exception:
                                     pass  # columna ya existe
-                                _conn360.execute(
-                                    "UPDATE plots SET tour_360_b64=? WHERE id=?",
-                                    (_b64_val, p["id"])
-                                )
-                                _conn360.commit()
-                                _conn360.close()
-                                st.success("✅ Tour 360° guardado. Recarga la página para verlo activo.")
+                                try:
+                                    _conn360.execute(
+                                        "UPDATE plots SET tour_360_b64=? WHERE id=?",
+                                        (_b64_val, p["id"])
+                                    )
+                                    _conn360.commit()
+                                finally:
+                                    _conn360.close()
+                                st.success("✅ Tour 360° guardado.")
+                                st.rerun()
                             except Exception as _e360:
                                 st.error(f"Error guardando tour 360°: {_e360}")
             else:
@@ -153,32 +235,130 @@ def main():
         except Exception as e:
             st.error(f"Error en Gestión de Fincas: {e}")
 
-    with tab2:
+    elif _admin_seccion == "🏗️ Gestión de Proyectos":
         try:
+            # Añadir columna status si no existe (ALTER TABLE idempotente)
+            try:
+                _pc = db_conn()
+                _pc.execute("ALTER TABLE projects ADD COLUMN status TEXT DEFAULT 'activo'")
+                _pc.commit()
+                _pc.close()
+            except Exception:
+                try:
+                    _pc.close()
+                except Exception:
+                    pass
+
             st.header("Gestión de Proyectos Arquitectónicos")
             projects = list_projects()
             if projects:
+                _PROJ_STATUS_ICONS = {
+                    "activo": "🟢", "publicado": "🟢",
+                    "reservado": "🟡", "vendido": "🔵",
+                    "no_disponible": "⚫", "suspendido": "🔴", "eliminado": "🗑️",
+                }
                 for proj in projects:
-                    with st.expander(f"Proyecto: {proj['title']}"):
-                        # Imagen principal o fallback
-                        img_path = proj['foto_principal'] if proj['foto_principal'] else "assets/fincas/image1.jpg"
-                        st.image(img_path, width=120, caption="Imagen principal")
-                        st.write(f"**Arquitecto:** {proj['architect_name']}")
-                        st.write(f"**Precio:** €{proj['price']}")
-                        st.write(f"**Área:** {proj['area_m2']} m²")
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            if st.button(f"Aprobar Proyecto {proj['id']}", key=f"approve_proj_{proj['id']}"):
-                                st.success("Proyecto aprobado (Admin)")
-                        with col2:
-                            if st.button(f"Rechazar Proyecto {proj['id']}", key=f"reject_proj_{proj['id']}"):
-                                st.info("Funcionalidad próximamente")
+                    _pstatus = proj.get("status") or ("activo" if proj.get("is_active", 1) else "suspendido")
+                    _picon = _PROJ_STATUS_ICONS.get(_pstatus, "⚪")
+                    with st.expander(
+                        f"{_picon} {proj['title']} — {proj['architect_name']} | €{proj.get('price',0):,.0f} | {_pstatus}"
+                    ):
+                        _pj1, _pj2 = st.columns([3, 2])
+                        with _pj1:
+                            # Imagen
+                            _img_path = proj.get('foto_principal') or "assets/branding/logo.png"
+                            import os as _os_pj
+                            if _img_path and _os_pj.path.exists(_img_path):
+                                st.image(_img_path, width=150, caption="Imagen principal")
+
+                            st.markdown("**📋 Datos del proyecto**")
+                            st.markdown(f"""
+| Campo | Valor |
+|---|---|
+| ID | `{proj['id'][:16]}…` |
+| Título | {proj['title']} |
+| Área | {proj.get('area_m2') or '—'} m² |
+| Precio | €{proj.get('price', 0):,.0f} |
+| Estado | **{_pstatus}** |
+| Fecha subida | {(proj.get('created_at') or '—')[:10]} |
+""")
+                            st.markdown("**👤 Creado por**")
+                            st.markdown(f"""
+| Campo | Valor |
+|---|---|
+| Nombre | {proj.get('architect_name') or '—'} |
+| Empresa | {proj.get('company') or '—'} |
+| Email | {proj.get('architect_email') or '—'} |
+| Teléfono | {proj.get('architect_phone') or '—'} |
+""")
+                            if proj.get('description'):
+                                with st.expander("Ver descripción"):
+                                    st.write(proj['description'])
+
+                        with _pj2:
+                            st.markdown("**⚙️ Cambiar estado**")
+                            _pb1, _pb2 = st.columns(2)
+                            with _pb1:
+                                if st.button("✅ Activo", key=f"proj_act_{proj['id']}",
+                                             use_container_width=True, type="primary"):
+                                    _cup = db_conn()
+                                    _cup.execute(
+                                        "UPDATE projects SET status='activo', is_active=1 WHERE id=?",
+                                        (proj["id"],)
+                                    )
+                                    _cup.commit(); _cup.close()
+                                    st.success("Activo ✅"); st.rerun()
+                                if st.button("🟡 Reservado", key=f"proj_res_{proj['id']}",
+                                             use_container_width=True):
+                                    _cup = db_conn()
+                                    _cup.execute("UPDATE projects SET status='reservado' WHERE id=?", (proj["id"],))
+                                    _cup.commit(); _cup.close()
+                                    st.info("Reservado"); st.rerun()
+                                if st.button("🔵 Vendido", key=f"proj_sold_{proj['id']}",
+                                             use_container_width=True):
+                                    _cup = db_conn()
+                                    _cup.execute("UPDATE projects SET status='vendido', is_active=0 WHERE id=?", (proj["id"],))
+                                    _cup.commit(); _cup.close()
+                                    st.info("Vendido"); st.rerun()
+                            with _pb2:
+                                if st.button("⚫ No disponible", key=f"proj_nd_{proj['id']}",
+                                             use_container_width=True):
+                                    _cup = db_conn()
+                                    _cup.execute("UPDATE projects SET status='no_disponible', is_active=0 WHERE id=?", (proj["id"],))
+                                    _cup.commit(); _cup.close()
+                                    st.warning("No disponible"); st.rerun()
+                                if st.button("🔴 Suspender", key=f"proj_sus_{proj['id']}",
+                                             use_container_width=True):
+                                    _cup = db_conn()
+                                    _cup.execute("UPDATE projects SET status='suspendido', is_active=0 WHERE id=?", (proj["id"],))
+                                    _cup.commit(); _cup.close()
+                                    st.warning("Suspendido"); st.rerun()
+                                if st.button("🗑️ Eliminar", key=f"proj_del_{proj['id']}",
+                                             use_container_width=True, type="secondary"):
+                                    st.session_state[f"confirm_del_proj_{proj['id']}"] = True
+
+                            if st.session_state.get(f"confirm_del_proj_{proj['id']}"):
+                                st.error(f"¿Eliminar '{proj['title']}'? Irreversible.")
+                                _dc1, _dc2 = st.columns(2)
+                                with _dc1:
+                                    if st.button("❌ Sí, eliminar", key=f"proj_del_yes_{proj['id']}",
+                                                 type="primary", use_container_width=True):
+                                        _cup = db_conn()
+                                        _cup.execute("DELETE FROM projects WHERE id=?", (proj["id"],))
+                                        _cup.commit(); _cup.close()
+                                        st.session_state.pop(f"confirm_del_proj_{proj['id']}", None)
+                                        st.success("Eliminado"); st.rerun()
+                                with _dc2:
+                                    if st.button("↩️ Cancelar", key=f"proj_del_no_{proj['id']}",
+                                                 use_container_width=True):
+                                        st.session_state.pop(f"confirm_del_proj_{proj['id']}", None)
+                                        st.rerun()
             else:
-                st.info("Próximamente. No hay proyectos.")
+                st.info("No hay proyectos publicados aún.")
         except Exception as e:
             st.error(f"Error en Gestión de Proyectos: {e}")
 
-    with tab3:
+    elif _admin_seccion == "💰 Ventas y Transacciones":
         st.header("💰 Ventas y Transacciones — Todos los flujos")
         import sqlite3 as _sq3, pandas as _pd3
 
@@ -241,7 +421,11 @@ def main():
             _db3b = db_conn()
             _df_res3 = _read3(
                 _db3b,
-                """SELECT r.id, r.buyer_name, r.buyer_email, p.title as finca,
+                """SELECT r.id, r.buyer_name, r.buyer_email,
+                          COALESCE(r.buyer_dni, '—') as buyer_dni,
+                          COALESCE(r.buyer_domicilio, '—') as buyer_domicilio,
+                          COALESCE(r.buyer_province, '—') as buyer_province,
+                          p.title as finca,
                           r.amount, r.kind, r.created_at
                    FROM reservations r LEFT JOIN plots p ON r.plot_id=p.id
                    ORDER BY r.created_at DESC"""
@@ -254,15 +438,51 @@ def main():
                     "aceptado": "✅ Aceptada", "compra_completa": "🏡 Compra completada",
                 }
                 _df_res3["estado"] = _df_res3["kind"].map(_STATUS_LABELS).fillna(_df_res3["kind"])
+
+                # Vista compacta con todos los datos
                 st.dataframe(
-                    _df_res3[["id","buyer_name","buyer_email","finca","amount","estado","created_at"]].rename(columns={
+                    _df_res3[[
+                        "id","buyer_name","buyer_email","finca","amount","estado","created_at"
+                    ]].rename(columns={
                         "id": "ID", "buyer_name": "Comprador", "buyer_email": "Email",
-                        "finca": "Finca", "amount": "Importe (€)", "estado": "Estado", "created_at": "Fecha"
+                        "finca": "Finca", "amount": "Importe (€)",
+                        "estado": "Estado", "created_at": "Fecha"
                     }),
                     use_container_width=True, hide_index=True
                 )
 
-                # Gestión de estado — admin puede avanzar el estado de cualquier reserva
+                # Fichas detalladas de cada comprador
+                st.markdown("**👤 Ficha detallada por comprador:**")
+                for _, _rrow in _df_res3.iterrows():
+                    with st.expander(
+                        f"{_rrow['estado']} — {_rrow['buyer_name']} | {_rrow['finca']} | €{_rrow['amount']:,.0f}",
+                        expanded=False
+                    ):
+                        _rc1, _rc2 = st.columns(2)
+                        with _rc1:
+                            st.markdown(f"""
+| Campo | Valor |
+|---|---|
+| Nombre | {_rrow['buyer_name']} |
+| Email | {_rrow['buyer_email']} |
+| DNI/NIE | {_rrow['buyer_dni']} |
+| Domicilio | {_rrow['buyer_domicilio']} |
+| Provincia | {_rrow['buyer_province']} |
+| Fecha | {str(_rrow['created_at'])[:16]} |
+""")
+                        with _rc2:
+                            st.markdown(f"""
+| Campo | Valor |
+|---|---|
+| Finca | {_rrow['finca']} |
+| Importe | €{_rrow['amount']:,.0f} |
+| Estado | {_rrow['estado']} |
+| ID reserva | `{str(_rrow['id'])[:16]}` |
+""")
+                            # Mailto directo
+                            st.markdown(f"[✉️ Escribir al comprador](mailto:{_rrow['buyer_email']})")
+
+                # Gestión de estado
                 st.markdown("**⚙️ Actualizar estado de reserva:**")
                 _col_r1, _col_r2, _col_r3 = st.columns(3)
                 with _col_r1:
@@ -283,12 +503,11 @@ def main():
                             )
                             _db_up.commit()
                             _db_up.close()
-                            # Notificar al comprador via Telegram
                             try:
                                 _buyer_r = _df_res3[_df_res3["id"]==_res_sel].iloc[0]
                                 from modules.marketplace.email_notify import _send as _t_send
                                 _lbl = {"en_tramitacion":"⚙️ en tramitación","aceptado":"✅ aceptada","compra_completa":"🏡 completada"}
-                                _t_send(f"📋 Admin actualizó reserva {_res_sel[:8]}... → {_lbl.get(_new_status, _new_status)}\nComprador: {_buyer_r['buyer_email']}")
+                                _t_send(f"📋 Admin actualizó reserva {str(_res_sel)[:8]}… → {_lbl.get(_new_status, _new_status)}\nComprador: {_buyer_r['buyer_email']}")
                             except Exception:
                                 pass
                             st.success(f"Estado actualizado a '{_new_status}'")
@@ -408,38 +627,38 @@ def main():
         st.markdown("---")
 
         # ── 5. Stripe — Todos los pagos ───────────────────────────────────────
-        st.subheader("💳 Stripe — Todos los pagos (tiempo real)")
-        try:
-            from modules.stripe_utils import list_recent_sessions as _lrs3
-            _stripe_all = _lrs3(limit=100)
-            _rows3 = []
-            _stripe_data3 = getattr(_stripe_all, "data", None) or list(_stripe_all)
-            for _ss3 in _stripe_data3:
-                try:
-                    _meta3 = dict(getattr(_ss3, "metadata", None) or {})
-                except Exception:
-                    _meta3 = {}
-                _rows3.append({
-                    "Fecha":      _pd3.to_datetime(getattr(_ss3, "created", 0), unit="s").strftime("%d/%m/%Y %H:%M"),
-                    "Email":      getattr(_ss3, "customer_email", None) or _meta3.get("client_email", "—"),
-                    "Concepto":   _meta3.get("products", _meta3.get("mode", _meta3.get("project", "—"))),
-                    "Importe (€)": (getattr(_ss3, "amount_total", 0) or 0) / 100,
-                    "Estado":     "✅ Pagado" if getattr(_ss3, "payment_status", "") == "paid" else "⏳ Pendiente",
-                    "Session ID": (getattr(_ss3, "id", "") or "")[-20:],
-                })
-            if _rows3:
-                _df_st3 = _pd3.DataFrame(_rows3)
-                _paid3  = _df_st3[_df_st3["Estado"] == "✅ Pagado"]["Importe (€)"].sum()
-                _sc1, _sc2 = st.columns(2)
-                _sc1.metric("💶 Total cobrado (Stripe)", f"€{_paid3:,.2f}")
-                _sc2.metric("🧾 Sesiones totales", len(_rows3))
-                st.dataframe(_df_st3, use_container_width=True, hide_index=True)
-            else:
-                st.info("Sin sesiones Stripe todavía. Usa tarjeta 4242 4242 4242 4242 para test.")
-        except Exception as _est3:
-            st.warning(f"Stripe error: {type(_est3).__name__}: {_est3}")
+        with st.expander("💳 Stripe — Todos los pagos (tiempo real)", expanded=False):
+            try:
+                from modules.stripe_utils import list_recent_sessions as _lrs3
+                _stripe_all = _lrs3(limit=100)
+                _rows3 = []
+                _stripe_data3 = getattr(_stripe_all, "data", None) or list(_stripe_all)
+                for _ss3 in _stripe_data3:
+                    try:
+                        _meta3 = dict(getattr(_ss3, "metadata", None) or {})
+                    except Exception:
+                        _meta3 = {}
+                    _rows3.append({
+                        "Fecha":      _pd3.to_datetime(getattr(_ss3, "created", 0), unit="s").strftime("%d/%m/%Y %H:%M"),
+                        "Email":      getattr(_ss3, "customer_email", None) or _meta3.get("client_email", "—"),
+                        "Concepto":   _meta3.get("products", _meta3.get("mode", _meta3.get("project", "—"))),
+                        "Importe (€)": (getattr(_ss3, "amount_total", 0) or 0) / 100,
+                        "Estado":     "✅ Pagado" if getattr(_ss3, "payment_status", "") == "paid" else "⏳ Pendiente",
+                        "Session ID": (getattr(_ss3, "id", "") or "")[-20:],
+                    })
+                if _rows3:
+                    _df_st3 = _pd3.DataFrame(_rows3)
+                    _paid3  = _df_st3[_df_st3["Estado"] == "✅ Pagado"]["Importe (€)"].sum()
+                    _sc1, _sc2 = st.columns(2)
+                    _sc1.metric("💶 Total cobrado (Stripe)", f"€{_paid3:,.2f}")
+                    _sc2.metric("🧾 Sesiones totales", len(_rows3))
+                    st.dataframe(_df_st3, use_container_width=True, hide_index=True)
+                else:
+                    st.info("Sin sesiones Stripe todavía. Usa tarjeta 4242 4242 4242 4242 para test.")
+            except Exception as _est3:
+                st.warning(f"Stripe error: {type(_est3).__name__}: {_est3}")
 
-    with tab4:
+    elif _admin_seccion == "📞 Consultas y Soporte":
         try:
             st.header("📞 Consultas y Soporte")
             _ts_conn = db_conn()
@@ -515,7 +734,7 @@ def main():
         except Exception as e:
             st.error(f"Error en Consultas y Soporte: {e}")
 
-    with tab5:
+    elif _admin_seccion == "🛠️ Profesionales":
         try:
             st.header("🛠️ Gestión de Profesionales / Constructores")
 
@@ -745,7 +964,7 @@ def main():
         except Exception as _eit:
             st.error(f"Error cargando tablón/comisiones: {_eit}")
 
-    with tab6:
+    elif _admin_seccion == "⚙️ Admin":
         st.header("⚙️ Herramientas de Administración")
         st.warning("Estas acciones afectan a datos reales. Úsalas solo si sabes lo que haces.")
 
@@ -956,7 +1175,7 @@ def main():
             import traceback
             st.error(f"Error gestionando catálogo de prefabricadas: {e}")
 
-    with tab7:
+    elif _admin_seccion == "🎯 Waitlist":
         st.header("Lista de Espera (Waitlist)")
         try:
             import sqlite3 as _sq3w, pandas as _pdw
@@ -1027,7 +1246,7 @@ def main():
             st.error(f"Error cargando waitlist: {_ew}")
             st.code(_tb7.format_exc())
 
-    with tab8:
+    elif _admin_seccion == "📬 Actividad":
         st.header("📬 Actividad Reciente")
 
         # Estado configuración Telegram
@@ -1137,8 +1356,8 @@ Obtén el token creando un bot con @BotFather en Telegram.
 
         _ca.close()
 
-    # ── TAB 9: ANALYTICS ──────────────────────────────────────────────────────
-    with tab9:
+    # ── ANALYTICS ─────────────────────────────────────────────────────────────
+    elif _admin_seccion == "📊 Analytics":
         st.header("📊 Dashboard de Analytics — ArchiRapid")
         import sqlite3 as _sq9
         import pandas as _pd9
@@ -1619,8 +1838,8 @@ Obtén el token creando un bot con @BotFather en Telegram.
         except Exception as _e9:
             st.error(f"Error en Analytics: {_e9}")
 
-    # ── TAB 10: MLS — INMOBILIARIAS ───────────────────────────────────────────
-    with tab10:
+    # ── MLS — INMOBILIARIAS ───────────────────────────────────────────────────
+    elif _admin_seccion == "🏢 MLS — Inmobiliarias":
         st.header("🏢 ArchiRapid MLS — Panel de Administración")
 
         # Imports locales — sin afectar el resto de la Intranet
@@ -2370,7 +2589,7 @@ Obtén el token creando un bot con @BotFather en Telegram.
         except Exception as _eg:
             st.warning(f"Error sección G: {_eg}")
 
-    with tab11:
+    elif _admin_seccion == "⚖️ Disclaimers Legales":
         try:
             import pandas as pd
             from modules.marketplace.utils import db_conn as _dc11
@@ -2418,11 +2637,18 @@ Obtén el token creando un bot con @BotFather en Telegram.
         except Exception as _eh:
             st.warning(f"Error sección Disclaimers: {_eh}")
 
-    with tab12:
+    elif _admin_seccion == "🎓 Estudiantes":
         try:
             _admin_estudiantes_tab()
         except Exception as _eh12:
             st.warning(f"Error sección Estudiantes: {_eh12}")
+
+    elif _admin_seccion == "🏠 Prefabricadas":
+        try:
+            from modules.prefabricadas.admin import render_admin_prefabricadas
+            render_admin_prefabricadas()
+        except Exception as _eh_pref:
+            st.warning(f"Error sección Prefabricadas: {_eh_pref}")
 
 # ─── ADMIN ESTUDIANTES ────────────────────────────────────────────────────────
 

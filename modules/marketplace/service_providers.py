@@ -465,11 +465,16 @@ def show_service_provider_panel():
 """, unsafe_allow_html=True)
 
     # ── Botón cerrar sesión ──────────────────────────────────────────────────
-    if st.button("🚪 Cerrar sesión", key="sp_logout"):
+    if st.button("← Volver al marketplace", key="sp_logout"):
         for k in ['logged_in', 'user_id', 'user_email', 'role', 'user_name',
-                   'viewing_login', 'login_role', 'selected_page']:
+                   'viewing_login', 'login_role']:
             st.session_state.pop(k, None)
-        st.query_params.clear()
+        st.session_state["selected_page"] = "🏠 Inicio / Marketplace"
+        st.session_state["_nav_radio"] = "🏠 Inicio / Marketplace"
+        try:
+            del st.query_params["page"]
+        except Exception:
+            pass
         st.rerun()
 
     tab1, tab2, tab3, tab4 = st.tabs(["📋 Tablón de Obras", "📨 Mis Ofertas", "👤 Mi Perfil", "💶 Mis tarifas"])

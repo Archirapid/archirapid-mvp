@@ -134,8 +134,19 @@ def guardar_datos_catastrales(data_extracted, pdf_path):
 
 
 def main():
-    st.header("Panel de Propietarios — Venta de Suelo")
-    
+    _ow_hcol, _ow_bcol = st.columns([6, 1])
+    with _ow_hcol:
+        st.header("Panel de Propietarios — Venta de Suelo")
+    with _ow_bcol:
+        if st.button("← Volver al marketplace", key="owners_back_home", use_container_width=True):
+            st.session_state["selected_page"] = "🏠 Inicio / Marketplace"
+            st.session_state["_nav_radio"] = "🏠 Inicio / Marketplace"
+            try:
+                del st.query_params["page"]
+            except Exception:
+                pass
+            st.rerun()
+
     # Aviso de comisión
     st.info("📢 ARCHIRAPID gestiona la venta y el desarrollo de tu finca. Por el uso de la plataforma y la gestión comercial, se aplicará una comisión del 7% al 10% sobre el precio de venta final.")
 

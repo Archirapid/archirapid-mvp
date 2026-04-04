@@ -199,10 +199,14 @@ def _detectar_plan_desde_session(sess) -> str | None:
 
 def ui_login_registro() -> None:
     # Botón volver al mapa/home (útil si un visitante llega aquí por error)
-    if st.button("← Volver al mapa", key="mls_login_volver"):
-        st.session_state.pop("selected_page", None)
+    if st.button("← Volver al marketplace", key="mls_login_volver"):
+        st.session_state["selected_page"] = "🏠 Inicio / Marketplace"
+        st.session_state["_nav_radio"] = "🏠 Inicio / Marketplace"
         st.session_state.pop("mls_goto_finca_pending", None)
-        st.query_params.clear()
+        try:
+            del st.query_params["page"]
+        except Exception:
+            pass
         st.rerun()
 
     st.markdown("## 🏢 ArchiRapid MLS — Portal Inmobiliario")

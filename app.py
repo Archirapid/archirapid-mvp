@@ -75,6 +75,19 @@ st.markdown("""
 from lola_widget import render_lola
 render_lola()
 
+# ── Browser back/forward: forzar recarga cuando URL cambia via historial ──────
+st.components.v1.html("""
+<script>
+(function(){
+  if(window._archirapid_popstate_registered) return;
+  window._archirapid_popstate_registered = true;
+  window.addEventListener('popstate', function(){
+    window.location.reload();
+  });
+})();
+</script>
+""", height=0)
+
 # HARDCODE DE ROL PARA PRUEBA
 if st.session_state.get('email') == 'asdfg@lkj.com': st.session_state['role'] = 'owner'
 
@@ -627,8 +640,9 @@ _SLUG_TO_PAGE = {
     "arquitectos":   "Arquitectos (Marketplace)",
     "proveedor":     "👤 Panel de Proveedor",
     "registro-pro":  "📝 Registro de Proveedor de Servicios",
-    "mls":           "🏢 Inmobiliarias MLS",
-    "estudiantes":   "🎓 Estudiantes",
+    "mls":              "🏢 Inmobiliarias MLS",
+    "estudiantes":      "🎓 Estudiantes",
+    "prefabricadas":    "🏠 Portal Prefabricadas",
 }
 _url_slug = st.query_params.get("page", "")
 # ?page=login → mostrar formulario de login genérico en home
@@ -873,6 +887,30 @@ if st.query_params.get("sp_comision_ok") == "1" and st.query_params.get("sp_sess
     except Exception:
         pass
 
+# === STRIPE: retorno pago plan prefabricadas ===
+if st.query_params.get("page") == "prefabricadas" and st.query_params.get("pago") == "ok":
+    _pref_plan = st.query_params.get("plan", "normal")
+    _pref_comp = st.session_state.get("prefab_company")
+    if _pref_comp and not st.session_state.get(f"pref_plan_ok_{_pref_comp['id']}_{_pref_plan}"):
+        try:
+            from datetime import datetime as _dt_pref, timedelta as _td_pref
+            from modules.marketplace.utils import db_conn as _dc_pref
+            _until_pref = (_dt_pref.utcnow() + _td_pref(days=30)).strftime("%Y-%m-%d")
+            _cp_conn = _dc_pref()
+            _cp_conn.execute(
+                "UPDATE prefab_companies SET plan=?, paid_until=? WHERE id=?",
+                (_pref_plan, _until_pref, _pref_comp["id"])
+            )
+            _cp_conn.commit(); _cp_conn.close()
+            # Actualizar sesión
+            st.session_state["prefab_company"] = {**_pref_comp, "plan": _pref_plan, "paid_until": _until_pref}
+            st.session_state[f"pref_plan_ok_{_pref_comp['id']}_{_pref_plan}"] = True
+            st.toast(f"✅ Plan {_pref_plan} activado hasta {_until_pref}", icon="✅")
+        except Exception:
+            pass
+    st.session_state["selected_page"] = "🏠 Portal Prefabricadas"
+    st.session_state["_nav_radio"] = "🏠 Portal Prefabricadas"
+
 # === NUEVAS RUTAS V2 (BORRÓN Y CUENTA NUEVA) ===
 page_from_query = False  # Variable para controlar si la página viene de query params
 if "selected_prefab" in st.query_params and not page_from_query:
@@ -986,6 +1024,7 @@ PAGES = {
     "Registro de Usuario": ("modules.marketplace.auth", "show_registration"),
     "💬 Lola": ("modules.marketplace.virtual_assistant", "main"),
     "🎓 Estudiantes": ("estudiantes", "mostrar_modulo_estudiantes"),
+    "🏠 Portal Prefabricadas": ("modules.prefabricadas.portal", "main"),
 }
 PAGES = list(PAGES.keys())
 
@@ -1191,6 +1230,7 @@ _PAGE_TO_SLUG = {
     "📝 Registro de Proveedor de Servicios": "registro-pro",
     "🏢 Inmobiliarias MLS":                  "mls",
     "🎓 Estudiantes":                        "estudiantes",
+    "🏠 Portal Prefabricadas":               "prefabricadas",
 }
 _cur_page = st.session_state.get('selected_page', '')
 _keep_nav_params = {"selected_plot", "selected_project_v2", "selected_prefab"}
@@ -1498,7 +1538,7 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
   <!-- Separador vertical -->
   <div style="width:1px;background:rgba(245,158,11,0.25);align-self:stretch;margin:0 8px;"></div>
   <!-- Sección derecha: MLS Inmobiliarias -->
-  <div style="flex:0 0 auto;max-width:260px;">
+  <div style="flex:0 0 auto;max-width:220px;">
     <span style="font-size:10px;font-weight:700;color:#F5A623;letter-spacing:2px;
                  text-transform:uppercase;">🏢 ¿Eres Inmobiliaria?</span>
     <div style="font-size:0.88em;font-weight:700;color:#F8FAFC;line-height:1.3;margin-top:2px;">
@@ -1513,6 +1553,26 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
               background:linear-gradient(90deg,#F5A623,#ef4444);color:white;
               border-radius:6px;font-size:0.78em;font-weight:700;text-decoration:none;">
       🎁 30 días Free Trial →
+    </a>
+  </div>
+  <!-- Separador vertical -->
+  <div style="width:1px;background:rgba(16,185,129,0.3);align-self:stretch;margin:0 8px;"></div>
+  <!-- Sección: Estudiantes -->
+  <div style="flex:0 0 auto;max-width:200px;">
+    <span style="font-size:10px;font-weight:700;color:#10B981;letter-spacing:2px;
+                 text-transform:uppercase;">🎓 ¿Eres Estudiante?</span>
+    <div style="font-size:0.88em;font-weight:700;color:#F8FAFC;line-height:1.3;margin-top:2px;">
+      Presenta tu TFG con IA
+    </div>
+    <div style="font-size:0.78em;color:#94A3B8;margin-top:2px;">
+      Planos reales y presupuesto.<br>
+      Acceso gratuito para arquitectura.
+    </div>
+    <a href="/?page=estudiantes"
+       style="display:inline-block;margin-top:6px;padding:4px 12px;
+              background:linear-gradient(90deg,#10B981,#3B82F6);color:white;
+              border-radius:6px;font-size:0.78em;font-weight:700;text-decoration:none;">
+      🎓 Acceso gratuito →
     </a>
   </div>
 </div>""", unsafe_allow_html=True)

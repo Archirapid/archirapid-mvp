@@ -432,6 +432,16 @@ def main():
     """
     Página principal del marketplace para arquitectos
     """
+    # Botón volver al marketplace — siempre visible arriba
+    if st.button("← Volver al marketplace", key="arq_back_home"):
+        st.session_state["selected_page"] = "🏠 Inicio / Marketplace"
+        st.session_state["_nav_radio"] = "🏠 Inicio / Marketplace"
+        try:
+            del st.query_params["page"]
+        except Exception:
+            pass
+        st.rerun()
+
     # si acabamos de registrarnos y no tenemos arquitecto_id, forzamos el login
     frm_key = "FormSubmitter:registro_form-🚀 Registrarme y Acceder"
     if st.session_state.get('login_role') == 'architect' and st.session_state.get(frm_key) and not st.session_state.get('arquitecto_id'):
