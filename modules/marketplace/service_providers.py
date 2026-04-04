@@ -361,7 +361,8 @@ def show_service_provider_panel():
     _init_sp_tables()
 
     if not st.session_state.get("logged_in") or st.session_state.get("role") != "services":
-        st.error("Debes iniciar sesión como constructor/profesional.")
+        # Sin sesión: mostrar directamente el registro/login
+        show_service_provider_registration()
         return
 
     user_email = st.session_state.get("user_email", "")

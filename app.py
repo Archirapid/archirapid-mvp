@@ -1622,15 +1622,21 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
             # ── Acceso directo al portal MLS — 30 días free trial ────────────
             st.link_button("🎁 30 días Free Trial — Acceder al portal MLS →", "/?seccion=mls", use_container_width=True, type="primary")
 
-        # ── 5 tarjetas de acceso en columnas iguales ─────────────────────────
-        _hc1, _hc2, _hc2b, _hc3, _hc4 = st.columns(5, gap="small")
+        # ── FILA 1 — PARTICULARES ─────────────────────────────────────────────
+        st.markdown(
+            "<p style='font-size:0.72em;font-weight:700;color:#94A3B8;"
+            "letter-spacing:1.5px;text-transform:uppercase;margin:6px 0 2px 2px;'>"
+            "Particulares</p>",
+            unsafe_allow_html=True,
+        )
+        _r1c1, _r1c2, _r1c3 = st.columns(3, gap="small")
 
-        with _hc1:
+        with _r1c1:
             st.markdown("""
 <div style="background:white;border-radius:10px;padding:14px 16px;
             border-top:3px solid #F5A623;box-shadow:0 2px 8px rgba(0,0,0,0.07);
             margin-bottom:4px;">
-  <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
+  <div style="display:flex;align-items:center;gap:10px;">
     <span style="font-size:22px;">🏗️</span>
     <div>
       <div style="font-weight:800;color:#0D1B2A;font-size:0.95em;">Tengo un Terreno</div>
@@ -1640,136 +1646,142 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
 </div>""", unsafe_allow_html=True)
             if st.button("Subir Mi Finca →", key="hp_btn_prop", use_container_width=True):
                 if st.session_state.get("logged_in") and st.session_state.get("role") == "owner":
-                    st.session_state['selected_page'] = "🏠 Propietarios"
+                    st.session_state["selected_page"] = "🏠 Propietarios"
                     st.query_params["page"] = "propietarios"
-                    st.rerun()
                 else:
-                    st.session_state['login_role'] = 'owner'
-                    st.session_state['viewing_login'] = True
-                    st.rerun()
-
-        with _hc2:
-            st.markdown("""
-<div style="background:white;border-radius:10px;padding:14px 16px;
-            border-top:3px solid #2563EB;box-shadow:0 2px 8px rgba(0,0,0,0.07);
-            margin-bottom:4px;">
-  <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
-    <span style="font-size:22px;">📐</span>
-    <div>
-      <div style="font-weight:800;color:#0D1B2A;font-size:0.95em;">Soy Arquitecto</div>
-      <div style="color:#64748B;font-size:0.78em;">Comparte propuestas de diseño y conecta con clientes reales.</div>
-    </div>
-  </div>
-</div>""", unsafe_allow_html=True)
-            if st.button("Acceso Arquitectos →", key="hp_btn_arq", use_container_width=True):
-                st.session_state['selected_page'] = "Arquitectos (Marketplace)"
-                st.query_params["page"] = "arquitectos"
+                    st.session_state["login_role"] = "owner"
+                    st.session_state["viewing_login"] = True
                 st.rerun()
 
-        with _hc2b:
+        with _r1c2:
             st.markdown("""
 <div style="background:white;border-radius:10px;padding:14px 16px;
             border-top:3px solid #10B981;box-shadow:0 2px 8px rgba(0,0,0,0.07);
             margin-bottom:4px;">
-  <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
+  <div style="display:flex;align-items:center;gap:10px;">
     <span style="font-size:22px;">🏡</span>
     <div>
-      <div style="font-weight:800;color:#0D1B2A;font-size:0.95em;">Comprador</div>
-      <div style="color:#64748B;font-size:0.78em;">Accede a tu panel, proyectos y transacciones.</div>
+      <div style="font-weight:800;color:#0D1B2A;font-size:0.95em;">Soy Comprador</div>
+      <div style="color:#64748B;font-size:0.78em;">Explora fincas, reserva y gestiona tus transacciones.</div>
     </div>
   </div>
 </div>""", unsafe_allow_html=True)
             if st.button("Mi Panel →", key="hp_btn_cli", use_container_width=True):
                 if st.session_state.get("logged_in") and st.session_state.get("role") == "client":
-                    st.session_state['selected_page'] = "👤 Panel de Cliente"
+                    st.session_state["selected_page"] = "👤 Panel de Cliente"
                     st.query_params["page"] = "cliente"
                 else:
-                    st.session_state['login_role'] = 'client'
-                    st.session_state['viewing_login'] = True
-                    st.session_state['_login_show_registro'] = False
+                    st.session_state["login_role"] = "client"
+                    st.session_state["viewing_login"] = True
+                    st.session_state["_login_show_registro"] = False
                     st.query_params["page"] = "login"
                 st.rerun()
 
-        with _hc3:
+        with _r1c3:
             st.markdown("""
 <div style="background:white;border-radius:10px;padding:14px 16px;
+            border-top:3px solid #8B5CF6;box-shadow:0 2px 8px rgba(0,0,0,0.07);
+            margin-bottom:4px;">
+  <div style="display:flex;align-items:center;gap:10px;">
+    <span style="font-size:22px;">🎓</span>
+    <div>
+      <div style="font-weight:800;color:#0D1B2A;font-size:0.95em;">Soy Estudiante</div>
+      <div style="color:#64748B;font-size:0.78em;">Publica tu TFG/TFM y recibe el 60% de cada venta.</div>
+    </div>
+  </div>
+</div>""", unsafe_allow_html=True)
+            if st.button("Portal Estudiantes →", key="hp_btn_est", use_container_width=True):
+                st.session_state["selected_page"] = "🎓 Estudiantes"
+                st.query_params["page"] = "estudiantes"
+                st.rerun()
+
+        # ── FILA 2 — PROFESIONALES Y EMPRESAS ────────────────────────────────
+        st.markdown(
+            "<p style='font-size:0.72em;font-weight:700;color:#94A3B8;"
+            "letter-spacing:1.5px;text-transform:uppercase;margin:10px 0 2px 2px;'>"
+            "Profesionales y Empresas</p>",
+            unsafe_allow_html=True,
+        )
+        _r2c1, _r2c2, _r2c3, _r2c4 = st.columns(4, gap="small")
+
+        with _r2c1:
+            st.markdown("""
+<div style="background:white;border-radius:10px;padding:12px 14px;
+            border-top:3px solid #2563EB;box-shadow:0 2px 8px rgba(0,0,0,0.07);
+            margin-bottom:4px;">
+  <div style="display:flex;align-items:center;gap:8px;">
+    <span style="font-size:20px;">📐</span>
+    <div>
+      <div style="font-weight:800;color:#0D1B2A;font-size:0.88em;">Arquitecto</div>
+      <div style="color:#64748B;font-size:0.74em;">Diseña, publica y cobra. Desde 29€/mes.</div>
+    </div>
+  </div>
+</div>""", unsafe_allow_html=True)
+            if st.button("Acceder →", key="hp_btn_arq", use_container_width=True):
+                st.session_state["selected_page"] = "Arquitectos (Marketplace)"
+                st.query_params["page"] = "arquitectos"
+                st.rerun()
+
+        with _r2c2:
+            st.markdown("""
+<div style="background:white;border-radius:10px;padding:12px 14px;
             border-top:3px solid #F59E0B;box-shadow:0 2px 8px rgba(0,0,0,0.07);
             margin-bottom:4px;">
-  <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
-    <span style="font-size:22px;">🛠️</span>
+  <div style="display:flex;align-items:center;gap:8px;">
+    <span style="font-size:20px;">🛠️</span>
     <div>
-      <div style="font-weight:800;color:#0D1B2A;font-size:0.95em;">¿Eres profesional?</div>
-      <div style="color:#64748B;font-size:0.78em;">Constructor, reformista o proveedor. Únete a la red.</div>
+      <div style="font-weight:800;color:#0D1B2A;font-size:0.88em;">Constructor</div>
+      <div style="color:#64748B;font-size:0.74em;">Recibe obras compatibles. Plan gratis disponible.</div>
     </div>
   </div>
 </div>""", unsafe_allow_html=True)
-            if st.button("Acceder / Registrarse →", key="hp_btn_pro", use_container_width=True):
+            if st.button("Acceder →", key="hp_btn_pro", use_container_width=True):
                 if st.session_state.get("logged_in") and st.session_state.get("role") == "services":
-                    st.session_state['selected_page'] = "👤 Panel de Proveedor"
+                    st.session_state["selected_page"] = "👤 Panel de Proveedor"
                     st.query_params["page"] = "proveedor"
                 else:
-                    st.session_state['login_role'] = 'services'
-                    st.session_state['viewing_login'] = True
-                    st.session_state['_login_show_registro'] = False
+                    st.session_state["login_role"] = "services"
+                    st.session_state["viewing_login"] = True
+                    st.session_state["_login_show_registro"] = False
                     st.query_params["page"] = "login"
                 st.rerun()
 
-        with _hc4:
+        with _r2c3:
             st.markdown("""
-<div style="background:white;border-radius:10px;padding:14px 16px;
-            border-top:3px solid #1B2A6B;box-shadow:0 2px 8px rgba(0,0,0,0.07);
+<div style="background:white;border-radius:10px;padding:12px 14px;
+            border-top:3px solid #EC4899;box-shadow:0 2px 8px rgba(0,0,0,0.07);
             margin-bottom:4px;">
-  <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
-    <span style="font-size:22px;">🏢</span>
+  <div style="display:flex;align-items:center;gap:8px;">
+    <span style="font-size:20px;">🏠</span>
     <div>
-      <div style="font-weight:800;color:#0D1B2A;font-size:0.95em;">¿Eres Inmobiliaria?</div>
-      <div style="color:#64748B;font-size:0.78em;">Bolsa MLS colaborativa. Comparte fincas, multiplica ventas.</div>
+      <div style="font-weight:800;color:#0D1B2A;font-size:0.88em;">Prefabricadas</div>
+      <div style="color:#64748B;font-size:0.74em;">Cataloga tu empresa. Planes desde 49€/mes.</div>
     </div>
   </div>
 </div>""", unsafe_allow_html=True)
-            if st.button("Acceder a ArchiRapid MLS →", key="hp_btn_mls", use_container_width=True):
+            if st.button("Acceder →", key="hp_btn_pref", use_container_width=True):
+                st.session_state["selected_page"] = "🏠 Portal Prefabricadas"
+                st.session_state["_nav_radio"] = "🏠 Portal Prefabricadas"
+                st.query_params["page"] = "prefabricadas"
+                st.rerun()
+
+        with _r2c4:
+            st.markdown("""
+<div style="background:white;border-radius:10px;padding:12px 14px;
+            border-top:3px solid #1B2A6B;box-shadow:0 2px 8px rgba(0,0,0,0.07);
+            margin-bottom:4px;">
+  <div style="display:flex;align-items:center;gap:8px;">
+    <span style="font-size:20px;">🏢</span>
+    <div>
+      <div style="font-weight:800;color:#0D1B2A;font-size:0.88em;">Inmobiliaria MLS</div>
+      <div style="color:#64748B;font-size:0.74em;">Red colaborativa. 30 días de trial gratuito.</div>
+    </div>
+  </div>
+</div>""", unsafe_allow_html=True)
+            if st.button("Acceder →", key="hp_btn_mls", use_container_width=True):
                 st.session_state["selected_page"] = "🏢 Inmobiliarias MLS"
                 st.query_params["page"] = "mls"
                 st.rerun()
-
-        # ── FRANJA PORTALES EMPRESA ──────────────────────────────────────────────
-        st.markdown("""
-<div style="background:#F1F5F9;border-radius:10px;padding:10px 16px;
-            margin:4px 0 8px 0;border:1px solid #E2E8F0;
-            display:flex;align-items:center;flex-wrap:wrap;gap:8px;">
-  <span style="font-size:0.78em;font-weight:700;color:#64748B;
-               letter-spacing:1.5px;text-transform:uppercase;white-space:nowrap;">
-    🏭 Portales empresa:
-  </span>
-  <a href="/?page=proveedor"
-     style="display:inline-flex;align-items:center;gap:5px;padding:5px 14px;
-            background:white;border:1px solid #CBD5E1;border-radius:6px;
-            color:#0D1B2A;font-size:0.82em;font-weight:600;text-decoration:none;">
-    🏗️ Constructores &amp; Profesionales
-    <span style="font-size:0.75em;color:#64748B;font-weight:400;">· desde gratis</span>
-  </a>
-  <a href="/?page=prefabricadas"
-     style="display:inline-flex;align-items:center;gap:5px;padding:5px 14px;
-            background:white;border:1px solid #CBD5E1;border-radius:6px;
-            color:#0D1B2A;font-size:0.82em;font-weight:600;text-decoration:none;">
-    🏠 Casas Prefabricadas
-    <span style="font-size:0.75em;color:#64748B;font-weight:400;">· planes desde 49€/mes</span>
-  </a>
-  <a href="/?seccion=mls"
-     style="display:inline-flex;align-items:center;gap:5px;padding:5px 14px;
-            background:white;border:1px solid #CBD5E1;border-radius:6px;
-            color:#0D1B2A;font-size:0.82em;font-weight:600;text-decoration:none;">
-    🏢 Inmobiliarias MLS
-    <span style="font-size:0.75em;color:#64748B;font-weight:400;">· 30 días gratis</span>
-  </a>
-  <a href="/?page=arquitectos"
-     style="display:inline-flex;align-items:center;gap:5px;padding:5px 14px;
-            background:white;border:1px solid #CBD5E1;border-radius:6px;
-            color:#0D1B2A;font-size:0.82em;font-weight:600;text-decoration:none;">
-    📐 Arquitectos
-    <span style="font-size:0.75em;color:#64748B;font-weight:400;">· desde 29€/mes</span>
-  </a>
-</div>""", unsafe_allow_html=True)
 
         # PASO 1: Renderizar MARKETPLACE (mapa, fincas y proyectos)
         try:
