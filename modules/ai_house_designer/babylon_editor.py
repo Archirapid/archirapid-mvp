@@ -395,6 +395,7 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
         const plotZ = (totalDepth  - plotD) / 2;
         const roofType = "{roof_type}";
         const houseStyle = "{house_style}";
+        let _currentStyle = "{house_style}";   // mutable — se actualiza en applyStyle()
         const WALL_H = 2.7;
         const WALL_T = 0.15;
         // Color de pared exterior según estilo elegido en Paso 1
@@ -1087,6 +1088,9 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             // Reconstruir todos
             roomsData.forEach((_,i) => buildRoom(i));
             try {{ buildMEPLayers(roomsData); }} catch(e) {{ console.warn('MEP rebuild error:', e); }}
+            // Z-anchor: re-posicionar chimenea/paneles solares sobre el tejado actual
+            try {{ buildStyleExtras(_currentStyle); }} catch(e) {{ console.warn('StyleExtras rebuild error:', e); }}
+            try {{ buildSolarPanels(); }} catch(e) {{ console.warn('SolarPanels rebuild error:', e); }}
             selectedMesh = null;
             selectedIndex = null;
             updateBudget();
@@ -1736,13 +1740,56 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
         // ================================================
         // DELETE — borrar elemento seleccionado
         // ================================================
+        // Primer clic activa modo confirmación; segundo clic dentro de 3s confirma.
+        let _deleteConfirmPending = false;
+        let _deleteConfirmTimer  = null;
+
         function deleteSelected() {{
+            // ── Habitación seleccionada ───────────────────────────────────────
             if (selectedIndex !== null) {{
-                // Es una habitación — no se puede borrar (solo elementos externos)
-                showToast('⚠️ Las habitaciones no se borran aquí. Usa el Paso 2.');
+                // Contar solo habitaciones interiores (no garden/exterior)
+                const interiorCount = roomsData.filter(r => {{
+                    const z = (r.zone||'').toLowerCase();
+                    return z !== 'garden' && z !== 'exterior';
+                }}).length;
+                if (interiorCount <= 2) {{
+                    showToast('⚠️ Mínimo 2 habitaciones — no se puede borrar más');
+                    return;
+                }}
+                // Doble-clic de confirmación
+                if (!_deleteConfirmPending) {{
+                    _deleteConfirmPending = true;
+                    const rName = roomsData[selectedIndex].name;
+                    showToast(`🗑️ ¿Borrar "${{rName}}"? Pulsa de nuevo para confirmar`);
+                    document.getElementById('btn-delete').style.background = 'rgba(231,76,60,0.6)';
+                    clearTimeout(_deleteConfirmTimer);
+                    _deleteConfirmTimer = setTimeout(() => {{
+                        _deleteConfirmPending = false;
+                        document.getElementById('btn-delete').style.background = 'rgba(231,76,60,0.25)';
+                        showToast('❌ Borrado cancelado');
+                    }}, 3000);
+                    return;
+                }}
+                // Segunda pulsación — confirmar borrado
+                clearTimeout(_deleteConfirmTimer);
+                _deleteConfirmPending = false;
+                document.getElementById('btn-delete').style.background = 'rgba(231,76,60,0.25)';
+                saveSnapshot();
+                const deletedName = roomsData[selectedIndex].name;
+                roomsData.splice(selectedIndex, 1);
+                selectedMesh = null;
+                selectedIndex = null;
+                hlLayer.removeAllMeshes();
+                document.getElementById('room-info').innerHTML =
+                    '<p style="color:#888;">Selecciona una habitación</p>';
+                document.getElementById('edit-panel').style.display = 'none';
+                // Redistribuir layout completo
+                const newLayout = generateLayoutJS(roomsData);
+                rebuildScene(newLayout);
+                showToast(`🗑️ "${{deletedName}}" eliminada — planta redistribuida`);
                 return;
             }}
-            // Buscar cerramiento seleccionado
+            // ── Cerramiento seleccionado ──────────────────────────────────────
             if (selectedMesh && selectedMesh.name.startsWith('cwall_')) {{
                 saveSnapshot();
                 const idx = window.customWalls.findIndex(cw => cw.id === selectedMesh.name);
@@ -1756,7 +1803,7 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                 showToast('🗑️ Cerramiento eliminado');
                 return;
             }}
-            showToast('⚠️ Selecciona primero un cerramiento para borrar');
+            showToast('⚠️ Selecciona una habitación o cerramiento para borrar');
         }}
 
         // Tecla Supr/Delete para borrar rápido
@@ -2403,6 +2450,7 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
         }};
 
         function applyStyle(styleName) {{
+            _currentStyle = styleName;   // anclar: rebuildScene lo usará
             const c = STYLE_COLORS[styleName] || [0.92, 0.92, 0.90];
             const newColor = new BABYLON.Color3(c[0], c[1], c[2]);
             // Recorrer todos los materiales de pared existentes en la escena
