@@ -236,34 +236,46 @@ Máximo 1800 palabras. Profesional, técnico, directo."""
                         story.append(Paragraph(l, s_body))
             story.append(PageBreak())
 
-            # ── CUADRO SUPERFICIES
+            # ── CUADRO SUPERFICIES (Útil / Construida)
             story.append(sec_header('IV. CUADRO DE SUPERFICIES'))
             story.append(Spacer(1,0.2*cm))
-            sup_h = [['ESTANCIA','USO','m²']]
+            sup_h = [['ESTANCIA','USO','Sup. Útil (m²)','Sup. Construida (m²)']]
+            _total_util = 0.0
             for r in rooms:
                 c = r.get('code','').lower()
-                uso = ('Húmedo' if any(x in c for x in ['bano','aseo'])
-                  else 'Noche'   if 'dorm' in c
-                  else 'Día'     if any(x in c for x in ['salon','cocina','comedor'])
+                uso = ('Húmedo'   if any(x in c for x in ['bano','aseo'])
+                  else 'Noche'    if 'dorm' in c
+                  else 'Día'      if any(x in c for x in ['salon','cocina','comedor'])
                   else 'Servicio' if any(x in c for x in ['garaje','garage'])
                   else 'Exterior' if any(x in c for x in ['porche','terraza'])
                   else 'Auxiliar')
-                sup_h.append([r['name'], uso, f"{r['area_m2']:.1f}"])
-            sup_h += [['','',''],
-                      ['TOTAL CONSTRUIDO','',f'{total_area:.1f} m²'],
-                      ['Máx. edificable','' ,f"{plot_data.get('buildable_m2',0):.0f} m²"],
-                      ['Ocupación edificable','',
-                       f"{(total_area/max(plot_data.get('buildable_m2',1),1)*100):.1f}%"]]
-            ts = Table(sup_h, colWidths=[9*cm,4.5*cm,3.5*cm])
+                _a = float(r.get('area_m2', 0))
+                _util = round(_a * 0.87, 1)   # Útil: descuento 13% muros
+                _total_util += _util
+                sup_h.append([r['name'], uso, f"{_util:.1f}", f"{_a:.1f}"])
+            _total_construida = total_area
+            _buildable = plot_data.get('buildable_m2', 1) or 1
+            sup_h += [
+                ['','','',''],
+                ['TOTAL SUPERFICIE ÚTIL','', f'{_total_util:.1f} m²',''],
+                ['TOTAL SUPERFICIE CONSTRUIDA','','',f'{_total_construida:.1f} m²'],
+                ['Máx. edificable parcela','','',f"{_buildable:.0f} m²"],
+                ['Ocupación edificable','','',
+                 f"{(_total_construida/max(_buildable,1)*100):.1f}%"],
+            ]
+            ts = Table(sup_h, colWidths=[7*cm,3.5*cm,3.25*cm,3.25*cm])
             ts.setStyle(TableStyle([
                 ('BACKGROUND',(0,0),(-1,0),C_DARK),('TEXTCOLOR',(0,0),(-1,0),white),
-                ('FONTNAME',(0,0),(-1,0),'Helvetica-Bold'),('FONTSIZE',(0,0),(-1,-1),9),
+                ('FONTNAME',(0,0),(-1,0),'Helvetica-Bold'),('FONTSIZE',(0,0),(-1,-1),8.5),
                 ('ROWPADDING',(0,0),(-1,-1),5),('GRID',(0,0),(-1,-1),0.3,C_LIGHT),
-                ('BACKGROUND',(0,-3),(-1,-1),C_LIGHT),('FONTNAME',(0,-3),(-1,-1),'Helvetica-Bold'),
-                ('ROWBACKGROUNDS',(0,1),(-1,-4),[white,C_ROW]),
+                ('BACKGROUND',(0,-4),(-1,-1),C_LIGHT),('FONTNAME',(0,-4),(-1,-1),'Helvetica-Bold'),
+                ('ROWBACKGROUNDS',(0,1),(-1,-5),[white,C_ROW]),
+                ('ALIGN',(2,0),(-1,-1),'CENTER'),
             ]))
             story.append(ts)
-            story.append(Paragraph('[MVP: superficies orientativas. El proyecto definitivo incluirá superficies útiles, construidas y computables según normativa municipal aplicable]', s_mvp))
+            story.append(Paragraph(
+                '[Útil = Construida × 0.87 (descuento 13% muros/tabiques). '
+                'El proyecto definitivo incluirá medición exacta por arquitecto]', s_mvp))
             story.append(PageBreak())
 
             # ── PRESUPUESTO
@@ -387,6 +399,31 @@ Máximo 1800 palabras. Profesional, técnico, directo."""
                     rl_img = RLImage(img_buf, width=16*cm, height=12*cm,
                                      kind='proportional')
                     story.append(rl_img)
+                    story.append(Spacer(1, 0.3*cm))
+                    # ── CAJETÍN TÉCNICO ──────────────────────────────────────
+                    _caj_rows = [
+                        ['PROYECTO', plot_data.get('title','Proyecto de Vivienda Unifamiliar').upper()],
+                        ['REF. CATASTRAL', plot_data.get('catastral_ref','N/A')],
+                        ['PROMOTOR', st.session_state.get('client_email','—')],
+                        ['SUPERFICIE ÚTIL', f"{round(total_area*0.87,1)} m²"],
+                        ['SUPERFICIE CONSTRUIDA', f"{total_area:.1f} m²"],
+                        ['ESCALA', '1:100 (orientativa — documento generado por IA)'],
+                        ['FECHA', fecha],
+                        ['GENERADO POR', 'ArchiRapid · www.archirapid.com'],
+                    ]
+                    _tcaj = Table(_caj_rows, colWidths=[5.5*cm, 11.5*cm])
+                    _tcaj.setStyle(TableStyle([
+                        ('BACKGROUND',(0,0),(0,-1),C_BLUE),
+                        ('TEXTCOLOR',(0,0),(0,-1),white),
+                        ('FONTNAME',(0,0),(0,-1),'Helvetica-Bold'),
+                        ('FONTNAME',(1,0),(1,-1),'Helvetica'),
+                        ('FONTSIZE',(0,0),(-1,-1),8),
+                        ('ROWPADDING',(0,0),(-1,-1),5),
+                        ('GRID',(0,0),(-1,-1),0.5,C_LIGHT),
+                        ('ROWBACKGROUNDS',(0,0),(-1,-1),[HexColor('#EBF5FB'),white]),
+                        ('TEXTCOLOR',(1,5),(1,5),C_ORA),  # escala en naranja (orientativo)
+                    ]))
+                    story.append(_tcaj)
                     story.append(Spacer(1, 0.2*cm))
                     story.append(Paragraph(
                         '[MVP ArchiRapid: plano orientativo generado por IA. '
@@ -507,6 +544,103 @@ sistema y servir de base de trabajo para el arquitecto que desarrolle el proyect
         ws.column_dimensions['A'].width = 35
         ws.column_dimensions['B'].width = 18
         ws.column_dimensions['D'].width = 40
+
+        # ── HOJA 2: MEDICIONES CONSTRUCTIVAS ─────────────────────────────────
+        ws2 = wb.create_sheet("Mediciones Constructivas")
+        _hf2 = Font(bold=True, color="FFFFFF", size=10)
+        _hfill2 = PatternFill("solid", fgColor="1A252F")
+        _sfill2 = PatternFill("solid", fgColor="2C3E50")
+        _tfill2 = PatternFill("solid", fgColor="27AE60")
+        _wfill2 = PatternFill("solid", fgColor="F8F9FA")
+
+        ws2.merge_cells("A1:E1")
+        ws2["A1"] = f"MEDICIONES CONSTRUCTIVAS (orientativas) — {proyecto_nombre}"
+        ws2["A1"].font = Font(bold=True, size=12, color="FFFFFF")
+        ws2["A1"].fill = _hfill2
+        ws2["A1"].alignment = Alignment(horizontal="center")
+        ws2.merge_cells("A2:E2")
+        ws2["A2"] = (f"Superficie construida: {total_area:.1f} m²  |  Estilo: {style}  |  "
+                     f"Ref. catastral: {plot_data.get('catastral_ref','N/A')}  |  {fecha}")
+        ws2["A2"].alignment = Alignment(horizontal="center")
+
+        # Calcular mediciones
+        _perim = round((total_area ** 0.5) * 4, 1)
+        _altura_lib = 2.7
+        _n_banos = sum(1 for r in rooms if any(x in r.get('code','').lower() for x in ['bano','aseo']))
+        _n_coc = sum(1 for r in rooms if 'cocina' in r.get('code','').lower())
+        _m3_cim = round(_perim * 0.40 * 0.80, 1)
+        _m3_sol = round(total_area * 0.12, 1)
+        _m3_horm = round(_m3_cim + _m3_sol, 1)
+        _m2_muro_ext = round(_perim * _altura_lib, 1)
+        _m2_muro_int = round(total_area * 0.30, 1)
+        _m2_cubierta = round(total_area * 1.15, 1)
+        _m2_fachada = round(_m2_muro_ext * 0.85, 1)
+        _ml_font = round((_n_banos * 8 + _n_coc * 6) + total_area * 0.3, 1)
+        _ml_elec = round(total_area * 2.5, 1)
+        _ml_san = round(_perim * 0.6 + _n_banos * 5, 1)
+        _sup_util = round(total_area * 0.87, 1)
+
+        _med_sections = [
+            ("SUPERFICIES", [
+                ("Superficie útil (Construida × 0.87)", f"{_sup_util:.1f}", "m²", "Descontando 13% muros/tabiques"),
+                ("Superficie construida total", f"{total_area:.1f}", "m²", "Incluye muros y tabiques"),
+                ("Superficie parcela", f"{plot_data.get('total_m2',0):.0f}", "m²", "Dato catastral"),
+                ("Superficie edificable (33%)", f"{plot_data.get('buildable_m2',0):.0f}", "m²", "Máxima edificabilidad"),
+            ]),
+            ("CIMENTACIÓN Y ESTRUCTURA", [
+                ("Hormigón cimentación (zapata corrida)", f"{_m3_cim:.1f}", "m³", f"Sección 0.40×0.80 m · Perímetro aprox. {_perim} m"),
+                ("Hormigón solera (e=12 cm)", f"{_m3_sol:.1f}", "m³", "HA-25/B/20/IIa"),
+                ("Hormigón TOTAL", f"{_m3_horm:.1f}", "m³", "Suma cimentación + solera"),
+                ("Acero cimentación (est. 80 kg/m³)", f"{round(_m3_horm * 80 / 1000, 2):.2f}", "t", "Estimación según EHE-08"),
+            ]),
+            ("CERRAMIENTOS Y TABIQUERÍA", [
+                ("Muros exteriores (fachada)", f"{_m2_muro_ext:.1f}", "m²", f"Altura libre {_altura_lib} m"),
+                ("Tabiques interiores", f"{_m2_muro_int:.1f}", "m²", "Estimación 30% superficie"),
+                ("Revestimiento fachada", f"{_m2_fachada:.1f}", "m²", "Descontando huecos ~15%"),
+                ("Cubierta / tejado", f"{_m2_cubierta:.1f}", "m²", "Incluye pendiente (×1.15)"),
+            ]),
+            ("INSTALACIONES", [
+                ("Fontanería agua fría + caliente", f"{_ml_font:.0f}", "ml", f"{_n_banos} baños/aseos + {_n_coc} cocina(s)"),
+                ("Instalación eléctrica BT (REBT)", f"{_ml_elec:.0f}", "ml", "Media 2.5 ml/m² vivienda unifamiliar"),
+                ("Red de saneamiento", f"{_ml_san:.0f}", "ml", "Colectores + ramales"),
+                ("Puntos de luz estimados", f"{round(total_area / 8):.0f}", "ud", "1 punto/8 m² (estándar REBT)"),
+                ("Tomas de corriente estimadas", f"{round(total_area / 5):.0f}", "ud", "1 toma/5 m² (estándar REBT)"),
+            ]),
+        ]
+
+        _row = 4
+        for _sec_name, _items in _med_sections:
+            ws2.merge_cells(f"A{_row}:E{_row}")
+            ws2[f"A{_row}"] = _sec_name
+            ws2[f"A{_row}"].font = _hf2
+            ws2[f"A{_row}"].fill = _sfill2
+            _row += 1
+            for _col, _h in enumerate(["Partida", "Cantidad", "Unidad", "Notas"], 1):
+                _c = ws2.cell(row=_row, column=_col, value=_h)
+                _c.font = _hf2; _c.fill = _hfill2
+            _row += 1
+            for _name, _qty, _unit, _note in _items:
+                ws2.cell(row=_row, column=1, value=_name)
+                ws2.cell(row=_row, column=2, value=_qty)
+                ws2.cell(row=_row, column=3, value=_unit)
+                ws2.cell(row=_row, column=4, value=_note)
+                if _row % 2 == 0:
+                    for _col in range(1, 5):
+                        ws2.cell(row=_row, column=_col).fill = _wfill2
+                _row += 1
+            _row += 1  # espacio entre secciones
+
+        ws2.merge_cells(f"A{_row}:E{_row}")
+        ws2[f"A{_row}"] = ("⚠️ AVISO: Mediciones ORIENTATIVAS calculadas por IA. "
+                           "El estado de mediciones definitivo requiere levantamiento "
+                           "y medición real por arquitecto/aparejador colegiado.")
+        ws2[f"A{_row}"].font = Font(bold=True, color="E67E22", size=9)
+        ws2[f"A{_row}"].alignment = Alignment(wrap_text=True)
+
+        ws2.column_dimensions['A'].width = 45
+        ws2.column_dimensions['B'].width = 12
+        ws2.column_dimensions['C'].width = 10
+        ws2.column_dimensions['D'].width = 55
 
         excel_buffer = io.BytesIO()
         wb.save(excel_buffer)
@@ -1768,7 +1902,7 @@ def render_step2():
         if st.button("Paso 3: Editor 3D →", key="go_to_3", type="primary", use_container_width=True):
             # ── Constraint Solver S1 ──────────────────────────────────────────
             try:
-                from modules.ai_house_designer.constraint_solver import validate_design, show_constraint_results
+                from .constraint_solver import validate_design, show_constraint_results
                 _rooms_cs = st.session_state.get("ai_house_requirements", {}).get("room_layout") or []
                 if not _rooms_cs:
                     _rooms_cs = [
@@ -2151,7 +2285,7 @@ def render_step2():
         
         # ── CTE Check en tiempo real ─────────────────────────────────────────
         try:
-            from modules.ai_house_designer.cte_checker import render_cte_panel
+            from .cte_checker import render_cte_panel
             _rooms_cte = [
                 {"code": k, "name": k, "area_m2": float(v)}
                 for k, v in proposal.items()
@@ -2182,7 +2316,7 @@ def render_step2():
             if st.button("Paso 3 →", type="primary", use_container_width=True):
                 # ── Constraint Solver S1 ──────────────────────────────────────
                 try:
-                    from modules.ai_house_designer.constraint_solver import validate_design, show_constraint_results
+                    from .constraint_solver import validate_design, show_constraint_results
                     _rooms_cs2 = st.session_state.get("ai_house_requirements", {}).get("room_layout") or []
                     if not _rooms_cs2:
                         _rooms_cs2 = [
