@@ -62,6 +62,25 @@ Flujo 5 pasos: 1) Buscar finca en mercado. 2) Ver ficha profesional (REF, comisi
 
 Fichas publicas: visibles sin login. Datos del listante NUNCA se exponen publicamente.
 
+## Portal Estudiantes TFG/TFM
+
+Acceso: banner "🎓 Estudiantes" en la home, o URL /?page=estudiantes.
+Registro propio con email y contraseña (no necesita cuenta general de ArchiRapid).
+
+FICHA DEL ESTUDIANTE: nombre, teléfono, edad, universidad, curso (1º Grado - Doctorado), año presentación TFG/TFM, ciudad, bio, portfolio/LinkedIn.
+
+SUBIDA DE PROYECTO: título, descripción, tipología (unifamiliar, plurifamiliar, mixto, equipamiento, rehabilitación, urbanismo, etc.), superficie m2, provincia, ciudad, ejecutable (Sí/No/En estudio), precio de venta.
+
+PRECIO RECOMENDADO: 1.900 EUR para TFG estándar. Proyectos con CAD, memoria completa, renders y realidad virtual pueden valorarse más.
+
+ARCHIVOS ACEPTADOS: fotos JPG/PNG (múltiples), planos PDF (obligatorio), memoria PDF, CAD/DWG/DXF/IFC, tour virtual MP4/GLB/GLTF, paquete ZIP.
+
+INGRESOS: 60% para el estudiante, 40% para ArchiRapid. Modalidad exclusiva (una venta) o múltiple (varios compradores).
+
+REVISIÓN: El equipo de ArchiRapid aprueba en 24-48h tras el registro. El proyecto aparece en la plataforma tras aprobación.
+
+AVISO LEGAL: Los proyectos son trabajos académicos orientativos. Cualquier uso constructivo requiere visado de arquitecto colegiado (LOE Ley 38/1999).
+
 ## Precios productos (compra proyecto)
 
 Memoria PDF: 1.800 EUR. Planos CAD: 2.500 EUR. Proyecto Completo: 4.000 EUR.
