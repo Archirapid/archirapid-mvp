@@ -590,22 +590,65 @@ def generate_mep_plan_png(rooms_layout, layer_name: str,
 
     # ── Capa MEP ─────────────────────────────────────────────────────────────
     if layer_name == 'sewage':
-        col_z = house_max_z + 0.6
-        pline(house_min_x, col_z, house_max_x, col_z, lw=3)
-        for r in wet_rooms:
-            cx, cz = r['x'] + r['width']/2, r['z'] + r['depth']/2
-            pline(cx, cz, cx, col_z, lw=1.5, ls='--')
+        # Colector principal horizontal en la parte baja del plano
+        col_z = house_max_z + 0.7
+        col_x0, col_x1 = house_min_x - 0.3, house_max_x + 0.3
+        pline(col_x0, col_z, col_x1, col_z, lw=3.5)
+        # Etiqueta colector
+        col_label_px, col_label_py = to_px((col_x0 + col_x1) / 2, col_z)
+        ax.text(col_label_px, col_label_py - 12, 'COLECTOR Ø110', ha='center',
+                fontsize=6, color=lc, fontweight='bold', zorder=8)
+
+        # Ramales ortogonales: horizontal al eje X del colector, luego vertical al colector
+        for i, r in enumerate(wet_rooms):
+            cx  = r['x'] + r['width'] / 2
+            cz  = r['z'] + r['depth'] / 2
+            code = (r.get('code') or r.get('name') or '').lower()
+            # Diámetro de ramal según tipo
+            if 'cocina' in code:
+                diam = 'Ø50'
+            elif 'bano' in code or 'aseo' in code:
+                diam = 'Ø40'
+            else:
+                diam = 'Ø40'
+
+            # Punto codo: salir horizontalmente de la estancia hasta un carril lateral,
+            # luego subir verticalmente hasta el colector
+            codo_x = house_min_x - 0.6 - i * 0.35   # cada ramal sale por un carril distinto
+            codo_z = col_z                             # altura del colector
+
+            # Ramal salida de la estancia → punto de codo (horizontal)
+            pline(cx, cz, codo_x, cz, lw=1.8, ls='--')
+            # Tramo vertical codo → colector
+            pline(codo_x, cz, codo_x, codo_z, lw=1.8, ls='--')
+            # Tramo horizontal final al colector
+            pline(codo_x, codo_z, col_x0, codo_z, lw=1.8, ls='--')
+
+            # Arqueta en el codo (cuadrado pequeño)
+            arq_px, arq_py = to_px(codo_x, cz)
+            sq = 7
+            ax.add_patch(mpatches.Rectangle((arq_px - sq/2, arq_py - sq/2), sq, sq,
+                                             linewidth=1.5, edgecolor=lc,
+                                             facecolor='white', zorder=8))
+
+            # Punto de descarga en la estancia (círculo)
             ppx, ppy = to_px(cx, cz)
             ax.plot(ppx, ppy, 'o', color=lc, markersize=6, zorder=7)
-            ax.text(ppx + 6, ppy, '⊕', fontsize=8, color=lc, va='center', zorder=7)
-        # Fosa séptica
-        fx, fz = house_max_x + 2.2, house_max_z * 0.5
-        fpx, fpy = to_px(fx, fz + 0.75)
-        ax.add_patch(mpatches.Rectangle((fpx, fpy - 0.75*SCALE), 2*SCALE, 1.5*SCALE,
+
+            # Etiqueta diámetro ramal
+            ax.text(arq_px - 10, arq_py - 14, diam, fontsize=5.5, color=lc,
+                    ha='center', va='top', zorder=8)
+
+        # Fosa séptica exterior (derecha)
+        fx, fz_c = house_max_x + 2.3, house_max_z * 0.45
+        fpx, fpy = to_px(fx, fz_c + 0.8)
+        ax.add_patch(mpatches.Rectangle((fpx, fpy - 0.8 * SCALE), 2.2 * SCALE, 1.6 * SCALE,
                                          linewidth=2, edgecolor=lc, facecolor='#DDDDDD', zorder=6))
-        ax.text(fpx + SCALE, fpy - 0.375*SCALE, 'FOSA\nSÉPTICA',
+        ax.text(fpx + 1.1 * SCALE, fpy - 0.4 * SCALE, 'FOSA\nSÉPTICA',
                 ha='center', va='center', fontsize=5.5, color=lc, fontweight='bold', zorder=7)
-        pline(house_max_x, house_max_z*0.5, fx, fz, lw=2)
+        # Conexión colector → fosa
+        pline(col_x1, col_z, house_max_x + 2.3, col_z, lw=2.5)
+        pline(house_max_x + 2.3, col_z, fx, fz_c, lw=2.5)
 
     elif layer_name == 'water':
         mz = house_max_z * 0.5
@@ -680,6 +723,207 @@ def generate_mep_plan_png(rooms_layout, layer_name: str,
     plt.tight_layout(pad=0)
     plt.savefig(buf, format='png', dpi=130, bbox_inches='tight',
                 facecolor=cfg['bg'], edgecolor='none')
+    plt.close(fig)
+    buf.seek(0)
+    return buf.read()
+
+
+# ─── Plano de Cimentación ─────────────────────────────────────────────────────
+
+def generate_cimentacion_plan_png(
+    rooms_layout,
+    foundation_type: str = "zapatas",   # "zapatas" | "losa"
+    total_width=None,
+    total_depth=None,
+) -> bytes | None:
+    """
+    Genera plano PNG de cimentación (zapata corrida perimetral + zapatas interiores
+    o losa de cimentación) a partir del layout de habitaciones.
+
+    Args:
+        rooms_layout : lista de dicts con x, z, width, depth, name, code
+        foundation_type : "zapatas" (defecto) | "losa"
+        total_width/depth : dimensiones casa (se calculan si None)
+
+    Returns:
+        PNG bytes o None si hay error.
+    """
+    import json
+    import math
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+    import matplotlib.patches as mpatches
+    import io as _io
+
+    if isinstance(rooms_layout, str):
+        try:
+            rooms_layout = json.loads(rooms_layout)
+        except Exception:
+            return None
+    if not rooms_layout:
+        return None
+
+    SCALE  = 55   # px / metro
+    MARGIN = 80
+    BG     = '#FAFAF8'
+    LC     = '#3E2723'    # marrón cimentación
+    ZAP_W  = 0.40         # vuelo de zapata corrida (m) a cada lado del muro
+
+    if total_width is None:
+        total_width  = max(r['x'] + r['width']  for r in rooms_layout)
+    if total_depth is None:
+        total_depth  = max(r['z'] + r['depth']  for r in rooms_layout)
+
+    house_max_x = max(r['x'] + r['width']  for r in rooms_layout)
+    house_max_z = max(r['z'] + r['depth']  for r in rooms_layout)
+    house_min_x = min(r['x']               for r in rooms_layout)
+    house_min_z = min(r['z']               for r in rooms_layout)
+
+    svg_w = int(total_width  * SCALE + MARGIN * 3 + 80)
+    svg_h = int(total_depth  * SCALE + MARGIN * 4 + 80)
+
+    fig, ax = plt.subplots(figsize=(svg_w / 100, svg_h / 100), facecolor=BG)
+    ax.set_xlim(0, svg_w)
+    ax.set_ylim(0, svg_h)
+    ax.set_aspect('equal')
+    ax.axis('off')
+    fig.patch.set_facecolor(BG)
+
+    def to_px(x_m, z_m):
+        return MARGIN + x_m * SCALE, MARGIN + (total_depth - z_m) * SCALE
+
+    def prect(x_m, z_m, w_m, d_m, fc, ec, lw=1.5, zo=3, alpha=1.0):
+        px, py = to_px(x_m, z_m + d_m)
+        ax.add_patch(mpatches.Rectangle(
+            (px, py), w_m * SCALE, d_m * SCALE,
+            linewidth=lw, edgecolor=ec, facecolor=fc, zorder=zo, alpha=alpha
+        ))
+
+    # ── Huella interior de habitaciones (gris claro) ──────────────────────────
+    for r in rooms_layout:
+        prect(r['x'], r['z'], r['width'], r['depth'],
+              fc='#EEEEEE', ec='#BDBDBD', lw=1.0, zo=2, alpha=0.7)
+        cx_px, cy_px = to_px(r['x'] + r['width']/2, r['z'] + r['depth']/2)
+        ax.text(cx_px, cy_px, r.get('name', ''),
+                ha='center', va='center', fontsize=5.5, color='#757575', zorder=3)
+
+    if foundation_type == "losa":
+        # ── LOSA: rectángulo relleno con hatch ────────────────────────────────
+        lx, lz = house_min_x - ZAP_W, house_min_z - ZAP_W
+        lw_m   = (house_max_x - house_min_x) + 2 * ZAP_W
+        ld_m   = (house_max_z - house_min_z) + 2 * ZAP_W
+        px, py = to_px(lx, lz + ld_m)
+        ax.add_patch(mpatches.Rectangle(
+            (px, py), lw_m * SCALE, ld_m * SCALE,
+            linewidth=2.5, edgecolor=LC, facecolor='#D7CCC8',
+            hatch='///', zorder=4
+        ))
+        # Cota longitud
+        cpx1, cpy = to_px(lx, lz - 0.5)
+        cpx2, _   = to_px(lx + lw_m, lz - 0.5)
+        ax.annotate('', xy=(cpx2, cpy), xytext=(cpx1, cpy),
+                    arrowprops=dict(arrowstyle='<->', color=LC, lw=1.2), zorder=9)
+        ax.text((cpx1+cpx2)/2, cpy - 10, f'{lw_m:.2f} m',
+                ha='center', va='top', fontsize=6.5, color=LC, fontweight='bold')
+        # Cota profundidad
+        cpy1, cpx = to_px(lx - 0.5, lz), to_px(lx - 0.5, lz)[0]
+        cpy2, _   = to_px(lx - 0.5, lz + ld_m)[1], None
+        _, cpy1v  = to_px(lx - 0.5, lz)
+        _, cpy2v  = to_px(lx - 0.5, lz + ld_m)
+        ax.annotate('', xy=(cpx, cpy2v), xytext=(cpx, cpy1v),
+                    arrowprops=dict(arrowstyle='<->', color=LC, lw=1.2), zorder=9)
+        ax.text(cpx - 8, (cpy1v+cpy2v)/2, f'{ld_m:.2f} m',
+                ha='right', va='center', fontsize=6.5, color=LC, fontweight='bold', rotation=90)
+        # Leyenda
+        leg_px, leg_py = to_px(house_min_x, house_min_z - 1.4)
+        ax.text(leg_px, leg_py, 'LOSA DE CIMENTACIÓN  ·  e=25 cm  ·  HA-25/B/20/IIa',
+                fontsize=6.5, color=LC, fontweight='bold', va='top')
+
+    else:
+        # ── ZAPATAS: corrida perimetral + puntuales interiores ────────────────
+        # Zapata corrida perimetral — doble línea (vuelo ZAP_W a cada lado)
+        for (x1, z1, x2, z2, label) in [
+            (house_min_x - ZAP_W, house_min_z - ZAP_W,
+             house_max_x + ZAP_W, house_min_z + ZAP_W, f'{(house_max_x - house_min_x + 2*ZAP_W):.2f} m'),
+            (house_min_x - ZAP_W, house_max_z - ZAP_W,
+             house_max_x + ZAP_W, house_max_z + ZAP_W, ''),
+            (house_min_x - ZAP_W, house_min_z - ZAP_W,
+             house_min_x + ZAP_W, house_max_z + ZAP_W, f'{(house_max_z - house_min_z + 2*ZAP_W):.2f} m'),
+            (house_max_x - ZAP_W, house_min_z - ZAP_W,
+             house_max_x + ZAP_W, house_max_z + ZAP_W, ''),
+        ]:
+            prect(x1, z1, x2 - x1, z2 - z1,
+                  fc='#BCAAA4', ec=LC, lw=2.0, zo=5)
+            if label:
+                mpx, mpy = to_px((x1+x2)/2, (z1+z2)/2)
+                ax.text(mpx, mpy, label, ha='center', va='center',
+                        fontsize=5.5, color='white', fontweight='bold', zorder=6)
+
+        # Zapatas aisladas interiores bajo muros de carga (medianeras entre habitaciones)
+        # Detectar muros verticales (bordes Z de habitaciones adyacentes)
+        interior_x_walls = set()
+        for r in rooms_layout:
+            interior_x_walls.add(round(r['x'], 2))
+            interior_x_walls.add(round(r['x'] + r['width'], 2))
+        # Filtrar solo las que están en el interior (no perimetrales)
+        eps = 0.05
+        interior_x_walls = {
+            xw for xw in interior_x_walls
+            if house_min_x + eps < xw < house_max_x - eps
+        }
+        for xw in sorted(interior_x_walls):
+            # Zapata corrida interior: franja de 0.3m a cada lado del muro
+            prect(xw - 0.15, house_min_z - ZAP_W * 0.5,
+                  0.30, house_max_z - house_min_z + ZAP_W,
+                  fc='#D7CCC8', ec=LC, lw=1.5, zo=4)
+
+        # Leyenda dimensiones zapata corrida perimetral
+        sec_w = 0.40 + 0.40          # total 0.80 m sección
+        leg_px, leg_py = to_px(house_min_x, house_min_z - 1.5)
+        ax.text(leg_px, leg_py,
+                f'ZAPATA CORRIDA PERIMETRAL  ·  0.80×0.50 m  ·  HA-25/B/20/IIa  ·  ϕ12@20',
+                fontsize=6.5, color=LC, fontweight='bold', va='top')
+        leg_py2 = leg_py - 14
+        ax.text(leg_px, leg_py2,
+                'ZAPATAS INTERIORES  ·  0.30×0.45 m  ·  HA-25  ·  ϕ12@20',
+                fontsize=6, color=LC, va='top')
+
+    # ── Norte simbólico ───────────────────────────────────────────────────────
+    npx, npy = svg_w - MARGIN + 10, svg_h - MARGIN - 10
+    ax.annotate('N', xy=(npx, npy + 20), xytext=(npx, npy),
+                fontsize=8, color=LC, ha='center', va='bottom', fontweight='bold',
+                arrowprops=dict(arrowstyle='->', color=LC, lw=1.5))
+
+    # ── Escala gráfica ────────────────────────────────────────────────────────
+    sc_x0, sc_y = to_px(house_min_x, house_min_z - 2.0)
+    sc_x1 = sc_x0 + 5 * SCALE   # 5 metros
+    ax.plot([sc_x0, sc_x1], [sc_y, sc_y], color=LC, lw=2.5, zorder=9)
+    for xsc in [sc_x0, sc_x1]:
+        ax.plot([xsc, xsc], [sc_y - 4, sc_y + 4], color=LC, lw=2.0, zorder=9)
+    ax.text((sc_x0+sc_x1)/2, sc_y - 9, '5 m', ha='center', va='top',
+            fontsize=6, color=LC, fontweight='bold')
+    ax.text(sc_x0, sc_y - 9, '0', ha='center', va='top', fontsize=5.5, color=LC)
+
+    # ── Título ────────────────────────────────────────────────────────────────
+    title_h = 44
+    ax.add_patch(mpatches.Rectangle((0, svg_h - title_h), svg_w, title_h,
+                                     facecolor='#3E2723', zorder=10))
+    ax.text(svg_w/2, svg_h - title_h/2,
+            f'PLANO DE CIMENTACIÓN  ·  Escala aprox. 1:100',
+            ha='center', va='center', fontsize=10, fontweight='bold',
+            color='white', fontfamily='monospace', zorder=11)
+
+    # ── Pie ───────────────────────────────────────────────────────────────────
+    ax.text(MARGIN, 10, f'Tipo: {foundation_type.upper()}', color=LC,
+            fontsize=6.5, fontweight='bold', va='bottom')
+    ax.text(svg_w - MARGIN, 10, 'ArchiRapid AI  ·  © 2026',
+            color='#AAAAAA', fontsize=6, ha='right', va='bottom')
+
+    buf = _io.BytesIO()
+    plt.tight_layout(pad=0)
+    plt.savefig(buf, format='png', dpi=130, bbox_inches='tight',
+                facecolor=BG, edgecolor='none')
     plt.close(fig)
     buf.seek(0)
     return buf.read()

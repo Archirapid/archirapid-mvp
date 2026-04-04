@@ -2632,6 +2632,37 @@ def render_step3_editor():
                                 )
                         except Exception as _le:
                             st.caption(f"⚠️ {_lbl}: {_le}")
+
+                # ── Plano de Cimentación ──────────────────────────────────────
+                st.markdown("---")
+                st.markdown("#### 🏗️ Plano de Cimentación")
+                try:
+                    from .floor_plan_svg import generate_cimentacion_plan_png as _gen_cim
+                    _cim_col1, _cim_col2, _cim_col3 = st.columns([2, 1, 1])
+                    with _cim_col1:
+                        _found_type = st.selectbox(
+                            "Tipo de cimentación",
+                            ["zapatas", "losa"],
+                            format_func=lambda x: "Zapata corrida + aisladas" if x == "zapatas" else "Losa de cimentación",
+                            key="cim_foundation_type",
+                        )
+                    _cim_png = _gen_cim(_mep_rooms, _found_type, _tw, _td)
+                    if _cim_png:
+                        _cim_c1, _cim_c2 = st.columns([3, 1])
+                        with _cim_c1:
+                            st.image(_cim_png, use_container_width=True)
+                        with _cim_c2:
+                            st.download_button(
+                                "⬇️ Plano Cimentación",
+                                _cim_png,
+                                file_name="plano_cimentacion.png",
+                                mime="image/png",
+                                key="dl_cim_plan",
+                                use_container_width=True,
+                            )
+                except Exception as _ce:
+                    st.caption(f"⚠️ Cimentación: {_ce}")
+
             except Exception as _me:
                 st.warning(f"No se pudieron generar los planos MEP: {_me}")
 
