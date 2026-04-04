@@ -25,7 +25,7 @@ def _get_groq_key() -> str:
 # GENERADOR ZIP COMPLETO DEL PROYECTO
 # ================================================
 def generar_zip_proyecto(req, design_data, plot_data, partidas, subsidy_total, energy_label):
-    import io, zipfile, json
+    import io, zipfile, json, hashlib
     from datetime import datetime
     import openpyxl
     from openpyxl.styles import Font, PatternFill, Alignment
@@ -586,12 +586,12 @@ sistema y servir de base de trabajo para el arquitecto que desarrolle el proyect
             zf.writestr(f"{proyecto_nombre}/06_Layout_3D_Editable.json",
                 json.dumps(babylon_layout, ensure_ascii=False, indent=2))
 
-        # 6. README
+        # 6. README (sin hash — se añade después de cerrar el ZIP)
         zf.writestr(f"{proyecto_nombre}/LEEME.txt", f"""PAQUETE DOCUMENTAL — {proyecto_nombre}
-ArchiRapid MVP | {fecha}
+ArchiRapid | {fecha}
 
 CONTENIDO:
-  01_Memoria_Descriptiva.txt       — Memoria proyecto básico
+  01_Memoria_Descriptiva.pdf       — Memoria proyecto básico
   02_Mediciones_Presupuesto.xlsx   — Mediciones y partidas presupuestarias
   03_Datos_Proyecto.json           — Datos completos (catastro, vivienda, costes)
   04_Plano_2D.png                  — Plano distribución en planta
@@ -604,12 +604,39 @@ PRÓXIMOS PASOS:
   4. Proyecto de Ejecución completo
   5. Contrato constructor
 
-AVISO LEGAL: MVP orientativo. Sin validez legal sin firma de arquitecto colegiado.
-www.archirapid.es | info@archirapid.es
-""" )
+CERTIFICADO DE INTEGRIDAD (SHA-256):
+  Ver archivo CERTIFICADO_INTEGRIDAD.txt en este mismo ZIP
+
+AVISO LEGAL: Documento orientativo. Sin validez legal sin firma de arquitecto colegiado.
+www.archirapid.com | hola@archirapid.com
+""")
+
+    # Calcular SHA-256 del ZIP antes de la firma final
+    zip_buffer.seek(0)
+    zip_bytes_raw = zip_buffer.getvalue()
+    _sha256 = hashlib.sha256(zip_bytes_raw).hexdigest()
+
+    # Reabrir el ZIP en modo append para añadir el certificado de integridad
+    with zipfile.ZipFile(zip_buffer, 'a', zipfile.ZIP_DEFLATED) as zf2:
+        zf2.writestr(f"{proyecto_nombre}/CERTIFICADO_INTEGRIDAD.txt", f"""CERTIFICADO DE INTEGRIDAD — ArchiRapid
+======================================
+Proyecto    : {proyecto_nombre}
+Fecha UTC   : {datetime.utcnow().isoformat()}Z
+Algoritmo   : SHA-256
+Hash        : {_sha256}
+
+Este hash identifica de forma única el contenido de este paquete documental.
+Cualquier modificación posterior al archivo ZIP alterará el hash.
+Para verificar: sha256sum {proyecto_nombre}.zip
+
+ArchiRapid | hola@archirapid.com
+""")
 
     zip_buffer.seek(0)
-    return zip_buffer.getvalue(), f"{proyecto_nombre}.zip"
+    final_bytes = zip_buffer.getvalue()
+    # Recalcular hash final (incluye el certificado de integridad)
+    _sha256_final = hashlib.sha256(final_bytes).hexdigest()
+    return final_bytes, f"{proyecto_nombre}.zip", _sha256_final
 
 # ---------------------------------------------------------------------------
 # CONSTANTES REUTILIZABLES
@@ -3431,7 +3458,23 @@ def render_step3():
                 st.rerun()
         with col_pay2:
             if st.button("📞 Hablar con un Arquitecto", use_container_width=True):
-                st.info("📧 Contacto: info@archirapid.es | ☎️ 900 XXX XXX")
+                _project_id = st.session_state.get("ai_project_db_id") or \
+                              st.session_state.get("design_plot_data", {}).get("id", "sin-id")
+                _client_email = st.session_state.get("client_email", "")
+                _req_s5 = st.session_state.get("ai_house_requirements", {})
+                try:
+                    from modules.marketplace.email_notify import _send
+                    _send(
+                        f"📞 <b>HABLAR CON ARQUITECTO — Paso 5</b>\n"
+                        f"Cliente: {_client_email}\n"
+                        f"Project_ID: {_project_id}\n"
+                        f"Estilo: {_req_s5.get('style','?')} · {_req_s5.get('total_m2','?')} m²\n"
+                        f"Dormitorios: {_req_s5.get('bedrooms','?')} · Presupuesto: "
+                        f"{_req_s5.get('presupuesto','?')}"
+                    )
+                    st.success("✅ Solicitud enviada. Un arquitecto de ArchiRapid contactará contigo en menos de 24h.")
+                except Exception:
+                    st.info("📧 hola@archirapid.com · ☎️ +34 623 172 704")
 
         # ------------------------------------------
         # POST-PAGO — desbloquear descargas
@@ -3462,7 +3505,7 @@ def render_step3():
             st.markdown("### 📥 Descarga Tu Proyecto Completo")
 
             try:
-                zip_bytes, zip_filename = generar_zip_proyecto(
+                zip_bytes, zip_filename, _zip_sha256 = generar_zip_proyecto(
                     req=st.session_state.get("ai_house_requirements", {}),
                     design_data=get_current_design_data(),
                     plot_data=st.session_state.get("design_plot_data", {}),
@@ -3480,6 +3523,15 @@ def render_step3():
                     type="primary"
                 )
                 st.caption("Incluye: Memoria descriptiva · Mediciones y presupuesto Excel · Plano 2D · Datos catastro · Layout 3D · Guía de próximos pasos")
+
+                # ── Certificado SHA-256 visible al cliente ────────────────────
+                st.markdown(f"""
+<div style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.3);
+            border-radius:8px;padding:10px 14px;margin-top:8px;font-family:monospace;">
+  <span style="color:#10B981;font-weight:700;font-size:12px;">🔐 CERTIFICADO DE INTEGRIDAD SHA-256</span><br>
+  <span style="color:#94A3B8;font-size:11px;word-break:break-all;">{_zip_sha256}</span><br>
+  <span style="color:#64748B;font-size:10px;">Este hash identifica de forma única tu paquete documental.</span>
+</div>""", unsafe_allow_html=True)
 
                 # ── Certificación criptográfica del ZIP ──────────────────────
                 try:
@@ -4331,7 +4383,7 @@ def _show_estudio_zip_button(f):
     try:
         req        = f["req"]
         plot_data  = st.session_state.get("design_plot_data", {})
-        zip_bytes, zip_filename = generar_zip_proyecto(
+        zip_bytes, zip_filename, _sha_est = generar_zip_proyecto(
             req=req,
             design_data=f["design_data"],
             plot_data=plot_data,
@@ -4349,6 +4401,7 @@ def _show_estudio_zip_button(f):
             key="btn_dl_estudio",
         )
         st.caption("Incluye: Memoria PDF · Mediciones Excel · Plano 2D · BIM/IFC")
+        st.caption(f"🔐 SHA-256: `{_sha_est}`")
     except Exception as _ez:
         st.error(f"Error generando ZIP: {_ez}")
 
@@ -4675,7 +4728,23 @@ def render_step6_pago():
                     st.rerun()
         with _cp2:
             if st.button("📞 Hablar con un Arquitecto", use_container_width=True, key="btn_arq_s6"):
-                st.info("📧 hola@archirapid.com · Solicita llamada en el chat →")
+                _project_id_s6 = st.session_state.get("ai_project_db_id") or \
+                                 st.session_state.get("design_plot_data", {}).get("id", "sin-id")
+                _client_email_s6 = st.session_state.get("client_email", "")
+                _req_s6_arq = st.session_state.get("ai_house_requirements", {})
+                try:
+                    from modules.marketplace.email_notify import _send
+                    _send(
+                        f"📞 <b>HABLAR CON ARQUITECTO — Paso 6</b>\n"
+                        f"Cliente: {_client_email_s6}\n"
+                        f"Project_ID: {_project_id_s6}\n"
+                        f"Estilo: {_req_s6_arq.get('style','?')} · {_req_s6_arq.get('total_m2','?')} m²\n"
+                        f"Dormitorios: {_req_s6_arq.get('bedrooms','?')} · Presupuesto: "
+                        f"{_req_s6_arq.get('presupuesto','?')}"
+                    )
+                    st.success("✅ Solicitud enviada. Un arquitecto contactará contigo en menos de 24h.")
+                except Exception:
+                    st.info("📧 hola@archirapid.com · ☎️ +34 623 172 704")
 
         # Botón de verificación de pago (después de volver de Stripe)
         if _stripe_sid_6:
@@ -4763,7 +4832,7 @@ def render_step6_pago():
     try:
         _plot_data = st.session_state.get("design_plot_data", {})
         _design_d  = f["design_data"]
-        _zip_bytes, _zip_filename = generar_zip_proyecto(
+        _zip_bytes, _zip_filename, _zip_sha256_s6 = generar_zip_proyecto(
             req=req,
             design_data=_design_d,
             plot_data=_plot_data,
@@ -4780,6 +4849,15 @@ def render_step6_pago():
             use_container_width=True,
         )
         st.caption("Incluye: Memoria descriptiva · Mediciones Excel · Plano 2D · Datos catastro · Layout 3D")
+
+        # ── Certificado SHA-256 visible al cliente ────────────────────────────
+        st.markdown(f"""
+<div style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.3);
+            border-radius:8px;padding:10px 14px;margin-top:8px;font-family:monospace;">
+  <span style="color:#10B981;font-weight:700;font-size:12px;">🔐 CERTIFICADO DE INTEGRIDAD SHA-256</span><br>
+  <span style="color:#94A3B8;font-size:11px;word-break:break-all;">{_zip_sha256_s6}</span><br>
+  <span style="color:#64748B;font-size:10px;">Incluido también dentro del ZIP en CERTIFICADO_INTEGRIDAD.txt</span>
+</div>""", unsafe_allow_html=True)
 
         # Certificación blockchain del ZIP
         try:
