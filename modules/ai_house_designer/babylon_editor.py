@@ -176,6 +176,7 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             <label>Fondo (m)</label>
             <input type="number" id="input-depth" min="1" max="20" step="0.1">
             <button id="btn-apply" onclick="applyDimensions()">✅ Aplicar</button>
+            <div id="area-info" style="font-size:10px;color:#aaa;margin-top:4px;"></div>
             <div id="cte-status"></div>
             <div style="margin-top:10px;border-top:1px solid #555;padding-top:8px;">
               <label style="color:#aaa;font-size:11px;">Material Fachada</label>
@@ -905,6 +906,8 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                             roomsData[idx].x = f.position.x - roomsData[idx].width / 2;
                             roomsData[idx].z = f.position.z - roomsData[idx].depth / 2;
                         }}
+                        // MAGNET: reempaquetar filas adyacentes para eliminar huecos
+                        packRows();
                         rebuildScene(roomsData);
                         updateBudget();
                     }});
@@ -959,6 +962,8 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                                 roomsData[selectedIndex].x = f.position.x - roomsData[selectedIndex].width / 2;
                                 roomsData[selectedIndex].z = f.position.z - roomsData[selectedIndex].depth / 2;
                             }}
+                            // MAGNET: reempaquetar filas adyacentes para eliminar huecos
+                            packRows();
                             rebuildScene(roomsData);
                             updateBudget();
                         }});
@@ -1148,6 +1153,21 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             document.getElementById('edit-room-name').textContent = room.name;
             document.getElementById('input-width').value = room.width.toFixed(2);
             document.getElementById('input-depth').value = room.depth.toFixed(2);
+            // FIX UI-MAT: restaurar material seleccionado del room
+            const matSel = document.getElementById('mat-select');
+            if (matSel) matSel.value = room.material_id || '';
+            // FIX SINCRO-ÁREA: mostrar área original del Paso 2 (bloqueada) vs área actual
+            const origA = room.original_area || room.area_m2 || 0;
+            const curA  = parseFloat((room.width * room.depth).toFixed(2));
+            const deltaA = parseFloat((curA - origA).toFixed(2));
+            const areaInfo = document.getElementById('area-info');
+            if (areaInfo) {{
+                areaInfo.innerHTML =
+                    `Área actual: <b>${{curA}} m²</b>` +
+                    (Math.abs(deltaA) > 0.05
+                        ? ` <span style="color:${{deltaA>0?'#F39C12':'#E74C3C'}}">(${{deltaA>0?'+':''}}${{deltaA}} vs Paso 2)</span>`
+                        : ` <span style="color:#2ECC71">✓ coincide con Paso 2</span>`);
+            }}
             document.getElementById('edit-panel').style.display = 'block';
             checkCTE(i, room.width, room.depth);
         }}
@@ -1161,11 +1181,15 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                 return;
             }}
             saveSnapshot();
-            // Actualizar dimensiones Y área en roomsData — NO llamar generateLayoutJS
-            // (generateLayoutJS recalcularía el ancho desde área, destruyendo la edición del usuario)
+            // FIX SINCRO-ÁREA: preservar original_area del Paso 2 — nunca sobreescribir
+            // Babylon sólo actualiza width/depth/area_m2; original_area es de sólo lectura
+            if (!roomsData[selectedIndex].original_area) {{
+                roomsData[selectedIndex].original_area = roomsData[selectedIndex].area_m2 || (newW * newD);
+            }}
             roomsData[selectedIndex].width   = newW;
             roomsData[selectedIndex].depth   = newD;
             roomsData[selectedIndex].area_m2 = parseFloat((newW * newD).toFixed(2));
+            // original_area permanece inalterado — Paso 2 manda
             // Reempaquetar filas para cerrar huecos sin redistribuir toda la planta
             packRows();
             rebuildScene(roomsData);
@@ -1278,14 +1302,16 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                 const payload = {{
                     type: 'archirapid_layout_update',
                     rooms: roomsData.map(r => ({{
-                        name:    r.name,
-                        code:    r.code    || '',
-                        zone:    r.zone    || '',
-                        x:       parseFloat((r.x     || 0).toFixed(3)),
-                        z:       parseFloat((r.z     || 0).toFixed(3)),
-                        width:   parseFloat((r.width || 0).toFixed(3)),
-                        depth:   parseFloat((r.depth || 0).toFixed(3)),
-                        area_m2: parseFloat((r.area_m2 || r.width * r.depth || 0).toFixed(2))
+                        name:          r.name,
+                        code:          r.code          || '',
+                        zone:          r.zone          || '',
+                        x:             parseFloat((r.x     || 0).toFixed(3)),
+                        z:             parseFloat((r.z     || 0).toFixed(3)),
+                        width:         parseFloat((r.width || 0).toFixed(3)),
+                        depth:         parseFloat((r.depth || 0).toFixed(3)),
+                        area_m2:       parseFloat((r.area_m2 || r.width * r.depth || 0).toFixed(2)),
+                        original_area: parseFloat((r.original_area || r.area_m2 || r.width * r.depth || 0).toFixed(2)),
+                        material_id:   r.material_id   || ''
                     }}))
                 }};
                 window.parent.postMessage(JSON.stringify(payload), '*');

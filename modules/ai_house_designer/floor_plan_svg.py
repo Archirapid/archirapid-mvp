@@ -832,15 +832,44 @@ def generate_cimentacion_plan_png(
                     ax.add_patch(circ)
                     ax.text(ppx, ppy, 'P', ha='center', va='center',
                             fontsize=5, color='white', fontweight='bold', zorder=6)
-        # Encepado (losa de remate)
+        # Encepado (losa de remate sobre los pilotes)
         enx, enz = house_min_x - ZAP_W, house_min_z - ZAP_W
         enw = (house_max_x - house_min_x) + 2 * ZAP_W
         end_ = (house_max_z - house_min_z) + 2 * ZAP_W
         prect(enx, enz, enw, end_, fc='#D7CCC815', ec=LC, lw=2.5, zo=4, alpha=0.25)
-        leg_px, leg_py = to_px(house_min_x, house_min_z - 1.5)
-        ax.text(leg_px, leg_py,
-                'PILOTES Ø50 cm  ·  HA-30/B/20/IIa  ·  Longitud según estudio geotécnico',
-                fontsize=6.5, color=LC, fontweight='bold', va='top')
+        # ── Cuadro de leyendas técnico (pilotes) ─────────────────────────────
+        leg_px, leg_py = to_px(house_min_x, house_min_z - 1.2)
+        # Fondo del cuadro
+        box_w_px = min(enw * SCALE, svg_w - MARGIN - leg_px - 10)
+        ax.add_patch(mpatches.FancyBboxPatch(
+            (leg_px - 4, leg_py - 42), max(box_w_px, 280), 46,
+            boxstyle='round,pad=2', linewidth=1.2,
+            edgecolor=LC, facecolor='#EFEBE9', zorder=10
+        ))
+        ax.text(leg_px, leg_py - 4,
+                'CIMENTACIÓN POR PILOTES', fontsize=7.5, color=LC,
+                fontweight='bold', va='top', zorder=11)
+        specs = [
+            ('Tipo',       'Pilote barrenado in situ (CPI-8)'),
+            ('Diámetro',   'Ø 50 cm'),
+            ('Hormigón',   'HA-30/B/20/IIa — XC2'),
+            ('Armadura',   '6Ø20 + cercos Ø8/15'),
+            ('Encepado',   f'e = 50 cm  ·  HA-25  ·  {enw:.2f}×{end_:.2f} m'),
+            ('Longitud',   'Según estudio geotécnico previo (EHE-08 Art.58)'),
+        ]
+        for k_idx, (label, value) in enumerate(specs):
+            row_y = leg_py - 14 - k_idx * 8
+            ax.text(leg_px + 2,  row_y, f'{label}:', fontsize=5.5, color='#5D4037',
+                    fontweight='bold', va='top', zorder=11)
+            ax.text(leg_px + 48, row_y, value,        fontsize=5.5, color='#3E2723',
+                    va='top', zorder=11)
+        # Símbolo pilote en leyenda
+        sym_cx = leg_px + box_w_px - 18 if box_w_px > 60 else leg_px + 240
+        sym_cy = leg_py - 22
+        ax.add_patch(mpatches.Circle((sym_cx, sym_cy), 10,
+                                      linewidth=1.5, edgecolor=LC, facecolor='#BCAAA4', zorder=12))
+        ax.text(sym_cx, sym_cy, 'P', ha='center', va='center',
+                fontsize=6, color='white', fontweight='bold', zorder=13)
     elif foundation_type == "losa":
         # ── LOSA: rectángulo relleno con hatch ────────────────────────────────
         lx, lz = house_min_x - ZAP_W, house_min_z - ZAP_W
