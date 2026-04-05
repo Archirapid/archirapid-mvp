@@ -1617,6 +1617,8 @@ def render_step1():
             ],
             index=3
         )
+        # Hard-link: publicar en session_state para lookup dinámico en floor_plan_svg
+        st.session_state["selected_foundation"] = foundation_type
     
     with col2:
         st.markdown("**Suministro de agua**")

@@ -178,17 +178,21 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             <button id="btn-apply" onclick="applyDimensions()">✅ Aplicar</button>
             <div id="area-info" style="font-size:10px;color:#aaa;margin-top:4px;"></div>
             <div id="cte-status"></div>
-            <div style="margin-top:10px;border-top:1px solid #555;padding-top:8px;">
-              <label style="color:#aaa;font-size:11px;">Material Fachada</label>
+            <!-- mat-selection-panel: z-index:9999 garantiza visibilidad sobre canvas Babylon -->
+            <div id="mat-selection-panel"
+                 style="margin-top:10px;border-top:1px solid #555;padding-top:8px;
+                        position:relative;z-index:9999;">
+              <label style="color:#aaa;font-size:11px;">🎨 Material Fachada</label>
               <select id="mat-select" onchange="applyMaterialPBR(selectedIndex, this.value)"
                       style="width:100%;background:#2a2a2a;color:#fff;border:1px solid #555;
-                             border-radius:4px;padding:4px;margin-top:4px;font-size:12px;">
+                             border-radius:4px;padding:4px;margin-top:4px;font-size:12px;
+                             position:relative;z-index:9999;">
                 <option value="">-- Sin material PBR --</option>
-                <option value="ladrillo_cara_vista">Ladrillo Cara Vista -- 85€/m²</option>
-                <option value="madera_laminada">Madera Laminada CLT -- 320€/m²</option>
-                <option value="piedra_caliza">Piedra Caliza -- 145€/m²</option>
-                <option value="hormigon_visto">Hormigón Visto HA-25 -- 95€/m²</option>
-                <option value="plancha_acero_corten">Acero Corten -- 210€/m²</option>
+                <option value="ladrillo_cara_vista">Ladrillo Cara Vista — 85€/m²</option>
+                <option value="madera_laminada">Madera Laminada CLT — 320€/m²</option>
+                <option value="piedra_caliza">Piedra Caliza — 145€/m²</option>
+                <option value="hormigon_visto">Hormigón Visto HA-25 — 95€/m²</option>
+                <option value="plancha_acero_corten">Acero Corten — 210€/m²</option>
               </select>
             </div>
         </div>
@@ -469,6 +473,30 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
         }};
         // material_id asignado por mesh index: roomsData[i].material_id
         // (se guarda cuando el usuario selecciona material desde el panel)
+
+        // ── Emergency fallback: si MATERIALS_DB está vacío o corrompido ───────
+        // Garantiza que mat-select siempre tenga al menos 5 opciones básicas
+        (function _ensureMaterialsDB() {{
+            if (typeof MATERIALS_DB !== 'object' || Object.keys(MATERIALS_DB).length === 0) {{
+                console.warn('[ArchiRapid] MATERIALS_DB vacío — inyectando fallback de emergencia');
+                const FALLBACK = [
+                    {{id:'ladrillo',  name:'Ladrillo',   price_m2:85,  color:'#C4845A', roughness:0.85, metallic:0.0}},
+                    {{id:'madera',    name:'Madera',     price_m2:320, color:'#A0724A', roughness:0.75, metallic:0.0}},
+                    {{id:'piedra',    name:'Piedra',     price_m2:145, color:'#C8B89A', roughness:0.90, metallic:0.0}},
+                    {{id:'hormigon', name:'Hormigon',  price_m2:95,  color:'#9E9E9E', roughness:0.80, metallic:0.05}},
+                    {{id:'acero',    name:'Acero',      price_m2:210, color:'#8B4513', roughness:0.70, metallic:0.85}},
+                ];
+                FALLBACK.forEach(m => {{ MATERIALS_DB[m.id] = m; }});
+                // Actualizar <select> con opciones de emergencia
+                const sel = document.getElementById('mat-select');
+                if (sel) {{
+                    sel.innerHTML = '<option value="">-- Sin material --</option>' +
+                        FALLBACK.map(m =>
+                            `<option value="${{m.id}}">${{m.name}} — ${{m.price_m2}}€/m²</option>`
+                        ).join('');
+                }}
+            }}
+        }})();
 
         // Mínimos CTE por tipo de habitación (m²)
         const CTE_MIN = {{
@@ -1142,6 +1170,8 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             selectedIndex = null;
             updateBudget();
             notifyParentLayout();
+            // ELASTICIDAD: recalcular cerramiento si está activo (bounding box dinámico)
+            if (typeof fenceActive !== 'undefined' && fenceActive) buildFence();
             showToast('✅ Planta redistribuida');
         }}
 
@@ -1784,6 +1814,33 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             }}
         }}
 
+        // ── Cerramiento elástico: bounding box computado desde posición real de objetos ──
+        function _computeSceneBBox() {{
+            // Recorre TODOS los roomsData (casa + jardín + caseta) y calcula
+            // el min/max real. Si el usuario mueve la Caseta fuera, la bbox crece.
+            if (!roomsData || roomsData.length === 0) {{
+                return {{ minX: plotX, minZ: plotZ, maxX: plotX + plotW, maxZ: plotZ + plotD }};
+            }}
+            let minX = Infinity, minZ = Infinity, maxX = -Infinity, maxZ = -Infinity;
+            roomsData.forEach(r => {{
+                const rx = (r.x != null) ? r.x : plotX;
+                const rz = (r.z != null) ? r.z : plotZ;
+                const rw = r.width  || 0;
+                const rd = r.depth  || 0;
+                minX = Math.min(minX, rx);
+                minZ = Math.min(minZ, rz);
+                maxX = Math.max(maxX, rx + rw);
+                maxZ = Math.max(maxZ, rz + rd);
+            }});
+            const ELASTIC_PAD = 1.5;  // margen elástico alrededor de todos los objetos
+            // Contener dentro del plot si la bbox cae fuera (no expandir más allá del solar)
+            minX = Math.min(minX - ELASTIC_PAD, plotX);
+            minZ = Math.min(minZ - ELASTIC_PAD, plotZ);
+            maxX = Math.max(maxX + ELASTIC_PAD, plotX + plotW);
+            maxZ = Math.max(maxZ + ELASTIC_PAD, plotZ + plotD);
+            return {{ minX, minZ, maxX, maxZ }};
+        }}
+
         function buildFence() {{
             // Limpiar previo
             fenceMeshes.forEach(m => {{ m.material && m.material.dispose(); m.dispose(); }});
@@ -1796,44 +1853,45 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
 
             const mat = new BABYLON.StandardMaterial('fenceMat', scene);
             if (style === 'muro') {{
-                mat.diffuseColor = new BABYLON.Color3(0.78, 0.76, 0.72);  // cemento gris
+                mat.diffuseColor = new BABYLON.Color3(0.78, 0.76, 0.72);
             }} else {{
-                mat.diffuseColor  = new BABYLON.Color3(0.30, 0.30, 0.30);  // metal oscuro
+                mat.diffuseColor  = new BABYLON.Color3(0.30, 0.30, 0.30);
                 mat.emissiveColor = new BABYLON.Color3(0.05, 0.05, 0.05);
                 mat.alpha = alpha;
             }}
 
-            // Perímetro: 4 lados del plot
-            // Lado Sur (fachada) — con huecos para portón (4m) + puerta (1.2m)
-            const GATE_CAR  = 4.0;   // portón vehículo
-            const GATE_PED  = 1.2;   // puerta peatonal
-            const GATE_GAP  = 0.3;   // separación entre ambas
-            const gateStart = plotX + 2.0;  // offset desde esquina
+            // ELASTICIDAD: calcular bounding box desde posición real de todos los objetos
+            const bbox = _computeSceneBBox();
+            const fX = bbox.minX;
+            const fZ = bbox.minZ;
+            const fW = bbox.maxX - bbox.minX;
+            const fD = bbox.maxZ - bbox.minZ;
 
-            // Sur (fachada entrada — z pequeño, frente al porche)
-            _fenceSegH('fs_left', plotX, plotZ,
-                        gateStart, FENCE_H, FENCE_T, mat);
-            _fenceSegH('fs_mid', gateStart + GATE_CAR + GATE_GAP, plotZ,
-                        gateStart + GATE_CAR + GATE_GAP + GATE_PED + GATE_GAP, FENCE_H, FENCE_T, mat);
-            _fenceSegH('fs_right', gateStart + GATE_CAR + GATE_GAP + GATE_PED + GATE_GAP, plotZ,
-                        plotX + plotW, FENCE_H, FENCE_T, mat);
+            const GATE_CAR  = 4.0;
+            const GATE_PED  = 1.2;
+            const GATE_GAP  = 0.3;
+            const gateStart = fX + 2.0;
 
-            // Norte (fachada trasera — z grande)
-            const backGateX = plotX + plotW/2 - GATE_PED/2;
-            _fenceSegH('fn_left',  plotX, plotZ + plotD, backGateX, FENCE_H, FENCE_T, mat);
-            _fenceSegH('fn_right', backGateX + GATE_PED, plotZ + plotD,
-                        plotX + plotW, FENCE_H, FENCE_T, mat);
+            // Sur — con portón y puerta peatonal
+            _fenceSegH('fs_left', fX, fZ, gateStart, FENCE_H, FENCE_T, mat);
+            _fenceSegH('fs_mid',  gateStart + GATE_CAR + GATE_GAP, fZ,
+                       gateStart + GATE_CAR + GATE_GAP + GATE_PED + GATE_GAP, FENCE_H, FENCE_T, mat);
+            _fenceSegH('fs_right', gateStart + GATE_CAR + GATE_GAP + GATE_PED + GATE_GAP, fZ,
+                       fX + fW, FENCE_H, FENCE_T, mat);
 
-            // Oeste completo
-            _fenceSegV('fw', plotX, plotZ, plotZ + plotD, FENCE_H, FENCE_T, mat);
+            // Norte
+            const backGateX = fX + fW / 2 - GATE_PED / 2;
+            _fenceSegH('fn_left',  fX, fZ + fD, backGateX, FENCE_H, FENCE_T, mat);
+            _fenceSegH('fn_right', backGateX + GATE_PED, fZ + fD, fX + fW, FENCE_H, FENCE_T, mat);
 
-            // Este completo
-            _fenceSegV('fe', plotX + plotW, plotZ, plotZ + plotD, FENCE_H, FENCE_T, mat);
+            // Oeste + Este
+            _fenceSegV('fw', fX,       fZ, fZ + fD, FENCE_H, FENCE_T, mat);
+            _fenceSegV('fe', fX + fW,  fZ, fZ + fD, FENCE_H, FENCE_T, mat);
 
-            // Marcadores de puertas
-            _fenceGate('gate_car', gateStart, plotZ, GATE_CAR, FENCE_H);
-            _fenceGate('gate_ped', gateStart + GATE_CAR + GATE_GAP, plotZ, GATE_PED, FENCE_H);
-            _fenceGate('gate_back', backGateX, plotZ + plotD, GATE_PED, FENCE_H);
+            // Puertas
+            _fenceGate('gate_car',  gateStart, fZ, GATE_CAR, FENCE_H);
+            _fenceGate('gate_ped',  gateStart + GATE_CAR + GATE_GAP, fZ, GATE_PED, FENCE_H);
+            _fenceGate('gate_back', backGateX, fZ + fD, GATE_PED, FENCE_H);
         }}
 
         function _fenceSegH(id, x1, z, x2, h, t, mat) {{

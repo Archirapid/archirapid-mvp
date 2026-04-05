@@ -727,24 +727,53 @@ def generate_mep_plan_png(rooms_layout, layer_name: str,
 
 # ─── Plano de Cimentación ─────────────────────────────────────────────────────
 
+def _resolve_foundation_type(foundation_type_arg: str | None) -> str:
+    """
+    Lookup dinámico: lee st.session_state['selected_foundation'] o
+    st.session_state['ai_house_requirements']['foundation_type'].
+    Si falla (entorno no-Streamlit) devuelve el argumento o 'zapatas'.
+    Elimina la dependencia de DEFAULT_FOUNDATION como constante global.
+    """
+    if foundation_type_arg:
+        return foundation_type_arg
+    try:
+        import streamlit as _st
+        # 1er intento: clave directa (set por el selector del Paso 2)
+        ft = _st.session_state.get("selected_foundation")
+        if ft:
+            return ft
+        # 2do intento: dentro del dict de requisitos
+        ft = (_st.session_state.get("ai_house_requirements") or {}).get("foundation_type")
+        if ft:
+            return ft
+    except Exception:
+        pass
+    return "zapatas"
+
+
 def generate_cimentacion_plan_png(
     rooms_layout,
-    foundation_type: str = "zapatas",   # "zapatas" | "losa"
+    foundation_type: str | None = None,   # None → lookup dinámico en session_state
     total_width=None,
     total_depth=None,
 ) -> bytes | None:
     """
-    Genera plano PNG de cimentación (zapata corrida perimetral + zapatas interiores
-    o losa de cimentación) a partir del layout de habitaciones.
+    Genera plano PNG de cimentación a partir del layout de habitaciones.
+    El tipo de cimentación se resuelve en orden:
+      1. Argumento foundation_type si se pasa explícitamente.
+      2. st.session_state['selected_foundation'] (selector Paso 2).
+      3. st.session_state['ai_house_requirements']['foundation_type'].
+      4. Fallback: 'zapatas'.
 
     Args:
         rooms_layout : lista de dicts con x, z, width, depth, name, code
-        foundation_type : "zapatas" (defecto) | "losa"
+        foundation_type : None (lookup dinámico) | "zapatas" | "losa" | "pilotes"
         total_width/depth : dimensiones casa (se calculan si None)
 
     Returns:
         PNG bytes o None si hay error.
     """
+    foundation_type = _resolve_foundation_type(foundation_type)
     import json
     import math
     import matplotlib
