@@ -642,6 +642,85 @@ sistema y servir de base de trabajo para el arquitecto que desarrolle el proyect
         ws2.column_dimensions['C'].width = 10
         ws2.column_dimensions['D'].width = 55
 
+        # ── HOJA 3: DESGLOSE DE MATERIALES (PEM) ─────────────────────────────
+        try:
+            from .materials_calculator import calculate_pem_breakdown as _calc_pem
+            _pem_layout = _st.session_state.get('babylon_modified_layout') or rooms
+            _pem = _calc_pem(_pem_layout)
+
+            ws3 = wb.create_sheet("Desglose de Materiales")
+            _hf3  = Font(bold=True, color="FFFFFF", size=10)
+            _hfill3_dark  = PatternFill("solid", fgColor="1B5E20")
+            _hfill3_med   = PatternFill("solid", fgColor="2E7D32")
+            _hfill3_light = PatternFill("solid", fgColor="388E3C")
+
+            ws3.merge_cells("A1:E1")
+            ws3["A1"] = f"DESGLOSE PEM POR MATERIALES — {proyecto_nombre}"
+            ws3["A1"].font = Font(bold=True, size=12, color="FFFFFF")
+            ws3["A1"].fill = _hfill3_dark
+            ws3["A1"].alignment = Alignment(horizontal="center")
+
+            # Subtítulo
+            ws3.merge_cells("A2:E2")
+            ws3["A2"] = (f"PEM Materiales: €{_pem.get('total_pem',0):,.2f}  |  "
+                         f"Habitaciones sin material: {len(_pem.get('rooms_without_material',[]))}")
+            ws3["A2"].alignment = Alignment(horizontal="center")
+
+            # Cabecera por material
+            ws3["A4"] = "RESUMEN POR MATERIAL"
+            ws3["A4"].font = Font(bold=True, color="1B5E20")
+            _pem_headers_mat = ["Material", "Precio/m²", "Total m²", "Subtotal €", "Normativa CTE"]
+            for _ci, _h in enumerate(_pem_headers_mat, 1):
+                _c = ws3.cell(row=5, column=_ci, value=_h)
+                _c.font = _hf3; _c.fill = _hfill3_med
+            _pem_row = 6
+            for _mid, _md in _pem.get('by_material', {}).items():
+                ws3.cell(_pem_row, 1, _md['name'])
+                ws3.cell(_pem_row, 2, f"€{_md['price_m2']:.2f}")
+                ws3.cell(_pem_row, 3, _md['total_m2'])
+                ws3.cell(_pem_row, 4, f"€{_md['subtotal_eur']:,.2f}")
+                ws3.cell(_pem_row, 5, _md.get('normativa', ''))
+                _pem_row += 1
+
+            # Fila total
+            _pem_row += 1
+            ws3.cell(_pem_row, 3, "TOTAL PEM:").font = Font(bold=True)
+            ws3.cell(_pem_row, 4, f"€{_pem.get('total_pem',0):,.2f}").font = Font(bold=True, color="1B5E20")
+
+            # Detalle por habitación
+            _pem_row += 2
+            ws3.cell(_pem_row, 1, "DETALLE POR HABITACIÓN")
+            ws3.cell(_pem_row, 1).font = Font(bold=True, color="1B5E20")
+            _pem_row += 1
+            _pem_headers_room = ["Habitación", "Zona", "Material", "Área m²", "Subtotal €"]
+            for _ci, _h in enumerate(_pem_headers_room, 1):
+                _c = ws3.cell(row=_pem_row, column=_ci, value=_h)
+                _c.font = _hf3; _c.fill = _hfill3_light
+            _pem_row += 1
+            for _item in _pem.get('by_room', []):
+                ws3.cell(_pem_row, 1, _item['room_name'])
+                ws3.cell(_pem_row, 2, _item['zone'])
+                ws3.cell(_pem_row, 3, _item['material_name'])
+                ws3.cell(_pem_row, 4, _item['area_m2'])
+                ws3.cell(_pem_row, 5, f"€{_item['subtotal_eur']:,.2f}")
+                _pem_row += 1
+
+            # Aviso sin material
+            if _pem.get('rooms_without_material'):
+                _pem_row += 1
+                ws3.cell(_pem_row, 1, "Sin material asignado:")
+                ws3.cell(_pem_row, 1).font = Font(italic=True, color="E65100")
+                ws3.cell(_pem_row, 2, ", ".join(_pem['rooms_without_material']))
+
+            ws3.column_dimensions['A'].width = 24
+            ws3.column_dimensions['B'].width = 14
+            ws3.column_dimensions['C'].width = 26
+            ws3.column_dimensions['D'].width = 12
+            ws3.column_dimensions['E'].width = 50
+        except Exception as _pem_err:
+            # Si falla el desglose de materiales, continúa sin él
+            pass
+
         excel_buffer = io.BytesIO()
         wb.save(excel_buffer)
         zf.writestr(f"{proyecto_nombre}/02_Mediciones_Presupuesto.xlsx", excel_buffer.getvalue())

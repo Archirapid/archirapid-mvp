@@ -1,0 +1,60 @@
+{
+  "version": "1.0",
+  "materials": [
+    {
+      "id": "ladrillo_cara_vista",
+      "name": "Ladrillo Cara Vista",
+      "price_m2": 85.0,
+      "texture_url_pbr": "https://cdn.babylonjs.com/Assets/textures/brick_diffuse.jpg",
+      "normal_url_pbr": "https://cdn.babylonjs.com/Assets/textures/brick_normal.jpg",
+      "roughness": 0.85,
+      "metallic": 0.0,
+      "normativa_cte_ref": "DB-HE1 §2.1 — U ≤ 0.27 W/m²K",
+      "color_hex": "#C4845A"
+    },
+    {
+      "id": "madera_laminada",
+      "name": "Madera Laminada (CLT)",
+      "price_m2": 320.0,
+      "texture_url_pbr": "https://cdn.babylonjs.com/Assets/textures/wood_diffuse.jpg",
+      "normal_url_pbr": "https://cdn.babylonjs.com/Assets/textures/wood_normal.jpg",
+      "roughness": 0.75,
+      "metallic": 0.0,
+      "normativa_cte_ref": "DB-SE-M §2 — Clase resistencia C24",
+      "color_hex": "#A0724A"
+    },
+    {
+      "id": "piedra_caliza",
+      "name": "Piedra Caliza",
+      "price_m2": 145.0,
+      "texture_url_pbr": "https://cdn.babylonjs.com/Assets/textures/stone_diffuse.jpg",
+      "normal_url_pbr": "https://cdn.babylonjs.com/Assets/textures/stone_normal.jpg",
+      "roughness": 0.90,
+      "metallic": 0.0,
+      "normativa_cte_ref": "DB-HE1 §2.1 — U ≤ 0.27 W/m²K",
+      "color_hex": "#C8B89A"
+    },
+    {
+      "id": "hormigon_visto",
+      "name": "Hormigón Visto HA-25",
+      "price_m2": 95.0,
+      "texture_url_pbr": "https://cdn.babylonjs.com/Assets/textures/concrete_diffuse.jpg",
+      "normal_url_pbr": "https://cdn.babylonjs.com/Assets/textures/concrete_normal.jpg",
+      "roughness": 0.80,
+      "metallic": 0.05,
+      "normativa_cte_ref": "EHE-08 Art.39 — fck ≥ 25 N/mm²",
+      "color_hex": "#9E9E9E"
+    },
+    {
+      "id": "plancha_acero_corten",
+      "name": "Plancha Acero Corten",
+      "price_m2": 210.0,
+      "texture_url_pbr": "https://cdn.babylonjs.com/Assets/textures/rust_diffuse.jpg",
+      "normal_url_pbr": "https://cdn.babylonjs.com/Assets/textures/rust_normal.jpg",
+      "roughness": 0.70,
+      "metallic": 0.85,
+      "normativa_cte_ref": "DB-SE-A §3 — Acero S355J0W",
+      "color_hex": "#8B4513"
+    }
+  ]
+}

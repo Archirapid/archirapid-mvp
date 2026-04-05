@@ -177,6 +177,19 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             <input type="number" id="input-depth" min="1" max="20" step="0.1">
             <button id="btn-apply" onclick="applyDimensions()">✅ Aplicar</button>
             <div id="cte-status"></div>
+            <div style="margin-top:10px;border-top:1px solid #555;padding-top:8px;">
+              <label style="color:#aaa;font-size:11px;">Material Fachada</label>
+              <select id="mat-select" onchange="applyMaterialPBR(selectedIndex, this.value)"
+                      style="width:100%;background:#2a2a2a;color:#fff;border:1px solid #555;
+                             border-radius:4px;padding:4px;margin-top:4px;font-size:12px;">
+                <option value="">-- Sin material PBR --</option>
+                <option value="ladrillo_cara_vista">Ladrillo Cara Vista -- 85€/m²</option>
+                <option value="madera_laminada">Madera Laminada CLT -- 320€/m²</option>
+                <option value="piedra_caliza">Piedra Caliza -- 145€/m²</option>
+                <option value="hormigon_visto">Hormigón Visto HA-25 -- 95€/m²</option>
+                <option value="plancha_acero_corten">Acero Corten -- 210€/m²</option>
+              </select>
+            </div>
         </div>
 
         <button class="tool-btn" id="btn-fence" onclick="toggleFence()">🧱 Cerramiento OFF</button>
@@ -444,6 +457,17 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
         const styleConf = STYLE_3D_CONFIG[houseStyle] || STYLE_3D_CONFIG['Moderno'];
 
         const COST_PER_M2 = {cost_per_m2}; // €/m² configurado por el arquitecto
+
+        // ── PBR Materials DB ─────────────────────────────────────────────────
+        const MATERIALS_DB = {{
+            "ladrillo_cara_vista": {{name:"Ladrillo Cara Vista", price_m2:85, roughness:0.85, metallic:0.0, color:"#C4845A", texUrl:"https://cdn.babylonjs.com/Assets/textures/brick_diffuse.jpg"}},
+            "madera_laminada":     {{name:"Madera Laminada (CLT)", price_m2:320, roughness:0.75, metallic:0.0, color:"#A0724A", texUrl:"https://cdn.babylonjs.com/Assets/textures/wood_diffuse.jpg"}},
+            "piedra_caliza":       {{name:"Piedra Caliza", price_m2:145, roughness:0.90, metallic:0.0, color:"#C8B89A", texUrl:"https://cdn.babylonjs.com/Assets/textures/stone_diffuse.jpg"}},
+            "hormigon_visto":      {{name:"Hormigón Visto HA-25", price_m2:95, roughness:0.80, metallic:0.05, color:"#9E9E9E", texUrl:"https://cdn.babylonjs.com/Assets/textures/concrete_diffuse.jpg"}},
+            "plancha_acero_corten":{{name:"Plancha Acero Corten", price_m2:210, roughness:0.70, metallic:0.85, color:"#8B4513", texUrl:"https://cdn.babylonjs.com/Assets/textures/rust_diffuse.jpg"}}
+        }};
+        // material_id asignado por mesh index: roomsData[i].material_id
+        // (se guarda cuando el usuario selecciona material desde el panel)
 
         // Mínimos CTE por tipo de habitación (m²)
         const CTE_MIN = {{
@@ -1193,6 +1217,56 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                     curX += r.width;
                 }});
             }}
+        }}
+
+        // ================================================
+        // MATERIALES PBR — aplicar textura + guardar en metadata
+        // ================================================
+        function applyMaterialPBR(meshIndex, materialId) {{
+            const matDef = MATERIALS_DB[materialId];
+            if (!matDef) return;
+            // Guardar en metadata del room
+            if (roomsData[meshIndex]) roomsData[meshIndex].material_id = materialId;
+            // Aplicar a floor mesh
+            const floor = scene.getMeshByName(`floor_${{meshIndex}}`);
+            if (!floor) return;
+            // Crear PBRMaterial si Babylon soporta
+            let pbr;
+            try {{
+                pbr = new BABYLON.PBRMaterial(`pbr_${{materialId}}_${{meshIndex}}`, scene);
+                pbr.roughness  = matDef.roughness;
+                pbr.metallic   = matDef.metallic;
+                // Albedo desde color hex como fallback (textura es opcional/async)
+                const r = parseInt(matDef.color.slice(1,3),16)/255;
+                const g = parseInt(matDef.color.slice(3,5),16)/255;
+                const b = parseInt(matDef.color.slice(5,7),16)/255;
+                pbr.albedoColor = new BABYLON.Color3(r, g, b);
+                // Intentar cargar textura (no bloquea si falla)
+                try {{
+                    const tex = new BABYLON.Texture(matDef.texUrl, scene);
+                    tex.onLoadObservable.addOnce(() => {{ pbr.albedoTexture = tex; }});
+                }} catch(e) {{}}
+                if (floor.material) floor.material.dispose();
+                floor.material = pbr;
+            }} catch(e) {{
+                // Fallback: StandardMaterial con color
+                const std = new BABYLON.StandardMaterial(`std_${{materialId}}_${{meshIndex}}`, scene);
+                const r = parseInt(matDef.color.slice(1,3),16)/255;
+                const g = parseInt(matDef.color.slice(3,5),16)/255;
+                const b = parseInt(matDef.color.slice(5,7),16)/255;
+                std.diffuseColor = new BABYLON.Color3(r, g, b);
+                if (floor.material) floor.material.dispose();
+                floor.material = std;
+            }}
+            notifyParentLayout();
+            showToast(`Material: ${{matDef.name}}`);
+        }}
+
+        function getMeshAreaM2(meshIndex) {{
+            // Área real = width * depth del roomsData
+            const r = roomsData[meshIndex];
+            if (!r) return 0;
+            return parseFloat(((r.width || 0) * (r.depth || 0)).toFixed(2));
         }}
 
         // ================================================

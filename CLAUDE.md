@@ -31,5 +31,7 @@ Convenciones:
 - Type hints + try/except en utils.
 - Probar local antes de push.
 - Schema BD actualizado en DOS sitios (db.py líneas ~613 y ~1352).
+- Materiales: nomenclatura basada en database/materials_db.json (id, price_m2, texture_url_pbr, normativa_cte_ref)
+- PEM = sum(mesh_area_m2 * price_m2) por material — almacenar en detailed_pem_breakdown (NO modifica total_cost)
 
 Estado actual y pendientes → consulta archivos específicos o estados en código.
