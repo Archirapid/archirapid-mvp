@@ -1804,12 +1804,13 @@ def render_step1():
 def _normalize_ai_proposal(proposal: dict, energy_list: list) -> dict:
     """Normaliza los nombres y entradas del JSON generado por la IA.
 
-    - Agrega o agrupa cualquier clave que mencione paneles o solar en una sola
-      entrada con código **paneles_solares**.
-    - Si el cliente pidió energía solar y no aparece ningún panel, inserta una
-      entrada mínima con {PANEL_MIN_M2} m² para garantizar su visualización.
-    - Devuelve el diccionario modificado (la operación se realiza in‑place).
+    - Agrega o agrupa paneles/solar en clave paneles_solares.
+    - Garantiza presencia de salon (≥12 m²) y cocina (≥8 m²) con alias mapping.
+    - Mapeo de alias: office/despacho/sala_estar/living/comedor → salon si falta salon.
+    - Añade salita_de_estar como opcional si hay espacio disponible.
+    - Devuelve el diccionario modificado.
     """
+    # ── 1. Paneles solares ────────────────────────────────────────────────────
     panel_area = 0.0
     keys_to_remove = []
 
@@ -1818,28 +1819,80 @@ def _normalize_ai_proposal(proposal: dict, energy_list: list) -> dict:
             try:
                 panel_area += float(v)
             except Exception:
-                # valores no numéricos se ignoran
                 pass
             keys_to_remove.append(k)
 
-    # quitar también claves de sistemas energéticos no espaciales
-    # si el usuario marcó cualquier energía distinta de solar, eliminamos
-    # posibles entradas generadas por la IA que mencionen el término.
     for en in energy_list:
         if en != 'solar':
             for k in list(proposal.keys()):
                 if en.lower() in k.lower():
                     proposal.pop(k, None)
 
-    # eliminar las claves antiguas asociadas a paneles
     for k in keys_to_remove:
         proposal.pop(k, None)
 
     if panel_area > 0:
         proposal['paneles_solares'] = panel_area
     elif 'solar' in energy_list:
-        # el usuario quería paneles pero la IA no generó ninguno
         proposal['paneles_solares'] = PANEL_MIN_M2
+
+    # ── 2. Garantizar Salón ───────────────────────────────────────────────────
+    # Aliases que pueden sustituir al salón si no existe la clave exacta
+    _SALON_ALIASES = ('salon', 'sala_estar', 'sala_de_estar', 'salita',
+                      'living', 'comedor', 'office', 'despacho', 'estudio')
+    _COCINA_MIN  = 8.0
+    _SALON_MIN   = 12.0
+
+    has_salon = any(
+        any(alias in k.lower() for alias in ('salon', 'sala_estar', 'sala_de_estar',
+                                              'salita', 'living', 'comedor'))
+        for k in proposal
+    )
+    if not has_salon:
+        # Buscar alias de mayor área para promover a salón
+        best_alias_key  = None
+        best_alias_area = 0.0
+        for k, v in list(proposal.items()):
+            kl = k.lower()
+            if any(alias in kl for alias in ('office', 'despacho', 'estudio')):
+                try:
+                    area = float(v)
+                except Exception:
+                    area = 0.0
+                if area > best_alias_area:
+                    best_alias_area = area
+                    best_alias_key  = k
+        if best_alias_key:
+            # Promover alias → renombrar a salon, asegurar área mínima
+            alias_area = max(float(proposal.pop(best_alias_key)), _SALON_MIN)
+            proposal['salon'] = alias_area
+        else:
+            # Insertar salon con área mínima CTE
+            proposal['salon'] = _SALON_MIN
+
+    # Asegurar área mínima si salon existe pero es pequeño
+    for k in list(proposal.keys()):
+        if 'salon' in k.lower() and 'cocina' not in k.lower():
+            try:
+                if float(proposal[k]) < _SALON_MIN:
+                    proposal[k] = _SALON_MIN
+            except Exception:
+                proposal[k] = _SALON_MIN
+            break
+
+    # ── 3. Garantizar Cocina ──────────────────────────────────────────────────
+    has_cocina = any('cocina' in k.lower() for k in proposal)
+    if not has_cocina:
+        proposal['cocina'] = _COCINA_MIN
+    else:
+        for k in list(proposal.keys()):
+            if 'cocina' in k.lower():
+                try:
+                    if float(proposal[k]) < _COCINA_MIN:
+                        proposal[k] = _COCINA_MIN
+                except Exception:
+                    proposal[k] = _COCINA_MIN
+                break
 
     return proposal
 

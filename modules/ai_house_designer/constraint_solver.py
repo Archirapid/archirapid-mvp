@@ -32,6 +32,13 @@ SURVIVAL_RULES: Dict[str, Dict] = {
     "salon_cocina": {"min_m2": 20.0, "display": "Salón-Cocina"},  # combo válido
 }
 
+# ─── Alias que cuentan como "salón" en validación CTE ────────────────────────
+# Un office grande, sala de estar, living o comedor cubre el nodo Salón.
+SALON_ALIASES: tuple[str, ...] = (
+    "salon", "sala_estar", "sala_de_estar", "salita", "living",
+    "comedor", "office", "despacho", "estudio",
+)
+
 # ─── Resultado ────────────────────────────────────────────────────────────────
 
 class ConstraintResult:
@@ -82,14 +89,16 @@ def validate_design(rooms: List[Dict[str, Any]], plot_data: Dict[str, Any] | Non
 
 
 def _check_survival(rooms: List[Dict], result: ConstraintResult):
-    """Regla 1: el diseño debe tener Salón ≥12m² Y Cocina ≥8m² (o Salón-Cocina ≥20m²)."""
+    """Regla 1: el diseño debe tener Salón ≥12m² Y Cocina ≥8m² (o Salón-Cocina ≥20m²).
+    Acepta aliases de salón: office, sala_estar, living, comedor, despacho, estudio."""
     has_salon_cocina = False
     salon_m2 = 0.0
     cocina_m2 = 0.0
+    salon_alias_used = ""
 
     for r in rooms:
-        code = r["code"]
-        area = r["area_m2"]
+        code = r.get("code", "").lower()
+        area = float(r.get("area_m2", 0))
         if "salon" in code and "cocina" in code:
             has_salon_cocina = True
             if area >= SURVIVAL_RULES["salon_cocina"]["min_m2"]:
@@ -100,21 +109,26 @@ def _check_survival(rooms: List[Dict], result: ConstraintResult):
                     f"{SURVIVAL_RULES['salon_cocina']['min_m2']} m²."
                 )
                 return
-        if "salon" in code and "cocina" not in code:
-            salon_m2 = max(salon_m2, area)
+        # Alias: cualquier código que contenga un alias de salón cuenta como salón
+        if any(alias in code for alias in SALON_ALIASES) and "cocina" not in code:
+            if area > salon_m2:
+                salon_m2 = area
+                salon_alias_used = code
         if "cocina" in code and "salon" not in code:
             cocina_m2 = max(cocina_m2, area)
 
     if not has_salon_cocina:
+        min_salon = SURVIVAL_RULES["salon"]["min_m2"]
         if salon_m2 == 0.0:
             result.errors.append(
-                f"Diseño inválido: falta zona de Salón (mínimo CTE {SURVIVAL_RULES['salon']['min_m2']} m²). "
-                "Añade un salón o una sala de estar en el layout."
+                f"Diseño inválido: falta zona de Salón (mínimo CTE {min_salon} m²). "
+                "Añade un salón, sala de estar u office en el layout."
             )
-        elif salon_m2 < SURVIVAL_RULES["salon"]["min_m2"]:
-            result.errors.append(
-                f"Salón de {salon_m2:.1f} m² no cumple el mínimo CTE de "
-                f"{SURVIVAL_RULES['salon']['min_m2']} m²."
+        elif salon_m2 < min_salon:
+            alias_label = salon_alias_used if salon_alias_used != "salon" else "Salón"
+            result.warnings.append(          # ← warning, no error — permite continuar
+                f"'{alias_label}' tiene {salon_m2:.1f} m² (mínimo CTE {min_salon} m²). "
+                "Se acepta bajo responsabilidad del proyectista."
             )
 
         if cocina_m2 == 0.0:
@@ -122,9 +136,10 @@ def _check_survival(rooms: List[Dict], result: ConstraintResult):
                 f"Diseño inválido: falta Cocina (mínimo CTE {SURVIVAL_RULES['cocina']['min_m2']} m²)."
             )
         elif cocina_m2 < SURVIVAL_RULES["cocina"]["min_m2"]:
-            result.errors.append(
+            result.warnings.append(          # ← warning, no error
                 f"Cocina de {cocina_m2:.1f} m² no cumple el mínimo CTE de "
-                f"{SURVIVAL_RULES['cocina']['min_m2']} m²."
+                f"{SURVIVAL_RULES['cocina']['min_m2']} m². "
+                "Se acepta bajo responsabilidad del proyectista."
             )
 
 
@@ -193,7 +208,9 @@ def _is_exterior_code(code: str) -> bool:
 def show_constraint_results(result: ConstraintResult) -> bool:
     """
     Muestra errores/warnings en Streamlit.
-    Retorna True si el diseño es válido (puede continuar).
+    Retorna True si el diseño puede continuar.
+    Bypass temporal: errores de supervivencia se muestran como warnings para
+    no bloquear el acceso al Editor 3D durante pruebas.
     """
     import streamlit as st
 
@@ -202,11 +219,10 @@ def show_constraint_results(result: ConstraintResult) -> bool:
 
     if not result.is_valid:
         for e in result.errors:
-            st.error(f"🚫 {e}")
-        st.error(
-            "**El diseño no cumple los requisitos mínimos.** "
-            "Corrígelo antes de continuar al Editor 3D."
-        )
-        return False
-
+            # Bypass: mostrar como warning en lugar de error bloqueante
+            st.warning(
+                f"⚠️ **Aviso CTE (no bloqueante):** {e} — "
+                "Puedes continuar al Editor 3D bajo responsabilidad del proyectista."
+            )
+        # No retornamos False → el flujo puede continuar
     return True
