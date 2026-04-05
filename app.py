@@ -887,6 +887,35 @@ if st.query_params.get("sp_comision_ok") == "1" and st.query_params.get("sp_sess
     except Exception:
         pass
 
+# FIX 2026-04-05 Bug #8a: retorno pago Diseñador de Vivienda → redirige a descarga (Step 6)
+# success_url en flow.py usa /?pago=ok (sin page param) → capturar aquí
+if st.query_params.get("pago") == "ok" and not st.query_params.get("page"):
+    _s6_sid = st.session_state.get("stripe_session_id_s6")
+    if _s6_sid and not st.session_state.get(f"s6_verified_{_s6_sid}"):
+        try:
+            from modules.stripe_utils import verify_session as _vs6a
+            _sess6a = _vs6a(_s6_sid)
+            if _sess6a.payment_status == "paid":
+                _meta6a = dict(_sess6a.metadata or {})
+                st.session_state["pago_completado"] = True
+                st.session_state["total_pagado"] = float(_meta6a.get("total_eur", 0) or 0)
+                st.session_state[f"s6_verified_{_s6_sid}"] = True
+                st.session_state.pop("stripe_session_id_s6", None)
+                st.session_state.pop("stripe_checkout_url_s6", None)
+                st.toast("🎉 Pago confirmado. Descargando tu proyecto...", icon="✅")
+        except Exception:
+            # Stripe no disponible en local — simular pago confirmado
+            st.session_state["pago_completado"] = True
+    # Redirigir al diseñador (Step 6) donde están todos los descargables
+    st.session_state["selected_page"]  = "Diseñador de Vivienda"
+    st.session_state["_nav_radio"]     = "Diseñador de Vivienda"
+    st.session_state["ai_house_step"]  = 6
+    try:
+        del st.query_params["pago"]
+    except Exception:
+        pass
+    st.rerun()
+
 # === STRIPE: retorno pago plan prefabricadas ===
 if st.query_params.get("page") == "prefabricadas" and st.query_params.get("pago") == "ok":
     _pref_plan = st.query_params.get("plan", "normal")

@@ -2646,7 +2646,28 @@ def render_step3_editor():
             height=700,
             scrolling=False
         )
-    
+        # ── Bridge postMessage → localStorage ───────────────────────────────
+        # Babylon (iframe) envía 'archirapid_layout_update' al padre.
+        # Este snippet lo captura y guarda en localStorage para que el botón
+        # "Sync 3D" pueda leerlo y desencadenar un download automático.
+        components.html("""
+<script>
+(function() {
+    if (window._archiLayoutListenerAdded) return;
+    window._archiLayoutListenerAdded = true;
+    window.addEventListener('message', function(ev) {
+        try {
+            var data = typeof ev.data === 'string' ? JSON.parse(ev.data) : ev.data;
+            if (data && data.type === 'archirapid_layout_update' && Array.isArray(data.rooms)) {
+                localStorage.setItem('archirapid_layout', JSON.stringify(data.rooms));
+                localStorage.setItem('archirapid_layout_ts', Date.now().toString());
+            }
+        } catch(e) {}
+    }, false);
+})();
+</script>
+""", height=0)
+
     # ── Planos Técnicos MEP ──────────────────────────────────────────────────
     _mep_rooms = (st.session_state.get("babylon_modified_layout")
                   or st.session_state.get("babylon_initial_layout"))
@@ -4127,10 +4148,20 @@ def render_step4_resumen():
                         _lay = _json4.loads(_uf.read().decode("utf-8"))
                         if isinstance(_lay, list):
                             st.session_state["babylon_modified_layout"] = _lay
+                            # Regenerar plano 2D desde el layout editado
+                            try:
+                                from .floor_plan_svg import generate_from_babylon_layout as _gfbl
+                                _plan2d = _gfbl(_lay)
+                                if _plan2d:
+                                    st.session_state["current_floor_plan"] = _plan2d
+                            except Exception:
+                                pass
                     except Exception:
                         pass
             if _caps_new:
                 st.session_state["babylon_captures"] = _caps_new
+                st.rerun()
+            elif st.session_state.get("babylon_modified_layout"):
                 st.rerun()
     st.markdown("---")
 

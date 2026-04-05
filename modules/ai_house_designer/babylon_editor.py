@@ -1,6 +1,8 @@
 """
 Editor 3D avanzado usando Babylon.js
-v3.0 - Panel numérico + paredes sincronizadas + CTE + GLB
+v3.2 - FIX 2026-04-05: dimensiones precisas (applyDimensions no llama generateLayoutJS),
+       generateLayoutJS respeta width/depth existentes, packRows elimina huecos,
+       notifyParentLayout sincroniza JSON al padre Streamlit via postMessage
 """
 
 def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos aguas (clásico, eficiente)", plot_area_m2=0, foundation_type="Losa de hormigón (suelos blandos)", house_style="Moderno", cost_per_m2=1600):
@@ -861,36 +863,29 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
 
             updateRoomInfo(idx);
 
-            // Si estamos en modo mover
+            // FIX #4: gizmo habilitado para TODAS las zonas
             if (currentMode === 'move') {{
-                const rZone = (roomsData[idx].zone || '').toLowerCase();
-                const isMovable = rZone === 'garden' || rZone === 'exterior';
-                if (isMovable) {{
-                    gizmoManager.attachToMesh(selectedMesh);
-                    gizmoManager.positionGizmoEnabled = true;
-                    gizmoManager.gizmos.positionGizmo.xGizmo.isEnabled = true;
-                    gizmoManager.gizmos.positionGizmo.yGizmo.isEnabled = false;
-                    gizmoManager.gizmos.positionGizmo.zGizmo.isEnabled = true;
-                    // Registrar observable aquí también (flujo: selección → modo mover)
-                    gizmoManager.gizmos.positionGizmo.onDragEndObservable.clear();
-                    gizmoManager.gizmos.positionGizmo.onDragEndObservable.add(() => {{
+                gizmoManager.attachToMesh(selectedMesh);
+                gizmoManager.positionGizmoEnabled = true;
+                // Guard: positionGizmo puede tardar un frame en crearse
+                const _pg = gizmoManager.gizmos && gizmoManager.gizmos.positionGizmo;
+                if (_pg) {{
+                    if (_pg.xGizmo) _pg.xGizmo.isEnabled = true;
+                    if (_pg.yGizmo) _pg.yGizmo.isEnabled = false;
+                    if (_pg.zGizmo) _pg.zGizmo.isEnabled = true;
+                    _pg.onDragEndObservable.clear();
+                    _pg.onDragEndObservable.add(() => {{
                         saveSnapshot();
                         const f = scene.getMeshByName(`floor_${{idx}}`);
                         if (f) {{
-                            const rw = roomsData[idx].width;
-                            const rd = roomsData[idx].depth;
-                            roomsData[idx].x = f.position.x - rw / 2;
-                            roomsData[idx].z = f.position.z - rd / 2;
+                            roomsData[idx].x = f.position.x - roomsData[idx].width / 2;
+                            roomsData[idx].z = f.position.z - roomsData[idx].depth / 2;
                         }}
                         rebuildScene(roomsData);
                         updateBudget();
                     }});
-                    showToast('↔️ Mueve: ' + roomsData[idx].name);
-                }} else {{
-                    gizmoManager.attachToMesh(null);
-                    gizmoManager.positionGizmoEnabled = false;
-                    showToast('💡 Para ajustar habitaciones usa Editar Dimensiones');
                 }}
+                showToast('↔️ Arrastra para mover: ' + roomsData[idx].name);
             }}
 
             // Si estamos en modo scale, mostrar panel numérico
@@ -923,36 +918,28 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
 
             }} else if (mode === 'move') {{
                 document.getElementById('btn-move').classList.add('active');
+                // FIX #4: gizmo para todas las zonas — selecciona antes de activar modo
                 if (selectedMesh && selectedIndex !== null) {{
                     gizmoManager.attachToMesh(selectedMesh);
                     gizmoManager.positionGizmoEnabled = true;
-                    gizmoManager.gizmos.positionGizmo.xGizmo.isEnabled = true;
-                    gizmoManager.gizmos.positionGizmo.yGizmo.isEnabled = false;
-                    gizmoManager.gizmos.positionGizmo.zGizmo.isEnabled = true;
-                    // Al soltar: actualizar según tipo de zona
-                    gizmoManager.gizmos.positionGizmo.onDragEndObservable.clear();
-                    gizmoManager.gizmos.positionGizmo.onDragEndObservable.add(() => {{
-                        saveSnapshot();
-                        const rZone = (roomsData[selectedIndex].zone || '').toLowerCase();
-                        const isMovable = rZone === 'garden' || rZone === 'exterior';
-                        if (isMovable) {{
-                            // Leer posición real del mesh y actualizar roomsData
+                    const _pg2 = gizmoManager.gizmos && gizmoManager.gizmos.positionGizmo;
+                    if (_pg2) {{
+                        if (_pg2.xGizmo) _pg2.xGizmo.isEnabled = true;
+                        if (_pg2.yGizmo) _pg2.yGizmo.isEnabled = false;
+                        if (_pg2.zGizmo) _pg2.zGizmo.isEnabled = true;
+                        _pg2.onDragEndObservable.clear();
+                        _pg2.onDragEndObservable.add(() => {{
+                            saveSnapshot();
                             const f = scene.getMeshByName(`floor_${{selectedIndex}}`);
                             if (f) {{
-                                const rw = roomsData[selectedIndex].width;
-                                const rd = roomsData[selectedIndex].depth;
-                                roomsData[selectedIndex].x = f.position.x - rw / 2;
-                                roomsData[selectedIndex].z = f.position.z - rd / 2;
+                                roomsData[selectedIndex].x = f.position.x - roomsData[selectedIndex].width / 2;
+                                roomsData[selectedIndex].z = f.position.z - roomsData[selectedIndex].depth / 2;
                             }}
-                            // Reconstruir solo ese elemento exterior, no redistribuir toda la casa
                             rebuildScene(roomsData);
-                        }} else {{
-                            // Zona habitable: redistribuir layout completo
-                            const newLayout = generateLayoutJS(roomsData);
-                            rebuildScene(newLayout);
-                        }}
-                        updateBudget();
-                    }});
+                            updateBudget();
+                        }});
+                    }}
+                    showToast('↔️ Arrastra: ' + roomsData[selectedIndex].name);
                 }} else {{
                     showToast('Primero selecciona una habitación');
                     setMode('select');
@@ -1016,6 +1003,14 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
         }}
 
         function generateLayoutJS(rooms) {{
+            // Si ya tienen coordenadas y dimensiones, devolver tal cual (no recalcular)
+            const alreadyPositioned = rooms.length > 0 && rooms.every(
+                r => typeof r.x === 'number' && typeof r.z === 'number'
+                  && typeof r.width === 'number' && r.width > 0
+                  && typeof r.depth === 'number' && r.depth > 0
+            );
+            if (alreadyPositioned) return rooms;
+
             const FILA1_D = 4.5, FILA3_D = 3.5, PASILLO_H = 1.2;
             const rs = rooms.map(r => ({{
                 ...r,
@@ -1098,7 +1093,7 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                     roomsData[i].z = item.z;
                     roomsData[i].width = item.width;
                     roomsData[i].depth = item.depth;
-                    roomsData[i].area_m2 = item.area_m2;
+                    roomsData[i].area_m2 = item.area_m2 !== undefined ? item.area_m2 : roomsData[i].area_m2;
                 }}
             }});
             // Reconstruir todos
@@ -1106,11 +1101,19 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             try {{ buildMEPLayers(roomsData); }} catch(e) {{ console.warn('MEP rebuild error:', e); }}
             // Z-anchor: re-posicionar chimenea/paneles solares sobre el tejado actual
             try {{ buildStyleExtras(_currentStyle); }} catch(e) {{ console.warn('StyleExtras rebuild error:', e); }}
-            try {{ buildSolarPanels(); }} catch(e) {{ console.warn('SolarPanels rebuild error:', e); }}
+            // FIX #1: rebuild roof & panels only when active — prevents ghost panels on move/dimension
+            try {{
+                if (typeof roofActive !== 'undefined' && roofActive) {{
+                    if (typeof roofMesh !== 'undefined' && roofMesh) {{ roofMesh.dispose(); roofMesh = null; }}
+                    buildRoof();
+                    buildSolarPanels();
+                }}
+            }} catch(e) {{ console.warn('Roof rebuild error:', e); }}
             selectedMesh = null;
             selectedIndex = null;
             updateBudget();
-            showToast('✅ Planta redistribuida sin colisiones');
+            notifyParentLayout();
+            showToast('✅ Planta redistribuida');
         }}
 
         // ================================================
@@ -1134,20 +1137,87 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                 return;
             }}
             saveSnapshot();
-            // Actualizar dimensiones Y área en roomsData
-            roomsData[selectedIndex].width  = newW;
-            roomsData[selectedIndex].depth  = newD;
+            // Actualizar dimensiones Y área en roomsData — NO llamar generateLayoutJS
+            // (generateLayoutJS recalcularía el ancho desde área, destruyendo la edición del usuario)
+            roomsData[selectedIndex].width   = newW;
+            roomsData[selectedIndex].depth   = newD;
             roomsData[selectedIndex].area_m2 = parseFloat((newW * newD).toFixed(2));
-            const rZone = (roomsData[selectedIndex].zone || '').toLowerCase();
-            if (rZone === 'exterior' || rZone === 'garden') {{
-                rebuildScene(roomsData);
-            }} else {{
-                const newLayout = generateLayoutJS(roomsData);
-                rebuildScene(newLayout);
-            }}
-            _resetPosSliders();   // reset posición parcela tras cambio de dimensión
+            // Reempaquetar filas para cerrar huecos sin redistribuir toda la planta
+            packRows();
+            rebuildScene(roomsData);
+            _resetPosSliders();
             checkCTE(selectedIndex, newW, newD);
             updateBudget();
+            notifyParentLayout();
+            // Mantener panel abierto con valores actualizados
+            showEditPanel(selectedIndex);
+        }}
+
+        // ================================================
+        // PACK ROWS — eliminar huecos tras redimensionar/mover
+        // Agrupa habitaciones por fila Z y reempaqueta X de izq a der
+        // ================================================
+        function packRows() {{
+            const SNAP = 0.6;  // tolerancia agrupación de filas (m)
+            // Separar jardín/exterior (posición libre) del resto
+            const fixed  = roomsData.filter(r => {{
+                const z = (r.zone||'').toLowerCase();
+                return z === 'garden' || z === 'exterior';
+            }});
+            const packing = roomsData.filter(r => {{
+                const z = (r.zone||'').toLowerCase();
+                return z !== 'garden' && z !== 'exterior';
+            }});
+            if (packing.length === 0) return;
+            // Agrupar por fila: usar el z más frecuente como clave
+            const rows = {{}};
+            packing.forEach(r => {{
+                let key = null;
+                for (const k of Object.keys(rows)) {{
+                    if (Math.abs(parseFloat(k) - r.z) < SNAP) {{ key = k; break; }}
+                }}
+                if (key === null) {{ key = r.z.toFixed(2); rows[key] = []; }}
+                rows[key].push(r);
+            }});
+            // Reempaquetar cada fila de izquierda a derecha
+            for (const key of Object.keys(rows)) {{
+                const row = rows[key];
+                row.sort((a, b) => a.x - b.x);
+                const rowZ  = parseFloat(key);
+                const rowD  = Math.max(...row.map(r => r.depth));
+                let   curX  = Math.min(...row.map(r => r.x));  // anclar al leftmost
+                row.forEach(r => {{
+                    r.x = curX;
+                    r.z = rowZ;
+                    r.depth = rowD;  // unificar profundidad de fila
+                    curX += r.width;
+                }});
+            }}
+        }}
+
+        // ================================================
+        // NOTIFY PARENT — envía layout JSON al padre Streamlit via postMessage
+        // El padre (app.py) escucha 'archirapid_layout_update' y guarda en session_state
+        // ================================================
+        function notifyParentLayout() {{
+            try {{
+                const payload = {{
+                    type: 'archirapid_layout_update',
+                    rooms: roomsData.map(r => ({{
+                        name:    r.name,
+                        code:    r.code    || '',
+                        zone:    r.zone    || '',
+                        x:       parseFloat((r.x     || 0).toFixed(3)),
+                        z:       parseFloat((r.z     || 0).toFixed(3)),
+                        width:   parseFloat((r.width || 0).toFixed(3)),
+                        depth:   parseFloat((r.depth || 0).toFixed(3)),
+                        area_m2: parseFloat((r.area_m2 || r.width * r.depth || 0).toFixed(2))
+                    }}))
+                }};
+                window.parent.postMessage(JSON.stringify(payload), '*');
+            }} catch(e) {{
+                console.warn('notifyParentLayout error:', e);
+            }}
         }}
 
         // ================================================
@@ -2576,11 +2646,13 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             foundMeshes.forEach(m => {{ m.material && m.material.dispose(); m.dispose(); }});
             foundMeshes = [];
 
-            // Detectar tipo
+            // FIX #3: detección robusta de pilotes (variantes en español)
             const ft = foundationType.toLowerCase();
             let type = 'losa';
             if (ft.includes('zapata')) type = 'zapatas';
-            else if (ft.includes('pilote')) type = 'pilotes';
+            else if (ft.includes('pilote') || ft.includes('micropilote') ||
+                     ft.startsWith('pil') || ft.includes('pilotaje')) type = 'pilotes';
+            else if (ft.includes('losa') || ft.includes('placa')) type = 'losa';
 
             // Material hormigón
             const mat = new BABYLON.StandardMaterial('foundMat', scene);
@@ -2732,31 +2804,39 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
         // ================================================
         // INICIALIZACIÓN — construir escena al cargar
         // ================================================
-        const initialLayout = generateLayoutJS(roomsData);
+        // FIX #2: use Python-computed coordinates when available; only generate from scratch if missing
+        const hasLayout = roomsData.length > 0 && typeof roomsData[0].x !== 'undefined'
+                          && typeof roomsData[0].width !== 'undefined';
+        const initialLayout = hasLayout ? roomsData : generateLayoutJS(roomsData);
         rebuildScene(initialLayout);
         // Aplicar automáticamente el estilo elegido en el Paso 1
         applyStyleUI(houseStyle);
 
-        // ── Inicializar sliders de posición en parcela ────────────────────────
+        // FIX #5: slider range calculado desde bounding box real de la casa
         (function initPlotSliders() {{
-            const margin = RETRANQUEO;
-            const minOX = plotX + margin;
-            const maxOX = plotX + plotW - totalWidth - margin;
-            const minOZ = plotZ + margin;
-            const maxOZ = plotZ + plotD - totalDepth - margin;
+            const houseRoomsS = roomsData.filter(r => (r.zone||'').toLowerCase() !== 'garden');
+            const hMinX = houseRoomsS.length ? Math.min(...houseRoomsS.map(r => r.x)) : 0;
+            const hMaxX = houseRoomsS.length ? Math.max(...houseRoomsS.map(r => r.x + r.width)) : totalWidth;
+            const hMinZ = houseRoomsS.length ? Math.min(...houseRoomsS.map(r => r.z)) : 0;
+            const hMaxZ = houseRoomsS.length ? Math.max(...houseRoomsS.map(r => r.z + r.depth)) : totalDepth;
+            const hW = hMaxX - hMinX;
+            const hD = hMaxZ - hMinZ;
+            // Espacio disponible = plot - huella casa - 2*retranqueo (ambos lados)
+            const availX = Math.max(0, plotW - hW - 2 * RETRANQUEO);
+            const availZ = Math.max(0, plotD - hD - 2 * RETRANQUEO);
             const slX = document.getElementById('slider-offset-x');
             const slZ = document.getElementById('slider-offset-z');
             if (slX) {{
-                slX.min   = minOX.toFixed(1);
-                slX.max   = (maxOX > minOX ? maxOX : minOX).toFixed(1);
-                slX.value = 0;
-                slX.disabled = maxOX <= minOX;
+                slX.min   = '0';
+                slX.max   = availX.toFixed(1);
+                slX.value = '0';
+                slX.disabled = availX <= 0;
             }}
             if (slZ) {{
-                slZ.min   = minOZ.toFixed(1);
-                slZ.max   = (maxOZ > minOZ ? maxOZ : minOZ).toFixed(1);
-                slZ.value = 0;
-                slZ.disabled = maxOZ <= minOZ;
+                slZ.min   = '0';
+                slZ.max   = availZ.toFixed(1);
+                slZ.value = '0';
+                slZ.disabled = availZ <= 0;
             }}
             // Guardar posiciones base al inicio
             _basePosData = roomsData.map(r => ({{ x: r.x, z: r.z }}));

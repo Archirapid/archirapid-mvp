@@ -1,6 +1,6 @@
 """
 Generador de planos arquitectónicos profesionales en SVG
-Distribución real con paredes conectadas, pasillos y medidas
+FIX 2026-04-05: #7 dimensiones desde layout real (no recalcular desde área)
 """
 import math
 from typing import List, Dict, Tuple, Optional
@@ -320,12 +320,9 @@ class FloorPlanSVG:
                     color='#2C3E50',
                     zorder=5)
 
-            # Dimensiones calculadas desde área original del slider
-            _geo_ratio = item["width"] / item["height"] if item["height"] > 0 else 1.4
-            _area_src = item.get("area_original", room.area_m2)
-            _safe_area = max(_area_src, 1.0)
-            _disp_w = round(math.sqrt(_safe_area * _geo_ratio), 1)
-            _disp_h = round(_safe_area / _disp_w, 1) if _disp_w > 0 else 1.0
+            # FIX #7: usar dimensiones reales del layout (no recalcular desde área)
+            _disp_w = round(item["width"], 1)
+            _disp_h = round(item["height"], 1)
             ax.text(px + pw / 2, py + ph * 0.38,
                     f'{_disp_w:.1f}m × {_disp_h:.1f}m',
                     ha='center', va='center',
@@ -808,7 +805,43 @@ def generate_cimentacion_plan_png(
         ax.text(cx_px, cy_px, r.get('name', ''),
                 ha='center', va='center', fontsize=5.5, color='#757575', zorder=3)
 
-    if foundation_type == "losa":
+    # FIX #3: normalizar tipo de cimentación para cubrir variantes de pilotes
+    _ft_norm = foundation_type.lower()
+    if 'pilote' in _ft_norm or 'micropilote' in _ft_norm or _ft_norm.startswith('pil'):
+        foundation_type = 'pilotes'
+    elif 'losa' in _ft_norm or 'placa' in _ft_norm:
+        foundation_type = 'losa'
+    else:
+        foundation_type = 'zapatas'
+
+    if foundation_type == "pilotes":
+        # ── PILOTES: círculos en esquinas + losa de encepado ─────────────────
+        pil_r = 0.25  # radio pilote 50cm diámetro
+        pil_positions = []
+        for r in rooms_layout:
+            for cx, cz in [(r['x'] + pil_r, r['z'] + pil_r),
+                           (r['x'] + r['width'] - pil_r, r['z'] + pil_r),
+                           (r['x'] + pil_r, r['z'] + r['depth'] - pil_r),
+                           (r['x'] + r['width'] - pil_r, r['z'] + r['depth'] - pil_r)]:
+                key = (round(cx, 1), round(cz, 1))
+                if key not in pil_positions:
+                    pil_positions.append(key)
+                    ppx, ppy = to_px(cx, cz)
+                    circ = mpatches.Circle((ppx, ppy), pil_r * SCALE,
+                                           linewidth=2, edgecolor=LC, facecolor='#BCAAA4', zorder=5)
+                    ax.add_patch(circ)
+                    ax.text(ppx, ppy, 'P', ha='center', va='center',
+                            fontsize=5, color='white', fontweight='bold', zorder=6)
+        # Encepado (losa de remate)
+        enx, enz = house_min_x - ZAP_W, house_min_z - ZAP_W
+        enw = (house_max_x - house_min_x) + 2 * ZAP_W
+        end_ = (house_max_z - house_min_z) + 2 * ZAP_W
+        prect(enx, enz, enw, end_, fc='#D7CCC815', ec=LC, lw=2.5, zo=4, alpha=0.25)
+        leg_px, leg_py = to_px(house_min_x, house_min_z - 1.5)
+        ax.text(leg_px, leg_py,
+                'PILOTES Ø50 cm  ·  HA-30/B/20/IIa  ·  Longitud según estudio geotécnico',
+                fontsize=6.5, color=LC, fontweight='bold', va='top')
+    elif foundation_type == "losa":
         # ── LOSA: rectángulo relleno con hatch ────────────────────────────────
         lx, lz = house_min_x - ZAP_W, house_min_z - ZAP_W
         lw_m   = (house_max_x - house_min_x) + 2 * ZAP_W
@@ -1139,3 +1172,27 @@ def generate_section_plan_png(
     plt.close(fig)
     buf.seek(0)
     return buf.read()
+
+
+# ─── Alias público para sincronización Babylon → 2D ──────────────────────────
+
+def generate_from_babylon_layout(babylon_layout, cut_height: float = 1.20) -> bytes | None:
+    """
+    Genera plano 2D arquitectónico directamente desde el JSON exportado por el
+    editor Babylon (babylon_modified_layout).  Delega en generate_section_plan_png.
+
+    Args:
+        babylon_layout: lista de dicts o string JSON con {x, z, width, depth, name, code, zone}
+        cut_height: altura de sección (default 1.20m — CTE DB-SU)
+    Returns:
+        PNG bytes o None si hay error.
+    """
+    import json as _json
+    if isinstance(babylon_layout, str):
+        try:
+            babylon_layout = _json.loads(babylon_layout)
+        except Exception:
+            return None
+    if not babylon_layout:
+        return None
+    return generate_section_plan_png(babylon_layout, cut_height=cut_height)
