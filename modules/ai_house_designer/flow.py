@@ -2699,29 +2699,40 @@ def render_step3_editor():
     - 🏠 Activa el tejado, los cimientos o el cerramiento
     - ✅ El sistema comprueba automáticamente la normativa CTE
     """)
-    
+
     # Botón abrir editor - DESTACADO
     st.markdown("### 🏗️ Diseña tu casa")
 
-    # ── Controles de posición en terreno ────────────────────────────────────
-    st.markdown("##### 📍 Posición de la casa en el terreno")
-    _pos_col1, _pos_col2 = st.columns(2)
-    with _pos_col1:
-        _offset_x = st.number_input(
-            "Desplazamiento X (m)",
-            min_value=-20.0, max_value=20.0, value=st.session_state.get("house_offset_x", 0.0),
-            step=0.5, key="house_offset_x_input",
-            help="Mueve la casa hacia la derecha (+) o izquierda (-)"
-        )
-        st.session_state["house_offset_x"] = _offset_x
-    with _pos_col2:
-        _offset_z = st.number_input(
-            "Desplazamiento Z (m)",
-            min_value=-20.0, max_value=20.0, value=st.session_state.get("house_offset_z", 0.0),
-            step=0.5, key="house_offset_z_input",
-            help="Mueve la casa hacia adelante (+) o atrás (-)"
-        )
-        st.session_state["house_offset_z"] = _offset_z
+    # ── HERRAMIENTAS ────────────────────────────────────────────────────────
+    with st.expander("🛠️ Herramientas", expanded=False):
+        st.markdown("#### 📍 Posición en parcela")
+        st.caption("Ajusta la ubicación de tu casa dentro del terreno.")
+
+        _h_col1, _h_col2 = st.columns(2)
+        with _h_col1:
+            _pos_x = st.slider(
+                "X (m)",
+                min_value=-20.0, max_value=20.0,
+                value=st.session_state.get("house_offset_x", 0.0),
+                step=0.5, key="house_offset_x_slider",
+                help="Derecha (+) / Izquierda (-)"
+            )
+            st.session_state["house_offset_x"] = _pos_x
+        with _h_col2:
+            _pos_z = st.slider(
+                "Z (m)",
+                min_value=-20.0, max_value=20.0,
+                value=st.session_state.get("house_offset_z", 0.0),
+                step=0.5, key="house_offset_z_slider",
+                help="Adelante (+) / Atrás (-)"
+            )
+            st.session_state["house_offset_z"] = _pos_z
+
+        # Botón aplicar posición sin construir
+        if st.button("🔄 Aplicar posición al editor", use_container_width=True, key="apply_position_offset"):
+            st.session_state.pop("babylon_html", None)
+            st.session_state["editor_needs_rebuild"] = True
+            st.rerun()
 
     if st.button("🏠 Construir mi Casa — Ver en 3D", type="primary", use_container_width=True, key="open_babylon"):
 
