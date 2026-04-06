@@ -384,13 +384,13 @@ def show_selected_project_panel_v2(client_email: str, project_id: str):
         # Mostrar botones de descarga
         col1, col2, col3 = st.columns(3)
         with col1:
-            if st.button("📄 Descargar Memoria PDF", use_container_width=True, type="primary"):
+            if st.button("📄 Descargar Memoria PDF", width='stretch', type="primary"):
                 st.info("Descarga iniciada... (simulado)")
         with col2:
-            if st.button("🖥️ Descargar Planos CAD", use_container_width=True, type="primary"):
+            if st.button("🖥️ Descargar Planos CAD", width='stretch', type="primary"):
                 st.info("Descarga iniciada... (simulado)")
         with col3:
-            if st.button("🏗️ Descargar Modelo 3D", use_container_width=True, type="primary"):
+            if st.button("🏗️ Descargar Modelo 3D", width='stretch', type="primary"):
                 st.info("Descarga iniciada... (simulado)")
 
     else:
@@ -399,7 +399,7 @@ def show_selected_project_panel_v2(client_email: str, project_id: str):
         col_pdf, col_cad = st.columns(2)
 
         with col_pdf:
-            if st.button(f"📄 Comprar Memoria PDF - €{project_data['price_memoria']}", use_container_width=True, type="primary"):
+            if st.button(f"📄 Comprar Memoria PDF - €{project_data['price_memoria']}", width='stretch', type="primary"):
                 # Simular compra directa de PDF
                 with st.spinner("Procesando compra de PDF..."):
                     import time
@@ -408,7 +408,7 @@ def show_selected_project_panel_v2(client_email: str, project_id: str):
                 st.info("📧 Recibirás el enlace de descarga por email")
 
         with col_cad:
-            if st.button(f"🖥️ Comprar Planos CAD - €{project_data['price_cad']}", use_container_width=True, type="primary"):
+            if st.button(f"🖥️ Comprar Planos CAD - €{project_data['price_cad']}", width='stretch', type="primary"):
                 # Simular compra directa de CAD
                 with st.spinner("Procesando compra de CAD..."):
                     import time
@@ -488,14 +488,14 @@ def show_selected_project_panel_v2(client_email: str, project_id: str):
             st.rerun()
 
     with col2:
-        if st.button("🛒 Mi Historial de Compras", use_container_width=True):
+        if st.button("🛒 Mi Historial de Compras", width='stretch'):
             # Limpiar proyecto seleccionado para mostrar panel normal
             if "selected_project_v2" in st.query_params:
                 del st.query_params["selected_project_v2"]
             st.rerun()
 
     with col3:
-        if st.button("📧 Contactar Arquitecto", use_container_width=True):
+        if st.button("📧 Contactar Arquitecto", width='stretch'):
             st.info(f"📧 Contacto: {project_data['architect_name'] or 'Equipo ARCHIRAPID'}")
             st.write("Email: proyectos@archirapid.com")
             st.write("Teléfono: +34 900 123 456")
@@ -1337,7 +1337,7 @@ st.session_state['selected_page'] = selected_page
 
 # ── Panic Button de Hard Reset (último en sidebar) ─────────────────────
 st.sidebar.divider()
-if st.sidebar.button("♻️ Hard Reset Sesión", key="panic_reset_session", use_container_width=True, type="secondary"):
+if st.sidebar.button("♻️ Hard Reset Sesión", key="panic_reset_session", width='stretch', type="secondary"):
     st.session_state.clear()
     st.rerun()
 
@@ -1489,7 +1489,7 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
                 password = st.text_input("Contraseña *", type="password", placeholder="Mínimo 6 caracteres")
                 password_confirm = st.text_input("Confirmar contraseña *", type="password", placeholder="Repite tu contraseña")
 
-                submitted = st.form_submit_button("🚀 Registrarme y Acceder", type="primary", use_container_width=True)
+                submitted = st.form_submit_button("🚀 Registrarme y Acceder", type="primary", width='stretch')
                 
                 if submitted:
                     if not name or not email or not password:
@@ -1563,7 +1563,7 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
                 email = st.text_input("📧 Email", key="login_email")
                 password = st.text_input("🔒 Contraseña", type="password", key="login_password")
                 
-                submitted = st.form_submit_button("🚀 Entrar", type="primary", use_container_width=True)
+                submitted = st.form_submit_button("🚀 Entrar", type="primary", width='stretch')
                 
                 if submitted:
                     if not email or not password:
@@ -1716,7 +1716,7 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
                         _wmsg = st.text_input("¿Qué buscas?", placeholder="Construir, invertir...")
                         _wsub = st.form_submit_button(
                             "Solicitar plaza" if _left > 0 else "Lista de espera",
-                            type="primary", use_container_width=True)
+                            type="primary", width='stretch')
                         if _wsub:
                             if not _wname or not _wemail or "@" not in _wemail:
                                 st.error("Nombre y email requeridos.")
@@ -1746,7 +1746,7 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
                 st.success(f"✅ Plaza reservada{', ' + _wname_saved if _wname_saved else ''}.")
 
             # ── Acceso directo al portal MLS — 30 días free trial ────────────
-            st.link_button("🎁 30 días Free Trial — Acceder al portal MLS →", "/?seccion=mls", use_container_width=True, type="primary")
+            st.link_button("🎁 30 días Free Trial — Acceder al portal MLS →", "/?seccion=mls", width='stretch', type="primary")
 
         # ── ACCESO RÁPIDO — 7 COLUMNAS PROFESIONALES ─────────────────────────────
         with st.container():
@@ -1757,7 +1757,7 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
             # Col 0: Terreno
             with cols[0]:
                 st.caption("📍 Terreno")
-                if st.button("Acceder", use_container_width=True, key="h1"):
+                if st.button("Acceder", width='stretch', key="h1"):
                     if st.session_state.get("logged_in") and st.session_state.get("role") == "owner":
                         st.session_state["selected_page"] = "🏠 Propietarios"
                         st.query_params["page"] = "propietarios"
@@ -1769,7 +1769,7 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
             # Col 1: Comprador
             with cols[1]:
                 st.caption("🏠 Comprador")
-                if st.button("Acceder", use_container_width=True, key="h2"):
+                if st.button("Acceder", width='stretch', key="h2"):
                     if st.session_state.get("logged_in") and st.session_state.get("role") == "client":
                         st.session_state["selected_page"] = "👤 Panel de Cliente"
                         st.query_params["page"] = "cliente"
@@ -1783,7 +1783,7 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
             # Col 2: Estudiante
             with cols[2]:
                 st.caption("🎓 Estudiante")
-                if st.button("Acceder", use_container_width=True, key="h3"):
+                if st.button("Acceder", width='stretch', key="h3"):
                     st.session_state["selected_page"] = "🎓 Estudiantes"
                     st.query_params["page"] = "estudiantes"
                     st.rerun()
@@ -1791,7 +1791,7 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
             # Col 3: Arquitecto
             with cols[3]:
                 st.caption("📐 Arquitecto")
-                if st.button("Acceder", use_container_width=True, key="h4"):
+                if st.button("Acceder", width='stretch', key="h4"):
                     st.session_state["selected_page"] = "Arquitectos (Marketplace)"
                     st.query_params["page"] = "arquitectos"
                     st.rerun()
@@ -1799,7 +1799,7 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
             # Col 4: Constructor
             with cols[4]:
                 st.caption("🏗️ Constructor")
-                if st.button("Acceder", use_container_width=True, key="h5"):
+                if st.button("Acceder", width='stretch', key="h5"):
                     if st.session_state.get("logged_in") and st.session_state.get("role") == "services":
                         st.session_state["selected_page"] = "👤 Panel de Proveedor"
                         st.query_params["page"] = "proveedor"
@@ -1813,7 +1813,7 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
             # Col 5: Prefabricadas
             with cols[5]:
                 st.caption("🏠 Prefab")
-                if st.button("Acceder", use_container_width=True, key="h6"):
+                if st.button("Acceder", width='stretch', key="h6"):
                     st.session_state["selected_page"] = "🏠 Portal Prefabricadas"
                     st.query_params["page"] = "prefabricadas"
                     st.rerun()
@@ -1821,7 +1821,7 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
             # Col 6: Inmobiliaria/MLS
             with cols[6]:
                 st.caption("🏢 Inmo/MLS")
-                if st.button("Acceder", use_container_width=True, key="h7"):
+                if st.button("Acceder", width='stretch', key="h7"):
                     st.session_state["selected_page"] = "🏢 Inmobiliarias MLS"
                     st.query_params["page"] = "mls"
                     st.rerun()
@@ -1871,11 +1871,11 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
                                 unsafe_allow_html=True
                             )
                         except Exception:
-                            st.image(thumbnail, use_container_width=True)
+                            st.image(thumbnail, width='stretch')
                         title = p.get('title', 'Proyecto')
                         st.markdown(f"**{title[:28]}{'…' if len(title)>28 else ''}**")
                         st.caption(f"💰 €{p.get('price',0):,.0f}  ·  📐 {p.get('area_m2',0)} m²")
-                        if st.button("Ver Detalles →", key=f"proj_home_{p['id']}", use_container_width=True):
+                        if st.button("Ver Detalles →", key=f"proj_home_{p['id']}", width='stretch'):
                             st.query_params["selected_project_v2"] = p['id']
                             st.rerun()
             else:
@@ -1930,7 +1930,7 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
                     else:
                         st.markdown('<div style="height:140px;background:#F0F9FF;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:2.5em;margin-bottom:6px;">🏠</div>', unsafe_allow_html=True)
                     st.markdown(f'<div style="font-weight:700;font-size:0.85em;color:#0D1B2A;">{_nm}</div><div style="font-size:0.76em;color:#64748B;">{_m2} m² · {_rms}hab · {_mat}</div><div style="font-weight:700;color:#2563EB;font-size:0.88em;margin-top:4px;">{_pdsp}</div>', unsafe_allow_html=True)
-                    if st.button("Ver modelo →", key=f"prefab_home_{_pf_id}", use_container_width=True):
+                    if st.button("Ver modelo →", key=f"prefab_home_{_pf_id}", width='stretch'):
                         st.query_params["selected_prefab"] = str(_pf_id)
                         st.rerun()
     except Exception as _e:

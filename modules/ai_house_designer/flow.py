@@ -1373,7 +1373,7 @@ def render_step1():
                 if st.button(
                     "✓ Seleccionar" if is_selected else "Elegir",
                     key=f"style_btn_{style_key}",
-                    use_container_width=True,
+                    width='stretch',
                     type="primary" if is_selected else "secondary"
                 ):
                     st.session_state['selected_style_key'] = style_key
@@ -1529,7 +1529,7 @@ def render_step1():
                 if st.button(
                     "✓ Incluido" if is_on else "Añadir",
                     key=f"btn_extra_{extra['key']}",
-                    use_container_width=True,
+                    width='stretch',
                     type="primary" if is_on else "secondary"
                 ):
                     st.session_state[key] = not is_on
@@ -1746,7 +1746,7 @@ def render_step1():
         design_button = st.button(
             "🤖 DISEÑAR MI CASA CON IA",
             type="primary",
-            use_container_width=True
+            width='stretch'
         )
     
     if design_button:
@@ -2029,11 +2029,11 @@ def render_step2():
     # Botones navegación
     col1, col2 = st.columns([1, 1])
     with col1:
-        if st.button("← Paso 1", key="back_to_1", use_container_width=True):
+        if st.button("← Paso 1", key="back_to_1", width='stretch'):
             st.session_state["ai_house_step"] = 1
             st.rerun()
     with col2:
-        if st.button("Paso 3: Editor 3D →", key="go_to_3", type="primary", use_container_width=True):
+        if st.button("Paso 3: Editor 3D →", key="go_to_3", type="primary", width='stretch'):
             # ── Constraint Solver S1 ──────────────────────────────────────────
             try:
                 from .constraint_solver import validate_design, show_constraint_results
@@ -2438,16 +2438,16 @@ def render_step2():
                 data=st.session_state['current_floor_plan'],
                 file_name="plano_distribucion.png",
                 mime="image/png",
-                use_container_width=True
+                width='stretch'
             )
         
         col1, col2 = st.columns(2)
         with col1:
-            if st.button("← Paso 1", use_container_width=True):
+            if st.button("← Paso 1", width='stretch'):
                 st.session_state["ai_house_step"] = 1
                 st.rerun()
         with col2:
-            if st.button("Paso 3 →", type="primary", use_container_width=True):
+            if st.button("Paso 3 →", type="primary", width='stretch'):
                 # ── Constraint Solver S1 ──────────────────────────────────────
                 try:
                     from .constraint_solver import validate_design, show_constraint_results
@@ -2510,7 +2510,7 @@ def render_step2():
             })
         
         df = pd.DataFrame(table_data)
-        st.dataframe(df, use_container_width=True, hide_index=True)
+        st.dataframe(df, width='stretch', hide_index=True)
         
         st.markdown("---")
 
@@ -2526,7 +2526,7 @@ def render_step2():
         _tab_svg, _tab_3d = st.tabs(["📐 Plano SVG", "🏗️ Sección desde Editor 3D"])
 
         with _tab_svg:
-            if st.button("Generar Plano 2D", type="primary", use_container_width=True, key="gen_plan_svg"):
+            if st.button("Generar Plano 2D", type="primary", width='stretch', key="gen_plan_svg"):
                 try:
                     from .floor_plan_svg import FloorPlanSVG
                     planner = FloorPlanSVG(design)
@@ -2548,7 +2548,7 @@ def render_step2():
                 st.image(
                     st.session_state['current_floor_plan'],
                     caption="Plano profesional con medidas reales",
-                    use_container_width=True
+                    width='stretch'
                 )
             else:
                 st.info("Pulsa 'Generar Plano 2D' para ver tu distribución")
@@ -2561,7 +2561,7 @@ def render_step2():
                     "Plano generado directamente desde las coordenadas reales del editor 3D. "
                     "Las dimensiones coinciden exactamente con la escena Babylon."
                 )
-                if st.button("Generar Sección desde 3D", type="primary", use_container_width=True, key="gen_plan_3d"):
+                if st.button("Generar Sección desde 3D", type="primary", width='stretch', key="gen_plan_3d"):
                     try:
                         from .floor_plan_svg import generate_section_plan_png as _gen_sec
                         import json as _json
@@ -2584,7 +2584,7 @@ def render_step2():
                         st.image(
                             st.session_state['section_plan_3d'],
                             caption="Sección real 1.20m — posiciones exactas del editor 3D",
-                            use_container_width=True,
+                            width='stretch',
                         )
                     with _s3_col2:
                         st.download_button(
@@ -2593,7 +2593,7 @@ def render_step2():
                             file_name="planta_seccion_3d.png",
                             mime="image/png",
                             key="dl_section_3d",
-                            use_container_width=True,
+                            width='stretch',
                         )
             else:
                 st.info(
@@ -2682,7 +2682,7 @@ def render_step3_editor():
         return
 
     # Botón volver arriba
-    if st.button("← Volver al Paso 2", key="back_to_2_top", use_container_width=True):
+    if st.button("← Volver al Paso 2", key="back_to_2_top", width='stretch'):
         st.session_state["ai_house_step"] = 2
         st.rerun()
     
@@ -2729,12 +2729,12 @@ def render_step3_editor():
             st.session_state["house_offset_z"] = _pos_z
 
         # Botón aplicar posición sin construir
-        if st.button("🔄 Aplicar posición al editor", use_container_width=True, key="apply_position_offset"):
+        if st.button("🔄 Aplicar posición al editor", width='stretch', key="apply_position_offset"):
             st.session_state.pop("babylon_html", None)
             st.session_state["editor_needs_rebuild"] = True
             st.rerun()
 
-    if st.button("🏠 Construir mi Casa — Ver en 3D", type="primary", use_container_width=True, key="open_babylon"):
+    if st.button("🏠 Construir mi Casa — Ver en 3D", type="primary", width='stretch', key="open_babylon"):
 
         # Invalidar solo HTML cache — NO borrar layout/rooms/coords
         st.session_state.pop("babylon_html", None)
@@ -2812,7 +2812,7 @@ def render_step3_editor():
 
     # Modo Estudio: botón para abrir Babylon en nueva pestaña (preserva contexto del portal)
     if st.session_state.get("estudio_mode") and st.session_state.get("babylon_html"):
-        if st.button("🔗 Abrir Editor 3D en Nueva Pestaña", key="open_babylon_newtab", use_container_width=True):
+        if st.button("🔗 Abrir Editor 3D en Nueva Pestaña", key="open_babylon_newtab", width='stretch'):
             import base64 as _b64mod
             import streamlit.components.v1 as _cv1_bt
             _b64html = _b64mod.b64encode(st.session_state["babylon_html"].encode("utf-8")).decode("utf-8")
@@ -2900,7 +2900,7 @@ def render_step3_editor():
                 _cim_png = _gen_cim_main(_cim_layout, _cim_type, _cim_tw, _cim_td)
 
                 if _cim_png:
-                    st.image(_cim_png, use_container_width=True, caption=f"Plano de Cimentación — {_cim_type.capitalize()}")
+                    st.image(_cim_png, width='stretch', caption=f"Plano de Cimentación — {_cim_type.capitalize()}")
                     with _cim_col2:
                         st.download_button(
                             "⬇️ Descargar PNG",
@@ -2908,7 +2908,7 @@ def render_step3_editor():
                             file_name=f"plano_cimentacion_{_cim_type}.png",
                             mime="image/png",
                             key="dl_cim_plan_main_editor",
-                            use_container_width=True,
+                            width='stretch',
                         )
                 else:
                     st.caption("⚠️ No se pudo generar el plano de cimentación.")
@@ -2944,13 +2944,13 @@ def render_step3_editor():
                         try:
                             _png = _gen_mep(_mep_rooms, _lid, _tw, _td)
                             if _png:
-                                st.image(_png, use_container_width=True)
+                                st.image(_png, width='stretch')
                                 st.download_button(
                                     f"⬇️ {_lbl}", _png,
                                     file_name=f"plano_mep_{_lid}.png",
                                     mime="image/png",
                                     key=f"dl_mep_{_lid}",
-                                    use_container_width=True,
+                                    width='stretch',
                                 )
                         except Exception as _le:
                             st.caption(f"⚠️ {_lbl}: {_le}")
@@ -2975,7 +2975,7 @@ def render_step3_editor():
                 #     if _cim_png:
                 #         _cim_c1, _cim_c2 = st.columns([3, 1])
                 #         with _cim_c1:
-                #             st.image(_cim_png, use_container_width=True)
+                #             st.image(_cim_png, width='stretch')
                 #         with _cim_c2:
                 #             st.download_button(
                 #                 "⬇️ Plano Cimentación",
@@ -2983,7 +2983,7 @@ def render_step3_editor():
                 #                 file_name="plano_cimentacion.png",
                 #                 mime="image/png",
                 #                 key="dl_cim_plan",
-                #                 use_container_width=True,
+                #                 width='stretch',
                 #             )
                 # except Exception as _ce:
                 #     st.caption(f"⚠️ Cimentación: {_ce}")
@@ -3006,7 +3006,7 @@ def render_step3_editor():
     
     col1, col2 = st.columns([1, 2])
     with col2:
-        if st.button("Continuar a Documentación (Paso 4) →", type="primary", use_container_width=True, key="go_to_4_bottom"):
+        if st.button("Continuar a Documentación (Paso 4) →", type="primary", width='stretch', key="go_to_4_bottom"):
             st.session_state["ai_house_step"] = 4
             st.rerun()
 
@@ -3168,7 +3168,7 @@ def render_step3():
                         'font-size:12px;color:#1A5276;margin:6px 0;">💡 Planos, memoria técnica y CAD listos para descargar.</div>',
                         unsafe_allow_html=True
                     )
-                    if st.button("Ver prefiguración completa →", key="wow_ver_proyecto", type="primary", use_container_width=True):
+                    if st.button("Ver prefiguración completa →", key="wow_ver_proyecto", type="primary", width='stretch'):
                         st.query_params["selected_project_v2"] = str(_pid)
                         st.rerun()
                 else:
@@ -3273,7 +3273,7 @@ def render_step3():
         }
         for i, (k, dataurl) in enumerate(caps_doc.items()):
             with cols_caps[i % 5]:
-                st.image(dataurl, caption=_cap_labels.get(k, k), use_container_width=True)
+                st.image(dataurl, caption=_cap_labels.get(k, k), width='stretch')
         zip_caps = _zip_images_dict(caps_doc, thumb=False)
         st.download_button(
             label="📁 Descargar vistas 3D (ZIP)",
@@ -3587,7 +3587,7 @@ def render_step3():
         
         df = pd.DataFrame(partidas, 
                          columns=["Partida", "Coste", "%", "Descripción"])
-        st.dataframe(df, use_container_width=True, hide_index=True)
+        st.dataframe(df, width='stretch', hide_index=True)
         
         # Total
         st.markdown(f"""
@@ -3613,7 +3613,7 @@ def render_step3():
             'ai_original': '🤖 Plano propuesta IA'
         }.get(plan_source, 'Plano de distribución')
 
-        if st.button("🗺️ Generar Plano Final", type="primary", use_container_width=True, key="gen_plan_paso4"):
+        if st.button("🗺️ Generar Plano Final", type="primary", width='stretch', key="gen_plan_paso4"):
             try:
                 from .architect_layout import generate_layout
                 from .floor_plan_svg import FloorPlanSVG
@@ -3655,13 +3655,13 @@ def render_step3():
             st.image(
                 st.session_state['final_floor_plan'],
                 caption=plan_label,
-                use_container_width=True
+                width='stretch'
             )
         elif 'current_floor_plan' in st.session_state:
             st.image(
                 st.session_state['current_floor_plan'],
                 caption="Plano del Paso 2 (genera el plano final arriba)",
-                use_container_width=True
+                width='stretch'
             )
         else:
             st.info("Pulsa 'Generar Plano Final' para ver el plano correcto")
@@ -3685,7 +3685,7 @@ def render_step3():
                 data=zip_all,
                 file_name="vistas_3d.zip",
                 mime="application/zip",
-                use_container_width=True
+                width='stretch'
             )
             if st.session_state.get('babylon_captures_thumb'):
                 zip_th = _zip_images_dict({k: f"data:image/png;base64,{b64}" for k,b64 in st.session_state['babylon_captures_thumb'].items()}, thumb=True)
@@ -3694,7 +3694,7 @@ def render_step3():
                     data=zip_th,
                     file_name="miniaturas_3d.zip",
                     mime="application/zip",
-                    use_container_width=True
+                    width='stretch'
                 )
 
         dl1, dl2 = st.columns(2)
@@ -3707,7 +3707,7 @@ def render_step3():
                     data=plan_to_download,
                     file_name="plano_archirapid_final.png",
                     mime="image/png",
-                    use_container_width=True
+                    width='stretch'
                 )
         
         with dl2:
@@ -3761,7 +3761,7 @@ def render_step3():
                     data=excel_buffer.getvalue(),
                     file_name="presupuesto_archirapid.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    use_container_width=True
+                    width='stretch'
                 )
             except Exception as e:
                 st.warning(f"Excel no disponible: {e}")
@@ -3866,7 +3866,7 @@ def render_step3():
             st.button(
                 f"Solicitar Presupuesto",
                 key=f"constructor_{constructor['name']}",
-                use_container_width=True,
+                width='stretch',
                 type="primary"
             )
     
@@ -3877,11 +3877,11 @@ def render_step3():
     # NAVEGACIÓN
     col1, col2 = st.columns(2)
     with col1:
-        if st.button("← Volver al Paso 2", use_container_width=True):
+        if st.button("← Volver al Paso 2", width='stretch'):
             st.session_state["ai_house_step"] = 2
             st.rerun()
     with col2:
-        if st.button("✅ He terminado el diseño — Ver opciones de proyecto", type="primary", use_container_width=True):
+        if st.button("✅ He terminado el diseño — Ver opciones de proyecto", type="primary", width='stretch'):
             st.session_state["mostrar_monetizacion"] = True
             st.rerun()
 
@@ -3988,13 +3988,13 @@ def render_step3():
 
         col_pay1, col_pay2 = st.columns(2)
         with col_pay1:
-            if st.button("💳 Pagar con Tarjeta (Simulado)", type="primary", use_container_width=True):
+            if st.button("💳 Pagar con Tarjeta (Simulado)", type="primary", width='stretch'):
                 st.session_state["pago_completado"] = True
                 st.session_state["servicios_contratados"] = seleccionados
                 st.session_state["total_pagado"] = total_monetizacion
                 st.rerun()
         with col_pay2:
-            if st.button("📞 Hablar con un Arquitecto", use_container_width=True):
+            if st.button("📞 Hablar con un Arquitecto", width='stretch'):
                 _project_id = st.session_state.get("ai_project_db_id") or \
                               st.session_state.get("design_plot_data", {}).get("id", "sin-id")
                 _client_email = st.session_state.get("client_email", "")
@@ -4056,7 +4056,7 @@ def render_step3():
                     data=zip_bytes,
                     file_name=zip_filename,
                     mime="application/zip",
-                    use_container_width=True,
+                    width='stretch',
                     type="primary"
                 )
                 st.caption("Incluye: Memoria descriptiva · Mediciones y presupuesto Excel · Plano 2D · Datos catastro · Layout 3D · Guía de próximos pasos")
@@ -4116,7 +4116,7 @@ def render_step3():
                             data=_ifc_bytes,
                             file_name=f"{_pname_ifc}.ifc",
                             mime="application/x-step",
-                            use_container_width=True,
+                            width='stretch',
                             help="Ábrelo en FreeCAD (gratis) o BIMvision para ver el modelo 3D técnico"
                         )
                         st.caption("IFC2x3 · FreeCAD · Archicad · Revit · Navisworks · BIMvision · UE BIM Mandate")
@@ -4170,7 +4170,7 @@ def render_step3():
                     )
 
                     if st.button("🏗️ Publicar en Tablón de Obras — Recibir ofertas",
-                                 type="primary", use_container_width=True, key="btn_tablon"):
+                                 type="primary", width='stretch', key="btn_tablon"):
                         try:
                             from modules.marketplace.service_providers import publish_to_tablon
                             _tid = publish_to_tablon(
@@ -4368,7 +4368,7 @@ def render_step4_resumen():
         _ccols = st.columns(min(len(_caps_r4), 5))
         for _ci, (_ck, _cu) in enumerate(_caps_r4.items()):
             with _ccols[_ci % 5]:
-                st.image(_cu, caption=_cap_lbl.get(_ck, _ck), use_container_width=True)
+                st.image(_cu, caption=_cap_lbl.get(_ck, _ck), width='stretch')
     else:
         st.info(
             "💡 Si editaste en el 3D: pulsa **📸 Capturar Vistas** (5 fotos) y **💾 Guardar JSON** "
@@ -4542,7 +4542,7 @@ def render_step4_resumen():
                                                                "#60A5FA","#93C5FD","#BFDBFE"]))
                     _fig_bim.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
                                            font_color="#F8FAFC", height=320, margin=dict(t=20,b=20))
-                    st.plotly_chart(_fig_bim, use_container_width=True)
+                    st.plotly_chart(_fig_bim, width='stretch')
                     st.caption("Cada segmento = objeto IFC2x3 certificable · Compatible BIM Mandate UE")
                 else:
                     st.info("Completa el diseño para ver la distribución de espacios.")
@@ -4566,7 +4566,7 @@ def render_step4_resumen():
                     _fig_e.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
                                          font_color="#F8FAFC", height=300, yaxis_title="kWh/año ahorrado",
                                          margin=dict(t=20,b=40))
-                    st.plotly_chart(_fig_e, use_container_width=True)
+                    st.plotly_chart(_fig_e, width='stretch')
                 else:
                     st.info("Activa sistemas energéticos en el Paso 2 para ver el análisis.")
                 st.metric("Consumo estimado", f"{f['consumo_real']:,} kWh/año",
@@ -4587,7 +4587,7 @@ def render_step4_resumen():
                 _fig_c.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
                                      font_color="#F8FAFC", height=300, yaxis_title="kg CO₂",
                                      margin=dict(t=20,b=40))
-                st.plotly_chart(_fig_c, use_container_width=True)
+                st.plotly_chart(_fig_c, width='stretch')
                 st.caption(f"CO₂ evitado vs casa convencional: **{f['co2_evitado']} t/año** gracias a tus sistemas energéticos")
 
             with tab_whatif:
@@ -4609,12 +4609,12 @@ def render_step4_resumen():
     st.markdown("---")
     _c_back, _c_next = st.columns(2)
     with _c_back:
-        if st.button("← Volver al Editor 3D", use_container_width=True, key="s4_back"):
+        if st.button("← Volver al Editor 3D", width='stretch', key="s4_back"):
             st.session_state["ai_house_step"] = 3
             st.rerun()
     with _c_next:
         if st.button("Continuar → Documentación y Servicios", type="primary",
-                     use_container_width=True, key="s4_next"):
+                     width='stretch', key="s4_next"):
             st.session_state["ai_house_step"] = 5
             st.rerun()
 
@@ -4666,7 +4666,7 @@ def render_step5_docs():
     }.get(_plan_source_p5, "Plano de distribución")
 
     if st.button("🗺️ Generar Plano de Planta", type="primary",
-                 use_container_width=True, key="gen_plan_s5"):
+                 width='stretch', key="gen_plan_s5"):
         try:
             from .architect_layout import generate_layout as _gen_lay
             from .floor_plan_svg import FloorPlanSVG as _FPSVG
@@ -4692,11 +4692,11 @@ def render_step5_docs():
 
     if st.session_state.get("final_floor_plan"):
         st.image(st.session_state["final_floor_plan"],
-                 caption=_plan_label_p5, use_container_width=True)
+                 caption=_plan_label_p5, width='stretch')
     elif st.session_state.get("current_floor_plan"):
         st.image(st.session_state["current_floor_plan"],
                  caption="Plano del Paso 2 (pulsa 'Generar' para actualizarlo con tu diseño orientativo)",
-                 use_container_width=True)
+                 width='stretch')
     else:
         st.info("Pulsa 'Generar Plano de Planta' para ver la distribución de tu casa")
 
@@ -4717,7 +4717,7 @@ def render_step5_docs():
         _ccols = st.columns(min(len(_caps5), 5))
         for _ci, (_ck, _cdurl) in enumerate(_caps5.items()):
             with _ccols[_ci % 5]:
-                st.image(_cdurl, caption=_cap_labels5.get(_ck, _ck), use_container_width=True)
+                st.image(_cdurl, caption=_cap_labels5.get(_ck, _ck), width='stretch')
     else:
         st.info("💡 Si capturaste vistas en el Editor 3D, súbelas aquí para incluirlas en la documentación. "
                 "En el editor: pulsa 📸 **Capturar Vistas** → se descargan automáticamente como ZIP.")
@@ -4787,7 +4787,7 @@ def render_step5_docs():
             data=_xls_buf.getvalue(),
             file_name="Presupuesto_ArchiRapid.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True,
+            width='stretch',
         )
     except Exception:
         pass
@@ -4808,7 +4808,7 @@ def render_step5_docs():
                         st.caption(f"{_b.get('specialty', '')} · {_b.get('rating', '⭐⭐⭐⭐')} · {_b.get('projects_done', '')} proyectos")
                     with _bc2:
                         st.button("Contactar", key=f"contact_{_b.get('id', _b.get('name', ''))}_s5",
-                                  use_container_width=True)
+                                  width='stretch')
         else:
             st.info(f"Constructores para {_province or 'tu zona'} disponibles tras registro.")
     except Exception:
@@ -4911,12 +4911,12 @@ def render_step5_docs():
     st.markdown("---")
     _c_back5, _c_next5 = st.columns(2)
     with _c_back5:
-        if st.button("← Volver al Resumen", use_container_width=True, key="s5_back"):
+        if st.button("← Volver al Resumen", width='stretch', key="s5_back"):
             st.session_state["ai_house_step"] = 4
             st.rerun()
     with _c_next5:
         if st.button("Continuar → Pago y Descarga", type="primary",
-                     use_container_width=True, key="s5_next"):
+                     width='stretch', key="s5_next"):
             st.session_state["ai_house_step"] = 6
             st.rerun()
 
@@ -4944,7 +4944,7 @@ def _show_estudio_zip_button(f):
             file_name=zip_filename,
             mime="application/zip",
             type="primary",
-            use_container_width=True,
+            width='stretch',
             key="btn_dl_estudio",
         )
         st.caption("Incluye: Memoria PDF · Mediciones Excel · Plano 2D · BIM/IFC")
@@ -5049,7 +5049,7 @@ def _render_estudio_download():
         st.markdown("<br>", unsafe_allow_html=True)
         _ev1, _ev2, _ev3 = st.columns([1, 2, 1])
         with _ev2:
-            if st.button("✅ Ya pagué — Verificar y Descargar", use_container_width=True, key="btn_verify_estudio"):
+            if st.button("✅ Ya pagué — Verificar y Descargar", width='stretch', key="btn_verify_estudio"):
                 try:
                     from modules.stripe_utils import verify_session as _vs_est
                     _sess_est = _vs_est(_sid_s)
@@ -5202,7 +5202,7 @@ def render_step6_pago():
             data=_pf_buf.getvalue(),
             file_name=f"Presupuesto_ArchiRapid_{_dtp.date.today().strftime('%Y%m%d')}.pdf",
             mime="application/pdf",
-            use_container_width=True,
+            width='stretch',
         )
     except Exception:
         pass  # sin PDF proforma no bloquea el flujo
@@ -5269,12 +5269,12 @@ def render_step6_pago():
             else:
                 # Fallback simulado si Stripe no está configurado
                 if st.button("💳 Confirmar y Pagar", type="primary",
-                             use_container_width=True, key="btn_pagar_s6"):
+                             width='stretch', key="btn_pagar_s6"):
                     st.session_state["pago_completado"] = True
                     st.session_state["total_pagado"]    = _total_iva_6
                     st.rerun()
         with _cp2:
-            if st.button("📞 Hablar con un Arquitecto", use_container_width=True, key="btn_arq_s6"):
+            if st.button("📞 Hablar con un Arquitecto", width='stretch', key="btn_arq_s6"):
                 _project_id_s6 = st.session_state.get("ai_project_db_id") or \
                                  st.session_state.get("design_plot_data", {}).get("id", "sin-id")
                 _client_email_s6 = st.session_state.get("client_email", "")
@@ -5298,7 +5298,7 @@ def render_step6_pago():
             st.markdown("<br>", unsafe_allow_html=True)
             _vp1, _vp2, _vp3 = st.columns([1, 2, 1])
             with _vp2:
-                if st.button("✅ Ya he pagado — Verificar pago", use_container_width=True,
+                if st.button("✅ Ya he pagado — Verificar pago", width='stretch',
                              key="btn_verify_s6"):
                     try:
                         from modules.stripe_utils import verify_session as _vs6
@@ -5393,7 +5393,7 @@ def render_step6_pago():
             file_name=_zip_filename,
             mime="application/zip",
             type="primary",
-            use_container_width=True,
+            width='stretch',
         )
         st.caption("Incluye: Memoria descriptiva · Mediciones Excel · Plano 2D · Datos catastro · Layout 3D")
 
@@ -5454,7 +5454,7 @@ def render_step6_pago():
                 data=_ifc_bytes,
                 file_name=f"{_pname_ifc}.ifc",
                 mime="application/x-step",
-                use_container_width=True,
+                width='stretch',
             )
     except Exception:
         pass
@@ -5493,7 +5493,7 @@ def render_step6_pago():
                 help="Solo recibirás ofertas de profesionales con esas especialidades.",
             )
             if st.button("🏗️ Publicar en Tablón de Obras — Recibir ofertas",
-                         type="primary", use_container_width=True, key="btn_tablon_s6"):
+                         type="primary", width='stretch', key="btn_tablon_s6"):
                 try:
                     from modules.marketplace.service_providers import publish_to_tablon
                     _tid = publish_to_tablon(
@@ -5521,7 +5521,7 @@ def render_step6_pago():
     st.markdown("---")
     _cb6, _ = st.columns(2)
     with _cb6:
-        if st.button("← Volver a Servicios", use_container_width=True, key="s6_back"):
+        if st.button("← Volver a Servicios", width='stretch', key="s6_back"):
             st.session_state["ai_house_step"] = 5
             st.rerun()
     st.info("📬 Proyecto guardado en tu **Panel de Cliente**. Accede desde el menú para consultarlo, modificarlo o contactar con nosotros.")
