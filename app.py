@@ -59,6 +59,39 @@ _init_app_db()
 import streamlit as st
 st.set_page_config(layout='wide', initial_sidebar_state="expanded")
 
+st.markdown("""
+    <style>
+        /* 1. Atacar el contenedor raíz de Streamlit */
+        #root > div:nth-child(1) > div > div > div > div > section > div {
+            padding-top: 0rem !important;
+        }
+
+        /* 2. Eliminar márgenes del visualizador de la app */
+        .main .block-container {
+            padding-top: 0rem !important;
+            margin-top: -3rem !important;
+        }
+
+        /* 3. Forzar el Header a ser visible y no ocupar espacio */
+        header[data-testid="stHeader"] {
+            background: transparent !important;
+            position: fixed !important;
+            top: 0 !important;
+            z-index: 999 !important;
+        }
+
+        /* 4. Rescatar el botón de 3 puntos por ID */
+        [data-testid="stHeader"] > div:first-child {
+            display: flex !important;
+        }
+
+        /* 5. Compactar el primer bloque de contenido (título) */
+        [data-testid="stVerticalBlock"] {
+            gap: 0rem !important;
+        }
+    </style>
+""", unsafe_allow_html=True)
+
 # ── CSS responsivo móvil (solo activa en <= 768px, desktop intacto) ───────────
 from modules.marketplace.mobile_css import inject as _inject_mobile_css
 _inject_mobile_css()
