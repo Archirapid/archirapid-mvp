@@ -57,7 +57,7 @@ _init_app_db()
 
 # Configurar página con layout amplio
 import streamlit as st
-st.set_page_config(layout='wide')
+st.set_page_config(layout='wide', initial_sidebar_state="expanded")
 
 # ── CSS responsivo móvil (solo activa en <= 768px, desktop intacto) ───────────
 from modules.marketplace.mobile_css import inject as _inject_mobile_css
@@ -1243,6 +1243,12 @@ selected_page = st.sidebar.radio(
 
 # Sincronizamos por si el usuario cambia el radio manualmente
 st.session_state['selected_page'] = selected_page
+
+# ── Panic Button de Hard Reset (último en sidebar) ─────────────────────
+st.sidebar.divider()
+if st.sidebar.button("♻️ Hard Reset Sesión", key="panic_reset_session", use_container_width=True, type="secondary"):
+    st.session_state.clear()
+    st.rerun()
 
 # Lógica de Redirección — sincroniza selected_page → ?page=slug en la URL
 _PAGE_TO_SLUG = {
