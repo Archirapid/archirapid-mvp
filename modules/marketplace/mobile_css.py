@@ -157,9 +157,21 @@ _CSS = """
     background: rgba(255,255,255,0.2) !important;
     border-radius: 4px  !important;
   }
+
+  /* ── Eliminar espacio muerto en cabecera (SOLO MÓVIL) ──────────
+     En móvil, Streamlit añade espacio innecesario.
+     Desktop: app.py CSS controla esto. */
+  header[data-testid="stHeader"] {
+    height: 3rem            !important;
+    min-height: 0           !important;
+    background: transparent !important;
+  }
+  .block-container {
+    padding-top: 0.75rem    !important;
+  }
 }
 
-/* ── Fuera del media query: mejoras universales leves ── */
+/* ── Reglas universales: SOLO para evitar zoom en iOS ── */
 
 /* Evitar que inputs hagan zoom en iOS (aplica siempre, inofensivo en desktop) */
 input[type="text"],
@@ -175,18 +187,6 @@ select {
 img {
   max-width: 100%;
   height: auto;
-}
-
-/* ── Eliminar espacio muerto en cabecera (todas las pantallas) ─────────────
-   Streamlit añade ~80-100px vacíos arriba por defecto.
-   Reducimos al mínimo sin ocultar la toolbar de Streamlit Cloud. */
-header[data-testid="stHeader"] {
-  height: 3rem            !important;
-  min-height: 0           !important;
-  background: transparent !important;
-}
-.block-container {
-  padding-top: 0.75rem    !important;
 }
 </style>
 """
