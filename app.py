@@ -66,10 +66,9 @@ st.markdown("""
             padding-top: 0rem !important;
         }
 
-        /* 2. Eliminar márgenes del visualizador de la app */
+        /* 2. Limpiar márgenes sin ocultar contenido */
         .main .block-container {
             padding-top: 0rem !important;
-            margin-top: -3rem !important;
         }
 
         /* 3. Forzar el Header a ser visible y no ocupar espacio */
@@ -90,28 +89,33 @@ st.markdown("""
             gap: 0rem !important;
         }
 
-        /* 6. Pintar el fondo de las 7 columnas con azul cielo directo (NUCLEAR) */
+        /* 6. Espaciado para que no se escondan bajo el banner */
         [data-testid="column"] {
-            background-color: #EBF5FB !important;
-            border: 1px solid #AED6F1 !important;
-            border-radius: 15px !important;
-            padding: 15px !important;
-            margin: 5px !important;
-            min-width: 0px !important;
+            margin-top: 15px !important;
+            padding: 5px !important;
         }
 
-        /* 7. Ajustar los botones internos para que resalten */
-        [data-testid="column"] button {
-            background-color: white !important;
-            border: 1px solid #3498DB !important;
-            color: #3498DB !important;
-            font-weight: bold !important;
+        /* 7. Crear el perímetro de color sin usar contenedores que bloqueen */
+        [data-testid="column"] [data-testid="stVerticalBlock"] {
+            border: 2px solid #3498DB !important;
+            border-radius: 10px !important;
+            background-color: #F8FBFE !important;
+            padding: 10px !important;
+            transition: all 0.3s ease !important;
         }
 
-        /* 8. Efecto hover real en columnas */
-        [data-testid="column"]:hover {
-            background-color: #D6EAF8 !important;
-            box-shadow: 0px 4px 15px rgba(0,0,0,0.1) !important;
+        /* 8. Efecto de resaltado al pasar el ratón */
+        [data-testid="column"] [data-testid="stVerticalBlock"]:hover {
+            border-color: #2E86C1 !important;
+            box-shadow: 0px 4px 12px rgba(52, 152, 219, 0.2) !important;
+            transform: translateY(-3px) !important;
+        }
+
+        /* 9. Forzar que el texto (caption) sea visible y negro */
+        [data-testid="column"] .stCaption {
+            color: #1C2833 !important;
+            font-weight: 700 !important;
+            font-size: 0.9rem !important;
         }
     </style>
 """, unsafe_allow_html=True)
