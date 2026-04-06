@@ -2704,7 +2704,11 @@ def render_step3_editor():
     st.markdown("### 🏗️ Diseña tu casa")
     
     if st.button("🏠 Construir mi Casa — Ver en 3D", type="primary", use_container_width=True, key="open_babylon"):
-        
+
+        # Invalidar solo HTML cache — NO borrar layout/rooms/coords
+        st.session_state.pop("babylon_html", None)
+        st.session_state["editor_needs_rebuild"] = True
+
         # Obtener forma de casa
         house_shape = st.session_state.get('request', {}).get('house_shape', 'Rectangular (más común)')
         
@@ -2712,14 +2716,28 @@ def render_step3_editor():
         
         # Obtener layout
         from .architect_layout import generate_layout
-        
-        rooms_data = []
-        for room_data in req.get("ai_room_proposal", {}).items():
-            rooms_data.append({
-                'code': room_data[0],
-                'name': room_data[0],
-                'area_m2': room_data[1]
-            })
+
+        # Flag bodega puerta exterior
+        st.session_state.setdefault("bodega_puerta_exterior", False)
+        req_sync = st.session_state.get("ai_house_requirements", {})
+        req_sync.setdefault("extras", {})
+        if req_sync["extras"].get("bodega"):
+            req_sync["extras"].setdefault("bodega_has_exterior_door", bool(st.session_state["bodega_puerta_exterior"]))
+        st.session_state["ai_house_requirements"] = req_sync
+
+        # OVERWRITE: usar dict para evitar duplicados garaje/bodega
+        _rooms_dict = {}
+        _bodega_ext_door = req_sync.get("extras", {}).get("bodega_has_exterior_door", False)
+        for _code, _area in req.get("ai_room_proposal", {}).items():
+            _room_entry = {
+                'code': _code,
+                'name': _code,
+                'area_m2': _area
+            }
+            if 'bodega' in _code.lower():
+                _room_entry['wants_bodega_exterior_door'] = bool(_bodega_ext_door)
+            _rooms_dict[_code] = _room_entry
+        rooms_data = list(_rooms_dict.values())
         
         layout_result = generate_layout(rooms_data, house_shape)
         
@@ -2741,7 +2759,7 @@ def render_step3_editor():
         plot_data = st.session_state.get("design_plot_data", {})
         plot_area_m2 = float(plot_data.get('total_m2', 0) or 0)
         req_data = st.session_state.get("ai_house_requirements", {})
-        foundation_type = req_data.get("foundation_type", "Losa de hormigón (suelos blandos)")
+        foundation_type = st.session_state.get('selected_foundation') or req_data.get("foundation_type", "Losa de hormigón (suelos blandos)")
         house_style = req_data.get("style", "Moderno")
         _arch_cost_m2 = int(st.session_state.get("arch_cost_per_m2", 1600))
         html_editor = generate_babylon_html(layout_result, total_width, total_depth, roof_type, plot_area_m2, foundation_type, house_style, cost_per_m2=_arch_cost_m2)

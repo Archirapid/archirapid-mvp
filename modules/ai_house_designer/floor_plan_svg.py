@@ -78,6 +78,28 @@ class FloorPlanSVG:
         engine = ArchitectLayout(rooms_data, house_shape)
         layout_raw = engine.generate()
         
+        # Post-pass: reempaquetar filas para eliminar huecos (packRows equivalente Python)
+        _SNAP = 0.6
+        _rows: dict = {}
+        for item in layout_raw:
+            z_key = None
+            for k in _rows:
+                if abs(float(k) - item['z']) < _SNAP:
+                    z_key = k
+                    break
+            if z_key is None:
+                z_key = f"{item['z']:.2f}"
+                _rows[z_key] = []
+            _rows[z_key].append(item)
+        for z_key, row in _rows.items():
+            row.sort(key=lambda i: i['x'])
+            cur_x = min(i['x'] for i in row)
+            row_d = max(i['depth'] for i in row)
+            for item in row:
+                item['x'] = round(cur_x, 3)
+                item['depth'] = row_d
+                cur_x += item['width']
+
         # Guardar dimensiones totales
         all_x = [item['x'] + item['width'] for item in layout_raw]
         all_z = [item['z'] + item['depth'] for item in layout_raw]
@@ -729,20 +751,24 @@ def generate_mep_plan_png(rooms_layout, layer_name: str,
 
 def _resolve_foundation_type(foundation_type_arg: str | None) -> str:
     """
-    Lookup dinámico: lee st.session_state['selected_foundation'] o
-    st.session_state['ai_house_requirements']['foundation_type'].
-    Si falla (entorno no-Streamlit) devuelve el argumento o 'zapatas'.
-    Elimina la dependencia de DEFAULT_FOUNDATION como constante global.
+    Lookup dinámico — prioridad:
+      1. st.session_state['selected_foundation']  (SIEMPRE gana, incluso sobre el arg)
+      2. foundation_type_arg (si no hay session_state)
+      3. st.session_state['ai_house_requirements']['foundation_type']
+      4. Fallback: 'zapatas'
     """
+    try:
+        import streamlit as _st
+        # session_state['selected_foundation'] siempre tiene prioridad
+        ft = _st.session_state.get("selected_foundation")
+        if ft:
+            return ft
+    except Exception:
+        pass
     if foundation_type_arg:
         return foundation_type_arg
     try:
         import streamlit as _st
-        # 1er intento: clave directa (set por el selector del Paso 2)
-        ft = _st.session_state.get("selected_foundation")
-        if ft:
-            return ft
-        # 2do intento: dentro del dict de requisitos
         ft = (_st.session_state.get("ai_house_requirements") or {}).get("foundation_type")
         if ft:
             return ft
@@ -774,6 +800,16 @@ def generate_cimentacion_plan_png(
         PNG bytes o None si hay error.
     """
     foundation_type = _resolve_foundation_type(foundation_type)
+    # Override directo: session_state siempre gana (independiente del arg)
+    try:
+        import streamlit as _st_fnd
+        _ss_fnd = _st_fnd.session_state.get('selected_foundation', '')
+        if _ss_fnd and 'pilote' in _ss_fnd.lower():
+            foundation_type = 'pilotes'
+        elif _ss_fnd and 'losa' in _ss_fnd.lower():
+            foundation_type = 'losa'
+    except Exception:
+        pass
     import json
     import math
     import matplotlib
@@ -859,8 +895,8 @@ def generate_cimentacion_plan_png(
                     circ = mpatches.Circle((ppx, ppy), pil_r * SCALE,
                                            linewidth=2, edgecolor=LC, facecolor='#BCAAA4', zorder=5)
                     ax.add_patch(circ)
-                    ax.text(ppx, ppy, 'P', ha='center', va='center',
-                            fontsize=5, color='white', fontweight='bold', zorder=6)
+                    ax.text(ppx, ppy, 'Ø50', ha='center', va='center',
+                            fontsize=4.5, color='white', fontweight='bold', zorder=6)
         # Encepado (losa de remate sobre los pilotes)
         enx, enz = house_min_x - ZAP_W, house_min_z - ZAP_W
         enw = (house_max_x - house_min_x) + 2 * ZAP_W
@@ -897,8 +933,8 @@ def generate_cimentacion_plan_png(
         sym_cy = leg_py - 22
         ax.add_patch(mpatches.Circle((sym_cx, sym_cy), 10,
                                       linewidth=1.5, edgecolor=LC, facecolor='#BCAAA4', zorder=12))
-        ax.text(sym_cx, sym_cy, 'P', ha='center', va='center',
-                fontsize=6, color='white', fontweight='bold', zorder=13)
+        ax.text(sym_cx, sym_cy, 'Ø50', ha='center', va='center',
+                fontsize=5, color='white', fontweight='bold', zorder=13)
     elif foundation_type == "losa":
         # ── LOSA: rectángulo relleno con hatch ────────────────────────────────
         lx, lz = house_min_x - ZAP_W, house_min_z - ZAP_W
@@ -1001,7 +1037,7 @@ def generate_cimentacion_plan_png(
     ax.add_patch(mpatches.Rectangle((0, svg_h - title_h), svg_w, title_h,
                                      facecolor='#3E2723', zorder=10))
     ax.text(svg_w/2, svg_h - title_h/2,
-            f'PLANO DE CIMENTACIÓN  ·  Escala aprox. 1:100',
+            f'PLANO DE CIMENTACIÓN PARA CONSTRUCCIÓN  ·  Escala 1:100',
             ha='center', va='center', fontsize=10, fontweight='bold',
             color='white', fontfamily='monospace', zorder=11)
 

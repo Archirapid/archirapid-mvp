@@ -124,6 +124,8 @@ def auto_eject(rooms: List[Dict]) -> Tuple[List[Dict], List[str]]:
     la huella INTERNAL lo expulsa +AUTO_EJECT_MARGIN metros en el eje X o Z
     más corto hasta eliminar el solapamiento.
 
+    Rooms marcados con is_user_placed=True NO se mueven (física OFF en edición manual).
+
     Args:
         rooms: lista de dicts con {code, x, z, width, depth, ...}
                (los que no tienen coordenadas se omiten silenciosamente)
@@ -140,6 +142,9 @@ def auto_eject(rooms: List[Dict]) -> Tuple[List[Dict], List[str]]:
     for r in rooms:
         code = r.get("code", "").lower()
         if not _is_external_code_strict(code):
+            continue
+        # Física OFF: usuario ha posicionado este elemento manualmente
+        if r.get("is_user_placed") or r.get("isEditable"):
             continue
         rx = r.get("x")
         rz = r.get("z")

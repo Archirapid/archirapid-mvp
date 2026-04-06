@@ -23,7 +23,8 @@ ZONE_GARDEN = "garden"
 
 def classify(code: str, name: str) -> str:
     c = (code + name).lower()
-    if any(x in c for x in ['piscin','pool','huerto','caseta','apero','panel','solar','bomba']):
+    if any(x in c for x in ['piscin','pool','huerto','caseta','apero','panel','solar','bomba',
+                             'tejavana','barbacoa','pozo','instalacion']):
         return ZONE_GARDEN
     if any(x in c for x in ['porche','terraza']):
         return ZONE_EXTERIOR
@@ -143,25 +144,40 @@ class ArchitectLayout:
             bano_widths.append(w)
 
         # Ancho fila 3: suma de dormitorios + baños
-        # Emparejar: [BAÑO?][DORM][BAÑO?][DORM]...
-        # Estrategia: 1 baño cada 1-2 dormitorios
+        # Agrupación suite: bano_principal/bano_suite → DESPUÉS de dormitorio_principal
+        # Resto de baños → ANTES de su dormitorio
         fila3_rooms = []  # Lista ordenada: (room, width)
-        
-        # Distribuir baños entre dormitorios
+
+        def _is_suite_bano(r: R) -> bool:
+            c = r.code.lower()
+            return any(k in c for k in ('suite', 'principal', 'ensuite', 'en_suite', 'master'))
+
+        # Separar baños de suite del resto
+        suite_banos = [r for r in wet if _is_suite_bano(r)]
+        regular_banos = [r for r in wet if r not in suite_banos]
+        wet_regular_widths = [bano_widths[wet.index(r)] for r in regular_banos]
+        wet_suite_widths   = [bano_widths[wet.index(r)] for r in suite_banos]
+
+        # Distribuir baños normales ANTES de cada dormitorio; baños suite DESPUÉS del principal
         bano_idx = 0
         for i, (r, w) in enumerate(zip(night, night_widths)):
-            # Añadir baño antes de este dormitorio si hay disponible
-            if bano_idx < len(wet):
-                bano = wet[bano_idx]
-                bw = bano_widths[bano_idx]
+            is_principal = (i == 0)  # dormitorio principal = primero (ya ordenado por área desc)
+            # Baño regular antes de cada dormitorio
+            if bano_idx < len(regular_banos):
+                bano = regular_banos[bano_idx]
+                bw = wet_regular_widths[bano_idx]
                 fila3_rooms.append((bano, bw, FILA3_D))
                 bano_idx += 1
             fila3_rooms.append((r, w, FILA3_D))
-        
-        # Baños sobrantes (si hay más baños que dormitorios)
-        while bano_idx < len(wet):
-            bano = wet[bano_idx]
-            bw = bano_widths[bano_idx]
+            # Baño suite DESPUÉS del dormitorio principal (en-suite layout)
+            if is_principal and suite_banos:
+                for sb, sbw in zip(suite_banos, wet_suite_widths):
+                    fila3_rooms.append((sb, sbw, FILA3_D))
+
+        # Baños regulares sobrantes
+        while bano_idx < len(regular_banos):
+            bano = regular_banos[bano_idx]
+            bw = wet_regular_widths[bano_idx]
             fila3_rooms.append((bano, bw, FILA3_D))
             bano_idx += 1
 
@@ -333,6 +349,91 @@ class ArchitectLayout:
             for i in layout:
                 i['x'] += ox
                 i['z'] += oz
+
+        # ================================================
+        # POST-PASS 1: PACK ROWS — eliminar huecos en eje X por fila
+        # ================================================
+        _SNAP = 0.6
+        rows: dict = {}
+        for item in layout:
+            z_key = None
+            for k in rows:
+                if abs(float(k) - item['z']) < _SNAP:
+                    z_key = k
+                    break
+            if z_key is None:
+                z_key = f"{item['z']:.2f}"
+                rows[z_key] = []
+            rows[z_key].append(item)
+
+        for z_key, row in rows.items():
+            row.sort(key=lambda i: i['x'])
+            row_z = float(z_key)
+            row_d = max(i['depth'] for i in row)
+            cur_x = min(i['x'] for i in row)
+            for item in row:
+                item['x'] = round(cur_x, 3)
+                item['z'] = row_z
+                item['depth'] = row_d
+                cur_x += item['width']
+
+        # ================================================
+        # POST-PASS 2: AABB EJECT — expulsar EXTERNAL si solapan INTERNAL
+        # ================================================
+        EXTERNAL_CODES = ('porche','terraza','piscin','pool','huerto','caseta','apero',
+                          'panel','solar','bomba','tejavana','barbacoa','pozo','instalacion')
+        INTERNAL_CODES = ('salon','cocina','dormitorio','bano','aseo','garaje',
+                          'pasillo','distribuidor','hall','bodega','despensa','estudio')
+
+        def _is_ext(code: str) -> bool:
+            c = code.lower()
+            return any(k in c for k in EXTERNAL_CODES)
+
+        def _is_int(code: str) -> bool:
+            c = code.lower()
+            return any(k in c for k in INTERNAL_CODES)
+
+        def _overlap_1d(a0, a1, b0, b1) -> float:
+            """Penetración positiva en 1D; 0 si separados."""
+            return max(0.0, min(a1, b1) - max(a0, b0))
+
+        for ext_item in layout:
+            if not _is_ext(ext_item['code']):
+                continue
+            # Solo GARDEN (caseta/tejavana/piscina) — NO exterior (porche/terraza)
+            # Porche/terraza son intencionalmente adyacentes a la casa
+            if ext_item.get('zone') == 'exterior':
+                continue
+            # Física OFF: usuario ha colocado este elemento manualmente
+            if ext_item.get('is_user_placed') or ext_item.get('isEditable'):
+                continue
+            ex0, ex1 = ext_item['x'], ext_item['x'] + ext_item['width']
+            ez0, ez1 = ext_item['z'], ext_item['z'] + ext_item['depth']
+            for int_item in layout:
+                if not _is_int(int_item['code']):
+                    continue
+                ix0, ix1 = int_item['x'], int_item['x'] + int_item['width']
+                iz0, iz1 = int_item['z'], int_item['z'] + int_item['depth']
+                pen_x = _overlap_1d(ex0, ex1, ix0, ix1)
+                pen_z = _overlap_1d(ez0, ez1, iz0, iz1)
+                if pen_x <= 0 or pen_z <= 0:
+                    continue
+                # Expulsar +2m en eje de menor penetración
+                if pen_x <= pen_z:
+                    # Empujar en X
+                    if (ex0 + ex1) / 2 < (ix0 + ix1) / 2:
+                        ext_item['x'] = ix0 - ext_item['width'] - 2.0
+                    else:
+                        ext_item['x'] = ix1 + 2.0
+                else:
+                    # Empujar en Z
+                    if (ez0 + ez1) / 2 < (iz0 + iz1) / 2:
+                        ext_item['z'] = iz0 - ext_item['depth'] - 2.0
+                    else:
+                        ext_item['z'] = iz1 + 2.0
+                # Actualizar coordenadas locales tras eject
+                ex0, ex1 = ext_item['x'], ext_item['x'] + ext_item['width']
+                ez0, ez1 = ext_item['z'], ext_item['z'] + ext_item['depth']
 
         return layout
 
