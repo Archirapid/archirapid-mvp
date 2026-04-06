@@ -63,12 +63,12 @@ st.markdown("""
     <style>
         /* 1. Atacar el contenedor raíz de Streamlit */
         #root > div:nth-child(1) > div > div > div > div > section > div {
-            padding-top: 0rem !important;
+            padding-top: 80px !important;
         }
 
-        /* 2. Limpiar márgenes sin ocultar contenido */
+        /* 2. Padding para dejar espacio bajo el banner */
         .main .block-container {
-            padding-top: 0rem !important;
+            padding-top: 100px !important;
         }
 
         /* 3. Forzar el Header a ser visible y no ocupar espacio */
@@ -89,33 +89,50 @@ st.markdown("""
             gap: 0rem !important;
         }
 
-        /* 6. Espaciado para que no se escondan bajo el banner */
+        /* 6. BAJAR MUCHO las columnas para evitar el banner */
         [data-testid="column"] {
-            margin-top: 15px !important;
-            padding: 5px !important;
-        }
-
-        /* 7. Crear el perímetro de color sin usar contenedores que bloqueen */
-        [data-testid="column"] [data-testid="stVerticalBlock"] {
-            border: 2px solid #3498DB !important;
-            border-radius: 10px !important;
-            background-color: #F8FBFE !important;
+            margin-top: 60px !important;
             padding: 10px !important;
+        }
+
+        /* 7. Borde DESTACADO y grosor aumentado */
+        [data-testid="column"] [data-testid="stVerticalBlock"] {
+            border: 3px solid #2471A3 !important;
+            border-radius: 12px !important;
+            background-color: #F8FBFE !important;
+            padding: 15px !important;
             transition: all 0.3s ease !important;
+            box-shadow: 0px 2px 6px rgba(36, 113, 163, 0.15) !important;
         }
 
-        /* 8. Efecto de resaltado al pasar el ratón */
+        /* 8. Efecto de resaltado FUERTE al pasar el ratón */
         [data-testid="column"] [data-testid="stVerticalBlock"]:hover {
-            border-color: #2E86C1 !important;
-            box-shadow: 0px 4px 12px rgba(52, 152, 219, 0.2) !important;
-            transform: translateY(-3px) !important;
+            border-color: #1649A8 !important;
+            border-width: 4px !important;
+            box-shadow: 0px 6px 16px rgba(22, 73, 168, 0.3) !important;
+            transform: translateY(-4px) !important;
+            background-color: #EBF5FB !important;
         }
 
-        /* 9. Forzar que el texto (caption) sea visible y negro */
+        /* 9. Captions GRANDES y bien visibles */
         [data-testid="column"] .stCaption {
             color: #1C2833 !important;
+            font-weight: 900 !important;
+            font-size: 1rem !important;
+            margin-bottom: 8px !important;
+            letter-spacing: 0.5px !important;
+        }
+
+        /* 10. Botones más destacados */
+        [data-testid="column"] button {
+            background-color: #3498DB !important;
+            border: 2px solid #2471A3 !important;
+            color: white !important;
             font-weight: 700 !important;
-            font-size: 0.9rem !important;
+        }
+
+        [data-testid="column"] button:hover {
+            background-color: #2980B9 !important;
         }
     </style>
 """, unsafe_allow_html=True)
