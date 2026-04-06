@@ -90,25 +90,28 @@ st.markdown("""
             gap: 0rem !important;
         }
 
-        /* 6. Forzar color azul cielo en las 7 columnas de acceso */
-        [data-testid="column"] > div > div[data-testid="stVerticalBlockBorderWrapper"] {
+        /* 6. Pintar el fondo de las 7 columnas con azul cielo directo (NUCLEAR) */
+        [data-testid="column"] {
             background-color: #EBF5FB !important;
             border: 1px solid #AED6F1 !important;
-            border-radius: 12px !important;
-            transition: transform 0.2s ease !important;
+            border-radius: 15px !important;
+            padding: 15px !important;
+            margin: 5px !important;
+            min-width: 0px !important;
         }
 
-        /* 7. Efecto hover profesional en columnas */
-        [data-testid="column"] > div > div[data-testid="stVerticalBlockBorderWrapper"]:hover {
-            transform: scale(1.02) !important;
-            border-color: #5DADE2 !important;
-            box-shadow: 0px 4px 10px rgba(0,0,0,0.05) !important;
+        /* 7. Ajustar los botones internos para que resalten */
+        [data-testid="column"] button {
+            background-color: white !important;
+            border: 1px solid #3498DB !important;
+            color: #3498DB !important;
+            font-weight: bold !important;
         }
 
-        /* 8. Ajuste de texto en columnas */
-        [data-testid="column"] [data-testid="stVerticalBlock"] {
-            padding: 5px !important;
-            gap: 0.2rem !important;
+        /* 8. Efecto hover real en columnas */
+        [data-testid="column"]:hover {
+            background-color: #D6EAF8 !important;
+            box-shadow: 0px 4px 15px rgba(0,0,0,0.1) !important;
         }
     </style>
 """, unsafe_allow_html=True)
@@ -1716,83 +1719,76 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
 
         # Col 0: Terreno
         with cols[0]:
-            with st.container(border=True):
-                st.caption("📍 Terreno")
-                if st.button("Acceder", use_container_width=True, key="h1"):
-                    if st.session_state.get("logged_in") and st.session_state.get("role") == "owner":
-                        st.session_state["selected_page"] = "🏠 Propietarios"
-                        st.query_params["page"] = "propietarios"
-                    else:
-                        st.session_state["login_role"] = "owner"
-                        st.session_state["viewing_login"] = True
-                    st.rerun()
+            st.caption("📍 Terreno")
+            if st.button("Acceder", use_container_width=True, key="h1"):
+                if st.session_state.get("logged_in") and st.session_state.get("role") == "owner":
+                    st.session_state["selected_page"] = "🏠 Propietarios"
+                    st.query_params["page"] = "propietarios"
+                else:
+                    st.session_state["login_role"] = "owner"
+                    st.session_state["viewing_login"] = True
+                st.rerun()
 
         # Col 1: Comprador
         with cols[1]:
-            with st.container(border=True):
-                st.caption("🏠 Comprador")
-                if st.button("Acceder", use_container_width=True, key="h2"):
-                    if st.session_state.get("logged_in") and st.session_state.get("role") == "client":
-                        st.session_state["selected_page"] = "👤 Panel de Cliente"
-                        st.query_params["page"] = "cliente"
-                    else:
-                        st.session_state["login_role"] = "client"
-                        st.session_state["viewing_login"] = True
-                        st.session_state["_login_show_registro"] = False
-                        st.query_params["page"] = "login"
-                    st.rerun()
+            st.caption("🏠 Comprador")
+            if st.button("Acceder", use_container_width=True, key="h2"):
+                if st.session_state.get("logged_in") and st.session_state.get("role") == "client":
+                    st.session_state["selected_page"] = "👤 Panel de Cliente"
+                    st.query_params["page"] = "cliente"
+                else:
+                    st.session_state["login_role"] = "client"
+                    st.session_state["viewing_login"] = True
+                    st.session_state["_login_show_registro"] = False
+                    st.query_params["page"] = "login"
+                st.rerun()
 
         # Col 2: Estudiante
         with cols[2]:
-            with st.container(border=True):
-                st.caption("🎓 Estudiante")
-                if st.button("Acceder", use_container_width=True, key="h3"):
-                    st.session_state["selected_page"] = "🎓 Estudiantes"
-                    st.query_params["page"] = "estudiantes"
-                    st.rerun()
+            st.caption("🎓 Estudiante")
+            if st.button("Acceder", use_container_width=True, key="h3"):
+                st.session_state["selected_page"] = "🎓 Estudiantes"
+                st.query_params["page"] = "estudiantes"
+                st.rerun()
 
         # Col 3: Arquitecto
         with cols[3]:
-            with st.container(border=True):
-                st.caption("📐 Arquitecto")
-                if st.button("Acceder", use_container_width=True, key="h4"):
-                    st.session_state["selected_page"] = "Arquitectos (Marketplace)"
-                    st.query_params["page"] = "arquitectos"
-                    st.rerun()
+            st.caption("📐 Arquitecto")
+            if st.button("Acceder", use_container_width=True, key="h4"):
+                st.session_state["selected_page"] = "Arquitectos (Marketplace)"
+                st.query_params["page"] = "arquitectos"
+                st.rerun()
 
         # Col 4: Constructor
         with cols[4]:
-            with st.container(border=True):
-                st.caption("🏗️ Constructor")
-                if st.button("Acceder", use_container_width=True, key="h5"):
-                    if st.session_state.get("logged_in") and st.session_state.get("role") == "services":
-                        st.session_state["selected_page"] = "👤 Panel de Proveedor"
-                        st.query_params["page"] = "proveedor"
-                    else:
-                        st.session_state["login_role"] = "services"
-                        st.session_state["viewing_login"] = True
-                        st.session_state["_login_show_registro"] = False
-                        st.query_params["page"] = "login"
-                    st.rerun()
+            st.caption("🏗️ Constructor")
+            if st.button("Acceder", use_container_width=True, key="h5"):
+                if st.session_state.get("logged_in") and st.session_state.get("role") == "services":
+                    st.session_state["selected_page"] = "👤 Panel de Proveedor"
+                    st.query_params["page"] = "proveedor"
+                else:
+                    st.session_state["login_role"] = "services"
+                    st.session_state["viewing_login"] = True
+                    st.session_state["_login_show_registro"] = False
+                    st.query_params["page"] = "login"
+                st.rerun()
 
         # Col 5: Prefabricadas
         with cols[5]:
-            with st.container(border=True):
-                st.caption("🏠 Prefab")
-                if st.button("Acceder", use_container_width=True, key="h6"):
-                    st.session_state["selected_page"] = "🏠 Portal Prefabricadas"
-                    st.session_state["_nav_radio"] = "🏠 Portal Prefabricadas"
-                    st.query_params["page"] = "prefabricadas"
-                    st.rerun()
+            st.caption("🏠 Prefab")
+            if st.button("Acceder", use_container_width=True, key="h6"):
+                st.session_state["selected_page"] = "🏠 Portal Prefabricadas"
+                st.session_state["_nav_radio"] = "🏠 Portal Prefabricadas"
+                st.query_params["page"] = "prefabricadas"
+                st.rerun()
 
         # Col 6: Inmobiliaria/MLS
         with cols[6]:
-            with st.container(border=True):
-                st.caption("🏢 Inmo/MLS")
-                if st.button("Acceder", use_container_width=True, key="h7"):
-                    st.session_state["selected_page"] = "🏢 Inmobiliarias MLS"
-                    st.query_params["page"] = "mls"
-                    st.rerun()
+            st.caption("🏢 Inmo/MLS")
+            if st.button("Acceder", use_container_width=True, key="h7"):
+                st.session_state["selected_page"] = "🏢 Inmobiliarias MLS"
+                st.query_params["page"] = "mls"
+                st.rerun()
 
         st.markdown("---")
 
