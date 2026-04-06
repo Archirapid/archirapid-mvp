@@ -201,7 +201,6 @@ def ui_login_registro() -> None:
     # Botón volver al mapa/home (útil si un visitante llega aquí por error)
     if st.button("← Volver al marketplace", key="mls_login_volver"):
         st.session_state["selected_page"] = "🏠 Inicio / Marketplace"
-        st.session_state.pop("mls_goto_finca_pending", None)
         try:
             del st.query_params["page"]
         except Exception:
