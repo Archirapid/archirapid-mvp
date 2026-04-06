@@ -90,14 +90,25 @@ st.markdown("""
             gap: 0rem !important;
         }
 
-        /* 6. Color profesional para las tarjetas de acceso de 7 columnas */
-        div[data-testid="stVerticalBlockBorderWrapper"] {
+        /* 6. Forzar color azul cielo en las 7 columnas de acceso */
+        [data-testid="column"] > div > div[data-testid="stVerticalBlockBorderWrapper"] {
             background-color: #EBF5FB !important;
             border: 1px solid #AED6F1 !important;
-            border-radius: 10px !important;
+            border-radius: 12px !important;
+            transition: transform 0.2s ease !important;
         }
-        div[data-testid="stVerticalBlockBorderWrapper"] > div {
-            padding: 10px !important;
+
+        /* 7. Efecto hover profesional en columnas */
+        [data-testid="column"] > div > div[data-testid="stVerticalBlockBorderWrapper"]:hover {
+            transform: scale(1.02) !important;
+            border-color: #5DADE2 !important;
+            box-shadow: 0px 4px 10px rgba(0,0,0,0.05) !important;
+        }
+
+        /* 8. Ajuste de texto en columnas */
+        [data-testid="column"] [data-testid="stVerticalBlock"] {
+            padding: 5px !important;
+            gap: 0.2rem !important;
         }
     </style>
 """, unsafe_allow_html=True)
