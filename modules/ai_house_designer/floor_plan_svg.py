@@ -752,21 +752,22 @@ def generate_mep_plan_png(rooms_layout, layer_name: str,
 def _resolve_foundation_type(foundation_type_arg: str | None) -> str:
     """
     Lookup dinámico — prioridad:
-      1. st.session_state['selected_foundation']  (SIEMPRE gana, incluso sobre el arg)
-      2. foundation_type_arg (si no hay session_state)
+      1. foundation_type_arg (si se pasa explícitamente, tiene MÁXIMA prioridad)
+      2. st.session_state['selected_foundation'] (selector Paso 2)
       3. st.session_state['ai_house_requirements']['foundation_type']
       4. Fallback: 'zapatas'
     """
+    # PRIORIDAD #1: argumento explícito siempre gana
+    if foundation_type_arg and foundation_type_arg.strip():
+        return foundation_type_arg.strip()
     try:
         import streamlit as _st
-        # session_state['selected_foundation'] siempre tiene prioridad
+        # PRIORIDAD #2: session_state['selected_foundation']
         ft = _st.session_state.get("selected_foundation")
         if ft:
             return ft
     except Exception:
         pass
-    if foundation_type_arg:
-        return foundation_type_arg
     try:
         import streamlit as _st
         ft = (_st.session_state.get("ai_house_requirements") or {}).get("foundation_type")
@@ -800,16 +801,17 @@ def generate_cimentacion_plan_png(
         PNG bytes o None si hay error.
     """
     foundation_type = _resolve_foundation_type(foundation_type)
-    # Override directo: session_state siempre gana (independiente del arg)
-    try:
-        import streamlit as _st_fnd
-        _ss_fnd = _st_fnd.session_state.get('selected_foundation', '')
-        if _ss_fnd and 'pilote' in _ss_fnd.lower():
-            foundation_type = 'pilotes'
-        elif _ss_fnd and 'losa' in _ss_fnd.lower():
-            foundation_type = 'losa'
-    except Exception:
-        pass
+    # Normalizar el tipo a tokens exactos (sin override de session_state)
+    _ft_lower = (foundation_type or '').lower()
+    if 'pilote' in _ft_lower:
+        foundation_type = 'pilotes'
+    elif 'losa' in _ft_lower:
+        foundation_type = 'losa'
+    elif 'zapata' in _ft_lower:
+        foundation_type = 'zapatas'
+    # Si no coincide ninguno, fallback zapatas
+    if foundation_type not in ('zapatas', 'losa', 'pilotes'):
+        foundation_type = 'zapatas'
     import json
     import math
     import matplotlib

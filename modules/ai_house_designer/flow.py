@@ -2702,7 +2702,27 @@ def render_step3_editor():
     
     # Botón abrir editor - DESTACADO
     st.markdown("### 🏗️ Diseña tu casa")
-    
+
+    # ── Controles de posición en terreno ────────────────────────────────────
+    st.markdown("##### 📍 Posición de la casa en el terreno")
+    _pos_col1, _pos_col2 = st.columns(2)
+    with _pos_col1:
+        _offset_x = st.number_input(
+            "Desplazamiento X (m)",
+            min_value=-20.0, max_value=20.0, value=st.session_state.get("house_offset_x", 0.0),
+            step=0.5, key="house_offset_x_input",
+            help="Mueve la casa hacia la derecha (+) o izquierda (-)"
+        )
+        st.session_state["house_offset_x"] = _offset_x
+    with _pos_col2:
+        _offset_z = st.number_input(
+            "Desplazamiento Z (m)",
+            min_value=-20.0, max_value=20.0, value=st.session_state.get("house_offset_z", 0.0),
+            step=0.5, key="house_offset_z_input",
+            help="Mueve la casa hacia adelante (+) o atrás (-)"
+        )
+        st.session_state["house_offset_z"] = _offset_z
+
     if st.button("🏠 Construir mi Casa — Ver en 3D", type="primary", use_container_width=True, key="open_babylon"):
 
         # Invalidar solo HTML cache — NO borrar layout/rooms/coords
@@ -2738,15 +2758,25 @@ def render_step3_editor():
                 _room_entry['wants_bodega_exterior_door'] = bool(_bodega_ext_door)
             _rooms_dict[_code] = _room_entry
         rooms_data = list(_rooms_dict.values())
-        
+
         layout_result = generate_layout(rooms_data, house_shape)
-        
-        # Calcular dimensiones
+
+        # ── Aplicar offsets de posición al layout ────────────────────────────
+        _apply_offset_x = st.session_state.get("house_offset_x", 0.0)
+        _apply_offset_z = st.session_state.get("house_offset_z", 0.0)
+        if layout_result and (_apply_offset_x != 0 or _apply_offset_z != 0):
+            for _item in layout_result:
+                _item['x'] = _item.get('x', 0) + _apply_offset_x
+                _item['z'] = _item.get('z', 0) + _apply_offset_z
+
+        # Calcular dimensiones (considerando offsets negativos)
         if layout_result:
-            all_x = [item['x'] + item['width'] for item in layout_result]
-            all_z = [item['z'] + item['depth'] for item in layout_result]
-            total_width = max(all_x)
-            total_depth = max(all_z)
+            all_x_min = min([item['x'] for item in layout_result])
+            all_x_max = max([item['x'] + item['width'] for item in layout_result])
+            all_z_min = min([item['z'] for item in layout_result])
+            all_z_max = max([item['z'] + item['depth'] for item in layout_result])
+            total_width = all_x_max - all_x_min
+            total_depth = all_z_max - all_z_min
         else:
             total_width = 10
             total_depth = 10
@@ -2820,6 +2850,63 @@ def render_step3_editor():
 </script>
 """, height=0)
 
+        # ── Plano de Cimentación (según diseño 3D) ──────────────────────────────
+        st.markdown("---")
+        st.markdown("#### 🏗️ Plano de Cimentación (según diseño 3D)")
+
+        # Layout fuente: preferir modified, si no initial
+        _cim_layout = (st.session_state.get("babylon_modified_layout")
+                       or st.session_state.get("babylon_initial_layout"))
+
+        if _cim_layout:
+            try:
+                from .floor_plan_svg import generate_cimentacion_plan_png as _gen_cim_main
+                import json as _json_cim
+
+                # Normalizar layout (puede ser string JSON o lista)
+                if isinstance(_cim_layout, str):
+                    _cim_layout = _json_cim.loads(_cim_layout)
+
+                # Dimensiones
+                _cim_tw = st.session_state.get("babylon_total_width") or 10
+                _cim_td = st.session_state.get("babylon_total_depth") or 10
+
+                # Selector de tipo de cimentación
+                _cim_col1, _cim_col2 = st.columns([3, 1])
+                with _cim_col1:
+                    _cim_type = st.selectbox(
+                        "Tipo de cimentación",
+                        ["zapatas", "losa", "pilotes"],
+                        format_func=lambda x: {
+                            "zapatas": "Zapata corrida + aisladas (terrenos medios)",
+                            "losa": "Losa de cimentación (terrenos blandos)",
+                            "pilotes": "Pilotes barrenados (terrenos muy blandos)"
+                        }.get(x, x),
+                        key="cim_foundation_type_main_editor",
+                    )
+
+                # Generar PNG
+                _cim_png = _gen_cim_main(_cim_layout, _cim_type, _cim_tw, _cim_td)
+
+                if _cim_png:
+                    st.image(_cim_png, use_container_width=True, caption=f"Plano de Cimentación — {_cim_type.capitalize()}")
+                    with _cim_col2:
+                        st.download_button(
+                            "⬇️ Descargar PNG",
+                            _cim_png,
+                            file_name=f"plano_cimentacion_{_cim_type}.png",
+                            mime="image/png",
+                            key="dl_cim_plan_main_editor",
+                            use_container_width=True,
+                        )
+                else:
+                    st.caption("⚠️ No se pudo generar el plano de cimentación.")
+
+            except Exception as _cim_err:
+                st.caption(f"⚠️ Error al generar plano de cimentación: {_cim_err}")
+        else:
+            st.caption("⚠️ No hay layout disponible. Edita tu casa en 3D primero.")
+
     # ── Planos Técnicos MEP ──────────────────────────────────────────────────
     _mep_rooms = (st.session_state.get("babylon_modified_layout")
                   or st.session_state.get("babylon_initial_layout"))
@@ -2857,35 +2944,38 @@ def render_step3_editor():
                         except Exception as _le:
                             st.caption(f"⚠️ {_lbl}: {_le}")
 
-                # ── Plano de Cimentación ──────────────────────────────────────
-                st.markdown("---")
-                st.markdown("#### 🏗️ Plano de Cimentación")
-                try:
-                    from .floor_plan_svg import generate_cimentacion_plan_png as _gen_cim
-                    _cim_col1, _cim_col2, _cim_col3 = st.columns([2, 1, 1])
-                    with _cim_col1:
-                        _found_type = st.selectbox(
-                            "Tipo de cimentación",
-                            ["zapatas", "losa"],
-                            format_func=lambda x: "Zapata corrida + aisladas" if x == "zapatas" else "Losa de cimentación",
-                            key="cim_foundation_type",
-                        )
-                    _cim_png = _gen_cim(_mep_rooms, _found_type, _tw, _td)
-                    if _cim_png:
-                        _cim_c1, _cim_c2 = st.columns([3, 1])
-                        with _cim_c1:
-                            st.image(_cim_png, use_container_width=True)
-                        with _cim_c2:
-                            st.download_button(
-                                "⬇️ Plano Cimentación",
-                                _cim_png,
-                                file_name="plano_cimentacion.png",
-                                mime="image/png",
-                                key="dl_cim_plan",
-                                use_container_width=True,
-                            )
-                except Exception as _ce:
-                    st.caption(f"⚠️ Cimentación: {_ce}")
+                # ── Plano de Cimentación (DEPRECADO — ahora se muestra tras el editor) ──
+                # NOTA: Este bloque se mantiene comentado para referencia histórica.
+                # El plano de cimentación principal ahora aparece justo después del editor 3D,
+                # no dentro del expander MEP, para mejor visibilidad.
+                # st.markdown("---")
+                # st.markdown("#### 🏗️ Plano de Cimentación")
+                # try:
+                #     from .floor_plan_svg import generate_cimentacion_plan_png as _gen_cim
+                #     _cim_col1, _cim_col2, _cim_col3 = st.columns([2, 1, 1])
+                #     with _cim_col1:
+                #         _found_type = st.selectbox(
+                #             "Tipo de cimentación",
+                #             ["zapatas", "losa"],
+                #             format_func=lambda x: "Zapata corrida + aisladas" if x == "zapatas" else "Losa de cimentación",
+                #             key="cim_foundation_type",
+                #         )
+                #     _cim_png = _gen_cim(_mep_rooms, _found_type, _tw, _td)
+                #     if _cim_png:
+                #         _cim_c1, _cim_c2 = st.columns([3, 1])
+                #         with _cim_c1:
+                #             st.image(_cim_png, use_container_width=True)
+                #         with _cim_c2:
+                #             st.download_button(
+                #                 "⬇️ Plano Cimentación",
+                #                 _cim_png,
+                #                 file_name="plano_cimentacion.png",
+                #                 mime="image/png",
+                #                 key="dl_cim_plan",
+                #                 use_container_width=True,
+                #             )
+                # except Exception as _ce:
+                #     st.caption(f"⚠️ Cimentación: {_ce}")
 
             except Exception as _me:
                 st.warning(f"No se pudieron generar los planos MEP: {_me}")
