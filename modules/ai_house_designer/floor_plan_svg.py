@@ -1050,9 +1050,8 @@ def generate_cimentacion_plan_png(
             color='#AAAAAA', fontsize=6, ha='right', va='bottom')
 
     buf = _io.BytesIO()
-    plt.tight_layout(pad=0)
-    plt.savefig(buf, format='png', dpi=130, bbox_inches='tight',
-                facecolor=BG, edgecolor='none')
+    fig.subplots_adjust(left=0, right=1, top=1, bottom=0)
+    plt.savefig(buf, format='png', dpi=130, facecolor=BG, edgecolor='none', pad_inches=0.2)
     plt.close(fig)
     buf.seek(0)
     return buf.read()

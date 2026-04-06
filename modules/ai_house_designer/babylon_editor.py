@@ -73,6 +73,12 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
         .tool-btn.green {{ background: rgba(46,204,113,0.25); border-color: #2ECC71; }}
         .tool-btn.green:hover {{ background: rgba(46,204,113,0.45); }}
         hr.divider {{ margin: 8px 0; border: none; border-top: 1px solid rgba(255,255,255,0.15); }}
+        /* POSITION SLIDER GROUP */
+        .tool-group {{ margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.1); }}
+        .tool-label {{ font-size: 10px; color: #F39C12; font-weight: 700; letter-spacing: 0.8px; margin-bottom: 5px; }}
+        .tool-row {{ display: flex; align-items: center; gap: 6px; margin: 4px 0; }}
+        .tool-row span {{ font-size: 11px; color: #aaa; width: 12px; flex-shrink: 0; }}
+        .tool-row input[type=range] {{ flex: 1; accent-color: #F39C12; cursor: pointer; height: 4px; }}
 
         /* PANEL NUMÉRICO DE EDICIÓN */
         #edit-panel {{
@@ -264,6 +270,19 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                         font-size:9px;color:#475569;line-height:1.4;">
               Las capas MEP se construyen automáticamente con los datos del proyecto.
             </div>
+          </div>
+        </div>
+
+        <!-- POSICIÓN EN PARCELA -->
+        <div class="tool-group" id="tool-pos-parcela">
+          <div class="tool-label">📍 POSICIÓN EN PARCELA</div>
+          <div class="tool-row">
+            <span>X</span>
+            <input type="range" id="slider-offset-x" step="0.1" value="0">
+          </div>
+          <div class="tool-row">
+            <span>Z</span>
+            <input type="range" id="slider-offset-z" step="0.1" value="0">
           </div>
         </div>
 
@@ -836,6 +855,61 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
         // Construir todas las habitaciones
         roomsData.forEach((_, i) => buildRoom(i));
         try {{ buildMEPLayers(roomsData); }} catch(e) {{ console.warn('MEP init error:', e); }}
+
+        // ── Posición en parcela — sliders tiempo real ─────────────────────────
+        let _houseOffsetX = 0, _houseOffsetZ = 0;
+        const _basePosByName = {{}};
+
+        // Guardar posiciones base de todos los meshes de la casa (excepto entorno)
+        const _ENV_NAMES = new Set(['ground','plotPlane','gridPlane']);
+        function _storeBaseMeshPositions() {{
+            scene.meshes.forEach(m => {{
+                if (_ENV_NAMES.has(m.name) || m.name.startsWith('border_')) return;
+                if (!_basePosByName[m.name]) {{
+                    _basePosByName[m.name] = {{ x: m.position.x, z: m.position.z }};
+                }}
+            }});
+        }}
+
+        function _applyHouseOffset(dx, dz) {{
+            // Snapshot any new meshes that appeared since last call (roof, foundation, etc.)
+            scene.meshes.forEach(m => {{
+                if (_ENV_NAMES.has(m.name) || m.name.startsWith('border_')) return;
+                if (!_basePosByName[m.name]) {{
+                    // Mesh appeared AFTER initial store — its current position already carries
+                    // the previous offset, so record base = current - previous offset
+                    _basePosByName[m.name] = {{ x: m.position.x - _houseOffsetX, z: m.position.z - _houseOffsetZ }};
+                }}
+            }});
+            for (const [nm, base] of Object.entries(_basePosByName)) {{
+                const m = scene.getMeshByName(nm);
+                if (m) {{ m.position.x = base.x + dx; m.position.z = base.z + dz; }}
+            }}
+        }}
+
+        // Store initial positions once all rooms are built
+        _storeBaseMeshPositions();
+
+        // Slider limits: half the clearance between plot and house footprint
+        const _maxOffsetX = Math.max(0, (plotW - totalWidth) / 2) || 20;
+        const _maxOffsetZ = Math.max(0, (plotD - totalDepth) / 2) || 20;
+        const _limX = (_maxOffsetX > 0.05) ? _maxOffsetX : 0.05;
+        const _limZ = (_maxOffsetZ > 0.05) ? _maxOffsetZ : 0.05;
+        const _sliderX = document.getElementById('slider-offset-x');
+        const _sliderZ = document.getElementById('slider-offset-z');
+        if (_sliderX && _sliderZ) {{
+            _sliderX.min = -_limX; _sliderX.max = _limX;
+            _sliderZ.min = -_limZ; _sliderZ.max = _limZ;
+            _sliderX.oninput = () => {{
+                _houseOffsetX = parseFloat(_sliderX.value) || 0;
+                _applyHouseOffset(_houseOffsetX, _houseOffsetZ);
+            }};
+            _sliderZ.oninput = () => {{
+                _houseOffsetZ = parseFloat(_sliderZ.value) || 0;
+                _applyHouseOffset(_houseOffsetX, _houseOffsetZ);
+            }};
+        }}
+        // ─────────────────────────────────────────────────────────────────────
 
         // Área original para presupuesto
         let originalTotalArea = roomsData.reduce((s, r) => s + (r.area_m2 || 0), 0);
