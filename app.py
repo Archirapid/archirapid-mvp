@@ -2124,4 +2124,13 @@ elif st.session_state.get('selected_page') == "🎓 Estudiantes":
         from estudiantes import mostrar_modulo_estudiantes
         mostrar_modulo_estudiantes()
 
+elif st.session_state.get('selected_page') == "🏠 Portal Prefabricadas":
+    st.components.v1.html(
+        "<script>window.parent.document.querySelector('section.main').scrollTo(0,0);</script>",
+        height=0,
+    )
+    with st.container():
+        from modules.prefabricadas.portal import main
+        main()
+
 
