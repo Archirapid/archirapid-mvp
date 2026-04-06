@@ -439,7 +439,7 @@ def main():
             del st.query_params["page"]
         except Exception:
             pass
-        st.rerun()
+        st.stop()
 
     # si acabamos de registrarnos y no tenemos arquitecto_id, forzamos el login
     frm_key = "FormSubmitter:registro_form-🚀 Registrarme y Acceder"

@@ -190,7 +190,7 @@ def mostrar_modulo_estudiantes():
                 del st.query_params["page"]
             except Exception:
                 pass
-            st.rerun()
+            st.stop()
 
     st.caption(
         "Publica tu TFG/TFM orientativo y **recibe el 60% de cada venta**. "

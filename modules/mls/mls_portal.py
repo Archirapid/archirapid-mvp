@@ -205,7 +205,7 @@ def ui_login_registro() -> None:
             del st.query_params["page"]
         except Exception:
             pass
-        st.rerun()
+        st.stop()
         st.rerun()
 
     st.markdown("## 🏢 ArchiRapid MLS — Portal Inmobiliario")

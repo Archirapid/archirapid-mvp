@@ -475,7 +475,7 @@ def show_service_provider_panel():
             del st.query_params["page"]
         except Exception:
             pass
-        st.rerun()
+        st.stop()
 
     tab1, tab2, tab3, tab4 = st.tabs(["📋 Tablón de Obras", "📨 Mis Ofertas", "👤 Mi Perfil", "💶 Mis tarifas"])
 

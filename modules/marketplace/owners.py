@@ -144,7 +144,7 @@ def main():
                 del st.query_params["page"]
             except Exception:
                 pass
-            st.rerun()
+            st.stop()
 
     # Aviso de comisión
     st.info("📢 ARCHIRAPID gestiona la venta y el desarrollo de tu finca. Por el uso de la plataforma y la gestión comercial, se aplicará una comisión del 7% al 10% sobre el precio de venta final.")

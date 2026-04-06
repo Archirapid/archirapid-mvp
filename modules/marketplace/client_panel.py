@@ -462,7 +462,7 @@ def show_buyer_panel_mls(client_email: str, finca_id: str) -> None:
                 del st.query_params["page"]
             except Exception:
                 pass
-            st.rerun()
+            st.stop()
 
     if finca:
         titulo           = finca.get("titulo") or "Finca MLS"
@@ -716,7 +716,7 @@ def show_full_client_dashboard(client_email):
                 del st.query_params["page"]
             except Exception:
                 pass
-            st.rerun()
+            st.stop()
     
     # Mostrar rol del usuario
     role_emoji = "🛒" if user_role == "buyer" else "🏠"
@@ -2091,7 +2091,7 @@ def show_buyer_panel(client_email):
             del st.query_params["page"]
         except Exception:
             pass
-        st.rerun()
+        st.stop()
 
 
 def show_mis_transacciones(client_email: str, plot_data):
