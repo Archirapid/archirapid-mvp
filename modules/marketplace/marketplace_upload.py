@@ -435,7 +435,6 @@ def main():
     # Botón volver al marketplace — siempre visible arriba
     if st.button("← Volver al marketplace", key="arq_back_home"):
         st.session_state["selected_page"] = "🏠 Inicio / Marketplace"
-        st.session_state["_nav_radio"] = "🏠 Inicio / Marketplace"
         try:
             del st.query_params["page"]
         except Exception:

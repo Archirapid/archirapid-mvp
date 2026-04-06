@@ -184,7 +184,6 @@ def mostrar_modulo_estudiantes():
     with bcol:
         if st.button("← Volver", key="est_back_home", use_container_width=True):
             st.session_state["selected_page"] = "🏠 Inicio / Marketplace"
-            st.session_state["_nav_radio"] = "🏠 Inicio / Marketplace"
             st.session_state.pop("est_session_logged", None)
             st.session_state.pop("est_session_email", None)
             try:

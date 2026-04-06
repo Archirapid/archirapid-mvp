@@ -140,7 +140,6 @@ def main():
     with _ow_bcol:
         if st.button("← Volver al marketplace", key="owners_back_home", use_container_width=True):
             st.session_state["selected_page"] = "🏠 Inicio / Marketplace"
-            st.session_state["_nav_radio"] = "🏠 Inicio / Marketplace"
             try:
                 del st.query_params["page"]
             except Exception:

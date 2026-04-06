@@ -471,7 +471,6 @@ def show_service_provider_panel():
                    'viewing_login', 'login_role']:
             st.session_state.pop(k, None)
         st.session_state["selected_page"] = "🏠 Inicio / Marketplace"
-        st.session_state["_nav_radio"] = "🏠 Inicio / Marketplace"
         try:
             del st.query_params["page"]
         except Exception:

@@ -458,7 +458,6 @@ def show_buyer_panel_mls(client_email: str, finca_id: str) -> None:
                        "mls_show_construccion_offers"]:
                 st.session_state.pop(_k, None)
             st.session_state["selected_page"] = "🏠 Inicio / Marketplace"
-            st.session_state["_nav_radio"] = "🏠 Inicio / Marketplace"
             try:
                 del st.query_params["page"]
             except Exception:
@@ -713,7 +712,6 @@ def show_full_client_dashboard(client_email):
                 if key in st.session_state:
                     del st.session_state[key]
             st.session_state["selected_page"] = "🏠 Inicio / Marketplace"
-            st.session_state["_nav_radio"] = "🏠 Inicio / Marketplace"
             try:
                 del st.query_params["page"]
             except Exception:
@@ -2089,7 +2087,6 @@ def show_buyer_panel(client_email):
         for _k in list(st.session_state.keys()):
             st.session_state.pop(_k, None)
         st.session_state["selected_page"] = "🏠 Inicio / Marketplace"
-        st.session_state["_nav_radio"] = "🏠 Inicio / Marketplace"
         try:
             del st.query_params["page"]
         except Exception:
