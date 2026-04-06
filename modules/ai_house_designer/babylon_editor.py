@@ -192,6 +192,31 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             </div>
         </div>
 
+        <!-- PANEL MATERIAL FACHADA -->
+        <hr class="divider">
+        <div id="mat-section">
+            <div style="font-size:11px; color:#E67E22; font-weight:700; letter-spacing:0.5px; margin-bottom:5px;">
+                🧱 MATERIAL FACHADA
+            </div>
+            <select id="mat-select" onchange="onMatSelectChange(this.value)"
+                style="width:100%; padding:5px 6px; background:#1a1a2e; color:white;
+                       border:1px solid rgba(230,126,34,0.6); border-radius:5px;
+                       font-size:11px; cursor:pointer; margin-bottom:4px;">
+                <option value="default">🏠 Por defecto (estilo)</option>
+                <option value="hormigon">🪨 Hormigón visto</option>
+                <option value="piedra">🪨 Piedra natural</option>
+                <option value="ladrillo">🧱 Ladrillo cara vista</option>
+                <option value="enfoscado">🏠 Enfoscado blanco</option>
+                <option value="clt">🌿 Madera CLT (sostenible) ♻️</option>
+            </select>
+            <div id="mat-price" style="font-size:10px; color:#E67E22; text-align:right;
+                                       display:none; padding:2px 4px;
+                                       background:rgba(230,126,34,0.1);
+                                       border-radius:3px;">
+                —
+            </div>
+        </div>
+
         <!-- MEP Instalaciones -->
         <div style="margin-top:8px;border-top:1px solid #1e293b;padding-top:8px;">
           <div onclick="document.getElementById('mep_panel').style.display=document.getElementById('mep_panel').style.display==='none'?'block':'none'"
@@ -425,6 +450,18 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
         const styleConf = STYLE_3D_CONFIG[houseStyle] || STYLE_3D_CONFIG['Moderno'];
 
         const COST_PER_M2 = {cost_per_m2}; // €/m² configurado por el arquitecto
+
+        // Materiales de fachada con color Babylon y precio orientativo €/m²
+        const WALL_MATERIALS = {{
+            'default':  {{ label: 'Por defecto (estilo)',    color: null,                     price: 0   }},
+            'hormigon': {{ label: 'Hormigón visto',          color: [0.78, 0.76, 0.73],       price: 45  }},
+            'piedra':   {{ label: 'Piedra natural',          color: [0.72, 0.65, 0.52],       price: 85  }},
+            'ladrillo': {{ label: 'Ladrillo cara vista',     color: [0.72, 0.38, 0.22],       price: 55  }},
+            'enfoscado':{{ label: 'Enfoscado blanco',        color: [0.96, 0.95, 0.92],       price: 30  }},
+            'clt':      {{ label: 'Madera CLT (sostenible)', color: [0.72, 0.54, 0.32],       price: 120 }},
+        }};
+        // Persiste la elección entre rebuilds
+        window.__AR_CURRENT_WALL_MAT = 'default';
 
         // Mínimos CTE por tipo de habitación (m²)
         const CTE_MIN = {{
@@ -951,8 +988,10 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                 }}
 
             }} else if (mode === 'wall') {{
-                document.getElementById('btn-wall').classList.add('active');
-                startWallMode();
+                const wallBtn = document.getElementById('btn-wall');
+                if (wallBtn) wallBtn.classList.add('active');
+                if (typeof startWallMode === 'function') startWallMode();
+                else showToast('⚠️ Modo tabiques no disponible en esta versión');
             }}
         }}
 
@@ -1087,6 +1126,10 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             // Reconstruir todos
             roomsData.forEach((_,i) => buildRoom(i));
             try {{ buildMEPLayers(roomsData); }} catch(e) {{ console.warn('MEP rebuild error:', e); }}
+            // Reaplicar material de fachada elegido por el usuario (persiste entre rebuilds)
+            if (window.__AR_CURRENT_WALL_MAT && window.__AR_CURRENT_WALL_MAT !== 'default') {{
+                applyWallMaterial(window.__AR_CURRENT_WALL_MAT);
+            }}
             selectedMesh = null;
             selectedIndex = null;
             updateBudget();
@@ -2438,6 +2481,54 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             applyStyle(styleName);
         }}
 
+        // ================================================
+        // MATERIALES DE FACHADA — aplica color a todas las paredes
+        // ================================================
+        function applyWallMaterial(matKey) {{
+            window.__AR_CURRENT_WALL_MAT = matKey || 'default';
+            const def = WALL_MATERIALS[matKey] || WALL_MATERIALS['default'];
+            const priceEl = document.getElementById('mat-price');
+
+            if (!def || !def.color) {{
+                // 'default': restaurar colores del estilo activo
+                const c = STYLE_COLORS[houseStyle] || [0.92, 0.92, 0.90];
+                const baseColor = new BABYLON.Color3(c[0], c[1], c[2]);
+                roomsData.forEach((room, i) => {{
+                    const zone = (room.zone || '').toLowerCase();
+                    if (zone === 'garden' || zone === 'exterior') return;
+                    const wMat = scene.getMaterialByName(`wMat_${{i}}`);
+                    if (wMat) wMat.diffuseColor = baseColor;
+                    const fwMat = scene.getMaterialByName(`fwMat_${{i}}`);
+                    if (fwMat) fwMat.diffuseColor = baseColor; // alpha preserved by fwMat
+                }});
+                if (priceEl) priceEl.style.display = 'none';
+                showToast('🏠 Material restaurado al estilo ' + houseStyle);
+                return;
+            }}
+
+            const newColor = new BABYLON.Color3(def.color[0], def.color[1], def.color[2]);
+            roomsData.forEach((room, i) => {{
+                const zone = (room.zone || '').toLowerCase();
+                if (zone === 'garden' || zone === 'exterior') return;
+                const wMat = scene.getMaterialByName(`wMat_${{i}}`);
+                if (wMat) wMat.diffuseColor = newColor;
+                const fwMat = scene.getMaterialByName(`fwMat_${{i}}`);
+                if (fwMat) fwMat.diffuseColor = newColor; // alpha (0.28) is preserved on fwMat
+            }});
+
+            if (priceEl) {{
+                priceEl.style.display = 'block';
+                priceEl.textContent = def.price > 0
+                    ? `€${{def.price}}/m² fachada`
+                    : 'Coste incluido en estructura';
+            }}
+            showToast(`🎨 ${{def.label}} aplicado a fachadas`);
+        }}
+
+        function onMatSelectChange(val) {{
+            applyWallMaterial(val);
+        }}
+
         function toggleStylePanel() {{
             const panel = document.getElementById('style-panel');
             const isVisible = panel.style.display !== 'none';
@@ -2560,10 +2651,23 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             }}
         }}                                                                                                                              
         // ================================================
-        // RENDER LOOP
+        // RENDER LOOP — guard contra múltiples loops + bridge debug
         // ================================================
-        engine.runRenderLoop(() => scene.render());
-        window.addEventListener('resize', () => engine.resize());
+        window.__AR_ENGINE__ = engine;
+        window.__AR_SCENE__  = scene;
+        try {{ window.top.__AR_ENGINE__ = engine; window.top.__AR_SCENE__ = scene; }} catch(e) {{}}
+
+        if (!window.__AR_LOOP_STARTED__) {{
+            window.__AR_LOOP_STARTED__ = true;
+            engine.runRenderLoop(() => {{
+                try {{
+                    if (scene && scene.activeCamera) scene.render();
+                }} catch (e) {{
+                    console.warn('[AR] render error', e);
+                }}
+            }});
+        }}
+        window.addEventListener('resize', () => {{ try {{ engine.resize(); }} catch(e) {{}} }});
 
         // ================================================
         // BRÚJULA — N siempre arriba, fija
