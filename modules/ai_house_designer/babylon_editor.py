@@ -1,8 +1,6 @@
 """
 Editor 3D avanzado usando Babylon.js
-v3.2 - FIX 2026-04-05: dimensiones precisas (applyDimensions no llama generateLayoutJS),
-       generateLayoutJS respeta width/depth existentes, packRows elimina huecos,
-       notifyParentLayout sincroniza JSON al padre Streamlit via postMessage
+v3.0 - Panel numérico + paredes sincronizadas + CTE + GLB
 """
 
 def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos aguas (clásico, eficiente)", plot_area_m2=0, foundation_type="Losa de hormigón (suelos blandos)", house_style="Moderno", cost_per_m2=1600):
@@ -176,25 +174,7 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             <label>Fondo (m)</label>
             <input type="number" id="input-depth" min="1" max="20" step="0.1">
             <button id="btn-apply" onclick="applyDimensions()">✅ Aplicar</button>
-            <div id="area-info" style="font-size:10px;color:#aaa;margin-top:4px;"></div>
             <div id="cte-status"></div>
-            <!-- mat-selection-panel: z-index:9999 garantiza visibilidad sobre canvas Babylon -->
-            <div id="mat-selection-panel"
-                 style="margin-top:10px;border-top:1px solid #555;padding-top:8px;
-                        position:relative;z-index:9999;">
-              <label style="color:#aaa;font-size:11px;">🎨 Material Fachada</label>
-              <select id="mat-select" onchange="applyMaterialPBR(selectedIndex, this.value)"
-                      style="width:100%;background:#2a2a2a;color:#fff;border:1px solid #555;
-                             border-radius:4px;padding:4px;margin-top:4px;font-size:12px;
-                             position:relative;z-index:9999;">
-                <option value="">-- Sin material PBR --</option>
-                <option value="ladrillo_cara_vista">Ladrillo Cara Vista — 85€/m²</option>
-                <option value="madera_laminada">Madera Laminada CLT — 320€/m²</option>
-                <option value="piedra_caliza">Piedra Caliza — 145€/m²</option>
-                <option value="hormigon_visto">Hormigón Visto HA-25 — 95€/m²</option>
-                <option value="plancha_acero_corten">Acero Corten — 210€/m²</option>
-              </select>
-            </div>
         </div>
 
         <button class="tool-btn" id="btn-fence" onclick="toggleFence()">🧱 Cerramiento OFF</button>
@@ -209,6 +189,31 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                 <p style="margin:2px 0;">📐 Superficie: <strong id="fence-area">—</strong> m²</p>
                 <p style="margin:2px 0;">📏 Perímetro: <strong id="fence-perim">—</strong> m lineales</p>
                 <p style="margin:2px 0; color:#2ECC71;">🏗️ Máx. construible: <strong id="fence-build">—</strong> m²</p>
+            </div>
+        </div>
+
+        <!-- PANEL MATERIAL FACHADA -->
+        <hr class="divider">
+        <div id="mat-section">
+            <div style="font-size:11px; color:#E67E22; font-weight:700; letter-spacing:0.5px; margin-bottom:5px;">
+                🧱 MATERIAL FACHADA
+            </div>
+            <select id="mat-select" onchange="onMatSelectChange(this.value)"
+                style="width:100%; padding:5px 6px; background:#1a1a2e; color:white;
+                       border:1px solid rgba(230,126,34,0.6); border-radius:5px;
+                       font-size:11px; cursor:pointer; margin-bottom:4px;">
+                <option value="default">🏠 Por defecto (estilo)</option>
+                <option value="hormigon">🪨 Hormigón visto</option>
+                <option value="piedra">🪨 Piedra natural</option>
+                <option value="ladrillo">🧱 Ladrillo cara vista</option>
+                <option value="enfoscado">🏠 Enfoscado blanco</option>
+                <option value="clt">🌿 Madera CLT (sostenible) ♻️</option>
+            </select>
+            <div id="mat-price" style="font-size:10px; color:#E67E22; text-align:right;
+                                       display:none; padding:2px 4px;
+                                       background:rgba(230,126,34,0.1);
+                                       border-radius:3px;">
+                —
             </div>
         </div>
 
@@ -288,22 +293,6 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
         <button class="tool-btn" onclick="resetLayout()">↩️ Reset Layout</button>
         <button class="tool-btn" onclick="undoLastAction()">⬅️ Deshacer</button>
         <button class="tool-btn" id="btn-delete" onclick="deleteSelected()" style="background:rgba(231,76,60,0.25);border-color:#E74C3C;">🗑️ Borrar seleccionado</button>
-        <hr class="divider">
-        <div style="font-size:10px;color:#F5A623;font-weight:700;letter-spacing:1px;margin-bottom:5px;">📍 POSICIÓN EN PARCELA</div>
-        <div style="display:flex;align-items:center;gap:4px;margin-bottom:3px;">
-          <span style="font-size:9px;color:#94a3b8;width:14px;">X</span>
-          <input type="range" id="slider-offset-x" min="0" max="0" step="0.5" value="0"
-                 style="flex:1;accent-color:#F5A623;height:14px;" oninput="onPlotOffsetChange()">
-          <span id="offset-x-val" style="font-size:9px;color:white;width:26px;text-align:right;">0m</span>
-        </div>
-        <div style="display:flex;align-items:center;gap:4px;margin-bottom:4px;">
-          <span style="font-size:9px;color:#94a3b8;width:14px;">Z</span>
-          <input type="range" id="slider-offset-z" min="0" max="0" step="0.5" value="0"
-                 style="flex:1;accent-color:#F5A623;height:14px;" oninput="onPlotOffsetChange()">
-          <span id="offset-z-val" style="font-size:9px;color:white;width:26px;text-align:right;">0m</span>
-        </div>
-        <div id="retranqueo-ok"   style="font-size:9px;color:#10B981;margin-bottom:3px;">✅ Retranqueo 3m OK</div>
-        <div id="retranqueo-warn" style="display:none;font-size:9px;color:#EF4444;margin-bottom:3px;">⚠️ Fuera de retranqueo</div>
         <hr class="divider">
         <button class="tool-btn green" onclick="saveChanges()">💾 Guardar JSON</button>
         <button class="tool-btn green" id="btn-glb" onclick="exportGLB()">📦 Exportar 3D (.glb)</button>
@@ -431,7 +420,6 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
         const plotZ = (totalDepth  - plotD) / 2;
         const roofType = "{roof_type}";
         const houseStyle = "{house_style}";
-        let _currentStyle = "{house_style}";   // mutable — se actualiza en applyStyle()
         const WALL_H = 2.7;
         const WALL_T = 0.15;
         // Color de pared exterior según estilo elegido en Paso 1
@@ -463,40 +451,17 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
 
         const COST_PER_M2 = {cost_per_m2}; // €/m² configurado por el arquitecto
 
-        // ── PBR Materials DB ─────────────────────────────────────────────────
-        const MATERIALS_DB = {{
-            "ladrillo_cara_vista": {{name:"Ladrillo Cara Vista", price_m2:85, roughness:0.85, metallic:0.0, color:"#C4845A", texUrl:"https://cdn.babylonjs.com/Assets/textures/brick_diffuse.jpg"}},
-            "madera_laminada":     {{name:"Madera Laminada (CLT)", price_m2:320, roughness:0.75, metallic:0.0, color:"#A0724A", texUrl:"https://cdn.babylonjs.com/Assets/textures/wood_diffuse.jpg"}},
-            "piedra_caliza":       {{name:"Piedra Caliza", price_m2:145, roughness:0.90, metallic:0.0, color:"#C8B89A", texUrl:"https://cdn.babylonjs.com/Assets/textures/stone_diffuse.jpg"}},
-            "hormigon_visto":      {{name:"Hormigón Visto HA-25", price_m2:95, roughness:0.80, metallic:0.05, color:"#9E9E9E", texUrl:"https://cdn.babylonjs.com/Assets/textures/concrete_diffuse.jpg"}},
-            "plancha_acero_corten":{{name:"Plancha Acero Corten", price_m2:210, roughness:0.70, metallic:0.85, color:"#8B4513", texUrl:"https://cdn.babylonjs.com/Assets/textures/rust_diffuse.jpg"}}
+        // Materiales de fachada con color Babylon y precio orientativo €/m²
+        const WALL_MATERIALS = {{
+            'default':  {{ label: 'Por defecto (estilo)',    color: null,                     price: 0   }},
+            'hormigon': {{ label: 'Hormigón visto',          color: [0.78, 0.76, 0.73],       price: 45  }},
+            'piedra':   {{ label: 'Piedra natural',          color: [0.72, 0.65, 0.52],       price: 85  }},
+            'ladrillo': {{ label: 'Ladrillo cara vista',     color: [0.72, 0.38, 0.22],       price: 55  }},
+            'enfoscado':{{ label: 'Enfoscado blanco',        color: [0.96, 0.95, 0.92],       price: 30  }},
+            'clt':      {{ label: 'Madera CLT (sostenible)', color: [0.72, 0.54, 0.32],       price: 120 }},
         }};
-        // material_id asignado por mesh index: roomsData[i].material_id
-        // (se guarda cuando el usuario selecciona material desde el panel)
-
-        // ── Emergency fallback: si MATERIALS_DB está vacío o corrompido ───────
-        // Garantiza que mat-select siempre tenga al menos 5 opciones básicas
-        (function _ensureMaterialsDB() {{
-            if (typeof MATERIALS_DB !== 'object' || Object.keys(MATERIALS_DB).length === 0) {{
-                console.warn('[ArchiRapid] MATERIALS_DB vacío — inyectando fallback de emergencia');
-                const FALLBACK = [
-                    {{id:'ladrillo',  name:'Ladrillo',   price_m2:85,  color:'#C4845A', roughness:0.85, metallic:0.0}},
-                    {{id:'madera',    name:'Madera',     price_m2:320, color:'#A0724A', roughness:0.75, metallic:0.0}},
-                    {{id:'piedra',    name:'Piedra',     price_m2:145, color:'#C8B89A', roughness:0.90, metallic:0.0}},
-                    {{id:'hormigon', name:'Hormigon',  price_m2:95,  color:'#9E9E9E', roughness:0.80, metallic:0.05}},
-                    {{id:'acero',    name:'Acero',      price_m2:210, color:'#8B4513', roughness:0.70, metallic:0.85}},
-                ];
-                FALLBACK.forEach(m => {{ MATERIALS_DB[m.id] = m; }});
-                // Actualizar <select> con opciones de emergencia
-                const sel = document.getElementById('mat-select');
-                if (sel) {{
-                    sel.innerHTML = '<option value="">-- Sin material --</option>' +
-                        FALLBACK.map(m =>
-                            `<option value="${{m.id}}">${{m.name}} — ${{m.price_m2}}€/m²</option>`
-                        ).join('');
-                }}
-            }}
-        }})();
+        // Persiste la elección entre rebuilds
+        window.__AR_CURRENT_WALL_MAT = 'default';
 
         // Mínimos CTE por tipo de habitación (m²)
         const CTE_MIN = {{
@@ -916,31 +881,36 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
 
             updateRoomInfo(idx);
 
-            // FIX #4: gizmo habilitado para TODAS las zonas
+            // Si estamos en modo mover
             if (currentMode === 'move') {{
-                gizmoManager.attachToMesh(selectedMesh);
-                gizmoManager.positionGizmoEnabled = true;
-                // Guard: positionGizmo puede tardar un frame en crearse
-                const _pg = gizmoManager.gizmos && gizmoManager.gizmos.positionGizmo;
-                if (_pg) {{
-                    if (_pg.xGizmo) _pg.xGizmo.isEnabled = true;
-                    if (_pg.yGizmo) _pg.yGizmo.isEnabled = false;
-                    if (_pg.zGizmo) _pg.zGizmo.isEnabled = true;
-                    _pg.onDragEndObservable.clear();
-                    _pg.onDragEndObservable.add(() => {{
+                const rZone = (roomsData[idx].zone || '').toLowerCase();
+                const isMovable = rZone === 'garden' || rZone === 'exterior';
+                if (isMovable) {{
+                    gizmoManager.attachToMesh(selectedMesh);
+                    gizmoManager.positionGizmoEnabled = true;
+                    gizmoManager.gizmos.positionGizmo.xGizmo.isEnabled = true;
+                    gizmoManager.gizmos.positionGizmo.yGizmo.isEnabled = false;
+                    gizmoManager.gizmos.positionGizmo.zGizmo.isEnabled = true;
+                    // Registrar observable aquí también (flujo: selección → modo mover)
+                    gizmoManager.gizmos.positionGizmo.onDragEndObservable.clear();
+                    gizmoManager.gizmos.positionGizmo.onDragEndObservable.add(() => {{
                         saveSnapshot();
                         const f = scene.getMeshByName(`floor_${{idx}}`);
                         if (f) {{
-                            roomsData[idx].x = f.position.x - roomsData[idx].width / 2;
-                            roomsData[idx].z = f.position.z - roomsData[idx].depth / 2;
+                            const rw = roomsData[idx].width;
+                            const rd = roomsData[idx].depth;
+                            roomsData[idx].x = f.position.x - rw / 2;
+                            roomsData[idx].z = f.position.z - rd / 2;
                         }}
-                        // MAGNET: reempaquetar filas adyacentes para eliminar huecos
-                        packRows();
                         rebuildScene(roomsData);
                         updateBudget();
                     }});
+                    showToast('↔️ Mueve: ' + roomsData[idx].name);
+                }} else {{
+                    gizmoManager.attachToMesh(null);
+                    gizmoManager.positionGizmoEnabled = false;
+                    showToast('💡 Para ajustar habitaciones usa Editar Dimensiones');
                 }}
-                showToast('↔️ Arrastra para mover: ' + roomsData[idx].name);
             }}
 
             // Si estamos en modo scale, mostrar panel numérico
@@ -973,30 +943,36 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
 
             }} else if (mode === 'move') {{
                 document.getElementById('btn-move').classList.add('active');
-                // FIX #4: gizmo para todas las zonas — selecciona antes de activar modo
                 if (selectedMesh && selectedIndex !== null) {{
                     gizmoManager.attachToMesh(selectedMesh);
                     gizmoManager.positionGizmoEnabled = true;
-                    const _pg2 = gizmoManager.gizmos && gizmoManager.gizmos.positionGizmo;
-                    if (_pg2) {{
-                        if (_pg2.xGizmo) _pg2.xGizmo.isEnabled = true;
-                        if (_pg2.yGizmo) _pg2.yGizmo.isEnabled = false;
-                        if (_pg2.zGizmo) _pg2.zGizmo.isEnabled = true;
-                        _pg2.onDragEndObservable.clear();
-                        _pg2.onDragEndObservable.add(() => {{
-                            saveSnapshot();
+                    gizmoManager.gizmos.positionGizmo.xGizmo.isEnabled = true;
+                    gizmoManager.gizmos.positionGizmo.yGizmo.isEnabled = false;
+                    gizmoManager.gizmos.positionGizmo.zGizmo.isEnabled = true;
+                    // Al soltar: actualizar según tipo de zona
+                    gizmoManager.gizmos.positionGizmo.onDragEndObservable.clear();
+                    gizmoManager.gizmos.positionGizmo.onDragEndObservable.add(() => {{
+                        saveSnapshot();
+                        const rZone = (roomsData[selectedIndex].zone || '').toLowerCase();
+                        const isMovable = rZone === 'garden' || rZone === 'exterior';
+                        if (isMovable) {{
+                            // Leer posición real del mesh y actualizar roomsData
                             const f = scene.getMeshByName(`floor_${{selectedIndex}}`);
                             if (f) {{
-                                roomsData[selectedIndex].x = f.position.x - roomsData[selectedIndex].width / 2;
-                                roomsData[selectedIndex].z = f.position.z - roomsData[selectedIndex].depth / 2;
+                                const rw = roomsData[selectedIndex].width;
+                                const rd = roomsData[selectedIndex].depth;
+                                roomsData[selectedIndex].x = f.position.x - rw / 2;
+                                roomsData[selectedIndex].z = f.position.z - rd / 2;
                             }}
-                            // MAGNET: reempaquetar filas adyacentes para eliminar huecos
-                            packRows();
+                            // Reconstruir solo ese elemento exterior, no redistribuir toda la casa
                             rebuildScene(roomsData);
-                            updateBudget();
-                        }});
-                    }}
-                    showToast('↔️ Arrastra: ' + roomsData[selectedIndex].name);
+                        }} else {{
+                            // Zona habitable: redistribuir layout completo
+                            const newLayout = generateLayoutJS(roomsData);
+                            rebuildScene(newLayout);
+                        }}
+                        updateBudget();
+                    }});
                 }} else {{
                     showToast('Primero selecciona una habitación');
                     setMode('select');
@@ -1012,8 +988,10 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                 }}
 
             }} else if (mode === 'wall') {{
-                document.getElementById('btn-wall').classList.add('active');
-                startWallMode();
+                const wallBtn = document.getElementById('btn-wall');
+                if (wallBtn) wallBtn.classList.add('active');
+                if (typeof startWallMode === 'function') startWallMode();
+                else showToast('⚠️ Modo tabiques no disponible en esta versión');
             }}
         }}
 
@@ -1060,14 +1038,6 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
         }}
 
         function generateLayoutJS(rooms) {{
-            // Si ya tienen coordenadas y dimensiones, devolver tal cual (no recalcular)
-            const alreadyPositioned = rooms.length > 0 && rooms.every(
-                r => typeof r.x === 'number' && typeof r.z === 'number'
-                  && typeof r.width === 'number' && r.width > 0
-                  && typeof r.depth === 'number' && r.depth > 0
-            );
-            if (alreadyPositioned) return rooms;
-
             const FILA1_D = 4.5, FILA3_D = 3.5, PASILLO_H = 1.2;
             const rs = rooms.map(r => ({{
                 ...r,
@@ -1150,29 +1120,20 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                     roomsData[i].z = item.z;
                     roomsData[i].width = item.width;
                     roomsData[i].depth = item.depth;
-                    roomsData[i].area_m2 = item.area_m2 !== undefined ? item.area_m2 : roomsData[i].area_m2;
+                    roomsData[i].area_m2 = item.area_m2;
                 }}
             }});
             // Reconstruir todos
             roomsData.forEach((_,i) => buildRoom(i));
             try {{ buildMEPLayers(roomsData); }} catch(e) {{ console.warn('MEP rebuild error:', e); }}
-            // Z-anchor: re-posicionar chimenea/paneles solares sobre el tejado actual
-            try {{ buildStyleExtras(_currentStyle); }} catch(e) {{ console.warn('StyleExtras rebuild error:', e); }}
-            // FIX #1: rebuild roof & panels only when active — prevents ghost panels on move/dimension
-            try {{
-                if (typeof roofActive !== 'undefined' && roofActive) {{
-                    if (typeof roofMesh !== 'undefined' && roofMesh) {{ roofMesh.dispose(); roofMesh = null; }}
-                    buildRoof();
-                    buildSolarPanels();
-                }}
-            }} catch(e) {{ console.warn('Roof rebuild error:', e); }}
+            // Reaplicar material de fachada elegido por el usuario (persiste entre rebuilds)
+            if (window.__AR_CURRENT_WALL_MAT && window.__AR_CURRENT_WALL_MAT !== 'default') {{
+                applyWallMaterial(window.__AR_CURRENT_WALL_MAT);
+            }}
             selectedMesh = null;
             selectedIndex = null;
             updateBudget();
-            notifyParentLayout();
-            // ELASTICIDAD: recalcular cerramiento si está activo (bounding box dinámico)
-            if (typeof fenceActive !== 'undefined' && fenceActive) buildFence();
-            showToast('✅ Planta redistribuida');
+            showToast('✅ Planta redistribuida sin colisiones');
         }}
 
         // ================================================
@@ -1183,21 +1144,6 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             document.getElementById('edit-room-name').textContent = room.name;
             document.getElementById('input-width').value = room.width.toFixed(2);
             document.getElementById('input-depth').value = room.depth.toFixed(2);
-            // FIX UI-MAT: restaurar material seleccionado del room
-            const matSel = document.getElementById('mat-select');
-            if (matSel) matSel.value = room.material_id || '';
-            // FIX SINCRO-ÁREA: mostrar área original del Paso 2 (bloqueada) vs área actual
-            const origA = room.original_area || room.area_m2 || 0;
-            const curA  = parseFloat((room.width * room.depth).toFixed(2));
-            const deltaA = parseFloat((curA - origA).toFixed(2));
-            const areaInfo = document.getElementById('area-info');
-            if (areaInfo) {{
-                areaInfo.innerHTML =
-                    `Área actual: <b>${{curA}} m²</b>` +
-                    (Math.abs(deltaA) > 0.05
-                        ? ` <span style="color:${{deltaA>0?'#F39C12':'#E74C3C'}}">(${{deltaA>0?'+':''}}${{deltaA}} vs Paso 2)</span>`
-                        : ` <span style="color:#2ECC71">✓ coincide con Paso 2</span>`);
-            }}
             document.getElementById('edit-panel').style.display = 'block';
             checkCTE(i, room.width, room.depth);
         }}
@@ -1211,143 +1157,19 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                 return;
             }}
             saveSnapshot();
-            // FIX SINCRO-ÁREA: preservar original_area del Paso 2 — nunca sobreescribir
-            // Babylon sólo actualiza width/depth/area_m2; original_area es de sólo lectura
-            if (!roomsData[selectedIndex].original_area) {{
-                roomsData[selectedIndex].original_area = roomsData[selectedIndex].area_m2 || (newW * newD);
-            }}
-            roomsData[selectedIndex].width   = newW;
-            roomsData[selectedIndex].depth   = newD;
+            // Actualizar dimensiones Y área en roomsData
+            roomsData[selectedIndex].width  = newW;
+            roomsData[selectedIndex].depth  = newD;
             roomsData[selectedIndex].area_m2 = parseFloat((newW * newD).toFixed(2));
-            // original_area permanece inalterado — Paso 2 manda
-            // Reempaquetar filas para cerrar huecos sin redistribuir toda la planta
-            packRows();
-            rebuildScene(roomsData);
-            _resetPosSliders();
+            const rZone = (roomsData[selectedIndex].zone || '').toLowerCase();
+            if (rZone === 'exterior' || rZone === 'garden') {{
+                rebuildScene(roomsData);
+            }} else {{
+                const newLayout = generateLayoutJS(roomsData);
+                rebuildScene(newLayout);
+            }}
             checkCTE(selectedIndex, newW, newD);
             updateBudget();
-            notifyParentLayout();
-            // Mantener panel abierto con valores actualizados
-            showEditPanel(selectedIndex);
-        }}
-
-        // ================================================
-        // PACK ROWS — eliminar huecos tras redimensionar/mover
-        // Agrupa habitaciones por fila Z y reempaqueta X de izq a der
-        // ================================================
-        function packRows() {{
-            const SNAP = 0.6;  // tolerancia agrupación de filas (m)
-            // Separar jardín/exterior (posición libre) del resto
-            const fixed  = roomsData.filter(r => {{
-                const z = (r.zone||'').toLowerCase();
-                return z === 'garden' || z === 'exterior';
-            }});
-            const packing = roomsData.filter(r => {{
-                const z = (r.zone||'').toLowerCase();
-                return z !== 'garden' && z !== 'exterior';
-            }});
-            if (packing.length === 0) return;
-            // Agrupar por fila: usar el z más frecuente como clave
-            const rows = {{}};
-            packing.forEach(r => {{
-                let key = null;
-                for (const k of Object.keys(rows)) {{
-                    if (Math.abs(parseFloat(k) - r.z) < SNAP) {{ key = k; break; }}
-                }}
-                if (key === null) {{ key = r.z.toFixed(2); rows[key] = []; }}
-                rows[key].push(r);
-            }});
-            // Reempaquetar cada fila de izquierda a derecha
-            for (const key of Object.keys(rows)) {{
-                const row = rows[key];
-                row.sort((a, b) => a.x - b.x);
-                const rowZ  = parseFloat(key);
-                const rowD  = Math.max(...row.map(r => r.depth));
-                let   curX  = Math.min(...row.map(r => r.x));  // anclar al leftmost
-                row.forEach(r => {{
-                    r.x = curX;
-                    r.z = rowZ;
-                    r.depth = rowD;  // unificar profundidad de fila
-                    curX += r.width;
-                }});
-            }}
-        }}
-
-        // ================================================
-        // MATERIALES PBR — aplicar textura + guardar en metadata
-        // ================================================
-        function applyMaterialPBR(meshIndex, materialId) {{
-            const matDef = MATERIALS_DB[materialId];
-            if (!matDef) return;
-            // Guardar en metadata del room
-            if (roomsData[meshIndex]) roomsData[meshIndex].material_id = materialId;
-            // Aplicar a floor mesh
-            const floor = scene.getMeshByName(`floor_${{meshIndex}}`);
-            if (!floor) return;
-            // Crear PBRMaterial si Babylon soporta
-            let pbr;
-            try {{
-                pbr = new BABYLON.PBRMaterial(`pbr_${{materialId}}_${{meshIndex}}`, scene);
-                pbr.roughness  = matDef.roughness;
-                pbr.metallic   = matDef.metallic;
-                // Albedo desde color hex como fallback (textura es opcional/async)
-                const r = parseInt(matDef.color.slice(1,3),16)/255;
-                const g = parseInt(matDef.color.slice(3,5),16)/255;
-                const b = parseInt(matDef.color.slice(5,7),16)/255;
-                pbr.albedoColor = new BABYLON.Color3(r, g, b);
-                // Intentar cargar textura (no bloquea si falla)
-                try {{
-                    const tex = new BABYLON.Texture(matDef.texUrl, scene);
-                    tex.onLoadObservable.addOnce(() => {{ pbr.albedoTexture = tex; }});
-                }} catch(e) {{}}
-                if (floor.material) floor.material.dispose();
-                floor.material = pbr;
-            }} catch(e) {{
-                // Fallback: StandardMaterial con color
-                const std = new BABYLON.StandardMaterial(`std_${{materialId}}_${{meshIndex}}`, scene);
-                const r = parseInt(matDef.color.slice(1,3),16)/255;
-                const g = parseInt(matDef.color.slice(3,5),16)/255;
-                const b = parseInt(matDef.color.slice(5,7),16)/255;
-                std.diffuseColor = new BABYLON.Color3(r, g, b);
-                if (floor.material) floor.material.dispose();
-                floor.material = std;
-            }}
-            notifyParentLayout();
-            showToast(`Material: ${{matDef.name}}`);
-        }}
-
-        function getMeshAreaM2(meshIndex) {{
-            // Área real = width * depth del roomsData
-            const r = roomsData[meshIndex];
-            if (!r) return 0;
-            return parseFloat(((r.width || 0) * (r.depth || 0)).toFixed(2));
-        }}
-
-        // ================================================
-        // NOTIFY PARENT — envía layout JSON al padre Streamlit via postMessage
-        // El padre (app.py) escucha 'archirapid_layout_update' y guarda en session_state
-        // ================================================
-        function notifyParentLayout() {{
-            try {{
-                const payload = {{
-                    type: 'archirapid_layout_update',
-                    rooms: roomsData.map(r => ({{
-                        name:          r.name,
-                        code:          r.code          || '',
-                        zone:          r.zone          || '',
-                        x:             parseFloat((r.x     || 0).toFixed(3)),
-                        z:             parseFloat((r.z     || 0).toFixed(3)),
-                        width:         parseFloat((r.width || 0).toFixed(3)),
-                        depth:         parseFloat((r.depth || 0).toFixed(3)),
-                        area_m2:       parseFloat((r.area_m2 || r.width * r.depth || 0).toFixed(2)),
-                        original_area: parseFloat((r.original_area || r.area_m2 || r.width * r.depth || 0).toFixed(2)),
-                        material_id:   r.material_id   || ''
-                    }}))
-                }};
-                window.parent.postMessage(JSON.stringify(payload), '*');
-            }} catch(e) {{
-                console.warn('notifyParentLayout error:', e);
-            }}
         }}
 
         // ================================================
@@ -1540,11 +1362,6 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
         // ================================================
         window.customWalls = [];
         let fenceActive = false;
-        // ── Posición casa en parcela (S7) ────────────────────────────────────
-        const RETRANQUEO = 3.0;       // retranqueo legal estándar (m)
-        let _houseOffsetX = 0;
-        let _houseOffsetZ = 0;
-        let _basePosData  = null;     // posiciones de habitaciones SIN offset
         let fenceMeshes = [];
 
         // ─── MEP Layer Manager ────────────────────────────────────────────────────
@@ -1814,33 +1631,6 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             }}
         }}
 
-        // ── Cerramiento elástico: bounding box computado desde posición real de objetos ──
-        function _computeSceneBBox() {{
-            // Recorre TODOS los roomsData (casa + jardín + caseta) y calcula
-            // el min/max real. Si el usuario mueve la Caseta fuera, la bbox crece.
-            if (!roomsData || roomsData.length === 0) {{
-                return {{ minX: plotX, minZ: plotZ, maxX: plotX + plotW, maxZ: plotZ + plotD }};
-            }}
-            let minX = Infinity, minZ = Infinity, maxX = -Infinity, maxZ = -Infinity;
-            roomsData.forEach(r => {{
-                const rx = (r.x != null) ? r.x : plotX;
-                const rz = (r.z != null) ? r.z : plotZ;
-                const rw = r.width  || 0;
-                const rd = r.depth  || 0;
-                minX = Math.min(minX, rx);
-                minZ = Math.min(minZ, rz);
-                maxX = Math.max(maxX, rx + rw);
-                maxZ = Math.max(maxZ, rz + rd);
-            }});
-            const ELASTIC_PAD = 1.5;  // margen elástico alrededor de todos los objetos
-            // Contener dentro del plot si la bbox cae fuera (no expandir más allá del solar)
-            minX = Math.min(minX - ELASTIC_PAD, plotX);
-            minZ = Math.min(minZ - ELASTIC_PAD, plotZ);
-            maxX = Math.max(maxX + ELASTIC_PAD, plotX + plotW);
-            maxZ = Math.max(maxZ + ELASTIC_PAD, plotZ + plotD);
-            return {{ minX, minZ, maxX, maxZ }};
-        }}
-
         function buildFence() {{
             // Limpiar previo
             fenceMeshes.forEach(m => {{ m.material && m.material.dispose(); m.dispose(); }});
@@ -1853,45 +1643,44 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
 
             const mat = new BABYLON.StandardMaterial('fenceMat', scene);
             if (style === 'muro') {{
-                mat.diffuseColor = new BABYLON.Color3(0.78, 0.76, 0.72);
+                mat.diffuseColor = new BABYLON.Color3(0.78, 0.76, 0.72);  // cemento gris
             }} else {{
-                mat.diffuseColor  = new BABYLON.Color3(0.30, 0.30, 0.30);
+                mat.diffuseColor  = new BABYLON.Color3(0.30, 0.30, 0.30);  // metal oscuro
                 mat.emissiveColor = new BABYLON.Color3(0.05, 0.05, 0.05);
                 mat.alpha = alpha;
             }}
 
-            // ELASTICIDAD: calcular bounding box desde posición real de todos los objetos
-            const bbox = _computeSceneBBox();
-            const fX = bbox.minX;
-            const fZ = bbox.minZ;
-            const fW = bbox.maxX - bbox.minX;
-            const fD = bbox.maxZ - bbox.minZ;
+            // Perímetro: 4 lados del plot
+            // Lado Sur (fachada) — con huecos para portón (4m) + puerta (1.2m)
+            const GATE_CAR  = 4.0;   // portón vehículo
+            const GATE_PED  = 1.2;   // puerta peatonal
+            const GATE_GAP  = 0.3;   // separación entre ambas
+            const gateStart = plotX + 2.0;  // offset desde esquina
 
-            const GATE_CAR  = 4.0;
-            const GATE_PED  = 1.2;
-            const GATE_GAP  = 0.3;
-            const gateStart = fX + 2.0;
+            // Sur (fachada entrada — z pequeño, frente al porche)
+            _fenceSegH('fs_left', plotX, plotZ,
+                        gateStart, FENCE_H, FENCE_T, mat);
+            _fenceSegH('fs_mid', gateStart + GATE_CAR + GATE_GAP, plotZ,
+                        gateStart + GATE_CAR + GATE_GAP + GATE_PED + GATE_GAP, FENCE_H, FENCE_T, mat);
+            _fenceSegH('fs_right', gateStart + GATE_CAR + GATE_GAP + GATE_PED + GATE_GAP, plotZ,
+                        plotX + plotW, FENCE_H, FENCE_T, mat);
 
-            // Sur — con portón y puerta peatonal
-            _fenceSegH('fs_left', fX, fZ, gateStart, FENCE_H, FENCE_T, mat);
-            _fenceSegH('fs_mid',  gateStart + GATE_CAR + GATE_GAP, fZ,
-                       gateStart + GATE_CAR + GATE_GAP + GATE_PED + GATE_GAP, FENCE_H, FENCE_T, mat);
-            _fenceSegH('fs_right', gateStart + GATE_CAR + GATE_GAP + GATE_PED + GATE_GAP, fZ,
-                       fX + fW, FENCE_H, FENCE_T, mat);
+            // Norte (fachada trasera — z grande)
+            const backGateX = plotX + plotW/2 - GATE_PED/2;
+            _fenceSegH('fn_left',  plotX, plotZ + plotD, backGateX, FENCE_H, FENCE_T, mat);
+            _fenceSegH('fn_right', backGateX + GATE_PED, plotZ + plotD,
+                        plotX + plotW, FENCE_H, FENCE_T, mat);
 
-            // Norte
-            const backGateX = fX + fW / 2 - GATE_PED / 2;
-            _fenceSegH('fn_left',  fX, fZ + fD, backGateX, FENCE_H, FENCE_T, mat);
-            _fenceSegH('fn_right', backGateX + GATE_PED, fZ + fD, fX + fW, FENCE_H, FENCE_T, mat);
+            // Oeste completo
+            _fenceSegV('fw', plotX, plotZ, plotZ + plotD, FENCE_H, FENCE_T, mat);
 
-            // Oeste + Este
-            _fenceSegV('fw', fX,       fZ, fZ + fD, FENCE_H, FENCE_T, mat);
-            _fenceSegV('fe', fX + fW,  fZ, fZ + fD, FENCE_H, FENCE_T, mat);
+            // Este completo
+            _fenceSegV('fe', plotX + plotW, plotZ, plotZ + plotD, FENCE_H, FENCE_T, mat);
 
-            // Puertas
-            _fenceGate('gate_car',  gateStart, fZ, GATE_CAR, FENCE_H);
-            _fenceGate('gate_ped',  gateStart + GATE_CAR + GATE_GAP, fZ, GATE_PED, FENCE_H);
-            _fenceGate('gate_back', backGateX, fZ + fD, GATE_PED, FENCE_H);
+            // Marcadores de puertas
+            _fenceGate('gate_car', gateStart, plotZ, GATE_CAR, FENCE_H);
+            _fenceGate('gate_ped', gateStart + GATE_CAR + GATE_GAP, plotZ, GATE_PED, FENCE_H);
+            _fenceGate('gate_back', backGateX, plotZ + plotD, GATE_PED, FENCE_H);
         }}
 
         function _fenceSegH(id, x1, z, x2, h, t, mat) {{
@@ -1990,57 +1779,13 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
         // ================================================
         // DELETE — borrar elemento seleccionado
         // ================================================
-        // Primer clic activa modo confirmación; segundo clic dentro de 3s confirma.
-        let _deleteConfirmPending = false;
-        let _deleteConfirmTimer  = null;
-
         function deleteSelected() {{
-            // ── Habitación seleccionada ───────────────────────────────────────
             if (selectedIndex !== null) {{
-                // Contar solo habitaciones interiores (no garden/exterior)
-                const interiorCount = roomsData.filter(r => {{
-                    const z = (r.zone||'').toLowerCase();
-                    return z !== 'garden' && z !== 'exterior';
-                }}).length;
-                if (interiorCount <= 2) {{
-                    showToast('⚠️ Mínimo 2 habitaciones — no se puede borrar más');
-                    return;
-                }}
-                // Doble-clic de confirmación
-                if (!_deleteConfirmPending) {{
-                    _deleteConfirmPending = true;
-                    const rName = roomsData[selectedIndex].name;
-                    showToast(`🗑️ ¿Borrar "${{rName}}"? Pulsa de nuevo para confirmar`);
-                    document.getElementById('btn-delete').style.background = 'rgba(231,76,60,0.6)';
-                    clearTimeout(_deleteConfirmTimer);
-                    _deleteConfirmTimer = setTimeout(() => {{
-                        _deleteConfirmPending = false;
-                        document.getElementById('btn-delete').style.background = 'rgba(231,76,60,0.25)';
-                        showToast('❌ Borrado cancelado');
-                    }}, 3000);
-                    return;
-                }}
-                // Segunda pulsación — confirmar borrado
-                clearTimeout(_deleteConfirmTimer);
-                _deleteConfirmPending = false;
-                document.getElementById('btn-delete').style.background = 'rgba(231,76,60,0.25)';
-                saveSnapshot();
-                const deletedName = roomsData[selectedIndex].name;
-                roomsData.splice(selectedIndex, 1);
-                selectedMesh = null;
-                selectedIndex = null;
-                hlLayer.removeAllMeshes();
-                document.getElementById('room-info').innerHTML =
-                    '<p style="color:#888;">Selecciona una habitación</p>';
-                document.getElementById('edit-panel').style.display = 'none';
-                // Redistribuir layout completo
-                const newLayout = generateLayoutJS(roomsData);
-                rebuildScene(newLayout);
-                _resetPosSliders();   // resetear offsets tras borrado
-                showToast(`🗑️ "${{deletedName}}" eliminada — planta redistribuida`);
+                // Es una habitación — no se puede borrar (solo elementos externos)
+                showToast('⚠️ Las habitaciones no se borran aquí. Usa el Paso 2.');
                 return;
             }}
-            // ── Cerramiento seleccionado ──────────────────────────────────────
+            // Buscar cerramiento seleccionado
             if (selectedMesh && selectedMesh.name.startsWith('cwall_')) {{
                 saveSnapshot();
                 const idx = window.customWalls.findIndex(cw => cw.id === selectedMesh.name);
@@ -2054,60 +1799,13 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                 showToast('🗑️ Cerramiento eliminado');
                 return;
             }}
-            showToast('⚠️ Selecciona una habitación o cerramiento para borrar');
+            showToast('⚠️ Selecciona primero un cerramiento para borrar');
         }}
 
         // Tecla Supr/Delete para borrar rápido
         window.addEventListener('keydown', (e) => {{
             if (e.key === 'Delete' || e.key === 'Backspace') deleteSelected();
         }});
-
-        // ================================================
-        // POSICIÓN DE LA CASA EN LA PARCELA (S7)
-        // ================================================
-        function _resetPosSliders() {{
-            _basePosData = null;
-            _houseOffsetX = 0;
-            _houseOffsetZ = 0;
-            const slX = document.getElementById('slider-offset-x');
-            const slZ = document.getElementById('slider-offset-z');
-            if (slX) {{ slX.value = 0; }}
-            if (slZ) {{ slZ.value = 0; }}
-            const vX = document.getElementById('offset-x-val');
-            const vZ = document.getElementById('offset-z-val');
-            if (vX) vX.textContent = '0m';
-            if (vZ) vZ.textContent = '0m';
-        }}
-
-        function onPlotOffsetChange() {{
-            const ox = parseFloat(document.getElementById('slider-offset-x').value) || 0;
-            const oz = parseFloat(document.getElementById('slider-offset-z').value) || 0;
-            document.getElementById('offset-x-val').textContent = ox.toFixed(1) + 'm';
-            document.getElementById('offset-z-val').textContent = oz.toFixed(1) + 'm';
-            _houseOffsetX = ox;
-            _houseOffsetZ = oz;
-
-            // Verificar retranqueo en los cuatro lados
-            const leftOK  = (ox - plotX) >= RETRANQUEO - 0.05;
-            const rightOK = (plotX + plotW - (ox + totalWidth)) >= RETRANQUEO - 0.05;
-            const frontOK = (oz - plotZ) >= RETRANQUEO - 0.05;
-            const backOK  = (plotZ + plotD - (oz + totalDepth)) >= RETRANQUEO - 0.05;
-            const allOK   = leftOK && rightOK && frontOK && backOK;
-            document.getElementById('retranqueo-ok').style.display   = allOK ? 'block' : 'none';
-            document.getElementById('retranqueo-warn').style.display  = allOK ? 'none'  : 'block';
-
-            // Guardar posiciones base la primera vez (antes de aplicar ningún offset)
-            if (!_basePosData || _basePosData.length !== roomsData.length) {{
-                _basePosData = roomsData.map(r => ({{ x: r.x, z: r.z }}));
-            }}
-
-            // Desplazar todas las habitaciones
-            roomsData.forEach((r, i) => {{
-                r.x = _basePosData[i].x + ox;
-                r.z = _basePosData[i].z + oz;
-            }});
-            rebuildScene(roomsData);
-        }}
 
         // ================================================
         function showToast(msg) {{
@@ -2255,9 +1953,8 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
         function buildStyleExtras(overrideStyle) {{
             clearStyleExtras();
             const conf = STYLE_3D_CONFIG[overrideStyle || houseStyle] || STYLE_3D_CONFIG['Moderno'];
-            // Centro real de la casa — desplazado si el usuario ha movido la vivienda en parcela
-            const hX = totalWidth / 2 + _houseOffsetX;
-            const hZ = totalDepth / 2 + _houseOffsetZ;
+            const hX = totalWidth / 2;
+            const hZ = totalDepth / 2;
             const wallH = 2.7;
 
             // --- CHIMENEA — centrada sobre la casa, visible desde cámara NE ---
@@ -2749,7 +2446,6 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
         }};
 
         function applyStyle(styleName) {{
-            _currentStyle = styleName;   // anclar: rebuildScene lo usará
             const c = STYLE_COLORS[styleName] || [0.92, 0.92, 0.90];
             const newColor = new BABYLON.Color3(c[0], c[1], c[2]);
             // Recorrer todos los materiales de pared existentes en la escena
@@ -2785,6 +2481,54 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             applyStyle(styleName);
         }}
 
+        // ================================================
+        // MATERIALES DE FACHADA — aplica color a todas las paredes
+        // ================================================
+        function applyWallMaterial(matKey) {{
+            window.__AR_CURRENT_WALL_MAT = matKey || 'default';
+            const def = WALL_MATERIALS[matKey] || WALL_MATERIALS['default'];
+            const priceEl = document.getElementById('mat-price');
+
+            if (!def || !def.color) {{
+                // 'default': restaurar colores del estilo activo
+                const c = STYLE_COLORS[houseStyle] || [0.92, 0.92, 0.90];
+                const baseColor = new BABYLON.Color3(c[0], c[1], c[2]);
+                roomsData.forEach((room, i) => {{
+                    const zone = (room.zone || '').toLowerCase();
+                    if (zone === 'garden' || zone === 'exterior') return;
+                    const wMat = scene.getMaterialByName(`wMat_${{i}}`);
+                    if (wMat) wMat.diffuseColor = baseColor;
+                    const fwMat = scene.getMaterialByName(`fwMat_${{i}}`);
+                    if (fwMat) fwMat.diffuseColor = baseColor; // alpha preserved by fwMat
+                }});
+                if (priceEl) priceEl.style.display = 'none';
+                showToast('🏠 Material restaurado al estilo ' + houseStyle);
+                return;
+            }}
+
+            const newColor = new BABYLON.Color3(def.color[0], def.color[1], def.color[2]);
+            roomsData.forEach((room, i) => {{
+                const zone = (room.zone || '').toLowerCase();
+                if (zone === 'garden' || zone === 'exterior') return;
+                const wMat = scene.getMaterialByName(`wMat_${{i}}`);
+                if (wMat) wMat.diffuseColor = newColor;
+                const fwMat = scene.getMaterialByName(`fwMat_${{i}}`);
+                if (fwMat) fwMat.diffuseColor = newColor; // alpha (0.28) is preserved on fwMat
+            }});
+
+            if (priceEl) {{
+                priceEl.style.display = 'block';
+                priceEl.textContent = def.price > 0
+                    ? `€${{def.price}}/m² fachada`
+                    : 'Coste incluido en estructura';
+            }}
+            showToast(`🎨 ${{def.label}} aplicado a fachadas`);
+        }}
+
+        function onMatSelectChange(val) {{
+            applyWallMaterial(val);
+        }}
+
         function toggleStylePanel() {{
             const panel = document.getElementById('style-panel');
             const isVisible = panel.style.display !== 'none';
@@ -2804,13 +2548,11 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             foundMeshes.forEach(m => {{ m.material && m.material.dispose(); m.dispose(); }});
             foundMeshes = [];
 
-            // FIX #3: detección robusta de pilotes (variantes en español)
+            // Detectar tipo
             const ft = foundationType.toLowerCase();
             let type = 'losa';
             if (ft.includes('zapata')) type = 'zapatas';
-            else if (ft.includes('pilote') || ft.includes('micropilote') ||
-                     ft.startsWith('pil') || ft.includes('pilotaje')) type = 'pilotes';
-            else if (ft.includes('losa') || ft.includes('placa')) type = 'losa';
+            else if (ft.includes('pilote')) type = 'pilotes';
 
             // Material hormigón
             const mat = new BABYLON.StandardMaterial('foundMat', scene);
@@ -2909,10 +2651,23 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             }}
         }}                                                                                                                              
         // ================================================
-        // RENDER LOOP
+        // RENDER LOOP — guard contra múltiples loops + bridge debug
         // ================================================
-        engine.runRenderLoop(() => scene.render());
-        window.addEventListener('resize', () => engine.resize());
+        window.__AR_ENGINE__ = engine;
+        window.__AR_SCENE__  = scene;
+        try {{ window.top.__AR_ENGINE__ = engine; window.top.__AR_SCENE__ = scene; }} catch(e) {{}}
+
+        if (!window.__AR_LOOP_STARTED__) {{
+            window.__AR_LOOP_STARTED__ = true;
+            engine.runRenderLoop(() => {{
+                try {{
+                    if (scene && scene.activeCamera) scene.render();
+                }} catch (e) {{
+                    console.warn('[AR] render error', e);
+                }}
+            }});
+        }}
+        window.addEventListener('resize', () => {{ try {{ engine.resize(); }} catch(e) {{}} }});
 
         // ================================================
         // BRÚJULA — N siempre arriba, fija
@@ -2962,43 +2717,10 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
         // ================================================
         // INICIALIZACIÓN — construir escena al cargar
         // ================================================
-        // FIX #2: use Python-computed coordinates when available; only generate from scratch if missing
-        const hasLayout = roomsData.length > 0 && typeof roomsData[0].x !== 'undefined'
-                          && typeof roomsData[0].width !== 'undefined';
-        const initialLayout = hasLayout ? roomsData : generateLayoutJS(roomsData);
+        const initialLayout = generateLayoutJS(roomsData);
         rebuildScene(initialLayout);
         // Aplicar automáticamente el estilo elegido en el Paso 1
         applyStyleUI(houseStyle);
-
-        // FIX #5: slider range calculado desde bounding box real de la casa
-        (function initPlotSliders() {{
-            const houseRoomsS = roomsData.filter(r => (r.zone||'').toLowerCase() !== 'garden');
-            const hMinX = houseRoomsS.length ? Math.min(...houseRoomsS.map(r => r.x)) : 0;
-            const hMaxX = houseRoomsS.length ? Math.max(...houseRoomsS.map(r => r.x + r.width)) : totalWidth;
-            const hMinZ = houseRoomsS.length ? Math.min(...houseRoomsS.map(r => r.z)) : 0;
-            const hMaxZ = houseRoomsS.length ? Math.max(...houseRoomsS.map(r => r.z + r.depth)) : totalDepth;
-            const hW = hMaxX - hMinX;
-            const hD = hMaxZ - hMinZ;
-            // Espacio disponible = plot - huella casa - 2*retranqueo (ambos lados)
-            const availX = Math.max(0, plotW - hW - 2 * RETRANQUEO);
-            const availZ = Math.max(0, plotD - hD - 2 * RETRANQUEO);
-            const slX = document.getElementById('slider-offset-x');
-            const slZ = document.getElementById('slider-offset-z');
-            if (slX) {{
-                slX.min   = '0';
-                slX.max   = availX.toFixed(1);
-                slX.value = '0';
-                slX.disabled = availX <= 0;
-            }}
-            if (slZ) {{
-                slZ.min   = '0';
-                slZ.max   = availZ.toFixed(1);
-                slZ.value = '0';
-                slZ.disabled = availZ <= 0;
-            }}
-            // Guardar posiciones base al inicio
-            _basePosData = roomsData.map(r => ({{ x: r.x, z: r.z }}));
-        }})();
 
         setMode('select');
         console.log('ArchiRapid Editor 3D v3.0 —', roomsData.length, 'habitaciones cargadas');
