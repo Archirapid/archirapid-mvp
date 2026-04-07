@@ -75,7 +75,37 @@ def render_admin_actions(item_id: str, table_name: str, section_slug: str, item_
                         st.error(f"Error: {e}")
 
 
-def _update_plot_status(pid: str, new_status: str) -> bool:
+def _update_project_status(pid: str, new_status: str) -> bool:
+    """
+    Actualiza el estado de un proyecto con lógica blindada de is_active.
+
+    Estados activos (is_active=1): activo, reservado
+    Estados inactivos (is_active=0): vendido, no_disponible, suspendido
+    """
+    is_active_map = {
+        'activo': 1,
+        'reservado': 1,
+        'vendido': 0,
+        'no_disponible': 0,
+        'suspendido': 0,
+    }
+    is_active = is_active_map.get(new_status, 1)
+
+    try:
+        _conn = db_conn()
+        _conn.execute(
+            "UPDATE projects SET status=?, is_active=? WHERE id=?",
+            (new_status, is_active, pid)
+        )
+        _conn.commit()
+        _conn.close()
+        return True
+    except Exception as e:
+        st.error(f"Error actualizando proyecto: {e}")
+        return False
+
+
+
     """
     Actualiza el estado de un plot con lógica blindada de is_active.
 
@@ -474,54 +504,62 @@ def main():
                             st.markdown("**⚙️ Cambiar estado**")
                             _pb1, _pb2 = st.columns(2)
                             with _pb1:
+                                # ACTIVO
                                 _is_primary = _pstatus == 'activo'
-                                if st.button("✅ Activo", key=f"proj_act_{proj['id']}",
+                                if st.button("✅ Activo", key=f"pj_btn_activo_{proj['id']}",
                                              use_container_width=True, type="primary" if _is_primary else "secondary"):
-                                    _cup = db_conn()
-                                    _cup.execute(
-                                        "UPDATE projects SET status='activo', is_active=1 WHERE id=?",
-                                        (proj["id"],)
-                                    )
-                                    _cup.commit(); _cup.close()
-                                    st.success("Activo ✅"); st.rerun()
+                                    if _update_project_status(proj['id'], 'activo'):
+                                        st.success("✅ Proyecto activo")
+                                        st.rerun()
+
+                                # RESERVADO
                                 _is_primary = _pstatus == 'reservado'
-                                if st.button("🟡 Reservado", key=f"proj_res_{proj['id']}",
+                                if st.button("🟡 Reservado", key=f"pj_btn_reservado_{proj['id']}",
                                              use_container_width=True, type="primary" if _is_primary else "secondary"):
-                                    _cup = db_conn()
-                                    _cup.execute("UPDATE projects SET status='reservado', is_active=1 WHERE id=?", (proj["id"],))
-                                    _cup.commit(); _cup.close()
-                                    st.info("Reservado"); st.rerun()
+                                    if _update_project_status(proj['id'], 'reservado'):
+                                        st.info("🟡 Proyecto reservado")
+                                        st.rerun()
+
+                                # VENDIDO
                                 _is_primary = _pstatus in ('vendido', 'vendida')
-                                if st.button("🔵 Vendido", key=f"proj_sold_{proj['id']}",
+                                if st.button("🔵 Vendido", key=f"pj_btn_vendido_{proj['id']}",
                                              use_container_width=True, type="primary" if _is_primary else "secondary"):
-                                    _cup = db_conn()
-                                    _cup.execute("UPDATE projects SET status='vendido', is_active=0 WHERE id=?", (proj["id"],))
-                                    _cup.commit(); _cup.close()
-                                    st.info("Vendido"); st.rerun()
+                                    if _update_project_status(proj['id'], 'vendido'):
+                                        st.info("🔵 Marcado como vendido")
+                                        st.rerun()
+
                             with _pb2:
+                                # NO DISPONIBLE
                                 _is_primary = _pstatus == 'no_disponible'
-                                if st.button("⚫ No disponible", key=f"proj_nd_{proj['id']}",
+                                if st.button("⚫ No disponible", key=f"pj_btn_no_disponible_{proj['id']}",
                                              use_container_width=True, type="primary" if _is_primary else "secondary"):
-                                    _cup = db_conn()
-                                    _cup.execute("UPDATE projects SET status='no_disponible', is_active=0 WHERE id=?", (proj["id"],))
-                                    _cup.commit(); _cup.close()
-                                    st.warning("No disponible"); st.rerun()
+                                    if _update_project_status(proj['id'], 'no_disponible'):
+                                        st.warning("⚫ No disponible")
+                                        st.rerun()
+
+                                # SUSPENDER
                                 _is_primary = _pstatus == 'suspendido'
-                                if st.button("🔴 Suspender", key=f"proj_sus_{proj['id']}",
+                                if st.button("🔴 Suspender", key=f"pj_btn_suspendido_{proj['id']}",
                                              use_container_width=True, type="primary" if _is_primary else "secondary"):
-                                    _cup = db_conn()
-                                    _cup.execute("UPDATE projects SET status='suspendido', is_active=0 WHERE id=?", (proj["id"],))
-                                    _cup.commit(); _cup.close()
-                                    st.warning("Suspendido"); st.rerun()
+                                    if _update_project_status(proj['id'], 'suspendido'):
+                                        st.warning("🔴 Proyecto suspendido")
+                                        st.rerun()
+
+                                # ELIMINAR (POPOVER)
                                 with st.popover("🗑️ Eliminar", use_container_width=True):
                                     st.error(f"⚠️ ¿Eliminar '{proj['title']}'?")
                                     st.caption("Irreversible. Se eliminará de la base de datos.")
-                                    if st.button("❌ Sí, eliminar", key=f"proj_del_yes_{proj['id']}",
+                                    if st.button("❌ Sí, eliminar", key=f"pj_btn_delete_{proj['id']}",
                                                  type="primary", use_container_width=True):
-                                        _cup = db_conn()
-                                        _cup.execute("DELETE FROM projects WHERE id=?", (proj["id"],))
-                                        _cup.commit(); _cup.close()
-                                        st.success("Eliminado"); st.rerun()
+                                        try:
+                                            _cup = db_conn()
+                                            _cup.execute("DELETE FROM projects WHERE id=?", (proj["id"],))
+                                            _cup.commit()
+                                            _cup.close()
+                                            st.success("✅ Proyecto eliminado")
+                                            st.rerun()
+                                        except Exception as e:
+                                            st.error(f"Error al eliminar: {e}")
             else:
                 st.info("No hay proyectos publicados aún.")
         except Exception as e:
