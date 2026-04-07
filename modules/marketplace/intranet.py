@@ -99,6 +99,7 @@ def _update_project_status(pid: str, new_status: str) -> bool:
         )
         _conn.commit()
         _conn.close()
+        st.cache_data.clear()
         return True
     except Exception as e:
         st.error(f"Error actualizando proyecto: {e}")
@@ -177,43 +178,43 @@ def main():
         return
 
     # PANEL DE GESTIÓN INTERNA
-    # ── Inyectar CSS válido para colorear botones por tipo ────────────────────────
+    # ── Inyectar CSS + JS para colorear botones por acción ────────────────────────
     st.markdown("""
     <style>
-    /* Selector de botones primary (Aprobar, Autorizar, Activar) - VERDE */
-    .stButton > button[kind="primary"] {
-        background-color: #28a745 !important;
-        color: white !important;
-        border-color: #28a745 !important;
-    }
-
     /* Botones normales - mantener color por defecto */
     .stButton > button[kind="secondary"] {
         border-color: #475569 !important;
     }
 
-    /* Usar clases CSS dinámicas para otros estados */
-    .btn-warning {
-        background-color: #ffc107 !important;
-        color: #000 !important;
-        border-color: #ffc107 !important;
-    }
-
-    .btn-danger {
-        background-color: #dc3545 !important;
+    /* Botones primary - color base (se sobrescribe con JS) */
+    .stButton > button[kind="primary"] {
         color: white !important;
-        border-color: #dc3545 !important;
     }
 
-    .btn-info {
+    /* Clases para diferentes acciones */
+    .btn-activo[kind="primary"] {
+        background-color: #28a745 !important;
+        border-color: #28a745 !important;
+    }
+
+    .btn-vendido[kind="primary"] {
         background-color: #007bff !important;
-        color: white !important;
         border-color: #007bff !important;
     }
 
-    .btn-dark {
+    .btn-suspender[kind="primary"] {
+        background-color: #dc3545 !important;
+        border-color: #dc3545 !important;
+    }
+
+    .btn-reservado[kind="primary"] {
+        background-color: #ffc107 !important;
+        border-color: #ffc107 !important;
+        color: #000 !important;
+    }
+
+    .btn-no-disponible[kind="primary"] {
         background-color: #343a40 !important;
-        color: white !important;
         border-color: #343a40 !important;
     }
 
@@ -222,6 +223,48 @@ def main():
         z-index: 100;
     }
     </style>
+
+    <script>
+    // Colorear botones de proyectos basados en su contenido
+    document.addEventListener('DOMContentLoaded', function() {
+        const buttons = document.querySelectorAll('.stButton > button[kind="primary"]');
+        buttons.forEach(btn => {
+            const text = btn.innerText || btn.textContent;
+            if (text.includes('Activo')) {
+                btn.classList.add('btn-activo');
+            } else if (text.includes('Vendido')) {
+                btn.classList.add('btn-vendido');
+            } else if (text.includes('Suspender')) {
+                btn.classList.add('btn-suspender');
+            } else if (text.includes('Reservado')) {
+                btn.classList.add('btn-reservado');
+            } else if (text.includes('No disponible')) {
+                btn.classList.add('btn-no-disponible');
+            }
+        });
+    });
+
+    // Reintentar coloreo después de rerun (Streamlit agrega elementos dinámicamente)
+    const observer = new MutationObserver(function() {
+        const buttons = document.querySelectorAll('.stButton > button[kind="primary"]:not([data-colored="true"])');
+        buttons.forEach(btn => {
+            const text = btn.innerText || btn.textContent;
+            if (text.includes('Activo')) {
+                btn.classList.add('btn-activo');
+            } else if (text.includes('Vendido')) {
+                btn.classList.add('btn-vendido');
+            } else if (text.includes('Suspender')) {
+                btn.classList.add('btn-suspender');
+            } else if (text.includes('Reservado')) {
+                btn.classList.add('btn-reservado');
+            } else if (text.includes('No disponible')) {
+                btn.classList.add('btn-no-disponible');
+            }
+            btn.setAttribute('data-colored', 'true');
+        });
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+    </script>
     """, unsafe_allow_html=True)
 
     # Badge en Analytics: cuenta leads MLS nuevos para alertar al admin
@@ -463,7 +506,7 @@ def main():
                     "no_disponible": "⚫", "suspendido": "🔴", "eliminado": "🗑️",
                 }
                 for proj in projects:
-                    _pstatus = proj.get("status") or ("activo" if proj.get("is_active", 1) else "suspendido")
+                    _pstatus = proj.get("status") or "activo"
                     _picon = _PROJ_STATUS_ICONS.get(_pstatus, "⚪")
                     with st.expander(
                         f"{_picon} {proj['title']} — {proj['architect_name']} | €{proj.get('price',0):,.0f} | {_pstatus}"
