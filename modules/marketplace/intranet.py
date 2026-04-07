@@ -1197,7 +1197,7 @@ def main():
 
             # Actualizar profesionales existentes a active=0 si no tienen status (registros viejos)
             try:
-                _conn5.execute("UPDATE service_providers SET active=0 WHERE status IS NULL")
+                _conn5.execute("UPDATE service_providers SET status='pendiente' WHERE status IS NULL")
                 _conn5.commit()
             except Exception:
                 pass
@@ -1296,7 +1296,7 @@ def main():
                             # ── Aprobar / Bloquear ──
                             _bc1, _bc2, _bc3 = st.columns(3)
                             with _bc1:
-                                if _active5:
+                                if _status5 == 'activo':
                                     if st.button("🚫 Bloquear", key=f"btn_prof_block_{_pid5}",
                                                  use_container_width=True,
                                                  help="Bloquear acceso — el profesional no podrá entrar a su panel"):
