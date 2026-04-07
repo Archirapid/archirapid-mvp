@@ -24,9 +24,20 @@ def _ensure_table():
                 plan TEXT DEFAULT 'normal',
                 paid_until TEXT,
                 active INTEGER DEFAULT 0,
+                status TEXT DEFAULT 'pendiente',
+                is_active INTEGER DEFAULT 0,
                 created_at TEXT DEFAULT (datetime('now'))
             )
         """)
+        # Migraciones seguras para nuevas columnas
+        try:
+            conn.execute("ALTER TABLE prefab_companies ADD COLUMN status TEXT DEFAULT 'pendiente'")
+        except Exception:
+            pass
+        try:
+            conn.execute("ALTER TABLE prefab_companies ADD COLUMN is_active INTEGER DEFAULT 0")
+        except Exception:
+            pass
         conn.commit()
     finally:
         conn.close()
@@ -117,6 +128,42 @@ def render_admin_prefabricadas():
                     st.success("Plan actualizado ✅"); st.rerun()
 
                 st.markdown("---")
+                st.markdown("**Gestión de estado**")
+                _sb1, _sb2, _sb3, _sb4 = st.columns(4)
+
+                with _sb1:
+                    if st.button("⏳ En trámite", key=f"pref_pending_{comp['id']}", use_container_width=True):
+                        _sp = db_conn()
+                        _sp.execute("UPDATE prefab_companies SET status=?, is_active=0 WHERE id=?", ("pendiente", comp["id"]))
+                        _sp.commit(); _sp.close()
+                        st.info("En trámite")
+                        st.rerun()
+
+                with _sb2:
+                    if st.button("✅ Autorizar", key=f"pref_authorized_{comp['id']}", type="primary", use_container_width=True):
+                        _sa = db_conn()
+                        _sa.execute("UPDATE prefab_companies SET status=?, is_active=1, active=1 WHERE id=?", ("autorizado", comp["id"]))
+                        _sa.commit(); _sa.close()
+                        st.success("Autorizada ✅")
+                        st.rerun()
+
+                with _sb3:
+                    if st.button("🔴 Suspender", key=f"pref_suspended_{comp['id']}", use_container_width=True):
+                        _ssp = db_conn()
+                        _ssp.execute("UPDATE prefab_companies SET status=?, is_active=0 WHERE id=?", ("suspendido", comp["id"]))
+                        _ssp.commit(); _ssp.close()
+                        st.warning("Suspendida")
+                        st.rerun()
+
+                with _sb4:
+                    if st.button("❌ Anular", key=f"pref_cancelled_{comp['id']}", use_container_width=True):
+                        _sc = db_conn()
+                        _sc.execute("UPDATE prefab_companies SET status=?, is_active=0 WHERE id=?", ("anulado", comp["id"]))
+                        _sc.commit(); _sc.close()
+                        st.error("Anulada")
+                        st.rerun()
+
+                st.markdown("---")
                 _ab1, _ab2 = st.columns(2)
                 with _ab1:
                     if comp["active"]:
@@ -182,9 +229,9 @@ def _render_add_form():
                 try:
                     _ac.execute(
                         """INSERT INTO prefab_companies
-                           (id, nombre, cif, email, telefono, plan, paid_until, active)
-                           VALUES (?,?,?,?,?,?,?,?)""",
-                        (_nid, _fn, _fcif or None, _fe, _ft or None, _fp, _fu or None, int(_fa))
+                           (id, nombre, cif, email, telefono, plan, paid_until, active, status, is_active)
+                           VALUES (?,?,?,?,?,?,?,?,?,?)""",
+                        (_nid, _fn, _fcif or None, _fe, _ft or None, _fp, _fu or None, int(_fa), "pendiente", int(_fa))
                     )
                     _ac.commit()
                     st.success(f"✅ Empresa '{_fn}' añadida.")
