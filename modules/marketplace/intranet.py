@@ -545,9 +545,10 @@ def main():
 
                         with _pj2:
                             st.markdown("**⚙️ Cambiar estado**")
-                            _pb1, _pb2 = st.columns(2)
+                            _pb1, _pb2, _pb3 = st.columns(3)
+
+                            # ACTIVO
                             with _pb1:
-                                # ACTIVO
                                 _is_primary = _pstatus == 'activo'
                                 if st.button("✅ Activo", key=f"pj_btn_activo_{proj['id']}",
                                              use_container_width=True, type="primary" if _is_primary else "secondary"):
@@ -555,7 +556,8 @@ def main():
                                         st.success("✅ Proyecto activo")
                                         st.rerun()
 
-                                # RESERVADO
+                            # RESERVADO
+                            with _pb2:
                                 _is_primary = _pstatus == 'reservado'
                                 if st.button("🟡 Reservado", key=f"pj_btn_reservado_{proj['id']}",
                                              use_container_width=True, type="primary" if _is_primary else "secondary"):
@@ -563,7 +565,8 @@ def main():
                                         st.info("🟡 Proyecto reservado")
                                         st.rerun()
 
-                                # VENDIDO
+                            # VENDIDO
+                            with _pb3:
                                 _is_primary = _pstatus in ('vendido', 'vendida')
                                 if st.button("🔵 Vendido", key=f"pj_btn_vendido_{proj['id']}",
                                              use_container_width=True, type="primary" if _is_primary else "secondary"):
@@ -571,8 +574,10 @@ def main():
                                         st.info("🔵 Marcado como vendido")
                                         st.rerun()
 
-                            with _pb2:
-                                # NO DISPONIBLE
+                            _pb4, _pb5, _pb6 = st.columns(3)
+
+                            # NO DISPONIBLE
+                            with _pb4:
                                 _is_primary = _pstatus == 'no_disponible'
                                 if st.button("⚫ No disponible", key=f"pj_btn_no_disponible_{proj['id']}",
                                              use_container_width=True, type="primary" if _is_primary else "secondary"):
@@ -580,7 +585,8 @@ def main():
                                         st.warning("⚫ No disponible")
                                         st.rerun()
 
-                                # SUSPENDER
+                            # SUSPENDER
+                            with _pb5:
                                 _is_primary = _pstatus == 'suspendido'
                                 if st.button("🔴 Suspender", key=f"pj_btn_suspendido_{proj['id']}",
                                              use_container_width=True, type="primary" if _is_primary else "secondary"):
@@ -588,7 +594,8 @@ def main():
                                         st.warning("🔴 Proyecto suspendido")
                                         st.rerun()
 
-                                # ELIMINAR (POPOVER)
+                            # ELIMINAR (POPOVER)
+                            with _pb6:
                                 with st.popover("🗑️ Eliminar", use_container_width=True):
                                     st.error(f"⚠️ ¿Eliminar '{proj['title']}'?")
                                     st.caption("Irreversible. Se eliminará de la base de datos.")
