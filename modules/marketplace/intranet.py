@@ -2515,6 +2515,31 @@ Obtén el token creando un bot con @BotFather en Telegram.
         # ══ SECCIÓN B: Inmobiliarias activas ═════════════════════════════════
         st.subheader("✅ B. Inmobiliarias activas")
         try:
+            # Agregar columnas si no existen
+            for _col, _def in [("status","TEXT DEFAULT 'activo'"),
+                                ("is_active","INTEGER DEFAULT 1")]:
+                try:
+                    _mls_altb = db_conn()
+                    _mls_altb.execute(f"ALTER TABLE inmobiliarias ADD COLUMN {_col} {_def}")
+                    _mls_altb.commit()
+                    _mls_altb.close()
+                except Exception:
+                    try:
+                        _mls_altb.close()
+                    except Exception:
+                        pass
+
+            # RESET: status a 'aprobada' solo UNA VEZ
+            if not st.session_state.get("_reset_inmos_done", False):
+                try:
+                    _mls_reset = db_conn()
+                    _mls_reset.execute("UPDATE inmobiliarias SET status='aprobada' WHERE status IS NULL OR status = ''")
+                    _mls_reset.commit()
+                    _mls_reset.close()
+                    st.session_state["_reset_inmos_done"] = True
+                except Exception:
+                    pass
+
             _activas = _mls.get_inmos_activas()
             if not _activas:
                 st.info("No hay inmobiliarias activas todavía.")
@@ -2537,6 +2562,17 @@ Obtén el token creando un bot con @BotFather en Telegram.
                     except Exception:
                         pass
 
+                    # GET status actual
+                    _imo_status = None
+                    try:
+                        _fcs = db_conn()
+                        _imo_status = _fcs.execute("SELECT status FROM inmobiliarias WHERE id=?", (_a["id"],)).fetchone()
+                        if _imo_status:
+                            _imo_status = _imo_status[0]
+                        _fcs.close()
+                    except Exception:
+                        _imo_status = "aprobada"
+
                     with st.expander(
                         f"🏢 {_anombre} — Plan {_plan_a} | Firma: {_firma_a} | "
                         f"Fincas: {_n_fincas_a} | {_a.get('email','')}"
@@ -2555,6 +2591,7 @@ Obtén el token creando un bot con @BotFather en Telegram.
 | Firma acuerdo | {_firma_a} |
 | Fecha firma | {((_a.get('firma_timestamp') or ''))[:10] or '—'} |
 | Fincas activas | {_n_fincas_a} |
+| Estado | {_imo_status or 'aprobada'} |
 """)
                             # Detalle completo en sub-expander
                             with st.expander("📋 Ver detalle completo"):
@@ -2581,11 +2618,34 @@ Obtén el token creando un bot con @BotFather en Telegram.
 """)
                         with _bb:
                             st.markdown("**Acciones**")
-                            if st.button("⏸ Suspender", key=f"mls_susp_{_a['id']}",
-                                         use_container_width=True):
-                                _mls.update_inmo_activa(_a["id"], 0)
-                                st.warning(f"⏸ {_anombre} suspendida.")
-                                st.rerun()
+
+                            _mls_c1, _mls_c2 = st.columns(2)
+                            with _mls_c1:
+                                if st.button("⏳ En trámite", key=f"mls_tramite_{_a['id']}", use_container_width=True):
+                                    try:
+                                        _mls_tr = db_conn()
+                                        _mls_tr.execute("UPDATE inmobiliarias SET status=? WHERE id=?", ("tramite", _a["id"]))
+                                        _mls_tr.commit()
+                                        _mls_tr.close()
+                                        st.cache_data.clear()
+                                        st.info("En trámite")
+                                        st.rerun()
+                                    except Exception as _e:
+                                        st.error(f"Error: {_e}")
+
+                            with _mls_c2:
+                                if st.button("⏸ Suspender", key=f"mls_susp_{_a['id']}", use_container_width=True):
+                                    try:
+                                        _mls_su = db_conn()
+                                        _mls_su.execute("UPDATE inmobiliarias SET status=? WHERE id=?", ("suspendida", _a["id"]))
+                                        _mls_su.commit()
+                                        _mls_su.close()
+                                        st.cache_data.clear()
+                                        st.warning(f"⏸ {_anombre} suspendida.")
+                                        st.rerun()
+                                    except Exception as _e:
+                                        st.error(f"Error: {_e}")
+
         except Exception as _eb:
             st.warning(f"Error sección B: {_eb}")
 
