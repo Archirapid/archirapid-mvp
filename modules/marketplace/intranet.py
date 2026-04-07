@@ -1183,7 +1183,7 @@ def main():
             for _col, _def in [("is_featured","INTEGER DEFAULT 0"),
                                 ("featured_until","TEXT"),
                                 ("featured_plan","TEXT DEFAULT 'free'"),
-                                ("active","INTEGER DEFAULT 1"),
+                                ("active","INTEGER DEFAULT 0"),
                                 ("status","TEXT DEFAULT 'pendiente'"),
                                 ("is_active","INTEGER DEFAULT 0")]:
                 try:
@@ -1194,6 +1194,13 @@ def main():
                         _conn5.rollback()
                     except Exception:
                         pass
+
+            # Actualizar profesionales existentes a active=0 si no tienen status (registros viejos)
+            try:
+                _conn5.execute("UPDATE service_providers SET active=0 WHERE status IS NULL")
+                _conn5.commit()
+            except Exception:
+                pass
 
             _providers5 = _conn5.execute("""
                 SELECT id, name, email, company, specialty, experience_years,
@@ -1275,6 +1282,7 @@ def main():
                                     (int(_new_feat), _new_until or None, _pid5)
                                 )
                                 _conn_upd.commit(); _conn_upd.close()
+                                st.cache_data.clear()
                                 try:
                                     from modules.marketplace.email_notify import _send
                                     _status = "ACTIVADO ⭐" if _new_feat else "desactivado"
@@ -1295,6 +1303,7 @@ def main():
                                         _cb = db_conn()
                                         _cb.execute("UPDATE service_providers SET active=0, is_featured=0, status=? WHERE id=?", ("bloqueado", _pid5))
                                         _cb.commit(); _cb.close()
+                                        st.cache_data.clear()
                                         st.warning(f"🚫 {_name5} bloqueado.")
                                         st.rerun()
                                 else:
@@ -1304,6 +1313,7 @@ def main():
                                         _ca = db_conn()
                                         _ca.execute("UPDATE service_providers SET active=1, status=?, is_active=? WHERE id=?", ("activo", 1, _pid5))
                                         _ca.commit(); _ca.close()
+                                        st.cache_data.clear()
                                         st.success(f"✅ {_name5} aprobado.")
                                         st.rerun()
 
@@ -1314,6 +1324,7 @@ def main():
                                     _cp = db_conn()
                                     _cp.execute("UPDATE service_providers SET status=?, is_active=? WHERE id=?", ("tramite", 0, _pid5))
                                     _cp.commit(); _cp.close()
+                                    st.cache_data.clear()
                                     st.info("En trámite")
                                     st.rerun()
 
@@ -1328,6 +1339,7 @@ def main():
                                         _cd.execute("DELETE FROM service_providers WHERE id=?", (_pid5,))
                                         _cd.execute("DELETE FROM users WHERE email=?", (_email5,))
                                         _cd.commit(); _cd.close()
+                                        st.cache_data.clear()
                                         st.success(f"🗑️ {_name5} eliminado.")
                                         st.rerun()
 
