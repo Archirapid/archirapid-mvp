@@ -1182,7 +1182,10 @@ def main():
             # Añadir columnas si no existen
             for _col, _def in [("is_featured","INTEGER DEFAULT 0"),
                                 ("featured_until","TEXT"),
-                                ("featured_plan","TEXT DEFAULT 'free'")]:
+                                ("featured_plan","TEXT DEFAULT 'free'"),
+                                ("active","INTEGER DEFAULT 1"),
+                                ("status","TEXT DEFAULT 'pendiente'"),
+                                ("is_active","INTEGER DEFAULT 0")]:
                 try:
                     _conn5.execute(f"ALTER TABLE service_providers ADD COLUMN {_col} {_def}")
                     _conn5.commit()
@@ -1195,7 +1198,7 @@ def main():
             _providers5 = _conn5.execute("""
                 SELECT id, name, email, company, specialty, experience_years,
                        service_area, is_featured, featured_until, featured_plan,
-                       created_at, active
+                       created_at, active, status, is_active
                 FROM service_providers ORDER BY is_featured DESC, name
             """).fetchall()
             _conn5.close()
@@ -1233,7 +1236,7 @@ def main():
 
                 for _p5 in _providers5:
                     (_pid5, _name5, _email5, _comp5, _spec5, _exp5,
-                     _area5, _feat5, _funtil5, _fplan5, _cat5, _active5) = _p5
+                     _area5, _feat5, _funtil5, _fplan5, _cat5, _active5, _status5, _is_active5) = _p5
                     _status_icon = "🟢" if _active5 else "🔴"
                     _badge = "⭐ DESTACADO" if _feat5 else "🆓 Gratuito"
                     with st.expander(f"{_status_icon} {_badge} · {_name5} ({_email5}) — {_area5}"):
