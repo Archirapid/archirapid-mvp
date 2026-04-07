@@ -1195,12 +1195,14 @@ def main():
                     except Exception:
                         pass
 
-            # RESET: Forzar todos los profesionales a pendiente (excepto los ya bloqueados)
-            try:
-                _conn5.execute("UPDATE service_providers SET status='pendiente' WHERE status IS NULL OR status = '' OR status = 'activo'")
-                _conn5.commit()
-            except Exception:
-                pass
+            # RESET: Forzar todos los profesionales a pendiente (solo UNA VEZ por sesión)
+            if not st.session_state.get("_reset_professionals_done", False):
+                try:
+                    _conn5.execute("UPDATE service_providers SET status='pendiente' WHERE status IS NULL OR status = '' OR status = 'activo'")
+                    _conn5.commit()
+                    st.session_state["_reset_professionals_done"] = True
+                except Exception:
+                    pass
 
             _providers5 = _conn5.execute("""
                 SELECT id, name, email, company, specialty, experience_years,
