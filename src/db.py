@@ -862,6 +862,27 @@ _PG_ALTER_MIGRATIONS = [
     "ALTER TABLE tickets_soporte ADD COLUMN IF NOT EXISTS usuario_email TEXT",
     # service_providers: cobertura por provincias (JSON array como TEXT)
     "ALTER TABLE service_providers ADD COLUMN IF NOT EXISTS provincias_cobertura TEXT DEFAULT '[]'",
+    # ── Columnas de gestión intranet (status e is_active) ──────────────────────
+    # projects — estado y actividad
+    "ALTER TABLE projects ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'activo'",
+    "ALTER TABLE projects ADD COLUMN IF NOT EXISTS is_active INTEGER DEFAULT 1",
+    # ai_projects — estado y actividad
+    "ALTER TABLE ai_projects ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'activo'",
+    "ALTER TABLE ai_projects ADD COLUMN IF NOT EXISTS is_active INTEGER DEFAULT 1",
+    # subscriptions — estado y actividad
+    "ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'active'",
+    "ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS is_active INTEGER DEFAULT 1",
+    # service_providers — estado y actividad (ya tiene 'active')
+    "ALTER TABLE service_providers ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'activo'",
+    # estudiantes — estado y actividad
+    "ALTER TABLE estudiantes ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pendiente'",
+    "ALTER TABLE estudiantes ADD COLUMN IF NOT EXISTS is_active INTEGER DEFAULT 0",
+    # proyectos_tfg — estado y actividad
+    "ALTER TABLE proyectos_tfg ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pendiente'",
+    "ALTER TABLE proyectos_tfg ADD COLUMN IF NOT EXISTS is_active INTEGER DEFAULT 0",
+    # fincas_mls — estado y actividad
+    "ALTER TABLE fincas_mls ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pendiente_validacion'",
+    "ALTER TABLE fincas_mls ADD COLUMN IF NOT EXISTS is_active INTEGER DEFAULT 0",
 ]
 
 
@@ -1328,7 +1349,7 @@ def ensure_tables():
         except sqlite3.OperationalError:
             pass
 
-        try: 
+        try:
             c.execute("ALTER TABLE projects ADD COLUMN vr_tour TEXT")
         except sqlite3.OperationalError:
             pass
@@ -1337,7 +1358,30 @@ def ensure_tables():
             c.execute("ALTER TABLE projects ADD COLUMN is_active INTEGER DEFAULT 1")
         except sqlite3.OperationalError:
             pass
-        
+
+        try:
+            c.execute("ALTER TABLE projects ADD COLUMN status TEXT DEFAULT 'activo'")
+        except sqlite3.OperationalError:
+            pass
+
+        # ── Migraciones para intranet: status e is_active en todas las tablas ─────
+        for _tbl, _status_def, _is_act_def in [
+            ("ai_projects", "TEXT DEFAULT 'activo'", "INTEGER DEFAULT 1"),
+            ("subscriptions", "TEXT DEFAULT 'active'", "INTEGER DEFAULT 1"),
+            ("service_providers", "TEXT DEFAULT 'activo'", "INTEGER DEFAULT 1"),
+            ("estudiantes", "TEXT DEFAULT 'pendiente'", "INTEGER DEFAULT 0"),
+            ("proyectos_tfg", "TEXT DEFAULT 'pendiente'", "INTEGER DEFAULT 0"),
+            ("fincas_mls", "TEXT DEFAULT 'pendiente_validacion'", "INTEGER DEFAULT 0"),
+        ]:
+            try:
+                c.execute(f"ALTER TABLE {_tbl} ADD COLUMN status {_status_def}")
+            except (sqlite3.OperationalError, Exception):
+                pass
+            try:
+                c.execute(f"ALTER TABLE {_tbl} ADD COLUMN is_active {_is_act_def}")
+            except (sqlite3.OperationalError, Exception):
+                pass
+
         # Índices para mejorar filtrado futuro (creación defensiva)
         try:
             c.execute("CREATE INDEX IF NOT EXISTS idx_plots_province ON plots(province)")

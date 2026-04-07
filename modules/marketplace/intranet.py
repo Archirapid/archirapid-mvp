@@ -54,6 +54,60 @@ def main():
         return
 
     # PANEL DE GESTIÓN INTERNA
+    # ── Inyectar CSS para colorear botones por estado ────────────────────────────
+    st.markdown("""
+    <style>
+    /* Botones verdes: Aprobar, Activo, Autorizado */
+    button:has-text("Aprobar"),
+    button:has-text("Activo"),
+    button:has-text("Autorizado"),
+    button:has-text("✅ Activo"),
+    button:has-text("✅ Aprobar") {
+        background-color: #28a745 !important;
+        color: white !important;
+    }
+
+    /* Botones amarillo/naranja: En trámite, Pendiente, Reservado */
+    button:has-text("En trámite"),
+    button:has-text("Pendiente"),
+    button:has-text("Reservado"),
+    button:has-text("🟡 Reservada") {
+        background-color: #ffc107 !important;
+        color: #000 !important;
+    }
+
+    /* Botones rojos: Suspender, No disponible */
+    button:has-text("Suspender"),
+    button:has-text("No disponible"),
+    button:has-text("🚫 Suspender") {
+        background-color: #dc3545 !important;
+        color: white !important;
+    }
+
+    /* Botones gris/negro: Anulado, Eliminar */
+    button:has-text("Anulado"),
+    button:has-text("🗑️ Eliminar"),
+    button:has-text("Rechazar"),
+    button:has-text("❌ Rechazar") {
+        background-color: #343a40 !important;
+        color: white !important;
+    }
+
+    /* Botones azules: Vendido */
+    button:has-text("Vendido"),
+    button:has-text("🔵 Vendida") {
+        background-color: #007bff !important;
+        color: white !important;
+    }
+
+    /* Variantes de texto en botones */
+    button:has-text("✅ Aprobar") { background-color: #28a745 !important; }
+    button:has-text("⏸ Suspender") { background-color: #dc3545 !important; }
+    button:has-text("Bloquear") { background-color: #dc3545 !important; }
+    button:has-text("Sí, eliminar") { background-color: #343a40 !important; }
+    </style>
+    """, unsafe_allow_html=True)
+
     # Badge en Analytics: cuenta leads MLS nuevos para alertar al admin
     _leads_nuevos_badge = ""
     try:
@@ -151,42 +205,67 @@ def main():
                                 if st.button("✅ Aprobar", key=f"plot_apro_{p['id']}",
                                              use_container_width=True, type="primary"):
                                     _uc = db_conn()
-                                    _uc.execute("UPDATE plots SET status='disponible' WHERE id=?", (p["id"],))
+                                    _uc.execute("UPDATE plots SET status='disponible', is_active=1 WHERE id=?", (p["id"],))
                                     _uc.commit(); _uc.close()
                                     st.success("Finca aprobada ✅"); st.rerun()
                                 if st.button("🚫 Suspender", key=f"plot_sus_{p['id']}",
                                              use_container_width=True):
                                     _uc = db_conn()
-                                    _uc.execute("UPDATE plots SET status='suspended' WHERE id=?", (p["id"],))
+                                    _uc.execute("UPDATE plots SET status='suspended', is_active=0 WHERE id=?", (p["id"],))
                                     _uc.commit(); _uc.close()
                                     st.warning("Finca suspendida"); st.rerun()
                                 if st.button("🔵 Vendida", key=f"plot_sold_{p['id']}",
                                              use_container_width=True):
                                     _uc = db_conn()
-                                    _uc.execute("UPDATE plots SET status='sold' WHERE id=?", (p["id"],))
+                                    _uc.execute("UPDATE plots SET status='sold', is_active=0 WHERE id=?", (p["id"],))
                                     _uc.commit(); _uc.close()
                                     st.info("Marcada como vendida"); st.rerun()
                             with _btn_col2:
                                 if st.button("🟡 Reservada", key=f"plot_res_{p['id']}",
                                              use_container_width=True):
                                     _uc = db_conn()
-                                    _uc.execute("UPDATE plots SET status='reserved' WHERE id=?", (p["id"],))
+                                    _uc.execute("UPDATE plots SET status='reserved', is_active=1 WHERE id=?", (p["id"],))
                                     _uc.commit(); _uc.close()
                                     st.info("Marcada como reservada"); st.rerun()
                                 if st.button("⚫ No disponible", key=f"plot_nd_{p['id']}",
                                              use_container_width=True):
                                     _uc = db_conn()
-                                    _uc.execute("UPDATE plots SET status='no_disponible' WHERE id=?", (p["id"],))
+                                    _uc.execute("UPDATE plots SET status='no_disponible', is_active=0 WHERE id=?", (p["id"],))
                                     _uc.commit(); _uc.close()
                                     st.warning("No disponible"); st.rerun()
-                                if st.button("📢 Alertar", key=f"alert_plot_{p['id']}",
+                                if st.button("🗑️ Eliminar", key=f"plot_del_{p['id']}",
                                              use_container_width=True):
-                                    try:
-                                        from modules.marketplace.alertas import notify_new_plot
-                                        _n = notify_new_plot(dict(p))
-                                        st.success(f"✅ {_n} email(s)" if _n > 0 else "Sin suscriptores")
-                                    except Exception as _ae:
-                                        st.error(f"Error alertas: {_ae}")
+                                    st.session_state[f"confirm_del_plot_{p['id']}"] = True
+
+                            # Confirmación de eliminación
+                            if st.session_state.get(f"confirm_del_plot_{p['id']}"):
+                                st.error(f"¿Eliminar '{p['title']}'? Irreversible.")
+                                _dc1, _dc2 = st.columns(2)
+                                with _dc1:
+                                    if st.button("❌ Sí, eliminar", key=f"plot_del_yes_{p['id']}",
+                                                 type="primary", use_container_width=True):
+                                        _uc = db_conn()
+                                        _uc.execute("DELETE FROM plots WHERE id=?", (p["id"],))
+                                        _uc.commit(); _uc.close()
+                                        st.session_state.pop(f"confirm_del_plot_{p['id']}", None)
+                                        st.success("Finca eliminada.")
+                                        st.rerun()
+                                with _dc2:
+                                    if st.button("↩️ Cancelar", key=f"plot_del_no_{p['id']}",
+                                                 use_container_width=True):
+                                        st.session_state.pop(f"confirm_del_plot_{p['id']}", None)
+                                        st.rerun()
+
+                                st.markdown("---")
+
+                            if st.button("📢 Alertar", key=f"alert_plot_{p['id']}",
+                                         use_container_width=True):
+                                try:
+                                    from modules.marketplace.alertas import notify_new_plot
+                                    _n = notify_new_plot(dict(p))
+                                    st.success(f"✅ {_n} email(s)" if _n > 0 else "Sin suscriptores")
+                                except Exception as _ae:
+                                    st.error(f"Error alertas: {_ae}")
 
                         # ── Tour 360° ──────────────────────────────────────────
                         st.markdown("---")
@@ -483,37 +562,70 @@ def main():
                             st.markdown(f"[✉️ Escribir al comprador](mailto:{_rrow['buyer_email']})")
 
                 # Gestión de estado
-                st.markdown("**⚙️ Actualizar estado de reserva:**")
-                _col_r1, _col_r2, _col_r3 = st.columns(3)
+                st.markdown("**⚙️ Actualizar estado de reserva / Eliminar:**")
+                _col_r1, _col_r2, _col_r3 = st.columns([2, 2, 2])
                 with _col_r1:
-                    _res_ids = _df_res3[_df_res3["kind"].isin(["reservation","en_tramitacion"])]["id"].tolist()
+                    _res_ids = _df_res3["id"].tolist()
                     _res_sel = st.selectbox("Reserva a gestionar", _res_ids, key="intra_res_sel") if _res_ids else None
                 with _col_r2:
-                    _new_status = st.selectbox(
-                        "Nuevo estado", ["en_tramitacion", "aceptado", "compra_completa"],
-                        key="intra_res_status"
-                    ) if _res_ids else None
+                    _action_type = st.selectbox(
+                        "Acción", ["Cambiar estado", "🗑️ Eliminar"],
+                        key="intra_res_action"
+                    )
                 with _col_r3:
                     st.markdown("<br>", unsafe_allow_html=True)
-                    if _res_sel and _new_status and st.button("✅ Actualizar", key="intra_res_update", type="primary"):
-                        try:
-                            _db_up = db_conn()
-                            _db_up.execute(
-                                "UPDATE reservations SET kind=? WHERE id=?", (_new_status, _res_sel)
-                            )
-                            _db_up.commit()
-                            _db_up.close()
+
+                    # Mostrar opciones según la acción
+                    if _action_type == "Cambiar estado":
+                        _new_status = st.selectbox(
+                            "Nuevo estado", ["en_tramitacion", "aceptado", "compra_completa"],
+                            key="intra_res_status"
+                        )
+                        if _res_sel and _new_status and st.button("✅ Actualizar", key="intra_res_update", type="primary"):
                             try:
-                                _buyer_r = _df_res3[_df_res3["id"]==_res_sel].iloc[0]
-                                from modules.marketplace.email_notify import _send as _t_send
-                                _lbl = {"en_tramitacion":"⚙️ en tramitación","aceptado":"✅ aceptada","compra_completa":"🏡 completada"}
-                                _t_send(f"📋 Admin actualizó reserva {str(_res_sel)[:8]}… → {_lbl.get(_new_status, _new_status)}\nComprador: {_buyer_r['buyer_email']}")
-                            except Exception:
-                                pass
-                            st.success(f"Estado actualizado a '{_new_status}'")
-                            st.rerun()
-                        except Exception as _eu:
-                            st.error(f"Error: {_eu}")
+                                _db_up = db_conn()
+                                _db_up.execute(
+                                    "UPDATE reservations SET kind=? WHERE id=?", (_new_status, _res_sel)
+                                )
+                                _db_up.commit()
+                                _db_up.close()
+                                try:
+                                    _buyer_r = _df_res3[_df_res3["id"]==_res_sel].iloc[0]
+                                    from modules.marketplace.email_notify import _send as _t_send
+                                    _lbl = {"en_tramitacion":"⚙️ en tramitación","aceptado":"✅ aceptada","compra_completa":"🏡 completada"}
+                                    _t_send(f"📋 Admin actualizó reserva {str(_res_sel)[:8]}… → {_lbl.get(_new_status, _new_status)}\nComprador: {_buyer_r['buyer_email']}")
+                                except Exception:
+                                    pass
+                                st.success(f"Estado actualizado a '{_new_status}'")
+                                st.rerun()
+                            except Exception as _eu:
+                                st.error(f"Error: {_eu}")
+                    else:
+                        # Acción Eliminar
+                        if _res_sel:
+                            st.warning("⚠️ Esta acción no se puede deshacer", icon="⚠️")
+                            if st.button("🗑️ Confirmar eliminación", key=f"intra_res_del_confirm_{_res_sel}", type="primary"):
+                                st.session_state[f"confirm_res_del_{_res_sel}"] = True
+
+                            if st.session_state.get(f"confirm_res_del_{_res_sel}"):
+                                st.error(f"¿Está seguro de eliminar esta reserva? Esta acción es irreversible.")
+                                _del_c1, _del_c2 = st.columns(2)
+                                with _del_c1:
+                                    if st.button("❌ Sí, eliminar", key=f"intra_res_del_yes_{_res_sel}", type="primary"):
+                                        try:
+                                            _db_del = db_conn()
+                                            _db_del.execute("DELETE FROM reservations WHERE id=?", (_res_sel,))
+                                            _db_del.commit()
+                                            _db_del.close()
+                                            st.success("✅ Reserva eliminada.")
+                                            st.session_state.pop(f"confirm_res_del_{_res_sel}", None)
+                                            st.rerun()
+                                        except Exception as _edel:
+                                            st.error(f"Error al eliminar: {_edel}")
+                                with _del_c2:
+                                    if st.button("↩️ Cancelar", key=f"intra_res_del_no_{_res_sel}"):
+                                        st.session_state.pop(f"confirm_res_del_{_res_sel}", None)
+                                        st.rerun()
             else:
                 st.info("Sin reservas ni compras todavía.")
         except Exception as _er3:
