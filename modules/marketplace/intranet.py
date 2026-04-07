@@ -1304,51 +1304,69 @@ def main():
 
                             st.markdown("---")
                             # DEBUG
-                            st.caption(f"🔧 Status BD: `{_status5}` | Active: `{_active5}` | is_active: `{_is_active5}`")
+                            st.caption(f"🔧 Status BD: `{_status5}` | Active: `{_active5}` | is_active: `{_is_active5}` | ID: `{_pid5}`")
 
                             # ── Aprobar / Bloquear ──
                             _bc1, _bc2, _bc3 = st.columns(3)
                             with _bc1:
                                 if st.button("✅ APROBAR", key=f"btn_prof_approve_{_pid5}",
                                              use_container_width=True, type="primary"):
+                                    st.write(f"🔴 BOTÓN PRESIONADO - Aprobando {_pid5}")
                                     try:
                                         _ca = db_conn()
+                                        st.write(f"✓ Conexión obtenida")
                                         _ca.execute("UPDATE service_providers SET active=1, status=?, is_active=? WHERE id=?", ("activo", 1, _pid5))
+                                        st.write(f"✓ UPDATE ejecutado")
                                         _ca.commit()
+                                        st.write(f"✓ COMMIT completado")
                                         _ca.close()
                                         st.cache_data.clear()
                                         st.success(f"✅ {_name5} aprobado.")
                                         st.rerun()
                                     except Exception as e:
-                                        st.error(f"ERROR: {e}")
+                                        st.error(f"❌ ERROR: {str(e)}")
+                                        import traceback
+                                        st.code(traceback.format_exc())
 
                             with _bc2:
                                 if st.button("⏳ EN TRÁMITE", key=f"btn_prof_tramite_{_pid5}",
                                              use_container_width=True):
+                                    st.write(f"🔴 BOTÓN PRESIONADO - Tramitando {_pid5}")
                                     try:
                                         _cp = db_conn()
+                                        st.write(f"✓ Conexión obtenida")
                                         _cp.execute("UPDATE service_providers SET status=?, is_active=? WHERE id=?", ("tramite", 0, _pid5))
+                                        st.write(f"✓ UPDATE ejecutado")
                                         _cp.commit()
+                                        st.write(f"✓ COMMIT completado")
                                         _cp.close()
                                         st.cache_data.clear()
                                         st.info("En trámite")
                                         st.rerun()
                                     except Exception as e:
-                                        st.error(f"ERROR: {e}")
+                                        st.error(f"❌ ERROR: {str(e)}")
+                                        import traceback
+                                        st.code(traceback.format_exc())
 
                             with _bc3:
                                 if st.button("🚫 BLOQUEAR", key=f"btn_prof_block_{_pid5}",
                                              use_container_width=True):
+                                    st.write(f"🔴 BOTÓN PRESIONADO - Bloqueando {_pid5}")
                                     try:
                                         _cb = db_conn()
+                                        st.write(f"✓ Conexión obtenida")
                                         _cb.execute("UPDATE service_providers SET active=0, is_featured=0, status=? WHERE id=?", ("bloqueado", _pid5))
+                                        st.write(f"✓ UPDATE ejecutado")
                                         _cb.commit()
+                                        st.write(f"✓ COMMIT completado")
                                         _cb.close()
                                         st.cache_data.clear()
                                         st.warning(f"🚫 {_name5} bloqueado.")
                                         st.rerun()
                                     except Exception as e:
-                                        st.error(f"ERROR: {e}")
+                                        st.error(f"❌ ERROR: {str(e)}")
+                                        import traceback
+                                        st.code(traceback.format_exc())
 
         except Exception as e:
             st.error(f"Error en Gestión de Profesionales: {e}")
