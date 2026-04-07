@@ -474,8 +474,9 @@ def main():
                             st.markdown("**⚙️ Cambiar estado**")
                             _pb1, _pb2 = st.columns(2)
                             with _pb1:
+                                _is_primary = _pstatus == 'activo'
                                 if st.button("✅ Activo", key=f"proj_act_{proj['id']}",
-                                             use_container_width=True, type="primary"):
+                                             use_container_width=True, type="primary" if _is_primary else "secondary"):
                                     _cup = db_conn()
                                     _cup.execute(
                                         "UPDATE projects SET status='activo', is_active=1 WHERE id=?",
@@ -483,51 +484,44 @@ def main():
                                     )
                                     _cup.commit(); _cup.close()
                                     st.success("Activo ✅"); st.rerun()
+                                _is_primary = _pstatus == 'reservado'
                                 if st.button("🟡 Reservado", key=f"proj_res_{proj['id']}",
-                                             use_container_width=True):
+                                             use_container_width=True, type="primary" if _is_primary else "secondary"):
                                     _cup = db_conn()
-                                    _cup.execute("UPDATE projects SET status='reservado' WHERE id=?", (proj["id"],))
+                                    _cup.execute("UPDATE projects SET status='reservado', is_active=1 WHERE id=?", (proj["id"],))
                                     _cup.commit(); _cup.close()
                                     st.info("Reservado"); st.rerun()
+                                _is_primary = _pstatus in ('vendido', 'vendida')
                                 if st.button("🔵 Vendido", key=f"proj_sold_{proj['id']}",
-                                             use_container_width=True):
+                                             use_container_width=True, type="primary" if _is_primary else "secondary"):
                                     _cup = db_conn()
                                     _cup.execute("UPDATE projects SET status='vendido', is_active=0 WHERE id=?", (proj["id"],))
                                     _cup.commit(); _cup.close()
                                     st.info("Vendido"); st.rerun()
                             with _pb2:
+                                _is_primary = _pstatus == 'no_disponible'
                                 if st.button("⚫ No disponible", key=f"proj_nd_{proj['id']}",
-                                             use_container_width=True):
+                                             use_container_width=True, type="primary" if _is_primary else "secondary"):
                                     _cup = db_conn()
                                     _cup.execute("UPDATE projects SET status='no_disponible', is_active=0 WHERE id=?", (proj["id"],))
                                     _cup.commit(); _cup.close()
                                     st.warning("No disponible"); st.rerun()
+                                _is_primary = _pstatus == 'suspendido'
                                 if st.button("🔴 Suspender", key=f"proj_sus_{proj['id']}",
-                                             use_container_width=True):
+                                             use_container_width=True, type="primary" if _is_primary else "secondary"):
                                     _cup = db_conn()
                                     _cup.execute("UPDATE projects SET status='suspendido', is_active=0 WHERE id=?", (proj["id"],))
                                     _cup.commit(); _cup.close()
                                     st.warning("Suspendido"); st.rerun()
-                                if st.button("🗑️ Eliminar", key=f"proj_del_{proj['id']}",
-                                             use_container_width=True, type="secondary"):
-                                    st.session_state[f"confirm_del_proj_{proj['id']}"] = True
-
-                            if st.session_state.get(f"confirm_del_proj_{proj['id']}"):
-                                st.error(f"¿Eliminar '{proj['title']}'? Irreversible.")
-                                _dc1, _dc2 = st.columns(2)
-                                with _dc1:
+                                with st.popover("🗑️ Eliminar", use_container_width=True):
+                                    st.error(f"⚠️ ¿Eliminar '{proj['title']}'?")
+                                    st.caption("Irreversible. Se eliminará de la base de datos.")
                                     if st.button("❌ Sí, eliminar", key=f"proj_del_yes_{proj['id']}",
                                                  type="primary", use_container_width=True):
                                         _cup = db_conn()
                                         _cup.execute("DELETE FROM projects WHERE id=?", (proj["id"],))
                                         _cup.commit(); _cup.close()
-                                        st.session_state.pop(f"confirm_del_proj_{proj['id']}", None)
                                         st.success("Eliminado"); st.rerun()
-                                with _dc2:
-                                    if st.button("↩️ Cancelar", key=f"proj_del_no_{proj['id']}",
-                                                 use_container_width=True):
-                                        st.session_state.pop(f"confirm_del_proj_{proj['id']}", None)
-                                        st.rerun()
             else:
                 st.info("No hay proyectos publicados aún.")
         except Exception as e:
@@ -892,30 +886,48 @@ def main():
 """)
                             with _sc2:
                                 st.markdown("**Cambiar estado**")
-                                if st.button("⏳ En trámite", key=f"sub_pending_{_sid}", use_container_width=True):
+                                _is_primary = _sstatus == 'pending'
+                                if st.button("⏳ En trámite", key=f"sub_pending_{_sid}",
+                                             use_container_width=True, type="primary" if _is_primary else "secondary"):
                                     _sc_conn = db_conn()
                                     _sc_conn.execute("UPDATE subscriptions SET status=?, is_active=0 WHERE id=?", ("pending", _sid))
                                     _sc_conn.commit(); _sc_conn.close()
                                     st.info("En trámite")
                                     st.rerun()
-                                if st.button("✅ Autorizada", key=f"sub_active_{_sid}", type="primary", use_container_width=True):
+                                _is_primary = _sstatus == 'active'
+                                if st.button("✅ Autorizada", key=f"sub_active_{_sid}",
+                                             use_container_width=True, type="primary" if _is_primary else "secondary"):
                                     _ac_conn = db_conn()
                                     _ac_conn.execute("UPDATE subscriptions SET status=?, is_active=1 WHERE id=?", ("active", _sid))
                                     _ac_conn.commit(); _ac_conn.close()
                                     st.success("Autorizada ✅")
                                     st.rerun()
-                                if st.button("🔴 Suspender", key=f"sub_suspended_{_sid}", use_container_width=True):
+                                _is_primary = _sstatus == 'suspended'
+                                if st.button("🔴 Suspender", key=f"sub_suspended_{_sid}",
+                                             use_container_width=True, type="primary" if _is_primary else "secondary"):
                                     _sus_conn = db_conn()
                                     _sus_conn.execute("UPDATE subscriptions SET status=?, is_active=0 WHERE id=?", ("suspended", _sid))
                                     _sus_conn.commit(); _sus_conn.close()
                                     st.warning("Suspendida")
                                     st.rerun()
-                                if st.button("❌ Anular", key=f"sub_cancelled_{_sid}", use_container_width=True):
+                                _is_primary = _sstatus == 'cancelled'
+                                if st.button("❌ Anular", key=f"sub_cancelled_{_sid}",
+                                             use_container_width=True, type="primary" if _is_primary else "secondary"):
                                     _can_conn = db_conn()
                                     _can_conn.execute("UPDATE subscriptions SET status=?, is_active=0 WHERE id=?", ("cancelled", _sid))
                                     _can_conn.commit(); _can_conn.close()
                                     st.error("Anulada")
                                     st.rerun()
+                                with st.popover("🗑️ Eliminar", use_container_width=True):
+                                    st.error(f"⚠️ ¿Eliminar suscripción de {_sname}?")
+                                    st.caption("Irreversible.")
+                                    if st.button("❌ Sí, eliminar", key=f"sub_del_yes_{_sid}",
+                                                 type="primary", use_container_width=True):
+                                        _del_conn = db_conn()
+                                        _del_conn.execute("DELETE FROM subscriptions WHERE id=?", (_sid,))
+                                        _del_conn.commit(); _del_conn.close()
+                                        st.success("Suscripción eliminada")
+                                        st.rerun()
 
             with _tab_ai:
                 st.subheader("Proyectos AI Designer")
@@ -952,30 +964,48 @@ def main():
 """)
                             with _aic2:
                                 st.markdown("**Cambiar estado**")
-                                if st.button("⏳ En trámite", key=f"ai_pending_{_aid}", use_container_width=True):
+                                _is_primary = _astatus == 'en_tramite'
+                                if st.button("⏳ En trámite", key=f"ai_pending_{_aid}",
+                                             use_container_width=True, type="primary" if _is_primary else "secondary"):
                                     _ai_conn = db_conn()
                                     _ai_conn.execute("UPDATE ai_projects SET status=?, is_active=0 WHERE id=?", ("en_tramite", _aid))
                                     _ai_conn.commit(); _ai_conn.close()
                                     st.info("En trámite")
                                     st.rerun()
-                                if st.button("✅ Autorizado", key=f"ai_active_{_aid}", type="primary", use_container_width=True):
+                                _is_primary = _astatus == 'activo'
+                                if st.button("✅ Autorizado", key=f"ai_active_{_aid}",
+                                             use_container_width=True, type="primary" if _is_primary else "secondary"):
                                     _aiac_conn = db_conn()
                                     _aiac_conn.execute("UPDATE ai_projects SET status=?, is_active=1 WHERE id=?", ("activo", _aid))
                                     _aiac_conn.commit(); _aiac_conn.close()
                                     st.success("Autorizado ✅")
                                     st.rerun()
-                                if st.button("🔴 Suspender", key=f"ai_suspended_{_aid}", use_container_width=True):
+                                _is_primary = _astatus == 'suspendido'
+                                if st.button("🔴 Suspender", key=f"ai_suspended_{_aid}",
+                                             use_container_width=True, type="primary" if _is_primary else "secondary"):
                                     _ai_sus = db_conn()
                                     _ai_sus.execute("UPDATE ai_projects SET status=?, is_active=0 WHERE id=?", ("suspendido", _aid))
                                     _ai_sus.commit(); _ai_sus.close()
                                     st.warning("Suspendido")
                                     st.rerun()
-                                if st.button("❌ Anular", key=f"ai_cancelled_{_aid}", use_container_width=True):
+                                _is_primary = _astatus == 'anulado'
+                                if st.button("❌ Anular", key=f"ai_cancelled_{_aid}",
+                                             use_container_width=True, type="primary" if _is_primary else "secondary"):
                                     _ai_can = db_conn()
                                     _ai_can.execute("UPDATE ai_projects SET status=?, is_active=0 WHERE id=?", ("anulado", _aid))
                                     _ai_can.commit(); _ai_can.close()
                                     st.error("Anulado")
                                     st.rerun()
+                                with st.popover("🗑️ Eliminar", use_container_width=True):
+                                    st.error(f"⚠️ ¿Eliminar proyecto '{_aname}'?")
+                                    st.caption("Irreversible.")
+                                    if st.button("❌ Sí, eliminar", key=f"ai_del_yes_{_aid}",
+                                                 type="primary", use_container_width=True):
+                                        _ai_del = db_conn()
+                                        _ai_del.execute("DELETE FROM ai_projects WHERE id=?", (_aid,))
+                                        _ai_del.commit(); _ai_del.close()
+                                        st.success("Proyecto eliminado")
+                                        st.rerun()
 
         except Exception as _e_subs_ai:
             st.error(f"Error en Suscripciones & Proyectos AI: {_e_subs_ai}")
@@ -2328,36 +2358,24 @@ Obtén el token creando un bot con @BotFather en Telegram.
                                 st.rerun()
 
                             st.markdown("")
-                            _confirm_key = f"mls_confirm_del_{_p['id']}"
-                            if st.session_state.get(_confirm_key):
-                                st.warning("⚠️ ¿Confirmar eliminación? Esta acción no se puede deshacer.")
-                                _cc1, _cc2 = st.columns(2)
-                                with _cc1:
-                                    if st.button("Sí, eliminar", key=f"mls_del_yes_{_p['id']}",
-                                                 type="primary", use_container_width=True):
-                                        try:
-                                            _dc = db_conn()
-                                            _dc.execute("DELETE FROM inmobiliarias WHERE id=?", (_p["id"],))
-                                            _dc.commit()
-                                            _dc.close()
-                                            _mls_notif.notif_aprobacion(
-                                                nombre=_pnombre,
-                                                email=_p.get("email", ""),
-                                                aprobada=False,
-                                            )
-                                        except Exception:
-                                            pass
-                                        st.session_state.pop(_confirm_key, None)
-                                        st.rerun()
-                                with _cc2:
-                                    if st.button("Cancelar", key=f"mls_del_no_{_p['id']}",
-                                                 use_container_width=True):
-                                        st.session_state.pop(_confirm_key, None)
-                                        st.rerun()
-                            else:
-                                if st.button("❌ Rechazar y eliminar", key=f"mls_del_{_p['id']}",
-                                             use_container_width=True):
-                                    st.session_state[_confirm_key] = True
+                            with st.popover("❌ Rechazar y eliminar", use_container_width=True):
+                                st.error(f"⚠️ ¿Eliminar {_pnombre}?")
+                                st.caption("Esta acción no se puede deshacer.")
+                                if st.button("❌ Sí, eliminar", key=f"mls_del_yes_{_p['id']}",
+                                             type="primary", use_container_width=True):
+                                    try:
+                                        _dc = db_conn()
+                                        _dc.execute("DELETE FROM inmobiliarias WHERE id=?", (_p["id"],))
+                                        _dc.commit()
+                                        _dc.close()
+                                        _mls_notif.notif_aprobacion(
+                                            nombre=_pnombre,
+                                            email=_p.get("email", ""),
+                                            aprobada=False,
+                                        )
+                                    except Exception:
+                                        pass
+                                    st.success("Inmobiliaria eliminada")
                                     st.rerun()
         except Exception as _ea:
             st.warning(f"Error sección A: {_ea}")
