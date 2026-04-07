@@ -2516,7 +2516,7 @@ Obtén el token creando un bot con @BotFather en Telegram.
         st.subheader("✅ B. Inmobiliarias activas")
         try:
             # Agregar columnas si no existen
-            for _col, _def in [("status","TEXT DEFAULT 'activo'"),
+            for _col, _def in [("status","TEXT DEFAULT 'aprobada'"),
                                 ("is_active","INTEGER DEFAULT 1")]:
                 try:
                     _mls_altb = db_conn()
@@ -2528,17 +2528,6 @@ Obtén el token creando un bot con @BotFather en Telegram.
                         _mls_altb.close()
                     except Exception:
                         pass
-
-            # RESET: status a 'aprobada' solo UNA VEZ
-            if not st.session_state.get("_reset_inmos_done", False):
-                try:
-                    _mls_reset = db_conn()
-                    _mls_reset.execute("UPDATE inmobiliarias SET status='aprobada' WHERE status IS NULL OR status = ''")
-                    _mls_reset.commit()
-                    _mls_reset.close()
-                    st.session_state["_reset_inmos_done"] = True
-                except Exception:
-                    pass
 
             _activas = _mls.get_inmos_activas()
             if not _activas:
@@ -2563,15 +2552,15 @@ Obtén el token creando un bot con @BotFather en Telegram.
                         pass
 
                     # GET status actual
-                    _imo_status = None
+                    _imo_status = "aprobada"
                     try:
                         _fcs = db_conn()
-                        _imo_status = _fcs.execute("SELECT status FROM inmobiliarias WHERE id=?", (_a["id"],)).fetchone()
-                        if _imo_status:
-                            _imo_status = _imo_status[0]
+                        _sts = _fcs.execute("SELECT status FROM inmobiliarias WHERE id=?", (_a["id"],)).fetchone()
+                        if _sts:
+                            _imo_status = _sts[0] or "aprobada"
                         _fcs.close()
                     except Exception:
-                        _imo_status = "aprobada"
+                        pass
 
                     with st.expander(
                         f"🏢 {_anombre} — Plan {_plan_a} | Firma: {_firma_a} | "
@@ -2591,7 +2580,7 @@ Obtén el token creando un bot con @BotFather en Telegram.
 | Firma acuerdo | {_firma_a} |
 | Fecha firma | {((_a.get('firma_timestamp') or ''))[:10] or '—'} |
 | Fincas activas | {_n_fincas_a} |
-| Estado | {_imo_status or 'aprobada'} |
+| Estado | {_imo_status} |
 """)
                             # Detalle completo en sub-expander
                             with st.expander("📋 Ver detalle completo"):
@@ -2618,10 +2607,28 @@ Obtén el token creando un bot con @BotFather en Telegram.
 """)
                         with _bb:
                             st.markdown("**Acciones**")
+                            st.caption(f"🔧 Status: `{_imo_status or 'aprobada'}`")
 
-                            _mls_c1, _mls_c2 = st.columns(2)
+                            _mls_c1, _mls_c2, _mls_c3 = st.columns(3)
+
                             with _mls_c1:
-                                if st.button("⏳ En trámite", key=f"mls_tramite_{_a['id']}", use_container_width=True):
+                                if st.button("✅ APROBAR", key=f"mls_apro_{_a['id']}",
+                                           use_container_width=True, type="primary"):
+                                    st.write(f"🔴 BOTÓN PRESIONADO - Aprobando {_a['id']}")
+                                    try:
+                                        _mls_ap = db_conn()
+                                        _mls_ap.execute("UPDATE inmobiliarias SET status=? WHERE id=?", ("aprobada", _a["id"]))
+                                        _mls_ap.commit()
+                                        _mls_ap.close()
+                                        st.cache_data.clear()
+                                        st.success("✅ Aprobada")
+                                        st.rerun()
+                                    except Exception as _e:
+                                        st.error(f"❌ ERROR: {_e}")
+
+                            with _mls_c2:
+                                if st.button("⏳ EN TRÁMITE", key=f"mls_tramite_{_a['id']}", use_container_width=True):
+                                    st.write(f"🔴 BOTÓN PRESIONADO - En trámite {_a['id']}")
                                     try:
                                         _mls_tr = db_conn()
                                         _mls_tr.execute("UPDATE inmobiliarias SET status=? WHERE id=?", ("tramite", _a["id"]))
@@ -2631,20 +2638,21 @@ Obtén el token creando un bot con @BotFather en Telegram.
                                         st.info("En trámite")
                                         st.rerun()
                                     except Exception as _e:
-                                        st.error(f"Error: {_e}")
+                                        st.error(f"❌ ERROR: {_e}")
 
-                            with _mls_c2:
-                                if st.button("⏸ Suspender", key=f"mls_susp_{_a['id']}", use_container_width=True):
+                            with _mls_c3:
+                                if st.button("⏸ SUSPENDER", key=f"mls_susp_{_a['id']}", use_container_width=True):
+                                    st.write(f"🔴 BOTÓN PRESIONADO - Suspendiendo {_a['id']}")
                                     try:
                                         _mls_su = db_conn()
                                         _mls_su.execute("UPDATE inmobiliarias SET status=? WHERE id=?", ("suspendida", _a["id"]))
                                         _mls_su.commit()
                                         _mls_su.close()
                                         st.cache_data.clear()
-                                        st.warning(f"⏸ {_anombre} suspendida.")
+                                        st.warning(f"⏸ Suspendida")
                                         st.rerun()
                                     except Exception as _e:
-                                        st.error(f"Error: {_e}")
+                                        st.error(f"❌ ERROR: {_e}")
 
         except Exception as _eb:
             st.warning(f"Error sección B: {_eb}")
