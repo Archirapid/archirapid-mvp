@@ -1195,9 +1195,9 @@ def main():
                     except Exception:
                         pass
 
-            # Actualizar profesionales existentes a active=0 si no tienen status (registros viejos)
+            # RESET: Forzar todos los profesionales a pendiente (excepto los ya bloqueados)
             try:
-                _conn5.execute("UPDATE service_providers SET status='pendiente' WHERE status IS NULL")
+                _conn5.execute("UPDATE service_providers SET status='pendiente' WHERE status IS NULL OR status = '' OR status = 'activo'")
                 _conn5.commit()
             except Exception:
                 pass
@@ -1244,7 +1244,13 @@ def main():
                 for _p5 in _providers5:
                     (_pid5, _name5, _email5, _comp5, _spec5, _exp5,
                      _area5, _feat5, _funtil5, _fplan5, _cat5, _active5, _status5, _is_active5) = _p5
-                    _status_icon = "🟢" if _active5 else "🔴"
+                    # Ícono basado en status, no en active
+                    if _status5 == 'activo':
+                        _status_icon = "🟢"
+                    elif _status5 == 'bloqueado':
+                        _status_icon = "🔴"
+                    else:  # pendiente, tramite, NULL
+                        _status_icon = "🟡"
                     _badge = "⭐ DESTACADO" if _feat5 else "🆓 Gratuito"
                     with st.expander(f"{_status_icon} {_badge} · {_name5} ({_email5}) — {_area5}"):
                         _ci1, _ci2 = st.columns(2)
@@ -1257,7 +1263,7 @@ def main():
   <b>Zona:</b> {_area5 or '—'}<br>
   <b>Plan solicitado:</b> {_fplan5 or 'free'}<br>
   <b>Registrado:</b> {(_cat5 or '')[:10]}<br>
-  <b>Estado:</b> {'✅ Activo' if _active5 else '🚫 Bloqueado'}
+  <b>Estado:</b> {_status5 or 'pendiente'}
 </div>""", unsafe_allow_html=True)
                         with _ci2:
                             # ── Destacado ──
@@ -1297,6 +1303,7 @@ def main():
                             _bc1, _bc2, _bc3 = st.columns(3)
                             with _bc1:
                                 if _status5 == 'activo':
+                                    # Si ya está activo, mostrar Bloquear
                                     if st.button("🚫 Bloquear", key=f"btn_prof_block_{_pid5}",
                                                  use_container_width=True,
                                                  help="Bloquear acceso — el profesional no podrá entrar a su panel"):
@@ -1306,7 +1313,19 @@ def main():
                                         st.cache_data.clear()
                                         st.warning(f"🚫 {_name5} bloqueado.")
                                         st.rerun()
+                                elif _status5 == 'bloqueado':
+                                    # Si está bloqueado, mostrar Desbloquear
+                                    if st.button("✅ Desbloquear", key=f"btn_prof_unblock_{_pid5}",
+                                                 use_container_width=True, type="primary",
+                                                 help="Desbloquear y aprobar acceso"):
+                                        _ca = db_conn()
+                                        _ca.execute("UPDATE service_providers SET active=1, status=?, is_active=? WHERE id=?", ("activo", 1, _pid5))
+                                        _ca.commit(); _ca.close()
+                                        st.cache_data.clear()
+                                        st.success(f"✅ {_name5} desbloqueado.")
+                                        st.rerun()
                                 else:
+                                    # Si está pendiente/tramite/etc, mostrar Aprobar
                                     if st.button("✅ Aprobar", key=f"btn_prof_approve_{_pid5}",
                                                  use_container_width=True, type="primary",
                                                  help="Aprobar acceso — el profesional podrá usar su panel"):
@@ -1318,15 +1337,21 @@ def main():
                                         st.rerun()
 
                             with _bc2:
-                                if st.button("⏳ En trámite", key=f"btn_prof_pending_{_pid5}",
-                                             use_container_width=True,
-                                             help="Marcar como en proceso de revisión"):
-                                    _cp = db_conn()
-                                    _cp.execute("UPDATE service_providers SET status=?, is_active=? WHERE id=?", ("tramite", 0, _pid5))
-                                    _cp.commit(); _cp.close()
-                                    st.cache_data.clear()
-                                    st.info("En trámite")
-                                    st.rerun()
+                                # Solo mostrar "En trámite" si NO está ya en trámite
+                                if _status5 != 'tramite':
+                                    if st.button("⏳ En trámite", key=f"btn_prof_pending_{_pid5}",
+                                                 use_container_width=True,
+                                                 help="Marcar como en proceso de revisión"):
+                                        _cp = db_conn()
+                                        _cp.execute("UPDATE service_providers SET status=?, is_active=? WHERE id=?", ("tramite", 0, _pid5))
+                                        _cp.commit(); _cp.close()
+                                        st.cache_data.clear()
+                                        st.info("En trámite")
+                                        st.rerun()
+                                else:
+                                    st.button("⏳ En trámite", key=f"btn_prof_pending_{_pid5}",
+                                             use_container_width=True, disabled=True,
+                                             help="Ya está en trámite")
 
                             with _bc3:
                                 # POPOVER para eliminar
