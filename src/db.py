@@ -1056,6 +1056,10 @@ def ensure_tables():
             c.execute("ALTER TABLE plots ADD COLUMN featured INTEGER DEFAULT 0")
         except Exception:
             pass  # ya existe
+        try:
+            c.execute("ALTER TABLE plots ADD COLUMN is_active INTEGER DEFAULT 1")
+        except Exception:
+            pass  # Columna ya existe
         c.execute("""CREATE TABLE IF NOT EXISTS projects (
             id TEXT PRIMARY KEY,
             title TEXT,

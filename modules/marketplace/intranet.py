@@ -75,6 +75,33 @@ def render_admin_actions(item_id: str, table_name: str, section_slug: str, item_
                         st.error(f"Error: {e}")
 
 
+def _update_plot_status(pid: str, new_status: str) -> bool:
+    """
+    Actualiza el estado de un plot con lógica blindada de is_active.
+
+    Estados con is_active=1: disponible, published, reserved
+    Estados con is_active=0: sold, suspended, no_disponible
+    """
+    is_active_map = {
+        'disponible': 1, 'published': 1, 'reserved': 1,
+        'sold': 0, 'suspended': 0, 'no_disponible': 0
+    }
+    is_active = is_active_map.get(new_status, 0)
+
+    try:
+        _conn = db_conn()
+        _conn.execute(
+            "UPDATE plots SET status=?, is_active=? WHERE id=?",
+            (new_status, is_active, pid)
+        )
+        _conn.commit()
+        _conn.close()
+        return True
+    except Exception as e:
+        st.error(f"Error actualizando estado: {e}")
+        return False
+
+
 def main():
     st.title("🔐 Intranet — Gestión Interna de ARCHIRAPID")
 
@@ -260,69 +287,74 @@ def main():
 
                         with _fi2:
                             st.markdown("**⚙️ Cambiar estado**")
+                            _current_status = p.get('status', 'published')
                             _btn_col1, _btn_col2, _btn_col3 = st.columns(3)
 
+                            # DISPONIBLE / PUBLICADA
                             with _btn_col1:
-                                if st.button("✅ Aprobar", key=f"btn_plots_approve_{p['id']}",
-                                             use_container_width=True, type="primary"):
-                                    _uc = db_conn()
-                                    _uc.execute("UPDATE plots SET status='disponible', is_active=1 WHERE id=?", (p["id"],))
-                                    _uc.commit(); _uc.close()
-                                    st.success("Finca aprobada ✅")
-                                    st.rerun()
+                                _is_primary = _current_status in ('disponible', 'published')
+                                if st.button("✅ Disponible", key=f"p_btn_disponible_{p['id']}",
+                                             use_container_width=True, type="primary" if _is_primary else "secondary"):
+                                    if _update_plot_status(p['id'], 'disponible'):
+                                        st.success("✅ Finca disponible")
+                                        st.rerun()
 
+                            # SUSPENDIDA
                             with _btn_col2:
-                                if st.button("🚫 Suspender", key=f"btn_plots_suspend_{p['id']}",
-                                             use_container_width=True):
-                                    _uc = db_conn()
-                                    _uc.execute("UPDATE plots SET status='suspended', is_active=0 WHERE id=?", (p["id"],))
-                                    _uc.commit(); _uc.close()
-                                    st.warning("Finca suspendida")
-                                    st.rerun()
+                                _is_primary = _current_status == 'suspended'
+                                if st.button("🚫 Suspender", key=f"p_btn_suspended_{p['id']}",
+                                             use_container_width=True, type="primary" if _is_primary else "secondary"):
+                                    if _update_plot_status(p['id'], 'suspended'):
+                                        st.warning("🚫 Finca suspendida")
+                                        st.rerun()
 
+                            # VENDIDA
                             with _btn_col3:
-                                if st.button("🔵 Vendida", key=f"btn_plots_sold_{p['id']}",
-                                             use_container_width=True):
-                                    _uc = db_conn()
-                                    _uc.execute("UPDATE plots SET status='sold', is_active=0 WHERE id=?", (p["id"],))
-                                    _uc.commit(); _uc.close()
-                                    st.info("Marcada como vendida")
-                                    st.rerun()
+                                _is_primary = _current_status in ('sold', 'vendida')
+                                if st.button("🔵 Vendida", key=f"p_btn_sold_{p['id']}",
+                                             use_container_width=True, type="primary" if _is_primary else "secondary"):
+                                    if _update_plot_status(p['id'], 'sold'):
+                                        st.info("🔵 Marcada como vendida")
+                                        st.rerun()
 
                             _btn_col4, _btn_col5, _btn_col6 = st.columns(3)
 
+                            # RESERVADA
                             with _btn_col4:
-                                if st.button("🟡 Reservada", key=f"btn_plots_reserved_{p['id']}",
-                                             use_container_width=True):
-                                    _uc = db_conn()
-                                    _uc.execute("UPDATE plots SET status='reserved', is_active=1 WHERE id=?", (p["id"],))
-                                    _uc.commit(); _uc.close()
-                                    st.info("Marcada como reservada")
-                                    st.rerun()
-
-                            with _btn_col5:
-                                if st.button("⚫ No disponible", key=f"btn_plots_unavailable_{p['id']}",
-                                             use_container_width=True):
-                                    _uc = db_conn()
-                                    _uc.execute("UPDATE plots SET status='no_disponible', is_active=0 WHERE id=?", (p["id"],))
-                                    _uc.commit(); _uc.close()
-                                    st.warning("No disponible")
-                                    st.rerun()
-
-                            with _btn_col6:
-                                # POPOVER para eliminar (sin anidamiento)
-                                with st.popover("🗑️ Eliminar", use_container_width=True):
-                                    st.error(f"⚠️ ¿Eliminar '{p['title']}'?")
-                                    st.caption("Esta acción es irreversible.")
-                                    if st.button("❌ Sí, eliminar", key=f"btn_plots_delete_yes_{p['id']}", type="primary", use_container_width=True):
-                                        _uc = db_conn()
-                                        _uc.execute("DELETE FROM plots WHERE id=?", (p["id"],))
-                                        _uc.commit(); _uc.close()
-                                        st.success("Finca eliminada.")
+                                _is_primary = _current_status in ('reserved', 'reservada')
+                                if st.button("🟡 Reservada", key=f"p_btn_reserved_{p['id']}",
+                                             use_container_width=True, type="primary" if _is_primary else "secondary"):
+                                    if _update_plot_status(p['id'], 'reserved'):
+                                        st.info("🟡 Marcada como reservada")
                                         st.rerun()
 
+                            # NO DISPONIBLE
+                            with _btn_col5:
+                                _is_primary = _current_status == 'no_disponible'
+                                if st.button("⚫ No disponible", key=f"p_btn_no_disponible_{p['id']}",
+                                             use_container_width=True, type="primary" if _is_primary else "secondary"):
+                                    if _update_plot_status(p['id'], 'no_disponible'):
+                                        st.warning("⚫ No disponible")
+                                        st.rerun()
+
+                            # ELIMINAR (POPOVER)
+                            with _btn_col6:
+                                with st.popover("🗑️ Eliminar", use_container_width=True):
+                                    st.error(f"⚠️ ¿Eliminar '{p['title']}'?")
+                                    st.caption("Irreversible. Se eliminará de la base de datos.")
+                                    if st.button("❌ Sí, eliminar", key=f"p_btn_delete_{p['id']}", type="primary", use_container_width=True):
+                                        try:
+                                            _uc = db_conn()
+                                            _uc.execute("DELETE FROM plots WHERE id=?", (p["id"],))
+                                            _uc.commit()
+                                            _uc.close()
+                                            st.success("✅ Finca eliminada.")
+                                            st.rerun()
+                                        except Exception as e:
+                                            st.error(f"Error al eliminar: {e}")
+
                             st.markdown("---")
-                            if st.button("📢 Alertar", key=f"btn_plots_alert_{p['id']}",
+                            if st.button("📢 Alertar", key=f"p_btn_alert_{p['id']}",
                                          use_container_width=True):
                                 try:
                                     from modules.marketplace.alertas import notify_new_plot
