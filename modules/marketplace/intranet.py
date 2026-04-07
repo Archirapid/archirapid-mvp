@@ -1303,98 +1303,52 @@ def main():
                                     st.error(f"Error guardando destacado: {_err_feat}")
 
                             st.markdown("---")
+                            # DEBUG
+                            st.caption(f"🔧 Status BD: `{_status5}` | Active: `{_active5}` | is_active: `{_is_active5}`")
+
                             # ── Aprobar / Bloquear ──
                             _bc1, _bc2, _bc3 = st.columns(3)
                             with _bc1:
-                                if _status5 == 'activo':
-                                    # Si ya está activo, mostrar Bloquear
-                                    if st.button("🚫 Bloquear", key=f"btn_prof_block_{_pid5}",
-                                                 use_container_width=True,
-                                                 help="Bloquear acceso — el profesional no podrá entrar a su panel"):
-                                        try:
-                                            _cb = db_conn()
-                                            _cb.execute("UPDATE service_providers SET active=0, is_featured=0, status=? WHERE id=?", ("bloqueado", _pid5))
-                                            _cb.commit()
-                                            _cb.close()
-                                            st.cache_data.clear()
-                                            st.warning(f"🚫 {_name5} bloqueado.")
-                                            st.rerun()
-                                        except Exception as _err_block:
-                                            st.error(f"Error al bloquear: {_err_block}")
-                                elif _status5 == 'bloqueado':
-                                    # Si está bloqueado, mostrar Desbloquear
-                                    if st.button("✅ Desbloquear", key=f"btn_prof_unblock_{_pid5}",
-                                                 use_container_width=True, type="primary",
-                                                 help="Desbloquear y aprobar acceso"):
-                                        try:
-                                            _ca = db_conn()
-                                            _ca.execute("UPDATE service_providers SET active=1, status=?, is_active=? WHERE id=?", ("activo", 1, _pid5))
-                                            _ca.commit()
-                                            _ca.close()
-                                            st.cache_data.clear()
-                                            st.success(f"✅ {_name5} desbloqueado.")
-                                            st.rerun()
-                                        except Exception as _err_unblock:
-                                            st.error(f"Error al desbloquear: {_err_unblock}")
-                                else:
-                                    # Si está pendiente/tramite/etc, mostrar Aprobar
-                                    if st.button("✅ Aprobar", key=f"btn_prof_approve_{_pid5}",
-                                                 use_container_width=True, type="primary",
-                                                 help="Aprobar acceso — el profesional podrá usar su panel"):
-                                        try:
-                                            _ca = db_conn()
-                                            _ca.execute("UPDATE service_providers SET active=1, status=?, is_active=? WHERE id=?", ("activo", 1, _pid5))
-                                            _ca.commit()
-                                            _ca.close()
-                                            st.cache_data.clear()
-                                            st.success(f"✅ {_name5} aprobado.")
-                                            st.rerun()
-                                        except Exception as _err_approve:
-                                            st.error(f"Error al aprobar: {_err_approve}")
-                                            import traceback
-                                            st.write(traceback.format_exc())
+                                if st.button("✅ APROBAR", key=f"btn_prof_approve_{_pid5}",
+                                             use_container_width=True, type="primary"):
+                                    try:
+                                        _ca = db_conn()
+                                        _ca.execute("UPDATE service_providers SET active=1, status=?, is_active=? WHERE id=?", ("activo", 1, _pid5))
+                                        _ca.commit()
+                                        _ca.close()
+                                        st.cache_data.clear()
+                                        st.success(f"✅ {_name5} aprobado.")
+                                        st.rerun()
+                                    except Exception as e:
+                                        st.error(f"ERROR: {e}")
 
                             with _bc2:
-                                # Solo mostrar "En trámite" si NO está ya en trámite
-                                if _status5 != 'tramite':
-                                    if st.button("⏳ En trámite", key=f"btn_prof_pending_{_pid5}",
-                                                 use_container_width=True,
-                                                 help="Marcar como en proceso de revisión"):
-                                        try:
-                                            _cp = db_conn()
-                                            _cp.execute("UPDATE service_providers SET status=?, is_active=? WHERE id=?", ("tramite", 0, _pid5))
-                                            _cp.commit()
-                                            _cp.close()
-                                            st.cache_data.clear()
-                                            st.info("En trámite")
-                                            st.rerun()
-                                        except Exception as _err_pending:
-                                            st.error(f"Error en trámite: {_err_pending}")
-                                            import traceback
-                                            st.write(traceback.format_exc())
-                                else:
-                                    st.button("⏳ En trámite", key=f"btn_prof_pending_{_pid5}",
-                                             use_container_width=True, disabled=True,
-                                             help="Ya está en trámite")
+                                if st.button("⏳ EN TRÁMITE", key=f"btn_prof_tramite_{_pid5}",
+                                             use_container_width=True):
+                                    try:
+                                        _cp = db_conn()
+                                        _cp.execute("UPDATE service_providers SET status=?, is_active=? WHERE id=?", ("tramite", 0, _pid5))
+                                        _cp.commit()
+                                        _cp.close()
+                                        st.cache_data.clear()
+                                        st.info("En trámite")
+                                        st.rerun()
+                                    except Exception as e:
+                                        st.error(f"ERROR: {e}")
 
                             with _bc3:
-                                # POPOVER para eliminar
-                                with st.popover("🗑️ Eliminar", use_container_width=True):
-                                    st.error(f"⚠️ ¿Eliminar a {_name5}?")
-                                    st.caption("Esta acción es irreversible.")
-                                    if st.button("❌ Sí, eliminar", key=f"btn_prof_delete_{_pid5}",
-                                                 type="primary", use_container_width=True):
-                                        try:
-                                            _cd = db_conn()
-                                            _cd.execute("DELETE FROM service_providers WHERE id=?", (_pid5,))
-                                            _cd.execute("DELETE FROM users WHERE email=?", (_email5,))
-                                            _cd.commit()
-                                            _cd.close()
-                                            st.cache_data.clear()
-                                            st.success(f"🗑️ {_name5} eliminado.")
-                                            st.rerun()
-                                        except Exception as _err_delete:
-                                            st.error(f"Error al eliminar: {_err_delete}")
+                                if st.button("🚫 BLOQUEAR", key=f"btn_prof_block_{_pid5}",
+                                             use_container_width=True):
+                                    try:
+                                        _cb = db_conn()
+                                        _cb.execute("UPDATE service_providers SET active=0, is_featured=0, status=? WHERE id=?", ("bloqueado", _pid5))
+                                        _cb.commit()
+                                        _cb.close()
+                                        st.cache_data.clear()
+                                        st.warning(f"🚫 {_name5} bloqueado.")
+                                        st.rerun()
+                                    except Exception as e:
+                                        st.error(f"ERROR: {e}")
 
         except Exception as e:
             st.error(f"Error en Gestión de Profesionales: {e}")
