@@ -128,6 +128,7 @@ def main():
         "📋 Gestión de Fincas",
         "🏗️ Gestión de Proyectos",
         "💰 Ventas y Transacciones",
+        "💎 Suscripciones & Proyectos AI",
         "📞 Consultas y Soporte",
         "🛠️ Profesionales",
         "⚙️ Admin",
@@ -769,6 +770,138 @@ def main():
                     st.info("Sin sesiones Stripe todavía. Usa tarjeta 4242 4242 4242 4242 para test.")
             except Exception as _est3:
                 st.warning(f"Stripe error: {type(_est3).__name__}: {_est3}")
+
+    elif _admin_seccion == "💎 Suscripciones & Proyectos AI":
+        try:
+            st.header("💎 Suscripciones & Proyectos AI — Gestión de Estados")
+
+            # Tabs para separar gestión
+            _tab_subs, _tab_ai = st.tabs(["📋 Suscripciones", "🏠 Proyectos AI"])
+
+            with _tab_subs:
+                st.subheader("Suscripciones de Arquitectos")
+                _db_subs = db_conn()
+                try:
+                    _subs_rows = _db_subs.execute("""
+                        SELECT s.id, COALESCE(a.name, u.name) as nombre, COALESCE(a.email, u.email) as email,
+                               s.plan_type as plan, s.price, s.status, s.start_date, s.end_date, s.created_at
+                        FROM subscriptions s
+                        LEFT JOIN architects a ON s.architect_id = a.id
+                        LEFT JOIN users u ON s.architect_id = u.id
+                        ORDER BY s.created_at DESC
+                    """).fetchall()
+                finally:
+                    _db_subs.close()
+
+                if not _subs_rows:
+                    st.info("Sin suscripciones todavía.")
+                else:
+                    for _srow in _subs_rows:
+                        _sid, _sname, _semail, _splan, _sprice, _sstatus, _sstart, _send, _scat = _srow
+                        _status_icon = "✅" if _sstatus == "active" else ("⏳" if _sstatus == "pending" else "❌")
+                        with st.expander(f"{_status_icon} {_sname} — Plan {_splan} | {_sstatus}"):
+                            _sc1, _sc2 = st.columns([3, 2])
+                            with _sc1:
+                                st.markdown(f"""
+| Campo | Valor |
+|---|---|
+| Email | {_semail} |
+| Plan | {_splan} |
+| Precio | €{_sprice:.0f}/mes |
+| Estado | **{_sstatus}** |
+| Inicio | {(_sstart or '—')[:10]} |
+| Vencimiento | {(_send or '—')[:10]} |
+| Registrado | {(_scat or '—')[:10]} |
+""")
+                            with _sc2:
+                                st.markdown("**Cambiar estado**")
+                                if st.button("⏳ En trámite", key=f"sub_pending_{_sid}", use_container_width=True):
+                                    _sc_conn = db_conn()
+                                    _sc_conn.execute("UPDATE subscriptions SET status=?, is_active=0 WHERE id=?", ("pending", _sid))
+                                    _sc_conn.commit(); _sc_conn.close()
+                                    st.info("En trámite")
+                                    st.rerun()
+                                if st.button("✅ Autorizada", key=f"sub_active_{_sid}", type="primary", use_container_width=True):
+                                    _ac_conn = db_conn()
+                                    _ac_conn.execute("UPDATE subscriptions SET status=?, is_active=1 WHERE id=?", ("active", _sid))
+                                    _ac_conn.commit(); _ac_conn.close()
+                                    st.success("Autorizada ✅")
+                                    st.rerun()
+                                if st.button("🔴 Suspender", key=f"sub_suspended_{_sid}", use_container_width=True):
+                                    _sus_conn = db_conn()
+                                    _sus_conn.execute("UPDATE subscriptions SET status=?, is_active=0 WHERE id=?", ("suspended", _sid))
+                                    _sus_conn.commit(); _sus_conn.close()
+                                    st.warning("Suspendida")
+                                    st.rerun()
+                                if st.button("❌ Anular", key=f"sub_cancelled_{_sid}", use_container_width=True):
+                                    _can_conn = db_conn()
+                                    _can_conn.execute("UPDATE subscriptions SET status=?, is_active=0 WHERE id=?", ("cancelled", _sid))
+                                    _can_conn.commit(); _can_conn.close()
+                                    st.error("Anulada")
+                                    st.rerun()
+
+            with _tab_ai:
+                st.subheader("Proyectos AI Designer")
+                _db_ai = db_conn()
+                try:
+                    _ai_rows = _db_ai.execute("""
+                        SELECT id, client_email, project_name, total_area, total_cost, style,
+                               status, created_at
+                        FROM ai_projects
+                        ORDER BY created_at DESC
+                    """).fetchall()
+                finally:
+                    _db_ai.close()
+
+                if not _ai_rows:
+                    st.info("Sin proyectos AI todavía.")
+                else:
+                    for _arow in _ai_rows:
+                        _aid, _aemail, _aname, _aarea, _acost, _astyle, _astatus, _acat = _arow
+                        _ai_status_icon = "✅" if _astatus == "activo" else ("⏳" if _astatus == "en_tramite" else "❌")
+                        with st.expander(f"{_ai_status_icon} {_aname} — €{_acost:,.0f} | {_astatus}"):
+                            _aic1, _aic2 = st.columns([3, 2])
+                            with _aic1:
+                                st.markdown(f"""
+| Campo | Valor |
+|---|---|
+| Cliente | {_aemail} |
+| Proyecto | {_aname} |
+| Área | {_aarea:.0f} m² |
+| Coste | €{_acost:,.0f} |
+| Estilo | {_astyle} |
+| Estado | **{_astatus}** |
+| Fecha | {(_acat or '—')[:10]} |
+""")
+                            with _aic2:
+                                st.markdown("**Cambiar estado**")
+                                if st.button("⏳ En trámite", key=f"ai_pending_{_aid}", use_container_width=True):
+                                    _ai_conn = db_conn()
+                                    _ai_conn.execute("UPDATE ai_projects SET status=?, is_active=0 WHERE id=?", ("en_tramite", _aid))
+                                    _ai_conn.commit(); _ai_conn.close()
+                                    st.info("En trámite")
+                                    st.rerun()
+                                if st.button("✅ Autorizado", key=f"ai_active_{_aid}", type="primary", use_container_width=True):
+                                    _aiac_conn = db_conn()
+                                    _aiac_conn.execute("UPDATE ai_projects SET status=?, is_active=1 WHERE id=?", ("activo", _aid))
+                                    _aiac_conn.commit(); _aiac_conn.close()
+                                    st.success("Autorizado ✅")
+                                    st.rerun()
+                                if st.button("🔴 Suspender", key=f"ai_suspended_{_aid}", use_container_width=True):
+                                    _ai_sus = db_conn()
+                                    _ai_sus.execute("UPDATE ai_projects SET status=?, is_active=0 WHERE id=?", ("suspendido", _aid))
+                                    _ai_sus.commit(); _ai_sus.close()
+                                    st.warning("Suspendido")
+                                    st.rerun()
+                                if st.button("❌ Anular", key=f"ai_cancelled_{_aid}", use_container_width=True):
+                                    _ai_can = db_conn()
+                                    _ai_can.execute("UPDATE ai_projects SET status=?, is_active=0 WHERE id=?", ("anulado", _aid))
+                                    _ai_can.commit(); _ai_can.close()
+                                    st.error("Anulado")
+                                    st.rerun()
+
+        except Exception as _e_subs_ai:
+            st.error(f"Error en Suscripciones & Proyectos AI: {_e_subs_ai}")
 
     elif _admin_seccion == "📞 Consultas y Soporte":
         try:
