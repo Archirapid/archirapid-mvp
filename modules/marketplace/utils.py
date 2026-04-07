@@ -151,7 +151,7 @@ def list_projects():
     c.execute("""
         SELECT p.id, p.title, p.description, p.area_m2, p.price,
                p.foto_principal, p.galeria_fotos, p.created_at,
-               p.is_active,
+               p.is_active, p.status,
                COALESCE(a.name, u.name, 'Sin nombre') AS architect_name,
                COALESCE(a.company, '') AS company,
                COALESCE(a.email, u.email, '') AS architect_email,
@@ -166,7 +166,7 @@ def list_projects():
     cols = [
         "id","title","description","area_m2","price",
         "foto_principal","galeria_fotos","created_at",
-        "is_active","architect_name","company",
+        "is_active","status","architect_name","company",
         "architect_email","architect_phone","architect_id",
     ]
     projects = [dict(zip(cols,r)) for r in rows]
