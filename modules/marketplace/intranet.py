@@ -2529,6 +2529,17 @@ Obtén el token creando un bot con @BotFather en Telegram.
                     except Exception:
                         pass
 
+            # RESET: status a 'aprobada' solo UNA VEZ (igual que profesionales)
+            if not st.session_state.get("_reset_inmos_mls_done", False):
+                try:
+                    _mls_reset = db_conn()
+                    _mls_reset.execute("UPDATE inmobiliarias SET status='aprobada' WHERE status IS NULL OR status=''")
+                    _mls_reset.commit()
+                    _mls_reset.close()
+                    st.session_state["_reset_inmos_mls_done"] = True
+                except Exception:
+                    pass
+
             _activas = _mls.get_inmos_activas()
             if not _activas:
                 st.info("No hay inmobiliarias activas todavía.")
