@@ -1,0 +1,76 @@
+📋 RESUMEN DE SESIÓN - ArchiRapid MVP (2026-04-07)
+🎯 OBJETIVOS COMPLETADOS
+
+FIX PLANO DE CIMENTACIÓN ✅
+Archivo: modules/ai_house_designer/floor_plan_svg.py
+Cambio: Restauré ax.set_aspect('equal') para mantener escala 1:1
+Resultado: PNG de cimentación visible sin recortes
+RESTAURAR SLIDERS DE POSICIÓN EN BABYLON ✅
+Archivo: modules/ai_house_designer/babylon_editor.py
+Cambio: HTML + JS para sliders X/Z en toolbar (sin reruns Streamlit)
+Resultado: Movimiento en tiempo real de casa sobre el lote
+LIMPIEZA DE FLOW.PY ✅
+Archivo: modules/ai_house_designer/flow.py
+Cambio: Eliminé aplicación de offsets al layout + sliders Streamlit redundantes
+Resultado: Flujo limpio sin duplicación de lógica
+FIX DE BOTONES "VOLVER" ✅
+FIX DE BOTONES "VOLVER" ✅
+Archivos: mls_portal.py, client_panel.py, marketplace_upload.py, owners.py, service_providers.py
+Cambio: Reemplacé st.rerun() por st.stop() en botones Volver
+Resultado: Navegación correcta sin loops infinitos
+ELIMINAR CONFLICTOS _nav_radio ✅
+Cambio: Removí asignaciones de st.session_state["_nav_radio"] en botones (Streamlit 1.42+ no permite modificar widgets instantaneados)
+Resultado: Sin errores StreamlitAPIException
+ACTUALIZAR SINTAXIS STREAMLIT 2026 ✅
+Cambios: use_container_width=True → width='stretch' (24 en app.py, 67 en flow.py)
+Resultado: Compatible con Streamlit 2026
+UI HOME - 7 COLUMNAS DE ACCESO ✅
+Archivo: app.py
+Cambio: Creé grid de 7 columnas nativas: Terreno, Comprador, Estudiante, Arquitecto, Constructor, Prefab, Inmo/MLS
+CSS: Bordes azul #2471A3, hover effects, captions destacados
+Resultado: Interfaz profesional y accesible
+ÁRBITRO DE NAVEGACIÓN (Back Button) ✅
+Archivo: app.py (línea ~720)
+Cambio: Sincronización bidireccional URL ↔ session_state
+Resultado: Botón Atrás del navegador funciona correctamente
+OPTIMIZAR MOBILE CSS ✅
+Archivo: modules/marketplace/mobile_css.py
+Cambio: Movré reglas header/block-container DENTRO del @media (max-width: 768px) para no afectar desktop
+Resultado: Desktop sin overhead, móvil optimizado
+📊 COMMITS REALIZADOS
+e3d3950 feat: Árbitro de Navegación - Sincronizar botón Atrás sin romper lógica
+ffd56f7 refactor: Actualizar sintaxis de botones a Streamlit 2026 (use_container_width → width)
+279161e ... (commits anteriores mantenidos)
+⚠️ ESTADO CRÍTICO - PENDIENTES
+Tarea Estado Notas
+Botones Volver (todas las páginas) ✅ Fijo Ahora usa st.stop()
+Conflictos _nav_radio ✅ Removidos No modificar en callbacks
+Query params routing ✅ Árbitro activo Sincroniza botón Atrás
+Push a main ❌ NO HECHO Cambios locales listos, sin push
+Stripe Live ⏳ Pendiente Activar cuando esté 100% estable
+🔧 CAMBIOS POR ARCHIVO
+Archivo Cambios Líneas
+app.py CSS header, 7 columnas, árbitro nav, sintaxis ST2026 ~750-2100
+flow.py Eliminar offsets/sliders, sintaxis ST2026 ~2700-3000
+floor_plan_svg.py aspect='equal', savefig sin bbox_inches ~850-1055
+babylon_editor.py HTML sliders, JS offset logic, CSS perimetral ~60-120, ~850-900
+mobile_css.py Header rules DENTRO @media, no universal ~161-190
+mls_portal.py st.stop() en volver ~200-210
+client_panel.py st.stop() en 3 lugares volver ~461, ~715, ~2090
+Otros módulos st.stop() en botones marketplace_upload, owners, service_providers
+🚀 PRÓXIMOS PASOS RECOMENDADOS
+Probar en localhost: home, botones acceso, navegación Atrás
+Verificar Streamlit Cloud (si deploy automático activado)
+Auditoría Stripe (antes de activar Live - usar skill archirapid-deploy)
+Review de MEP en Babylon (pendiente desde prior sessions)
+📝 NOTAS IMPORTANTES
+✅ NO romped: Cambios quirúrgicos, lógica intacta
+✅ URL Router: Sincronizado a través de _SLUG_TO_PAGE global
+✅ Mobile CSS: Aislado en @media, desktop sin overhead
+⚠️ _nav_radio: NUNCA asignar en callbacks (Streamlit 1.42+ lo prohíbe)
+⚠️ st.stop(): Usar en módulos para romper el rerun recursivo 3 reglas de oro para que no rompa lo que acabamos de arreglar:
+Regla st.stop(): "En botones de 'Volver', usamos siempre st.stop() en lugar de st.rerun() para evitar bucles de navegación".
+
+Regla _nav_radio: "No intentes asignar valores a st.session_state['_nav_radio'] dentro de un callback, da error en Streamlit 1.42+".
+
+Regla del Árbitro: "El sistema de navegación ahora depende del 'Árbitro de Navegación' (línea ~720 de app.py). Cualquier cambio de página debe sincronizarse con st.query_params".
