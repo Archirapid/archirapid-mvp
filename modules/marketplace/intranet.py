@@ -2952,6 +2952,39 @@ def _admin_solicitudes_estudiantes():
                     if st.button("❌ Rechazar", key=f"rec_est_{id_}"):
                         _cambiar_estado_estudiante(id_, "rechazado")
                         st.rerun()
+            else:
+                # Para estudiantes aprobados o rechazados, ofrecer opciones de cambio de estado
+                _est_col1, _est_col2, _est_col3 = st.columns(3)
+                with _est_col1:
+                    if estado != "aprobado":
+                        if st.button("✅ Restaurar como aprobado", key=f"restore_est_{id_}"):
+                            _cambiar_estado_estudiante(id_, "aprobado")
+                            st.rerun()
+                with _est_col2:
+                    if st.button("🔴 Suspender acceso", key=f"susp_est_{id_}"):
+                        _cambiar_estado_estudiante(id_, "suspendido")
+                        st.rerun()
+                with _est_col3:
+                    if st.button("🗑️ Eliminar", key=f"del_est_{id_}"):
+                        st.session_state[f"confirm_del_est_{id_}"] = True
+
+                # Confirmación de eliminación
+                if st.session_state.get(f"confirm_del_est_{id_}"):
+                    st.error(f"¿Eliminar a {nombre}? Irreversible.")
+                    _d1, _d2 = st.columns(2)
+                    with _d1:
+                        if st.button("❌ Sí, eliminar", key=f"del_est_yes_{id_}", type="primary"):
+                            _c = db_conn()
+                            _c.execute("DELETE FROM estudiantes WHERE id=?", (id_,))
+                            _c.commit()
+                            _c.close()
+                            st.session_state.pop(f"confirm_del_est_{id_}", None)
+                            st.success("Estudiante eliminado")
+                            st.rerun()
+                    with _d2:
+                        if st.button("↩️ Cancelar", key=f"del_est_no_{id_}"):
+                            st.session_state.pop(f"confirm_del_est_{id_}", None)
+                            st.rerun()
 
 
 def _admin_proyectos_tfg():
@@ -3002,30 +3035,68 @@ def _admin_proyectos_tfg():
                     if st.button("❌ Rechazar", key=f"rec_proy_{id_}"):
                         _cambiar_estado_proyecto(id_, "rechazado")
                         st.rerun()
+            else:
+                # Para proyectos aprobados o rechazados, ofrecer opciones de cambio de estado
+                _proj_col1, _proj_col2, _proj_col3, _proj_col4 = st.columns(4)
+                with _proj_col1:
+                    if estado != "aprobado":
+                        if st.button("✅ Restaurar como aprobado", key=f"restore_proy_{id_}"):
+                            _cambiar_estado_proyecto(id_, "aprobado")
+                            st.rerun()
+                with _proj_col2:
+                    if st.button("⏸ Pausar publicación", key=f"pause_proy_{id_}"):
+                        _cambiar_estado_proyecto(id_, "pausado")
+                        st.rerun()
+                with _proj_col3:
+                    if st.button("🔴 Suspender", key=f"susp_proy_{id_}"):
+                        _cambiar_estado_proyecto(id_, "suspendido")
+                        st.rerun()
+                with _proj_col4:
+                    if st.button("🗑️ Eliminar", key=f"del_proy_{id_}"):
+                        st.session_state[f"confirm_del_proy_{id_}"] = True
+
+                # Confirmación de eliminación
+                if st.session_state.get(f"confirm_del_proy_{id_}"):
+                    st.error(f"¿Eliminar proyecto '{titulo}'? Irreversible.")
+                    _dp1, _dp2 = st.columns(2)
+                    with _dp1:
+                        if st.button("❌ Sí, eliminar", key=f"del_proy_yes_{id_}", type="primary"):
+                            _cp = db_conn()
+                            _cp.execute("DELETE FROM proyectos_tfg WHERE id=?", (id_,))
+                            _cp.commit()
+                            _cp.close()
+                            st.session_state.pop(f"confirm_del_proy_{id_}", None)
+                            st.success("Proyecto eliminado")
+                            st.rerun()
+                    with _dp2:
+                        if st.button("↩️ Cancelar", key=f"del_proy_no_{id_}"):
+                            st.session_state.pop(f"confirm_del_proy_{id_}", None)
+                            st.rerun()
 
 
 def _cambiar_estado_estudiante(id_: int, nuevo_estado: str):
+    _is_active = 1 if nuevo_estado == "aprobado" else 0
     conn = db_conn()
     try:
         conn.execute("""
             UPDATE estudiantes
-            SET estado = ?, approved_at = datetime('now')
+            SET estado = ?, status = ?, is_active = ?, approved_at = datetime('now')
             WHERE id = ?
-        """, (nuevo_estado, id_))
+        """, (nuevo_estado, nuevo_estado, _is_active, id_))
         conn.commit()
     finally:
         conn.close()
 
 
 def _cambiar_estado_proyecto(id_: int, nuevo_estado: str):
-    activo = 1 if nuevo_estado == "aprobado" else 0
+    _is_active = 1 if nuevo_estado == "aprobado" else 0
     conn = db_conn()
     try:
         conn.execute("""
             UPDATE proyectos_tfg
-            SET estado = ?, activo = ?, approved_at = datetime('now')
+            SET estado = ?, status = ?, is_active = ?, activo = ?, approved_at = datetime('now')
             WHERE id = ?
-        """, (nuevo_estado, activo, id_))
+        """, (nuevo_estado, nuevo_estado, _is_active, _is_active, id_))
         conn.commit()
     finally:
         conn.close()
