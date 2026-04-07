@@ -717,7 +717,8 @@ if _qp_seccion == "mls" and not st.session_state.get("_deep_link_routed"):
     if _qp_demo == "true":
         st.session_state["mls_demo_mode"] = True
 
-# === SYNC URL ↔ session_state — bidireccional, siempre activo (habilita browser back/forward) ===
+# --- ÁRBITRO DE NAVEGACIÓN (Sincronización Botón Atrás) ---
+# Mapeo slug → página (debe definirse antes de usarse)
 _SLUG_TO_PAGE = {
     "home":          "🏠 Inicio / Marketplace",
     "admin":         "Intranet",
@@ -731,10 +732,27 @@ _SLUG_TO_PAGE = {
     "arquitectos":   "Arquitectos (Marketplace)",
     "proveedor":     "👤 Panel de Proveedor",
     "registro-pro":  "📝 Registro de Proveedor de Servicios",
-    "mls":              "🏢 Inmobiliarias MLS",
-    "estudiantes":      "🎓 Estudiantes",
-    "prefabricadas":    "🏠 Portal Prefabricadas",
+    "mls":           "🏢 Inmobiliarias MLS",
+    "estudiantes":   "🎓 Estudiantes",
+    "prefabricadas": "🏠 Portal Prefabricadas",
 }
+
+_current_url_page = st.query_params.get("page", "home")
+_last_sync_page = st.session_state.get("last_synced_page", "home")
+
+# Si la URL ha cambiado (por el botón Atrás) y no coincide con lo último que procesamos
+if _current_url_page != _last_sync_page:
+    st.session_state["last_synced_page"] = _current_url_page
+    # Mapear el slug de la URL al título de la página
+    _target_title = _SLUG_TO_PAGE.get(_current_url_page, "🏠 Inicio / Marketplace")
+    st.session_state["selected_page"] = _target_title
+    st.session_state["_nav_radio"] = _target_title
+    if _current_url_page == "login":
+        st.session_state["viewing_login"] = True
+    else:
+        st.session_state["viewing_login"] = False
+    st.rerun()
+
 _url_slug = st.query_params.get("page", "")
 # ?page=login → mostrar formulario de login genérico en home
 if _url_slug == "login":
