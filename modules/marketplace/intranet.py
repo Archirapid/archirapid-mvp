@@ -1133,50 +1133,49 @@ def main():
 
                             st.markdown("---")
                             # ── Aprobar / Bloquear ──
-                            _bc1, _bc2 = st.columns(2)
+                            _bc1, _bc2, _bc3 = st.columns(3)
                             with _bc1:
                                 if _active5:
-                                    if st.button("🚫 Bloquear", key=f"block_{_pid5}",
+                                    if st.button("🚫 Bloquear", key=f"btn_prof_block_{_pid5}",
                                                  use_container_width=True,
                                                  help="Bloquear acceso — el profesional no podrá entrar a su panel"):
                                         _cb = db_conn()
-                                        _cb.execute("UPDATE service_providers SET active=0, is_featured=0 WHERE id=?", (_pid5,))
+                                        _cb.execute("UPDATE service_providers SET active=0, is_featured=0, status=? WHERE id=?", ("bloqueado", _pid5))
                                         _cb.commit(); _cb.close()
                                         st.warning(f"🚫 {_name5} bloqueado.")
                                         st.rerun()
                                 else:
-                                    if st.button("✅ Aprobar", key=f"approve_{_pid5}",
-                                                 use_container_width=True,
+                                    if st.button("✅ Aprobar", key=f"btn_prof_approve_{_pid5}",
+                                                 use_container_width=True, type="primary",
                                                  help="Aprobar acceso — el profesional podrá usar su panel"):
                                         _ca = db_conn()
-                                        _ca.execute("UPDATE service_providers SET active=1 WHERE id=?", (_pid5,))
+                                        _ca.execute("UPDATE service_providers SET active=1, status=?, is_active=? WHERE id=?", ("activo", 1, _pid5))
                                         _ca.commit(); _ca.close()
                                         st.success(f"✅ {_name5} aprobado.")
                                         st.rerun()
-                            with _bc2:
-                                if st.button("🗑️ Eliminar", key=f"del_{_pid5}",
-                                             use_container_width=True, type="secondary",
-                                             help="Eliminar permanentemente este profesional y su cuenta de usuario"):
-                                    st.session_state[f"confirm_del_{_pid5}"] = True
 
-                            # Confirmación de eliminación
-                            if st.session_state.get(f"confirm_del_{_pid5}"):
-                                st.error(f"¿Seguro que quieres eliminar a **{_name5}** ({_email5})? Esta acción no se puede deshacer.")
-                                _dc1, _dc2 = st.columns(2)
-                                with _dc1:
-                                    if st.button("❌ Sí, eliminar", key=f"confirm_yes_{_pid5}",
+                            with _bc2:
+                                if st.button("⏳ En trámite", key=f"btn_prof_pending_{_pid5}",
+                                             use_container_width=True,
+                                             help="Marcar como en proceso de revisión"):
+                                    _cp = db_conn()
+                                    _cp.execute("UPDATE service_providers SET status=?, is_active=? WHERE id=?", ("tramite", 0, _pid5))
+                                    _cp.commit(); _cp.close()
+                                    st.info("En trámite")
+                                    st.rerun()
+
+                            with _bc3:
+                                # POPOVER para eliminar
+                                with st.popover("🗑️ Eliminar", use_container_width=True):
+                                    st.error(f"⚠️ ¿Eliminar a {_name5}?")
+                                    st.caption("Esta acción es irreversible.")
+                                    if st.button("❌ Sí, eliminar", key=f"btn_prof_delete_{_pid5}",
                                                  type="primary", use_container_width=True):
                                         _cd = db_conn()
                                         _cd.execute("DELETE FROM service_providers WHERE id=?", (_pid5,))
                                         _cd.execute("DELETE FROM users WHERE email=?", (_email5,))
                                         _cd.commit(); _cd.close()
-                                        st.session_state.pop(f"confirm_del_{_pid5}", None)
                                         st.success(f"🗑️ {_name5} eliminado.")
-                                        st.rerun()
-                                with _dc2:
-                                    if st.button("↩️ Cancelar", key=f"confirm_no_{_pid5}",
-                                                 use_container_width=True):
-                                        st.session_state.pop(f"confirm_del_{_pid5}", None)
                                         st.rerun()
 
         except Exception as e:
@@ -3002,33 +3001,23 @@ def _admin_solicitudes_estudiantes():
                 _est_col1, _est_col2, _est_col3 = st.columns(3)
                 with _est_col1:
                     if estado != "aprobado":
-                        if st.button("✅ Restaurar como aprobado", key=f"restore_est_{id_}"):
+                        if st.button("✅ Restaurar", key=f"btn_est_restore_{id_}", type="primary", use_container_width=True):
                             _cambiar_estado_estudiante(id_, "aprobado")
                             st.rerun()
                 with _est_col2:
-                    if st.button("🔴 Suspender acceso", key=f"susp_est_{id_}"):
+                    if st.button("🔴 Suspender", key=f"btn_est_suspend_{id_}", use_container_width=True):
                         _cambiar_estado_estudiante(id_, "suspendido")
                         st.rerun()
                 with _est_col3:
-                    if st.button("🗑️ Eliminar", key=f"del_est_{id_}"):
-                        st.session_state[f"confirm_del_est_{id_}"] = True
-
-                # Confirmación de eliminación
-                if st.session_state.get(f"confirm_del_est_{id_}"):
-                    st.error(f"¿Eliminar a {nombre}? Irreversible.")
-                    _d1, _d2 = st.columns(2)
-                    with _d1:
-                        if st.button("❌ Sí, eliminar", key=f"del_est_yes_{id_}", type="primary"):
+                    with st.popover("🗑️ Eliminar", use_container_width=True):
+                        st.error(f"⚠️ ¿Eliminar a {nombre}?")
+                        st.caption("Irreversible.")
+                        if st.button("❌ Sí, eliminar", key=f"btn_est_delete_{id_}", type="primary", use_container_width=True):
                             _c = db_conn()
                             _c.execute("DELETE FROM estudiantes WHERE id=?", (id_,))
                             _c.commit()
                             _c.close()
-                            st.session_state.pop(f"confirm_del_est_{id_}", None)
                             st.success("Estudiante eliminado")
-                            st.rerun()
-                    with _d2:
-                        if st.button("↩️ Cancelar", key=f"del_est_no_{id_}"):
-                            st.session_state.pop(f"confirm_del_est_{id_}", None)
                             st.rerun()
 
 
@@ -3085,37 +3074,27 @@ def _admin_proyectos_tfg():
                 _proj_col1, _proj_col2, _proj_col3, _proj_col4 = st.columns(4)
                 with _proj_col1:
                     if estado != "aprobado":
-                        if st.button("✅ Restaurar como aprobado", key=f"restore_proy_{id_}"):
+                        if st.button("✅ Restaurar", key=f"btn_tfg_restore_{id_}", type="primary", use_container_width=True):
                             _cambiar_estado_proyecto(id_, "aprobado")
                             st.rerun()
                 with _proj_col2:
-                    if st.button("⏸ Pausar publicación", key=f"pause_proy_{id_}"):
+                    if st.button("⏸ Pausar", key=f"btn_tfg_pause_{id_}", use_container_width=True):
                         _cambiar_estado_proyecto(id_, "pausado")
                         st.rerun()
                 with _proj_col3:
-                    if st.button("🔴 Suspender", key=f"susp_proy_{id_}"):
+                    if st.button("🔴 Suspender", key=f"btn_tfg_suspend_{id_}", use_container_width=True):
                         _cambiar_estado_proyecto(id_, "suspendido")
                         st.rerun()
                 with _proj_col4:
-                    if st.button("🗑️ Eliminar", key=f"del_proy_{id_}"):
-                        st.session_state[f"confirm_del_proy_{id_}"] = True
-
-                # Confirmación de eliminación
-                if st.session_state.get(f"confirm_del_proy_{id_}"):
-                    st.error(f"¿Eliminar proyecto '{titulo}'? Irreversible.")
-                    _dp1, _dp2 = st.columns(2)
-                    with _dp1:
-                        if st.button("❌ Sí, eliminar", key=f"del_proy_yes_{id_}", type="primary"):
+                    with st.popover("🗑️ Eliminar", use_container_width=True):
+                        st.error(f"⚠️ ¿Eliminar '{titulo}'?")
+                        st.caption("Irreversible.")
+                        if st.button("❌ Sí, eliminar", key=f"btn_tfg_delete_{id_}", type="primary", use_container_width=True):
                             _cp = db_conn()
                             _cp.execute("DELETE FROM proyectos_tfg WHERE id=?", (id_,))
                             _cp.commit()
                             _cp.close()
-                            st.session_state.pop(f"confirm_del_proy_{id_}", None)
                             st.success("Proyecto eliminado")
-                            st.rerun()
-                    with _dp2:
-                        if st.button("↩️ Cancelar", key=f"del_proy_no_{id_}"):
-                            st.session_state.pop(f"confirm_del_proy_{id_}", None)
                             st.rerun()
 
 

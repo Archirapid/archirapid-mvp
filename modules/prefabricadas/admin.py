@@ -164,42 +164,44 @@ def render_admin_prefabricadas():
                         st.rerun()
 
                 st.markdown("---")
-                _ab1, _ab2 = st.columns(2)
+                _ab1, _ab2, _ab3 = st.columns(3)
                 with _ab1:
                     if comp["active"]:
-                        if st.button("🚫 Desactivar", key=f"pref_deact_{comp['id']}",
+                        if st.button("🚫 Desactivar", key=f"btn_pref_deact_{comp['id']}",
                                      use_container_width=True):
                             _ud = db_conn()
                             _ud.execute("UPDATE prefab_companies SET active=0 WHERE id=?", (comp["id"],))
                             _ud.commit(); _ud.close()
-                            st.warning("Desactivada"); st.rerun()
+                            st.warning("Desactivada")
+                            st.rerun()
                     else:
-                        if st.button("✅ Activar", key=f"pref_act_{comp['id']}",
+                        if st.button("✅ Activar", key=f"btn_pref_act_{comp['id']}",
                                      type="primary", use_container_width=True):
                             _ud = db_conn()
                             _ud.execute("UPDATE prefab_companies SET active=1 WHERE id=?", (comp["id"],))
                             _ud.commit(); _ud.close()
-                            st.success("Activada ✅"); st.rerun()
+                            st.success("Activada ✅")
+                            st.rerun()
                 with _ab2:
-                    if st.button("🗑️ Eliminar", key=f"pref_del_{comp['id']}",
-                                 use_container_width=True, type="secondary"):
-                        st.session_state[f"pref_del_confirm_{comp['id']}"] = True
+                    if st.button("⏸ Pausar", key=f"btn_pref_pause_{comp['id']}",
+                                 use_container_width=True):
+                        _up = db_conn()
+                        _up.execute("UPDATE prefab_companies SET status=?, is_active=0 WHERE id=?", ("pausado", comp["id"]))
+                        _up.commit(); _up.close()
+                        st.info("Pausada")
+                        st.rerun()
 
-                if st.session_state.get(f"pref_del_confirm_{comp['id']}"):
-                    st.error(f"¿Eliminar {comp['nombre']}? Irreversible.")
-                    _dc1, _dc2 = st.columns(2)
-                    with _dc1:
-                        if st.button("❌ Sí", key=f"pref_del_yes_{comp['id']}",
+                with _ab3:
+                    # POPOVER para eliminar
+                    with st.popover("🗑️ Eliminar", use_container_width=True):
+                        st.error(f"⚠️ ¿Eliminar {comp['nombre']}?")
+                        st.caption("Irreversible.")
+                        if st.button("❌ Sí, eliminar", key=f"btn_pref_delete_{comp['id']}",
                                      type="primary", use_container_width=True):
                             _dd = db_conn()
                             _dd.execute("DELETE FROM prefab_companies WHERE id=?", (comp["id"],))
                             _dd.commit(); _dd.close()
-                            st.session_state.pop(f"pref_del_confirm_{comp['id']}", None)
-                            st.success("Eliminada"); st.rerun()
-                    with _dc2:
-                        if st.button("↩️ Cancelar", key=f"pref_del_no_{comp['id']}",
-                                     use_container_width=True):
-                            st.session_state.pop(f"pref_del_confirm_{comp['id']}", None)
+                            st.success("Eliminada")
                             st.rerun()
 
     st.markdown("---")
