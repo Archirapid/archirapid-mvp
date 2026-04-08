@@ -883,6 +883,9 @@ _PG_ALTER_MIGRATIONS = [
     # fincas_mls — estado y actividad
     "ALTER TABLE fincas_mls ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pendiente_validacion'",
     "ALTER TABLE fincas_mls ADD COLUMN IF NOT EXISTS is_active INTEGER DEFAULT 0",
+    # plots — is_active estaba solo en SQLite, añadir también en PG
+    "ALTER TABLE plots ADD COLUMN IF NOT EXISTS is_active INTEGER DEFAULT 1",
+    "ALTER TABLE plots ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'published'",
 ]
 
 

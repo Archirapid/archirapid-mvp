@@ -1337,6 +1337,25 @@ def render_portal_cliente_proyecto():
 
 # Lógica de navegación robusta
 
+def sync_navigation():
+    """Reset quirúrgico: si URL no tiene ?page= (o es home), limpiar sesión y fijar home.
+    Evita que basura de sesiones previas (como _nav_radio='👤 Panel de Cliente')
+    haga que el sidebar radio sobreescriba selected_page tras un botón 'Volver'.
+    """
+    page_param = st.query_params.get("page", "")
+    if not page_param or page_param == "home":
+        _portal_pages = {
+            "👤 Panel de Cliente", "🏢 Inmobiliarias MLS",
+            "🏠 Propietarios", "Diseñador de Vivienda",
+            "👤 Panel de Proveedor", "🏠 Portal Prefabricadas",
+        }
+        if st.session_state.get("_nav_radio") in _portal_pages:
+            st.session_state.clear()
+            st.session_state["_nav_radio"] = "🏠 Inicio / Marketplace"
+            st.session_state["selected_page"] = "🏠 Inicio / Marketplace"
+
+sync_navigation()
+
 # Pre-configurar la key del radio si no existe o si su valor no está en PAGES
 _nav_val = st.session_state.get("_nav_radio")
 if _nav_val is None or _nav_val not in PAGES:

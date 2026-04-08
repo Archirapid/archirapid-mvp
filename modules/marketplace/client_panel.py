@@ -452,17 +452,10 @@ def show_buyer_panel_mls(client_email: str, finca_id: str) -> None:
         )
     with _back_col:
         if st.button("← Volver al marketplace", key="mls_back_to_map", use_container_width=True):
-            for _k in ["logged_in", "user_email", "role", "user_name", "mls_reserva_finca_id",
-                       "mls_show_project_search", "mls_show_prefab_config",
-                       "mls_show_transacciones", "mls_show_documentacion",
-                       "mls_show_construccion_offers"]:
-                st.session_state.pop(_k, None)
-            st.session_state["selected_page"] = "🏠 Inicio / Marketplace"
-            try:
-                del st.query_params["page"]
-            except Exception:
-                pass
-            st.stop()
+            st.query_params.clear()
+            st.session_state.clear()
+            st.cache_data.clear()
+            st.rerun()
 
     if finca:
         titulo           = finca.get("titulo") or "Finca MLS"
@@ -706,17 +699,11 @@ def show_full_client_dashboard(client_email):
     # Botón de cerrar sesión en sidebar
     with st.sidebar:
         st.info("💡 Puedes volver a acceder a tu portal en cualquier momento desde la página de inicio con tu email.")
-        if st.button("← Volver al marketplace", width='stretch', key="logout_button"):
-            st.session_state["client_logged_in"] = False
-            for key in ["client_email", "user_role", "has_transactions", "has_properties", "selected_project_for_panel"]:
-                if key in st.session_state:
-                    del st.session_state[key]
-            st.session_state["selected_page"] = "🏠 Inicio / Marketplace"
-            try:
-                del st.query_params["page"]
-            except Exception:
-                pass
-            st.stop()
+        if st.button("← Volver al marketplace", use_container_width=True, key="logout_button"):
+            st.query_params.clear()
+            st.session_state.clear()
+            st.cache_data.clear()
+            st.rerun()
     
     # Mostrar rol del usuario
     role_emoji = "🛒" if user_role == "buyer" else "🏠"
@@ -2084,14 +2071,10 @@ def show_buyer_panel(client_email):
     # BOTÓN SALIR — siempre visible al final del panel
     st.markdown("---")
     if st.button("← Volver al marketplace", key="buyer_panel_logout", type="secondary"):
-        for _k in list(st.session_state.keys()):
-            st.session_state.pop(_k, None)
-        st.session_state["selected_page"] = "🏠 Inicio / Marketplace"
-        try:
-            del st.query_params["page"]
-        except Exception:
-            pass
-        st.stop()
+        st.query_params.clear()
+        st.session_state.clear()
+        st.cache_data.clear()
+        st.rerun()
 
 
 def show_mis_transacciones(client_email: str, plot_data):
