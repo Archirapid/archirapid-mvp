@@ -1728,16 +1728,16 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
             # ── Acceso directo al portal MLS — 30 días free trial ────────────
             st.link_button("🎁 30 días Free Trial — Acceder al portal MLS →", "/?seccion=mls", width='stretch', type="primary")
 
-        # ── ACCESO RÁPIDO — 7 MICRO-CARDS ────────────────────────────────────────
+        # ── NAVEGACIÓN COMPACTA Y PROFESIONAL ─────────────────────────────────
         st.markdown("""
 <style>
     .access-card {
-        background: white; padding: 12px; border-radius: 10px;
+        background: white; padding: 10px; border-radius: 8px;
         border: 1px solid #e5e7eb; border-top: 4px solid #ccc; text-align: center;
-        transition: transform 0.2s;
+        transition: all 0.2s; margin: -2px 0;
     }
-    .access-card:hover { transform: translateY(-3px); box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); }
-    .card-label { font-weight: 700; color: #111827; font-size: 0.85rem; margin-bottom: 8px; display: block; }
+    .access-card:hover { transform: translateY(-2px); box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); }
+    .card-label { font-weight: 700; color: #111827; font-size: 0.75rem; margin-bottom: 6px; display: block; }
     .terreno   { border-top-color: #10b981; }
     .comprador { border-top-color: #3b82f6; }
     .estudiante{ border-top-color: #8b5cf6; }
@@ -1746,87 +1746,52 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
     .prefab    { border-top-color: #06b6d4; }
     .mls       { border-top-color: #f43f5e; }
     div[data-testid="stButton"] > button {
-        width: 100% !important; height: 28px !important; padding: 0 !important;
-        font-size: 0.75rem !important; font-weight: 600 !important;
+        width: 100% !important; height: 26px !important; padding: 0 !important;
+        font-size: 0.7rem !important; font-weight: 600 !important; border-radius: 6px !important;
     }
+    hr { margin-top: 0.5rem !important; margin-bottom: 0.5rem !important; }
 </style>
 """, unsafe_allow_html=True)
 
         _acc = st.columns(7, gap="small")
+        _nav_config = [
+            ("📍 Terreno", "terreno", "btn_nav_owner",
+             lambda: (
+                st.session_state.update({"selected_page": "🏠 Propietarios", "query_params": {"page": "propietarios"}})
+                if st.session_state.get("logged_in") and st.session_state.get("role") == "owner"
+                else st.session_state.update({"login_role": "owner", "viewing_login": True})
+            )),
+            ("🏠 Comprador", "comprador", "btn_nav_client",
+             lambda: (
+                st.session_state.update({"selected_page": "👤 Panel de Cliente"})
+                if st.session_state.get("logged_in") and st.session_state.get("role") == "client"
+                else st.session_state.update({"login_role": "client", "viewing_login": True, "_login_show_registro": False})
+            )),
+            ("🎓 Estudiante", "estudiante", "btn_nav_student",
+             lambda: st.session_state.update({"selected_page": "🎓 Estudiantes"})),
+            ("📐 Arquitecto", "arquitecto", "btn_nav_arch",
+             lambda: st.session_state.update({"selected_page": "Arquitectos (Marketplace)"})),
+            ("🏗️ Constructor", "constructor", "btn_nav_builder",
+             lambda: (
+                st.session_state.update({"selected_page": "👤 Panel de Proveedor"})
+                if st.session_state.get("logged_in") and st.session_state.get("role") == "services"
+                else st.session_state.update({"login_role": "services", "viewing_login": True, "_login_show_registro": False})
+            )),
+            ("🏠 Prefab", "prefab", "btn_nav_prefab",
+             lambda: st.session_state.update({"selected_page": "🏠 Portal Prefabricadas"})),
+            ("🏢 Inmo/MLS", "mls", "btn_nav_mls",
+             lambda: st.session_state.update({"selected_page": "🏢 Inmobiliarias MLS"})),
+        ]
 
-        with _acc[0]:
-            st.markdown('<div class="access-card terreno"><span class="card-label">📍 Terreno</span>', unsafe_allow_html=True)
-            if st.button("Acceder", key="btn_nav_owner", use_container_width=True):
-                if st.session_state.get("logged_in") and st.session_state.get("role") == "owner":
-                    st.session_state["selected_page"] = "🏠 Propietarios"
-                    st.query_params["page"] = "propietarios"
-                else:
-                    st.session_state["login_role"] = "owner"
-                    st.session_state["viewing_login"] = True
-                st.rerun()
-            st.markdown('</div>', unsafe_allow_html=True)
+        for i, (label, style, key, action) in enumerate(_nav_config):
+            with _acc[i]:
+                st.markdown(f'<div class="access-card {style}"><span class="card-label">{label}</span>', unsafe_allow_html=True)
+                if st.button("Acceder", key=key, use_container_width=True):
+                    action()
+                    st.rerun()
+                st.markdown('</div>', unsafe_allow_html=True)
 
-        with _acc[1]:
-            st.markdown('<div class="access-card comprador"><span class="card-label">🏠 Comprador</span>', unsafe_allow_html=True)
-            if st.button("Acceder", key="btn_nav_client", use_container_width=True):
-                if st.session_state.get("logged_in") and st.session_state.get("role") == "client":
-                    st.session_state["selected_page"] = "👤 Panel de Cliente"
-                    st.query_params["page"] = "cliente"
-                else:
-                    st.session_state["login_role"] = "client"
-                    st.session_state["viewing_login"] = True
-                    st.session_state["_login_show_registro"] = False
-                    st.query_params["page"] = "login"
-                st.rerun()
-            st.markdown('</div>', unsafe_allow_html=True)
-
-        with _acc[2]:
-            st.markdown('<div class="access-card estudiante"><span class="card-label">🎓 Estudiante</span>', unsafe_allow_html=True)
-            if st.button("Acceder", key="btn_nav_student", use_container_width=True):
-                st.session_state["selected_page"] = "🎓 Estudiantes"
-                st.query_params["page"] = "estudiantes"
-                st.rerun()
-            st.markdown('</div>', unsafe_allow_html=True)
-
-        with _acc[3]:
-            st.markdown('<div class="access-card arquitecto"><span class="card-label">📐 Arquitecto</span>', unsafe_allow_html=True)
-            if st.button("Acceder", key="btn_nav_arch", use_container_width=True):
-                st.session_state["selected_page"] = "Arquitectos (Marketplace)"
-                st.query_params["page"] = "arquitectos"
-                st.rerun()
-            st.markdown('</div>', unsafe_allow_html=True)
-
-        with _acc[4]:
-            st.markdown('<div class="access-card constructor"><span class="card-label">🏗️ Constructor</span>', unsafe_allow_html=True)
-            if st.button("Acceder", key="btn_nav_builder", use_container_width=True):
-                if st.session_state.get("logged_in") and st.session_state.get("role") == "services":
-                    st.session_state["selected_page"] = "👤 Panel de Proveedor"
-                    st.query_params["page"] = "proveedor"
-                else:
-                    st.session_state["login_role"] = "services"
-                    st.session_state["viewing_login"] = True
-                    st.session_state["_login_show_registro"] = False
-                    st.query_params["page"] = "login"
-                st.rerun()
-            st.markdown('</div>', unsafe_allow_html=True)
-
-        with _acc[5]:
-            st.markdown('<div class="access-card prefab"><span class="card-label">🏠 Prefab</span>', unsafe_allow_html=True)
-            if st.button("Acceder", key="btn_nav_prefab", use_container_width=True):
-                st.session_state["selected_page"] = "🏠 Portal Prefabricadas"
-                st.query_params["page"] = "prefabricadas"
-                st.rerun()
-            st.markdown('</div>', unsafe_allow_html=True)
-
-        with _acc[6]:
-            st.markdown('<div class="access-card mls"><span class="card-label">🏢 Inmo/MLS</span>', unsafe_allow_html=True)
-            if st.button("Acceder", key="btn_nav_mls", use_container_width=True):
-                st.session_state["selected_page"] = "🏢 Inmobiliarias MLS"
-                st.query_params["page"] = "mls"
-                st.rerun()
-            st.markdown('</div>', unsafe_allow_html=True)
-
-        st.markdown("---")
+        st.divider()
 
         # PASO 1: Renderizar MARKETPLACE (mapa, fincas y proyectos)
         try:
@@ -1839,7 +1804,7 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
 
 
         # PASO 3: Renderizar PROYECTOS ARQUITECTÓNICOS
-        st.markdown("---")
+        st.divider()
         st.markdown("#### 🏗️ Proyectos Arquitectónicos Disponibles")
 
         try:
