@@ -1762,10 +1762,14 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
 
         cols = st.columns(7, gap="small")
 
+        # --- LISTA DE ROLES CON SLUGS CORREGIDOS ---
         roles = [
-            ("📍 Terreno", "terreno", "owner"), ("🏠 Comprador", "comprador", "client"),
-            ("🎓 Estudiante", "estudiante", "student"), ("📐 Arquitecto", "arquitecto", "arch"),
-            ("🏗️ Constructor", "constructor", "builder"), ("🏠 Prefab", "prefab", "prefab"),
+            ("📍 Terreno", "terreno", "terreno"),
+            ("🏠 Comprador", "comprador", "comprador"),
+            ("🎓 Estudiante", "estudiante", "estudiante"),
+            ("📐 Arquitecto", "arquitecto", "arquitecto"),
+            ("🏗️ Constructor", "constructor", "constructor"),
+            ("🏠 Prefab", "prefab", "prefab"),
             ("🏢 Inmo/MLS", "mls", "mls")
         ]
 
@@ -1773,10 +1777,12 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
             with cols[i]:
                 st.markdown(f'<div class="access-card {style_class}"><span class="card-label">{label}</span>', unsafe_allow_html=True)
                 if st.button("Acceder", key=f"btn_nav_{page_slug}", use_container_width=True):
-                    # NAVEGACIÓN DIRECTA (El router de la app manejará el login/registro)
+                    # NAVEGACIÓN REDUNDANTE (Para asegurar que el router lo vea)
+                    st.session_state["page"] = page_slug
                     st.session_state["selected_page"] = page_slug
-                    st.session_state["page"] = page_slug  # Sincronización para el router principal
                     st.query_params["page"] = page_slug
+
+                    # Forzamos el reinicio limpio
                     st.rerun()
                 st.markdown('</div>', unsafe_allow_html=True)
 
