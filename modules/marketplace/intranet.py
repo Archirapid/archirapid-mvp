@@ -2291,21 +2291,65 @@ Obtén el token creando un bot con @BotFather en Telegram.
 
         st.markdown("---")
 
-        # ══ SECCIÓN A: Inmobiliarias pendientes de aprobación ════════════════
-        st.subheader("⏳ A. Inmobiliarias pendientes de aprobación")
+        # ══ HELPER: actualiza status en inmobiliarias (única fuente de verdad) ══
+        def _mls_set_status(inmo_id: str, new_status: str):
+            """Escribe status + activa coherente y limpia caché."""
+            _activa_val = 1 if new_status == "active" else 0
+            _c = db_conn()
+            try:
+                _c.execute(
+                    "UPDATE inmobiliarias SET status=?, activa=? WHERE id=?",
+                    (new_status, _activa_val, inmo_id)
+                )
+                _c.commit()
+            finally:
+                _c.close()
+            st.cache_data.clear()
+
+        # ══ MIGRACIÓN: garantizar columnas status/is_active ══════════════════
+        _mls_mig_conn = db_conn()
         try:
-            _pendientes = _mls.get_inmos_pendientes()
-            if not _pendientes:
-                st.success("✅ Sin registros pendientes de aprobación.")
+            for _mc, _md in [("status","TEXT DEFAULT 'pending'"),
+                              ("is_active","INTEGER DEFAULT 0")]:
+                try:
+                    _mls_mig_conn.execute(f"ALTER TABLE inmobiliarias ADD COLUMN {_mc} {_md}")
+                    _mls_mig_conn.commit()
+                except Exception:
+                    pass
+        finally:
+            _mls_mig_conn.close()
+
+        # ══ SECCIÓN A: Nuevas solicitudes (activa=0, sin status asignado) ════
+        st.subheader("⏳ A. Nuevas solicitudes pendientes de revisión")
+        try:
+            # Cargamos directamente de la tabla para control total de keys (evita colisión con sección B)
+            _secA_conn = db_conn()
+            try:
+                _secA_raw = _secA_conn.execute(
+                    "SELECT * FROM inmobiliarias WHERE activa=0 AND (status IS NULL OR status='' OR status='pending') ORDER BY created_at DESC"
+                ).fetchall()
+                _secA_cols = [d[0] for d in _secA_conn.execute("SELECT * FROM inmobiliarias LIMIT 0").description or []]
+            finally:
+                _secA_conn.close()
+            _pendientes_b = [dict(zip(_secA_cols, r)) for r in _secA_raw] if _secA_cols else []
+
+            if not _pendientes_b:
+                st.success("✅ Sin nuevas solicitudes pendientes.")
             else:
-                st.warning(f"**{len(_pendientes)} inmobiliaria(s) esperando aprobación.**")
-                for _p in _pendientes:
+                st.warning(f"**{len(_pendientes_b)} inmobiliaria(s) esperando revisión.**")
+                for _p in _pendientes_b:
                     _pnombre = _p.get("nombre_comercial") or _p.get("nombre", "Sin nombre")
-                    with st.expander(f"📋 {_pnombre} — {_p.get('cif','?')} | {_p.get('email','?')} | {(_p.get('created_at',''))[:10]}"):
+                    _p_firma = bool(_p.get("firma_hash"))
+                    with st.expander(
+                        f"📋 {'🔴 SIN FIRMA' if not _p_firma else '⏳'} {_pnombre} "
+                        f"— {_p.get('cif','?')} | {_p.get('email','?')} | {str(_p.get('created_at',''))[:10]}"
+                    ):
                         _ca, _cb = st.columns([3, 1])
                         with _ca:
-                            st.markdown("**📊 Datos de empresa**")
+                            _iban_m_a = _mask_iban(_p.get('iban') or '')
                             st.markdown(f"""
+**🏢 Empresa**
+
 | Campo | Valor |
 |---|---|
 | Nombre legal | {_p.get('nombre_sociedad') or '—'} |
@@ -2313,310 +2357,325 @@ Obtén el token creando un bot con @BotFather en Telegram.
 | CIF | `{_p.get('cif','—')}` |
 | Email corporativo | {_p.get('email','—')} |
 | Email login | {_p.get('email_login') or '—'} |
-| Teléfono principal | {_p.get('telefono') or '—'} |
-| Teléfono secundario | {_p.get('telefono_secundario') or '—'} |
+| Teléfono | {_p.get('telefono') or '—'} / {_p.get('telefono_secundario') or '—'} |
 | Telegram | {_p.get('telegram_contacto') or '—'} |
 | Web | {_p.get('web') or '—'} |
 | IP registro | `{_p.get('ip_registro','—')}` |
-| Fecha registro | {(_p.get('created_at',''))[:19]} |
-""")
-                            st.markdown("**📍 Dirección**")
-                            st.markdown(f"""
+| Fecha registro | {str(_p.get('created_at',''))[:19]} |
+
+**📍 Dirección**
+
 | Campo | Valor |
 |---|---|
 | Dirección | {_p.get('direccion') or '—'} |
 | Localidad | {_p.get('localidad') or '—'} |
 | Provincia | {_p.get('provincia') or '—'} |
 | CP | {_p.get('codigo_postal') or '—'} |
-| País | {_p.get('pais') or '—'} |
-""")
-                            st.markdown("**👤 Persona de contacto**")
-                            st.markdown(f"""
+
+**👤 Persona de contacto**
+
 | Campo | Valor |
 |---|---|
 | Nombre | {_p.get('contacto_nombre') or '—'} |
 | Cargo | {_p.get('contacto_cargo') or '—'} |
-| Email directo | {_p.get('contacto_email') or '—'} |
+| Email | {_p.get('contacto_email') or '—'} |
 | Teléfono | {_p.get('contacto_telefono') or '—'} |
 | Telegram | {_p.get('contacto_telegram') or '—'} |
-""")
-                            st.markdown("**🧾 Facturación**")
-                            _iban_m = _mask_iban(_p.get('iban') or '')
-                            st.markdown(f"""
+
+**🧾 Facturación & Cobros**
+
 | Campo | Valor |
 |---|---|
 | Razón social | {_p.get('factura_razon_social') or '—'} |
 | CIF factura | {_p.get('factura_cif') or '—'} |
 | Dirección fiscal | {_p.get('factura_direccion') or '—'} |
 | Email facturas | {_p.get('factura_email') or '—'} |
-| IBAN | `{_iban_m}` |
-| Banco | {_p.get('banco_nombre') or '—'} |
-| Titular | {_p.get('banco_titular') or '—'} |
+| IBAN | `{_iban_m_a}` |
+| Banco | {_p.get('banco_nombre') or '—'} — Titular: {_p.get('banco_titular') or '—'} |
 """)
+                            if not _p_firma:
+                                st.error("⚠️ ACCESO BLOQUEADO — SIN FIRMA DEL ACUERDO MLS")
+                            else:
+                                st.success(f"✅ Acuerdo firmado | SHA-256: `{str(_p.get('firma_hash',''))[:32]}…`")
+
                         with _cb:
                             st.markdown("**Acciones**")
-                            if st.button("✅ Aprobar", key=f"mls_apro_{_p['id']}", type="primary",
-                                         use_container_width=True):
+                            # APROBAR — activa trial, envía email bienvenida
+                            if st.button("✅ Aprobar 🟢", key=f"mlsA_apr_{_p['id']}",
+                                         type="primary", use_container_width=True,
+                                         disabled=not _p_firma,
+                                         help="Requiere firma del acuerdo" if not _p_firma else ""):
+                                _mls_set_status(_p["id"], "active")
                                 _mls.update_inmo_activa(_p["id"], 1)
-                                # Activar trial 30 días automáticamente al aprobar
                                 try:
                                     _mls.activate_trial(_p["id"])
                                 except Exception:
                                     pass
                                 try:
-                                    _mls_notif.notif_aprobacion(
-                                        nombre=_pnombre,
-                                        email=_p.get("email", ""),
-                                        aprobada=True,
-                                    )
+                                    _mls_notif.notif_aprobacion(nombre=_pnombre, email=_p.get("email",""), aprobada=True)
                                 except Exception:
                                     pass
-                                # Email bienvenida trial
                                 try:
                                     from modules.mls.mls_trial_emails import send_trial_email
-                                    send_trial_email(
-                                        inmo_email=_p.get("email", ""),
-                                        inmo_nombre=_pnombre,
-                                        tipo="bienvenida",
-                                    )
+                                    send_trial_email(inmo_email=_p.get("email",""), inmo_nombre=_pnombre, tipo="bienvenida")
                                 except Exception:
                                     pass
-                                st.success(f"✅ {_pnombre} aprobada. Trial de 30 días activado.")
+                                st.success(f"✅ {_pnombre} aprobada.")
+                                st.rerun()
+
+                            if st.button("⏳ Pendiente 🟡", key=f"mlsA_pend_{_p['id']}",
+                                         use_container_width=True):
+                                _mls_set_status(_p["id"], "pending")
+                                st.info("Marcada como pendiente")
+                                st.rerun()
+
+                            if st.button("🚫 Suspender 🔴", key=f"mlsA_susp_{_p['id']}",
+                                         use_container_width=True):
+                                _mls_set_status(_p["id"], "suspended")
+                                st.warning("Suspendida")
                                 st.rerun()
 
                             st.markdown("")
-                            with st.popover("❌ Rechazar y eliminar", use_container_width=True):
-                                st.error(f"⚠️ ¿Eliminar {_pnombre}?")
-                                st.caption("Esta acción no se puede deshacer.")
-                                if st.button("❌ Sí, eliminar", key=f"mls_del_yes_{_p['id']}",
+                            with st.popover("🗑️ Eliminar", use_container_width=True):
+                                st.error(f"⚠️ ¿Eliminar '{_pnombre}'?")
+                                st.caption("Borra el registro de la BBDD. Irreversible.")
+                                if st.button("❌ Sí, eliminar", key=f"mlsA_del_{_p['id']}",
                                              type="primary", use_container_width=True):
+                                    _dc = db_conn()
                                     try:
-                                        _dc = db_conn()
                                         _dc.execute("DELETE FROM inmobiliarias WHERE id=?", (_p["id"],))
                                         _dc.commit()
+                                    finally:
                                         _dc.close()
-                                        _mls_notif.notif_aprobacion(
-                                            nombre=_pnombre,
-                                            email=_p.get("email", ""),
-                                            aprobada=False,
-                                        )
+                                    try:
+                                        _mls_notif.notif_aprobacion(nombre=_pnombre, email=_p.get("email",""), aprobada=False)
                                     except Exception:
                                         pass
-                                    st.success("Inmobiliaria eliminada")
+                                    st.success("Eliminada")
                                     st.rerun()
         except Exception as _ea:
-            st.warning(f"Error sección A: {_ea}")
+            st.error(f"Error sección A: {_ea}")
 
         st.markdown("---")
 
-        # ══ SECCIÓN B: Inmobiliarias activas ═════════════════════════════════
-        st.subheader("✅ B. Inmobiliarias activas")
+        # ══ SECCIÓN B: Panel 360° de TODAS las inmobiliarias ════════════════
+        st.subheader("🏢 B. Panel de control 360° — Todas las inmobiliarias")
+        st.caption("Muestra registros con cualquier status (activas, suspendidas, en trámite).")
         try:
-            # Agregar columnas si no existen
-            for _col, _def in [("status","TEXT DEFAULT 'aprobada'"),
-                                ("is_active","INTEGER DEFAULT 1")]:
-                try:
-                    _mls_altb = db_conn()
-                    _mls_altb.execute(f"ALTER TABLE inmobiliarias ADD COLUMN {_col} {_def}")
-                    _mls_altb.commit()
-                    _mls_altb.close()
-                except Exception:
-                    try:
-                        _mls_altb.close()
-                    except Exception:
-                        pass
-
-            # Inicializar status vacíos (solo si es NULL o ''), NO resetea estados ya asignados
-            if not st.session_state.get("_init_inmos_status_done", False):
-                try:
-                    _mls_reset = db_conn()
-                    try:
-                        _mls_reset.execute("UPDATE inmobiliarias SET status='aprobada' WHERE (status IS NULL OR status='') AND firma_hash IS NOT NULL")
-                        _mls_reset.execute("UPDATE inmobiliarias SET status='pendiente_firma' WHERE (status IS NULL OR status='') AND (firma_hash IS NULL OR firma_hash='')")
-                        _mls_reset.commit()
-                    finally:
-                        _mls_reset.close()
-                    st.session_state["_init_inmos_status_done"] = True
-                except Exception:
-                    pass
-
-            # Consulta directa: mostrar TODAS (activas + suspendidas + en trámite)
-            # get_inmos_activas() filtra activa=1 y pierde las suspendidas
-            _inmo_all_conn = db_conn()
+            # Leer TODAS — sin filtro por activa ni status
+            _secB_conn = db_conn()
             try:
-                _activas_raw = _inmo_all_conn.execute(
-                    "SELECT * FROM inmobiliarias WHERE activa=1 OR (status IS NOT NULL AND status != '') ORDER BY created_at DESC"
+                _secB_raw = _secB_conn.execute(
+                    "SELECT * FROM inmobiliarias ORDER BY created_at DESC"
                 ).fetchall()
-                _inmo_cols = [d[0] for d in _inmo_all_conn.execute("SELECT * FROM inmobiliarias LIMIT 0").description or []]
+                _secB_cols = [d[0] for d in _secB_conn.execute("SELECT * FROM inmobiliarias LIMIT 0").description or []]
             finally:
-                _inmo_all_conn.close()
-            _activas = [dict(zip(_inmo_cols, r)) for r in _activas_raw] if _inmo_cols and _activas_raw else []
+                _secB_conn.close()
+            _todas = [dict(zip(_secB_cols, r)) for r in _secB_raw] if _secB_cols else []
 
-            if not _activas:
-                st.info("No hay inmobiliarias activas todavía.")
+            if not _todas:
+                st.info("No hay inmobiliarias registradas todavía.")
             else:
-                for _a in _activas:
+                # Filtro rápido por status
+                _secB_status_opts = ["Todas", "active", "pending", "suspended"]
+                _secB_fil = st.selectbox("Filtrar por estado", _secB_status_opts, key="mlsB_status_filter")
+                if _secB_fil != "Todas":
+                    _todas = [_x for _x in _todas if (_x.get("status") or "pending") == _secB_fil]
+
+                st.caption(f"Mostrando {len(_todas)} inmobiliaria(s)")
+
+                # Semáforo de estados canónico
+                _STATUS_ICON = {
+                    "active":    "🟢", "aprobada": "🟢",
+                    "pending":   "🟡", "tramite": "🟡", "pendiente": "🟡",
+                    "suspended": "🔴", "suspendida": "🔴",
+                }
+                _STATUS_LABEL = {
+                    "active": "Activa", "aprobada": "Activa",
+                    "pending": "Pendiente", "tramite": "Pendiente", "pendiente": "Pendiente",
+                    "suspended": "Suspendida", "suspendida": "Suspendida",
+                }
+
+                for _idx_b, _a in enumerate(_todas):
                     if _a is None:
                         continue
-                    _anombre = _a.get("nombre_comercial") or _a.get("nombre", "?")
-                    _plan_a  = (_a.get("plan") or "ninguno").upper()
+                    _anombre  = _a.get("nombre_comercial") or _a.get("nombre", "?")
+                    _plan_a   = (_a.get("plan") or "starter").upper()
                     _tiene_firma = bool(_a.get("firma_hash"))
-                    _firma_a = "✅ Firmado" if _tiene_firma else "🔴 Sin firma"
-                    # Contar fincas activas
-                    _n_fincas_a = 0
+                    _firma_str   = "✅ Firmado" if _tiene_firma else "🔴 SIN FIRMA"
+
+                    # Leer status fresco desde el dict (ya vino de BD en este render)
+                    _raw_status  = (_a.get("status") or ("active" if _a.get("activa") else "pending"))
+                    _sem_icon    = _STATUS_ICON.get(_raw_status, "⚪")
+                    _sem_label   = _STATUS_LABEL.get(_raw_status, _raw_status)
+
+                    # Fincas activas de esta inmo
+                    _n_fincas_b = 0
                     try:
-                        _fc = db_conn()
-                        _n_fincas_a = _fc.execute(
+                        _fcc = db_conn()
+                        _n_fincas_b = _fcc.execute(
                             "SELECT COUNT(*) FROM fincas_mls WHERE inmo_id=? AND estado NOT IN ('eliminada','cerrada')",
                             (_a["id"],)
                         ).fetchone()[0]
-                        _fc.close()
+                        _fcc.close()
                     except Exception:
                         pass
 
-                    # GET status actual
-                    _imo_status = "aprobada"
+                    # Comisión media de sus fincas
+                    _com_media = 0.0
                     try:
-                        _fcs = db_conn()
-                        _sts = _fcs.execute("SELECT status FROM inmobiliarias WHERE id=?", (_a["id"],)).fetchone()
-                        if _sts:
-                            _imo_status = _sts[0] or "aprobada"
-                        _fcs.close()
+                        _fcc2 = db_conn()
+                        _com_row = _fcc2.execute(
+                            "SELECT AVG(comision_total_pct) FROM fincas_mls WHERE inmo_id=? AND comision_total_pct IS NOT NULL",
+                            (_a["id"],)
+                        ).fetchone()
+                        _com_media = float(_com_row[0] or 0)
+                        _fcc2.close()
                     except Exception:
                         pass
 
-                    _inmo_icon = "🟢" if _tiene_firma else "🔴"
                     with st.expander(
-                        f"{_inmo_icon} {_anombre} — Plan {_plan_a} | Firma: {_firma_a} | "
-                        f"Fincas: {_n_fincas_a} | {_a.get('email','')}"
+                        f"{_sem_icon} [{_sem_label}] {_anombre} — {_plan_a} | "
+                        f"Firma: {_firma_str} | Fincas: {_n_fincas_b} | {_a.get('email','')}",
+                        expanded=False
                     ):
+                        # ── AVISO BLOQUEADO si no hay firma ──────────────────
+                        if not _tiene_firma:
+                            st.error("⚠️ ACCESO BLOQUEADO — SIN FIRMA DEL ACUERDO MLS. Hasta que no firme, no puede operar.")
+
                         _ba, _bb = st.columns([3, 1])
                         with _ba:
-                            # Tabla resumida
+                            # Resumen
                             st.markdown(f"""
 | Campo | Valor |
 |---|---|
 | Nombre comercial | {_anombre} |
+| Nombre legal | {_a.get('nombre_sociedad') or '—'} |
 | CIF | `{_a.get('cif','—')}` |
 | Email | {_a.get('email','—')} |
+| Email login | {_a.get('email_login') or '—'} |
 | Plan | **{_plan_a}** |
-| Plan activo | {'✅' if _a.get('plan_activo') else '❌'} |
-| Firma acuerdo | {_firma_a} |
-| Fecha firma | {((_a.get('firma_timestamp') or ''))[:10] or '—'} |
-| Fincas activas | {_n_fincas_a} |
-| Estado | {_imo_status} |
+| Plan activo | {'✅ Sí' if _a.get('plan_activo') else '❌ No'} |
+| Trial activo | {'✅' if _a.get('trial_active') else '—'} |
+| Trial expirado | {'⚠️ Sí' if _a.get('trial_expired') else '—'} |
+| Trial inicio | {str(_a.get('trial_start_date') or '—')[:10]} |
+| **Status** | **{_sem_icon} {_sem_label}** |
+| Firma acuerdo | {_firma_str} |
+| Fecha firma | {str(_a.get('firma_timestamp') or '—')[:10]} |
+| Fincas activas | {_n_fincas_b} |
+| Comisión media | {f'{_com_media:.2f}%' if _com_media else '—'} |
+| Fecha registro | {str(_a.get('created_at') or '—')[:19]} |
+| IP registro | `{_a.get('ip_registro') or '—'}` |
 """)
-                            # Detalle completo en sub-expander
-                            with st.expander("📋 Ver detalle completo"):
+                            # ── PANEL 360° COMPLETO ───────────────────────────
+                            with st.expander("🔍 Ver ficha completa (auditoría)"):
                                 _iban_full = _a.get("iban") or "—"
+                                _firma_hash_full = _a.get("firma_hash") or "—"
                                 st.markdown(f"""
-**Empresa**
-- Nombre legal: {_a.get('nombre_sociedad') or '—'}
-- Teléfono: {_a.get('telefono') or '—'} / {_a.get('telefono_secundario') or '—'}
-- Web: {_a.get('web') or '—'}
-- Dirección: {_a.get('direccion') or '—'}, {_a.get('localidad') or '—'}, {_a.get('provincia') or '—'} {_a.get('codigo_postal') or ''}, {_a.get('pais') or '—'}
+**📍 Dirección**
 
-**Contacto responsable**
-- {_a.get('contacto_nombre') or '—'} ({_a.get('contacto_cargo') or 'sin cargo'})
-- Email: {_a.get('contacto_email') or '—'}
-- Tel: {_a.get('contacto_telefono') or '—'}
+| Campo | Valor |
+|---|---|
+| Dirección | {_a.get('direccion') or '—'} |
+| Localidad | {_a.get('localidad') or '—'} |
+| Provincia | {_a.get('provincia') or '—'} |
+| Código postal | {_a.get('codigo_postal') or '—'} |
+| País | {_a.get('pais') or 'España'} |
 
-**Facturación**
-- Razón social: {_a.get('factura_razon_social') or '—'}
-- CIF: {_a.get('factura_cif') or '—'}
-- Dirección fiscal: {_a.get('factura_direccion') or '—'}
-- Email facturas: {_a.get('factura_email') or '—'}
-- IBAN completo: `{_iban_full}`
-- Banco: {_a.get('banco_nombre') or '—'} — Titular: {_a.get('banco_titular') or '—'}
+**👤 Persona de contacto responsable**
+
+| Campo | Valor |
+|---|---|
+| Nombre | {_a.get('contacto_nombre') or '—'} |
+| Cargo | {_a.get('contacto_cargo') or '—'} |
+| Email directo | {_a.get('contacto_email') or '—'} |
+| Teléfono directo | {_a.get('contacto_telefono') or '—'} |
+| Telegram | {_a.get('contacto_telegram') or '—'} |
+
+**🧾 Facturación & Datos de cobro**
+
+| Campo | Valor |
+|---|---|
+| Razón social | {_a.get('factura_razon_social') or '—'} |
+| CIF factura | {_a.get('factura_cif') or '—'} |
+| Dirección fiscal | {_a.get('factura_direccion') or '—'} |
+| Email facturas | {_a.get('factura_email') or '—'} |
+| **IBAN completo** | `{_iban_full}` |
+| Banco | {_a.get('banco_nombre') or '—'} |
+| Titular cuenta | {_a.get('banco_titular') or '—'} |
+| Comisión media fincas | {f'{_com_media:.2f}%' if _com_media else '—'} |
+
+**📜 Log & Legalidad**
+
+| Campo | Valor |
+|---|---|
+| ID interno | `{_a.get('id','—')}` |
+| Stripe session | `{_a.get('stripe_session_id') or '—'}` |
+| Fecha registro | {str(_a.get('created_at') or '—')[:19]} |
+| IP de registro | `{_a.get('ip_registro') or '—'}` |
+| Firma SHA-256 | `{_firma_hash_full[:48] + '…' if len(str(_firma_hash_full)) > 48 else _firma_hash_full}` |
+| Timestamp firma | {str(_a.get('firma_timestamp') or '—')[:19]} |
+| Teléfono principal | {_a.get('telefono') or '—'} |
+| Teléfono secundario | {_a.get('telefono_secundario') or '—'} |
+| Web | {_a.get('web') or '—'} |
+| Telegram corporativo | {_a.get('telegram_contacto') or '—'} |
 """)
+                                st.markdown(f"[✉️ Contactar por email](mailto:{_a.get('email','')})")
+
                         with _bb:
-                            st.markdown("**Acciones**")
-                            st.caption(f"🔧 Status: `{_imo_status or 'aprobada'}` | Firma: {_firma_a}")
+                            st.markdown("**⚙️ Semáforo de estado**")
+                            st.caption(f"Estado actual: {_sem_icon} **{_sem_label}**")
 
-                            if not _tiene_firma:
-                                st.warning("🔴 Sin acuerdo firmado — solo se puede suspender hasta que firme.")
+                            # Único key por acción+id+sección para evitar duplicados con sección A
+                            _bid = f"{_a['id']}_{_idx_b}"
 
-                            _mls_c1, _mls_c2, _mls_c3, _mls_c4 = st.columns(4)
-
-                            with _mls_c1:
-                                _is_prim_apr_mls = (_imo_status == 'aprobada')
-                                if st.button("✅ APROBAR 🟢", key=f"mls_apro_{_a['id']}",
-                                           use_container_width=True,
-                                           disabled=not _tiene_firma,
-                                           help="Requiere firma del acuerdo MLS" if not _tiene_firma else "",
-                                           type="primary" if _is_prim_apr_mls else "secondary"):
+                            if st.button("✅ Aprobar 🟢", key=f"mlsB_apr_{_bid}",
+                                         use_container_width=True,
+                                         disabled=not _tiene_firma,
+                                         help="Requiere firma del acuerdo" if not _tiene_firma else "",
+                                         type="primary" if _raw_status in ("active","aprobada") else "secondary"):
+                                _mls_set_status(_a["id"], "active")
+                                if not _a.get("activa"):
                                     try:
-                                        _mls_ap = db_conn()
-                                        try:
-                                            _mls_ap.execute("UPDATE inmobiliarias SET status=?, activa=1 WHERE id=?", ("aprobada", _a["id"]))
-                                            _mls_ap.commit()
-                                        finally:
-                                            _mls_ap.close()
-                                        st.cache_data.clear()
-                                        st.success("✅ Aprobada")
-                                        st.rerun()
-                                    except Exception as _e:
-                                        st.error(f"Error: {_e}")
+                                        _mls.activate_trial(_a["id"])
+                                    except Exception:
+                                        pass
+                                st.success("🟢 Activa")
+                                st.rerun()
 
-                            with _mls_c2:
-                                _is_prim_tram_mls = (_imo_status == 'tramite')
-                                if st.button("⏳ EN TRÁMITE 🟡", key=f"mls_tramite_{_a['id']}",
-                                             use_container_width=True,
-                                             type="primary" if _is_prim_tram_mls else "secondary"):
+                            if st.button("⏳ Pendiente 🟡", key=f"mlsB_pend_{_bid}",
+                                         use_container_width=True,
+                                         type="primary" if _raw_status in ("pending","tramite","pendiente") else "secondary"):
+                                _mls_set_status(_a["id"], "pending")
+                                st.info("🟡 Pendiente")
+                                st.rerun()
+
+                            if st.button("🚫 Suspender 🔴", key=f"mlsB_susp_{_bid}",
+                                         use_container_width=True,
+                                         type="primary" if _raw_status in ("suspended","suspendida") else "secondary"):
+                                _mls_set_status(_a["id"], "suspended")
+                                st.warning("🔴 Suspendida (sin eliminar)")
+                                st.rerun()
+
+                            st.markdown("")
+                            with st.popover("🗑️ Eliminar", use_container_width=True):
+                                st.error(f"⚠️ ¿Eliminar '{_anombre}'?")
+                                st.caption("Borra el registro de la BBDD permanentemente.")
+                                if st.button("❌ Sí, eliminar definitivamente",
+                                             key=f"mlsB_del_{_bid}",
+                                             type="primary", use_container_width=True):
+                                    _del_c = db_conn()
                                     try:
-                                        _mls_tr = db_conn()
-                                        try:
-                                            _mls_tr.execute("UPDATE inmobiliarias SET status=? WHERE id=?", ("tramite", _a["id"]))
-                                            _mls_tr.commit()
-                                        finally:
-                                            _mls_tr.close()
-                                        st.cache_data.clear()
-                                        st.info("En trámite")
-                                        st.rerun()
-                                    except Exception as _e:
-                                        st.error(f"Error: {_e}")
-
-                            with _mls_c3:
-                                _is_prim_susp_mls = (_imo_status in ('suspendida', 'suspended'))
-                                if st.button("🔴 SUSPENDER", key=f"mls_susp_{_a['id']}",
-                                             use_container_width=True,
-                                             type="primary" if _is_prim_susp_mls else "secondary"):
-                                    try:
-                                        _mls_su = db_conn()
-                                        try:
-                                            # Solo suspende — NO elimina el registro
-                                            _mls_su.execute("UPDATE inmobiliarias SET status=?, activa=0 WHERE id=?", ("suspendida", _a["id"]))
-                                            _mls_su.commit()
-                                        finally:
-                                            _mls_su.close()
-                                        st.cache_data.clear()
-                                        st.warning("🔴 Suspendida (registro conservado)")
-                                        st.rerun()
-                                    except Exception as _e:
-                                        st.error(f"Error: {_e}")
-
-                            with _mls_c4:
-                                with st.popover("🗑️ Eliminar", use_container_width=True):
-                                    _inmo_nom_del = _a.get("nombre_comercial") or _a.get("nombre", "?")
-                                    st.error(f"⚠️ ¿Eliminar '{_inmo_nom_del}'?")
-                                    st.caption("Irreversible. El registro se borra de la BBDD.")
-                                    if st.button("❌ Sí, eliminar", key=f"mls_b_del_yes_{_a['id']}",
-                                                 type="primary", use_container_width=True):
-                                        try:
-                                            _mls_del = db_conn()
-                                            try:
-                                                _mls_del.execute("DELETE FROM inmobiliarias WHERE id=?", (_a["id"],))
-                                                _mls_del.commit()
-                                            finally:
-                                                _mls_del.close()
-                                            st.cache_data.clear()
-                                            st.success("Eliminada")
-                                            st.rerun()
-                                        except Exception as _e:
-                                            st.error(f"Error: {_e}")
+                                        _del_c.execute("DELETE FROM inmobiliarias WHERE id=?", (_a["id"],))
+                                        _del_c.commit()
+                                    finally:
+                                        _del_c.close()
+                                    st.cache_data.clear()
+                                    st.success("Eliminada")
+                                    st.rerun()
 
         except Exception as _eb:
-            st.warning(f"Error sección B: {_eb}")
+            st.error(f"Error sección B: {_eb}")
 
         st.markdown("---")
 
