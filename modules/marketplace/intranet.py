@@ -36,7 +36,7 @@ def render_admin_actions(item_id: str, table_name: str, section_slug: str, item_
 
             if action_type == 'delete':
                 # DELETE usa popover para confirmación (no anidamiento)
-                with st.popover(label, use_container_width=True):
+                with st.popover(label, width="stretch"):
                     st.error(f"⚠️ ¿Eliminar '{item_name}'?")
                     st.caption("Esta acción no se puede deshacer.")
                     if st.button("❌ Sí, eliminar", key=f"btn_{section_slug}_del_yes_{item_id}", type="primary"):
@@ -51,7 +51,7 @@ def render_admin_actions(item_id: str, table_name: str, section_slug: str, item_
                             st.error(f"Error: {e}")
             else:
                 # Otros botones updatean directamente sin confirmación
-                if st.button(label, key=f"btn_{section_slug}_{action_type}_{item_id}", type=btn_type, use_container_width=True):
+                if st.button(label, key=f"btn_{section_slug}_{action_type}_{item_id}", type=btn_type, width="stretch"):
                     try:
                         status_map = {
                             'approve': 'activo',
@@ -169,7 +169,7 @@ def main():
     else:
         # SOLO ACCESO CON CONTRASEÑA DE ADMIN
         password = st.text_input("Contraseña de Acceso Administrativo", type="password")
-        if st.button("🔐 Acceder", key="admin_login_btn", type="primary", use_container_width=True):
+        if st.button("🔐 Acceder", key="admin_login_btn", type="primary", width="stretch"):
             if password == _admin_pw:
                 st.session_state["rol"] = "admin"
                 st.query_params["admin_token"] = _valid_token
@@ -370,7 +370,7 @@ def main():
                             with _btn_col1:
                                 _is_primary = _current_status in ('disponible', 'published')
                                 if st.button("✅ Disponible", key=f"p_btn_disponible_{p['id']}",
-                                             use_container_width=True, type="primary" if _is_primary else "secondary"):
+                                             width="stretch", type="primary" if _is_primary else "secondary"):
                                     if _update_plot_status(p['id'], 'disponible'):
                                         st.success("✅ Finca disponible")
                                         st.rerun()
@@ -379,7 +379,7 @@ def main():
                             with _btn_col2:
                                 _is_primary = _current_status == 'suspended'
                                 if st.button("🚫 Suspender", key=f"p_btn_suspended_{p['id']}",
-                                             use_container_width=True, type="primary" if _is_primary else "secondary"):
+                                             width="stretch", type="primary" if _is_primary else "secondary"):
                                     if _update_plot_status(p['id'], 'suspended'):
                                         st.warning("🚫 Finca suspendida")
                                         st.rerun()
@@ -388,7 +388,7 @@ def main():
                             with _btn_col3:
                                 _is_primary = _current_status in ('sold', 'vendida')
                                 if st.button("🔵 Vendida", key=f"p_btn_sold_{p['id']}",
-                                             use_container_width=True, type="primary" if _is_primary else "secondary"):
+                                             width="stretch", type="primary" if _is_primary else "secondary"):
                                     if _update_plot_status(p['id'], 'sold'):
                                         st.info("🔵 Marcada como vendida")
                                         st.rerun()
@@ -399,7 +399,7 @@ def main():
                             with _btn_col4:
                                 _is_primary = _current_status in ('reserved', 'reservada')
                                 if st.button("🟡 Reservada", key=f"p_btn_reserved_{p['id']}",
-                                             use_container_width=True, type="primary" if _is_primary else "secondary"):
+                                             width="stretch", type="primary" if _is_primary else "secondary"):
                                     if _update_plot_status(p['id'], 'reserved'):
                                         st.info("🟡 Marcada como reservada")
                                         st.rerun()
@@ -408,17 +408,17 @@ def main():
                             with _btn_col5:
                                 _is_primary = _current_status == 'no_disponible'
                                 if st.button("⚫ No disponible", key=f"p_btn_no_disponible_{p['id']}",
-                                             use_container_width=True, type="primary" if _is_primary else "secondary"):
+                                             width="stretch", type="primary" if _is_primary else "secondary"):
                                     if _update_plot_status(p['id'], 'no_disponible'):
                                         st.warning("⚫ No disponible")
                                         st.rerun()
 
                             # ELIMINAR (POPOVER)
                             with _btn_col6:
-                                with st.popover("🗑️ Eliminar", use_container_width=True):
+                                with st.popover("🗑️ Eliminar", width="stretch"):
                                     st.error(f"⚠️ ¿Eliminar '{p['title']}'?")
                                     st.caption("Irreversible. Se eliminará de la base de datos.")
-                                    if st.button("❌ Sí, eliminar", key=f"p_btn_delete_{p['id']}", type="primary", use_container_width=True):
+                                    if st.button("❌ Sí, eliminar", key=f"p_btn_delete_{p['id']}", type="primary", width="stretch"):
                                         try:
                                             _uc = db_conn()
                                             _uc.execute("DELETE FROM plots WHERE id=?", (p["id"],))
@@ -431,7 +431,7 @@ def main():
 
                             st.markdown("---")
                             if st.button("📢 Alertar", key=f"p_btn_alert_{p['id']}",
-                                         use_container_width=True):
+                                         width="stretch"):
                                 try:
                                     from modules.marketplace.alertas import notify_new_plot
                                     _n = notify_new_plot(dict(p))
@@ -557,7 +557,7 @@ def main():
                             with _pb1:
                                 _is_primary = _pstatus == 'activo'
                                 if st.button("✅ Activo", key=f"pj_btn_activo_{proj['id']}",
-                                             use_container_width=True, type="primary" if _is_primary else "secondary"):
+                                             width="stretch", type="primary" if _is_primary else "secondary"):
                                     if _update_project_status(proj['id'], 'activo'):
                                         st.success("✅ Proyecto activo")
                                         st.rerun()
@@ -566,7 +566,7 @@ def main():
                             with _pb2:
                                 _is_primary = _pstatus == 'reservado'
                                 if st.button("🟡 Reservado", key=f"pj_btn_reservado_{proj['id']}",
-                                             use_container_width=True, type="primary" if _is_primary else "secondary"):
+                                             width="stretch", type="primary" if _is_primary else "secondary"):
                                     if _update_project_status(proj['id'], 'reservado'):
                                         st.info("🟡 Proyecto reservado")
                                         st.rerun()
@@ -575,7 +575,7 @@ def main():
                             with _pb3:
                                 _is_primary = _pstatus in ('vendido', 'vendida')
                                 if st.button("🔵 Vendido", key=f"pj_btn_vendido_{proj['id']}",
-                                             use_container_width=True, type="primary" if _is_primary else "secondary"):
+                                             width="stretch", type="primary" if _is_primary else "secondary"):
                                     if _update_project_status(proj['id'], 'vendido'):
                                         st.info("🔵 Marcado como vendido")
                                         st.rerun()
@@ -586,7 +586,7 @@ def main():
                             with _pb4:
                                 _is_primary = _pstatus == 'no_disponible'
                                 if st.button("⚫ No disponible", key=f"pj_btn_no_disponible_{proj['id']}",
-                                             use_container_width=True, type="primary" if _is_primary else "secondary"):
+                                             width="stretch", type="primary" if _is_primary else "secondary"):
                                     if _update_project_status(proj['id'], 'no_disponible'):
                                         st.warning("⚫ No disponible")
                                         st.rerun()
@@ -595,18 +595,18 @@ def main():
                             with _pb5:
                                 _is_primary = _pstatus == 'suspendido'
                                 if st.button("🔴 Suspender", key=f"pj_btn_suspendido_{proj['id']}",
-                                             use_container_width=True, type="primary" if _is_primary else "secondary"):
+                                             width="stretch", type="primary" if _is_primary else "secondary"):
                                     if _update_project_status(proj['id'], 'suspendido'):
                                         st.warning("🔴 Proyecto suspendido")
                                         st.rerun()
 
                             # ELIMINAR (POPOVER)
                             with _pb6:
-                                with st.popover("🗑️ Eliminar", use_container_width=True):
+                                with st.popover("🗑️ Eliminar", width="stretch"):
                                     st.error(f"⚠️ ¿Eliminar '{proj['title']}'?")
                                     st.caption("Irreversible. Se eliminará de la base de datos.")
                                     if st.button("❌ Sí, eliminar", key=f"pj_btn_delete_{proj['id']}",
-                                                 type="primary", use_container_width=True):
+                                                 type="primary", width="stretch"):
                                         try:
                                             _cup = db_conn()
                                             _cup.execute("DELETE FROM projects WHERE id=?", (proj["id"],))
@@ -718,7 +718,7 @@ def main():
                         "finca": "Finca", "amount": "Importe (€)",
                         "estado": "Estado", "created_at": "Fecha"
                     }),
-                    use_container_width=True, hide_index=True
+                    width="stretch", hide_index=True
                 )
 
                 # Fichas detalladas de cada comprador
@@ -764,7 +764,7 @@ def main():
                         key="intra_res_status"
                     )
                 with _col_r3:
-                    if _res_sel and _new_status and st.button("✅ Actualizar", key="intra_res_update", type="primary", use_container_width=True):
+                    if _res_sel and _new_status and st.button("✅ Actualizar", key="intra_res_update", type="primary", width="stretch"):
                         try:
                             _db_up = db_conn()
                             _db_up.execute(
@@ -786,10 +786,10 @@ def main():
 
                 with _col_r4:
                     if _res_sel:
-                        with st.popover("🗑️ Eliminar", use_container_width=True):
+                        with st.popover("🗑️ Eliminar", width="stretch"):
                             st.error("⚠️ ¿Eliminar reserva?")
                             st.caption("La acción no se puede deshacer.")
-                            if st.button("❌ Sí, eliminar", key=f"intra_res_del_yes_{_res_sel}", type="primary", use_container_width=True):
+                            if st.button("❌ Sí, eliminar", key=f"intra_res_del_yes_{_res_sel}", type="primary", width="stretch"):
                                 try:
                                     _db_del = db_conn()
                                     _db_del.execute("DELETE FROM reservations WHERE id=?", (_res_sel,))
@@ -834,7 +834,7 @@ def main():
                         "comision": "Comisión", "status": "Estado",
                         "start_date": "Inicio", "end_date": "Vencimiento"
                     }),
-                    use_container_width=True, hide_index=True
+                    width="stretch", hide_index=True
                 )
             else:
                 st.info("Sin suscripciones activas todavía.")
@@ -864,7 +864,7 @@ def main():
                         "style": "Estilo", "energy_label": "Energía",
                         "status": "Estado", "created_at": "Fecha"
                     }),
-                    use_container_width=True, hide_index=True
+                    width="stretch", hide_index=True
                 )
             else:
                 st.info("Sin proyectos AI Designer pagados todavía.")
@@ -902,7 +902,7 @@ def main():
                         "style": "Estilo", "budget": "Presupuesto",
                         "total_cost": "Coste generado", "paid": "Pago", "created_at": "Fecha"
                     }).drop(columns=["architect_id"], errors="ignore"),
-                    use_container_width=True, hide_index=True
+                    width="stretch", hide_index=True
                 )
             else:
                 st.info("Sin proyectos Modo Estudio todavía.")
@@ -937,7 +937,7 @@ def main():
                     _sc1, _sc2 = st.columns(2)
                     _sc1.metric("💶 Total cobrado (Stripe)", f"€{_paid3:,.2f}")
                     _sc2.metric("🧾 Sesiones totales", len(_rows3))
-                    st.dataframe(_df_st3, use_container_width=True, hide_index=True)
+                    st.dataframe(_df_st3, width="stretch", hide_index=True)
                 else:
                     st.info("Sin sesiones Stripe todavía. Usa tarjeta 4242 4242 4242 4242 para test.")
             except Exception as _est3:
@@ -989,7 +989,7 @@ def main():
                                 st.markdown("**Cambiar estado**")
                                 _is_primary = _sstatus == 'pending'
                                 if st.button("⏳ En trámite", key=f"sub_pending_{_sid}",
-                                             use_container_width=True, type="primary" if _is_primary else "secondary"):
+                                             width="stretch", type="primary" if _is_primary else "secondary"):
                                     _sc_conn = db_conn()
                                     _sc_conn.execute("UPDATE subscriptions SET status=?, is_active=0 WHERE id=?", ("pending", _sid))
                                     _sc_conn.commit(); _sc_conn.close()
@@ -997,7 +997,7 @@ def main():
                                     st.rerun()
                                 _is_primary = _sstatus == 'active'
                                 if st.button("✅ Autorizada", key=f"sub_active_{_sid}",
-                                             use_container_width=True, type="primary" if _is_primary else "secondary"):
+                                             width="stretch", type="primary" if _is_primary else "secondary"):
                                     _ac_conn = db_conn()
                                     _ac_conn.execute("UPDATE subscriptions SET status=?, is_active=1 WHERE id=?", ("active", _sid))
                                     _ac_conn.commit(); _ac_conn.close()
@@ -1005,7 +1005,7 @@ def main():
                                     st.rerun()
                                 _is_primary = _sstatus == 'suspended'
                                 if st.button("🔴 Suspender", key=f"sub_suspended_{_sid}",
-                                             use_container_width=True, type="primary" if _is_primary else "secondary"):
+                                             width="stretch", type="primary" if _is_primary else "secondary"):
                                     _sus_conn = db_conn()
                                     _sus_conn.execute("UPDATE subscriptions SET status=?, is_active=0 WHERE id=?", ("suspended", _sid))
                                     _sus_conn.commit(); _sus_conn.close()
@@ -1013,17 +1013,17 @@ def main():
                                     st.rerun()
                                 _is_primary = _sstatus == 'cancelled'
                                 if st.button("❌ Anular", key=f"sub_cancelled_{_sid}",
-                                             use_container_width=True, type="primary" if _is_primary else "secondary"):
+                                             width="stretch", type="primary" if _is_primary else "secondary"):
                                     _can_conn = db_conn()
                                     _can_conn.execute("UPDATE subscriptions SET status=?, is_active=0 WHERE id=?", ("cancelled", _sid))
                                     _can_conn.commit(); _can_conn.close()
                                     st.error("Anulada")
                                     st.rerun()
-                                with st.popover("🗑️ Eliminar", use_container_width=True):
+                                with st.popover("🗑️ Eliminar", width="stretch"):
                                     st.error(f"⚠️ ¿Eliminar suscripción de {_sname}?")
                                     st.caption("Irreversible.")
                                     if st.button("❌ Sí, eliminar", key=f"sub_del_yes_{_sid}",
-                                                 type="primary", use_container_width=True):
+                                                 type="primary", width="stretch"):
                                         _del_conn = db_conn()
                                         _del_conn.execute("DELETE FROM subscriptions WHERE id=?", (_sid,))
                                         _del_conn.commit(); _del_conn.close()
@@ -1067,7 +1067,7 @@ def main():
                                 st.markdown("**Cambiar estado**")
                                 _is_primary = _astatus == 'en_tramite'
                                 if st.button("⏳ En trámite", key=f"ai_pending_{_aid}",
-                                             use_container_width=True, type="primary" if _is_primary else "secondary"):
+                                             width="stretch", type="primary" if _is_primary else "secondary"):
                                     _ai_conn = db_conn()
                                     _ai_conn.execute("UPDATE ai_projects SET status=?, is_active=0 WHERE id=?", ("en_tramite", _aid))
                                     _ai_conn.commit(); _ai_conn.close()
@@ -1075,7 +1075,7 @@ def main():
                                     st.rerun()
                                 _is_primary = _astatus == 'activo'
                                 if st.button("✅ Autorizado", key=f"ai_active_{_aid}",
-                                             use_container_width=True, type="primary" if _is_primary else "secondary"):
+                                             width="stretch", type="primary" if _is_primary else "secondary"):
                                     _aiac_conn = db_conn()
                                     _aiac_conn.execute("UPDATE ai_projects SET status=?, is_active=1 WHERE id=?", ("activo", _aid))
                                     _aiac_conn.commit(); _aiac_conn.close()
@@ -1083,7 +1083,7 @@ def main():
                                     st.rerun()
                                 _is_primary = _astatus == 'suspendido'
                                 if st.button("🔴 Suspender", key=f"ai_suspended_{_aid}",
-                                             use_container_width=True, type="primary" if _is_primary else "secondary"):
+                                             width="stretch", type="primary" if _is_primary else "secondary"):
                                     _ai_sus = db_conn()
                                     _ai_sus.execute("UPDATE ai_projects SET status=?, is_active=0 WHERE id=?", ("suspendido", _aid))
                                     _ai_sus.commit(); _ai_sus.close()
@@ -1091,17 +1091,17 @@ def main():
                                     st.rerun()
                                 _is_primary = _astatus == 'anulado'
                                 if st.button("❌ Anular", key=f"ai_cancelled_{_aid}",
-                                             use_container_width=True, type="primary" if _is_primary else "secondary"):
+                                             width="stretch", type="primary" if _is_primary else "secondary"):
                                     _ai_can = db_conn()
                                     _ai_can.execute("UPDATE ai_projects SET status=?, is_active=0 WHERE id=?", ("anulado", _aid))
                                     _ai_can.commit(); _ai_can.close()
                                     st.error("Anulado")
                                     st.rerun()
-                                with st.popover("🗑️ Eliminar", use_container_width=True):
+                                with st.popover("🗑️ Eliminar", width="stretch"):
                                     st.error(f"⚠️ ¿Eliminar proyecto '{_aname}'?")
                                     st.caption("Irreversible.")
                                     if st.button("❌ Sí, eliminar", key=f"ai_del_yes_{_aid}",
-                                                 type="primary", use_container_width=True):
+                                                 type="primary", width="stretch"):
                                         _ai_del = db_conn()
                                         _ai_del.execute("DELETE FROM ai_projects WHERE id=?", (_aid,))
                                         _ai_del.commit(); _ai_del.close()
@@ -1295,7 +1295,7 @@ def main():
                                 placeholder="2026-12-31"
                             )
                             if st.button("💾 Guardar Destacado", key=f"savefeat_{_pid5}",
-                                         type="primary", use_container_width=True,
+                                         type="primary", width="stretch",
                                          help="Guarda el estado Destacado y la fecha de validez para este profesional"):
                                 try:
                                     _conn_upd = db_conn()
@@ -1326,7 +1326,7 @@ def main():
                             with _bc1:
                                 _is_prim_apr = (_status5 == 'activo')
                                 if st.button("✅ APROBAR 🟢", key=f"btn_prof_approve_{_pid5}",
-                                             use_container_width=True,
+                                             width="stretch",
                                              type="primary" if _is_prim_apr else "secondary"):
                                     try:
                                         _ca = db_conn()
@@ -1344,7 +1344,7 @@ def main():
                             with _bc2:
                                 _is_prim_tram = (_status5 == 'tramite')
                                 if st.button("⏳ EN TRÁMITE 🟡", key=f"btn_prof_tramite_{_pid5}",
-                                             use_container_width=True,
+                                             width="stretch",
                                              type="primary" if _is_prim_tram else "secondary"):
                                     try:
                                         _cp = db_conn()
@@ -1364,7 +1364,7 @@ def main():
                             with _bc3:
                                 _is_prim_bloq = (_status5 == 'bloqueado')
                                 if st.button("🚫 BLOQUEAR 🔴", key=f"btn_prof_block_{_pid5}",
-                                             use_container_width=True,
+                                             width="stretch",
                                              type="primary" if _is_prim_bloq else "secondary"):
                                     try:
                                         _cb = db_conn()
@@ -1560,7 +1560,7 @@ def main():
                         with _wa1:
                             if st.button("✅ Aprobar 🟢", key=f"wl_apr_{_wid}",
                                          type="primary" if _wapproved else "secondary",
-                                         use_container_width=True):
+                                         width="stretch"):
                                 _cwa = db_conn()
                                 try:
                                     _cwa.execute("UPDATE waitlist SET approved=1 WHERE id=?", (_wid,))
@@ -1573,7 +1573,7 @@ def main():
                         with _wa2:
                             if st.button("⏳ Trámite 🟡", key=f"wl_tram_{_wid}",
                                          type="primary" if _wext_status == "tramite" else "secondary",
-                                         use_container_width=True):
+                                         width="stretch"):
                                 _cwt = db_conn()
                                 try:
                                     _cwt.execute("UPDATE waitlist SET approved=0 WHERE id=?", (_wid,))
@@ -1585,7 +1585,7 @@ def main():
                         with _wa3:
                             if st.button("🔴 Suspender", key=f"wl_sus_{_wid}",
                                          type="primary" if _wext_status == "suspendido" else "secondary",
-                                         use_container_width=True):
+                                         width="stretch"):
                                 _cws = db_conn()
                                 try:
                                     _cws.execute("UPDATE waitlist SET approved=0 WHERE id=?", (_wid,))
@@ -1595,11 +1595,11 @@ def main():
                                 st.session_state[f"wl_ext_{_wid}"] = "suspendido"
                                 st.rerun()
                         with _wa4:
-                            with st.popover("🗑️ Eliminar", use_container_width=True):
+                            with st.popover("🗑️ Eliminar", width="stretch"):
                                 st.error(f"⚠️ ¿Eliminar a {_wname}?")
                                 st.caption("Irreversible.")
                                 if st.button("❌ Sí, eliminar", key=f"wl_del_yes_{_wid}",
-                                             type="primary", use_container_width=True):
+                                             type="primary", width="stretch"):
                                     _cwd = db_conn()
                                     try:
                                         _cwd.execute("DELETE FROM waitlist WHERE id=?", (_wid,))
@@ -1615,7 +1615,7 @@ def main():
                     data=_csv,
                     file_name="waitlist_archirapid.csv",
                     mime="text/csv",
-                    use_container_width=True
+                    width="stretch"
                 )
             else:
                 st.info("Aun no hay solicitudes en la lista de espera.")
@@ -1680,7 +1680,7 @@ Obtén el token creando un bot con @BotFather en Telegram.
                 )
                 st.dataframe(
                     _df_users.rename(columns={"name": "Nombre", "email": "Email", "role": "Rol", "created_at": "Fecha"}),
-                    use_container_width=True, hide_index=True
+                    width="stretch", hide_index=True
                 )
             else:
                 st.info("Sin registros todavía.")
@@ -1706,7 +1706,7 @@ Obtén el token creando un bot con @BotFather en Telegram.
                         "finca": "Finca", "amount": "Importe (€)",
                         "kind": "Tipo", "created_at": "Fecha"
                     }),
-                    use_container_width=True, hide_index=True
+                    width="stretch", hide_index=True
                 )
             else:
                 st.info("Sin transacciones todavía.")
@@ -1725,7 +1725,7 @@ Obtén el token creando un bot con @BotFather en Telegram.
             if not _df_wl.empty:
                 st.dataframe(
                     _df_wl.rename(columns={"name": "Nombre", "email": "Email", "profile": "Perfil", "created_at": "Fecha"}),
-                    use_container_width=True, hide_index=True
+                    width="stretch", hide_index=True
                 )
             else:
                 st.info("Sin solicitudes todavía.")
@@ -1904,7 +1904,7 @@ Obtén el token creando un bot con @BotFather en Telegram.
                     _sc1.metric("💶 Revenue Stripe (test)", f"€{_total_stripe:,.0f}")
                     _sc2.metric("🧾 Pagos completados", len(_stripe_rows))
                     _sc3.metric("📊 Ticket medio", f"€{_total_stripe/len(_stripe_rows):,.0f}" if _stripe_rows else "—")
-                    st.dataframe(_df_stripe, use_container_width=True, hide_index=True)
+                    st.dataframe(_df_stripe, width="stretch", hide_index=True)
                 else:
                     st.info("Aún no hay pagos completados en Stripe (modo test). Realiza una compra de prueba con la tarjeta 4242 4242 4242 4242.")
             except Exception as _stripe_err:
@@ -1934,7 +1934,7 @@ Obtén el token creando un bot con @BotFather en Telegram.
                         "SELECT role as Rol, COUNT(*) as Total FROM users GROUP BY role ORDER BY Total DESC"
                     )
                     if not _df_roles.empty:
-                        st.dataframe(_df_roles, use_container_width=True, hide_index=True)
+                        st.dataframe(_df_roles, width="stretch", hide_index=True)
                         st.bar_chart(_df_roles.set_index("Rol"))
                     else:
                         st.info("Sin datos de roles todavía.")
@@ -1949,7 +1949,7 @@ Obtén el token creando un bot con @BotFather en Telegram.
                         "SELECT province as Provincia, COUNT(*) as Fincas FROM plots GROUP BY province ORDER BY Fincas DESC"
                     )
                     if not _df_prov.empty:
-                        st.dataframe(_df_prov, use_container_width=True, hide_index=True)
+                        st.dataframe(_df_prov, width="stretch", hide_index=True)
                         st.bar_chart(_df_prov.set_index("Provincia"))
                     else:
                         st.info("Sin datos de provincias todavía.")
@@ -1970,7 +1970,7 @@ Obtén el token creando un bot con @BotFather en Telegram.
                         {"purchase": "Compra", "reservation": "Reserva", "pdf": "Docs PDF",
                          "cad": "Docs CAD", "full": "Paquete completo"}
                     ).fillna(_df_kind["Tipo"])
-                    st.dataframe(_df_kind, use_container_width=True, hide_index=True)
+                    st.dataframe(_df_kind, width="stretch", hide_index=True)
                     st.bar_chart(_df_kind.set_index("Tipo")["Importe"])
                 else:
                     st.info("Sin transacciones todavía.")
@@ -2007,7 +2007,7 @@ Obtén el token creando un bot con @BotFather en Telegram.
                     "SELECT title as Finca, province as Provincia, m2 as Superficie_m2, price as Precio_EUR, status as Estado FROM plots ORDER BY price DESC LIMIT 10"
                 )
                 if not _df_top.empty:
-                    st.dataframe(_df_top, use_container_width=True, hide_index=True)
+                    st.dataframe(_df_top, width="stretch", hide_index=True)
                 else:
                     st.info("Sin fincas en el catálogo.")
             except Exception as _et:
@@ -2052,7 +2052,7 @@ Obtén el token creando un bot con @BotFather en Telegram.
                     _kv1.metric("Total visitas demo", _total_vis)
                     _kv2.metric("Registros generados", _total_reg)
                     _kv3.metric("Conversión global", f"{_conv_global}%")
-                    st.dataframe(_df_vis, use_container_width=True, hide_index=True)
+                    st.dataframe(_df_vis, width="stretch", hide_index=True)
 
                     # Gráfica visitas por día
                     _df_dia = _read_sql9(
@@ -2077,7 +2077,7 @@ Obtén el token creando un bot con @BotFather en Telegram.
                                WHERE timestamp >= '{_desde_iso}' AND timestamp < '{_hasta_iso}'
                                ORDER BY timestamp DESC"""
                         )
-                        st.dataframe(_df_det, use_container_width=True, hide_index=True, height=400)
+                        st.dataframe(_df_det, width="stretch", hide_index=True, height=400)
                 else:
                     st.info("Sin visitas registradas en este periodo. Comparte el enlace demo para empezar a trackear.")
                     st.code("https://archirapid.streamlit.app/?seccion=arquitecto&demo=true&from=linkedin&user=nombre")
@@ -2171,7 +2171,7 @@ Obtén el token creando un bot con @BotFather en Telegram.
                     )
                     if not _df_notifs.empty:
                         st.caption("Notificaciones MLS sin leer por tipo")
-                        st.dataframe(_df_notifs, use_container_width=True, hide_index=True)
+                        st.dataframe(_df_notifs, width="stretch", hide_index=True)
                 except Exception:
                     pass
 
@@ -2199,7 +2199,7 @@ Obtén el token creando un bot con @BotFather en Telegram.
                         _ll2.metric("Sin contactar", _lnuevos)
                         st.caption("URL demo para compartir:")
                         st.code("https://archirapid.streamlit.app/?seccion=mls&demo=true&from=linkedin")
-                        st.dataframe(_df_leads, use_container_width=True, hide_index=True)
+                        st.dataframe(_df_leads, width="stretch", hide_index=True)
                     else:
                         st.info("Sin leads MLS todavía. Comparte la URL demo para empezar a recibir solicitudes.")
                         st.code("https://archirapid.streamlit.app/?seccion=mls&demo=true&from=linkedin")
@@ -2402,7 +2402,7 @@ Obtén el token creando un bot con @BotFather en Telegram.
                             st.markdown("**Acciones**")
                             # APROBAR — activa trial, envía email bienvenida
                             if st.button("✅ Aprobar 🟢", key=f"mlsA_apr_{_p['id']}",
-                                         type="primary", use_container_width=True,
+                                         type="primary", width="stretch",
                                          disabled=not _p_firma,
                                          help="Requiere firma del acuerdo" if not _p_firma else ""):
                                 _mls_set_status(_p["id"], "active")
@@ -2424,23 +2424,23 @@ Obtén el token creando un bot con @BotFather en Telegram.
                                 st.rerun()
 
                             if st.button("⏳ Pendiente 🟡", key=f"mlsA_pend_{_p['id']}",
-                                         use_container_width=True):
+                                         width="stretch"):
                                 _mls_set_status(_p["id"], "pending")
                                 st.info("Marcada como pendiente")
                                 st.rerun()
 
                             if st.button("🚫 Suspender 🔴", key=f"mlsA_susp_{_p['id']}",
-                                         use_container_width=True):
+                                         width="stretch"):
                                 _mls_set_status(_p["id"], "suspended")
                                 st.warning("Suspendida")
                                 st.rerun()
 
                             st.markdown("")
-                            with st.popover("🗑️ Eliminar", use_container_width=True):
+                            with st.popover("🗑️ Eliminar", width="stretch"):
                                 st.error(f"⚠️ ¿Eliminar '{_pnombre}'?")
                                 st.caption("Borra el registro de la BBDD. Irreversible.")
                                 if st.button("❌ Sí, eliminar", key=f"mlsA_del_{_p['id']}",
-                                             type="primary", use_container_width=True):
+                                             type="primary", width="stretch"):
                                     _dc = db_conn()
                                     try:
                                         _dc.execute("DELETE FROM inmobiliarias WHERE id=?", (_p["id"],))
@@ -2630,7 +2630,7 @@ Obtén el token creando un bot con @BotFather en Telegram.
                             _bid = f"{_a['id']}_{_idx_b}"
 
                             if st.button("✅ Aprobar 🟢", key=f"mlsB_apr_{_bid}",
-                                         use_container_width=True,
+                                         width="stretch",
                                          disabled=not _tiene_firma,
                                          help="Requiere firma del acuerdo" if not _tiene_firma else "",
                                          type="primary" if _raw_status in ("active","aprobada") else "secondary"):
@@ -2644,26 +2644,26 @@ Obtén el token creando un bot con @BotFather en Telegram.
                                 st.rerun()
 
                             if st.button("⏳ Pendiente 🟡", key=f"mlsB_pend_{_bid}",
-                                         use_container_width=True,
+                                         width="stretch",
                                          type="primary" if _raw_status in ("pending","tramite","pendiente") else "secondary"):
                                 _mls_set_status(_a["id"], "pending")
                                 st.info("🟡 Pendiente")
                                 st.rerun()
 
                             if st.button("🚫 Suspender 🔴", key=f"mlsB_susp_{_bid}",
-                                         use_container_width=True,
+                                         width="stretch",
                                          type="primary" if _raw_status in ("suspended","suspendida") else "secondary"):
                                 _mls_set_status(_a["id"], "suspended")
                                 st.warning("🔴 Suspendida (sin eliminar)")
                                 st.rerun()
 
                             st.markdown("")
-                            with st.popover("🗑️ Eliminar", use_container_width=True):
+                            with st.popover("🗑️ Eliminar", width="stretch"):
                                 st.error(f"⚠️ ¿Eliminar '{_anombre}'?")
                                 st.caption("Borra el registro de la BBDD permanentemente.")
                                 if st.button("❌ Sí, eliminar definitivamente",
                                              key=f"mlsB_del_{_bid}",
-                                             type="primary", use_container_width=True):
+                                             type="primary", width="stretch"):
                                     _del_c = db_conn()
                                     try:
                                         _del_c.execute("DELETE FROM inmobiliarias WHERE id=?", (_a["id"],))
@@ -2728,14 +2728,14 @@ Obtén el token creando un bot con @BotFather en Telegram.
                 _df_fincas["días"] = _df_fincas["dias_en_mercado_inicio"].apply(_dias)
                 _df_fincas["catastro"] = _df_fincas["catastro_validada"].map({1: "✅", 0: "⚠️"}).fillna("⚠️")
 
-                st.dataframe(
-                    _df_fincas[["ref_codigo","titulo","precio","estado","días","listante","catastro"]].rename(columns={
-                        "ref_codigo": "REF", "titulo": "Título",
-                        "precio": "Precio (€)", "estado": "Estado",
-                        "días": "Días", "listante": "Listante", "catastro": "Catastro"
-                    }),
-                    use_container_width=True, hide_index=True
-                )
+                _df_fincas_display = _df_fincas[["ref_codigo","titulo","precio","estado","días","listante","catastro"]].rename(columns={
+                    "ref_codigo": "REF", "titulo": "Título",
+                    "precio": "Precio (€)", "estado": "Estado",
+                    "días": "Días", "listante": "Listante", "catastro": "Catastro"
+                })
+                # Fix Arrow: columna Días mezcla int y str ("—") → forzar todo a str
+                _df_fincas_display["Días"] = _df_fincas_display["Días"].astype(str)
+                st.dataframe(_df_fincas_display, hide_index=True)
 
                 st.markdown("**Acciones por finca:**")
                 for _, _frow in _df_fincas.iterrows():
@@ -2756,7 +2756,7 @@ Obtén el token creando un bot con @BotFather en Telegram.
                             # Aprobar publicación — solo si está validada_pendiente_aprobacion
                             if _festado == "validada_pendiente_aprobacion":
                                 if st.button("✅ Aprobar publicación", key=f"mls_apro_f_{_fid}",
-                                             type="primary", use_container_width=True):
+                                             type="primary", width="stretch"):
                                     try:
                                         _mls.update_finca_estado(_fid, "publicada")
                                         _mls_notif.notif_finca_publicada(
@@ -2795,7 +2795,7 @@ Obtén el token creando un bot con @BotFather en Telegram.
                                 _rc1, _rc2 = st.columns(2)
                                 with _rc1:
                                     if st.button("✅ Confirmar disponible", key=f"mls_conf_{_fid}",
-                                                 type="primary", use_container_width=True):
+                                                 type="primary", width="stretch"):
                                         _mls.update_finca_estado(_fid, "reservada")
                                         try:
                                             _mls_notif.notif_confirmacion_reserva_cliente(
@@ -2809,7 +2809,7 @@ Obtén el token creando un bot con @BotFather en Telegram.
                                         st.rerun()
                                 with _rc2:
                                     if st.button("❌ No disponible", key=f"mls_nodisp_{_fid}",
-                                                 use_container_width=True):
+                                                 width="stretch"):
                                         _mls.update_finca_estado(_fid, "publicada")
                                         try:
                                             _mls_notif.notif_confirmacion_reserva_cliente(
@@ -2827,12 +2827,12 @@ Obtén el token creando un bot con @BotFather en Telegram.
                             with _gb1:
                                 if _festado not in ("pausada", "cerrada", "eliminada"):
                                     if st.button("⏸ Pausar", key=f"mls_pau_{_fid}",
-                                                 use_container_width=True):
+                                                 width="stretch"):
                                         _mls.update_finca_estado(_fid, "pausada")
                                         st.rerun()
                                 elif _festado == "pausada":
                                     if st.button("▶️ Reactivar", key=f"mls_react_{_fid}",
-                                                 type="primary", use_container_width=True):
+                                                 type="primary", width="stretch"):
                                         _mls.update_finca_estado(_fid, "publicada")
                                         st.rerun()
                             with _gb2:
@@ -2841,13 +2841,13 @@ Obtén el token creando un bot con @BotFather en Telegram.
                                     if st.session_state.get(_elim_key):
                                         if st.button("⚠️ Confirmar borrado lógico",
                                                      key=f"mls_elim_yes_{_fid}",
-                                                     use_container_width=True):
+                                                     width="stretch"):
                                             _mls.update_finca_estado(_fid, "eliminada")
                                             st.session_state.pop(_elim_key, None)
                                             st.rerun()
                                     else:
                                         if st.button("🗑️ Eliminar", key=f"mls_elim_{_fid}",
-                                                     use_container_width=True):
+                                                     width="stretch"):
                                             st.session_state[_elim_key] = True
                                             st.rerun()
         except Exception as _ec:
@@ -2918,7 +2918,7 @@ Obtén el token creando un bot con @BotFather en Telegram.
 """)
                         with _rb:
                             if st.button("⏰ Forzar expiración", key=f"mls_fexp_{_rd['id']}",
-                                         use_container_width=True):
+                                         width="stretch"):
                                 try:
                                     _ec2 = db_conn()
                                     _ec2.execute(
@@ -2971,7 +2971,7 @@ Obtén el token creando un bot con @BotFather en Telegram.
                         "doc_hash_s": "Doc hash (16)", "firma_hash_s": "Firma hash (16)",
                         "version": "Versión"
                     }),
-                    use_container_width=True, hide_index=True
+                    width="stretch", hide_index=True
                 )
                 st.caption("Firmas digitales eIDAS art.25 — SHA-256 sobre TEXTO_ACUERDO + timestamp + CIF + IP")
 
@@ -3052,7 +3052,7 @@ Obtén el token creando un bot con @BotFather en Telegram.
                                 "✅ Confirmar reserva 72h",
                                 key=f"mls_sol_ok_{_sid}",
                                 type="primary",
-                                use_container_width=True,
+                                width="stretch",
                             ):
                                 try:
                                     _mls.update_finca_estado(_finca_id, "reservada")
@@ -3081,7 +3081,7 @@ Obtén el token creando un bot con @BotFather en Telegram.
                             if st.button(
                                 "❌ Rechazar",
                                 key=f"mls_sol_no_{_sid}",
-                                use_container_width=True,
+                                width="stretch",
                             ):
                                 try:
                                     _mls.create_notificacion(
@@ -3139,8 +3139,13 @@ Obtén el token creando un bot con @BotFather en Telegram.
                         "Día trial": _ts["trial_day"],
                     })
                 import pandas as _pd_g
-                st.dataframe(_pd_g.DataFrame(_trial_rows),
-                             use_container_width=True, hide_index=True)
+                _df_trial = _pd_g.DataFrame(_trial_rows)
+                # Fix Arrow: Días restantes puede ser int/None → str
+                if "Días restantes" in _df_trial.columns:
+                    _df_trial["Días restantes"] = _df_trial["Días restantes"].astype(str)
+                if "Día trial" in _df_trial.columns:
+                    _df_trial["Día trial"] = _df_trial["Día trial"].astype(str)
+                st.dataframe(_df_trial, hide_index=True)
             else:
                 st.info("No hay inmobiliarias con trial activo.")
         except Exception as _eg:
@@ -3179,7 +3184,7 @@ Obtén el token creando un bot con @BotFather en Telegram.
                 _col_a.metric("Diseño IA", int((_df11["Tipo"] == "diseno_ia").sum()))
                 _col_b.metric("Documentación/Pago", int((_df11["Tipo"] == "documentacion_pago").sum()))
 
-                st.dataframe(_df11_display, use_container_width=True)
+                st.dataframe(_df11_display, width="stretch")
 
                 _csv11 = _df11.to_csv(index=False).encode("utf-8")
                 st.download_button(
@@ -3217,10 +3222,10 @@ Conservar durante 5 años como evidencia legal.
                                 file_name=f"disclaimer_{_row11['Email'].replace('@','_')}_{str(_row11['Fecha UTC'])[:10]}.txt",
                                 mime="text/plain",
                                 key=f"dl_disc_{_idx11}",
-                                use_container_width=True,
+                                width="stretch",
                             )
                             if _row11.get("PDF") and str(_row11["PDF"]).startswith("http"):
-                                st.link_button("📥 PDF original", _row11["PDF"], use_container_width=True)
+                                st.link_button("📥 PDF original", _row11["PDF"], width="stretch")
             else:
                 st.info("No hay disclaimers registrados aún.")
 
@@ -3292,27 +3297,27 @@ def _admin_solicitudes_estudiantes():
             with _ec1:
                 if st.button("✅ Aprobar 🟢", key=f"est_apr_{id_}",
                              type="primary" if estado == "aprobado" else "secondary",
-                             use_container_width=True):
+                             width="stretch"):
                     _cambiar_estado_estudiante(id_, "aprobado")
                     st.rerun()
             with _ec2:
                 if st.button("⏳ Pendiente 🟡", key=f"est_pend_{id_}",
                              type="primary" if estado == "pendiente" else "secondary",
-                             use_container_width=True):
+                             width="stretch"):
                     _cambiar_estado_estudiante(id_, "pendiente")
                     st.rerun()
             with _ec3:
                 if st.button("🔴 Suspender", key=f"est_susp_{id_}",
                              type="primary" if estado in ("suspendido", "rechazado") else "secondary",
-                             use_container_width=True):
+                             width="stretch"):
                     _cambiar_estado_estudiante(id_, "suspendido")
                     st.rerun()
             with _ec4:
-                with st.popover("🗑️ Eliminar", use_container_width=True):
+                with st.popover("🗑️ Eliminar", width="stretch"):
                     st.error(f"⚠️ ¿Eliminar a {nombre}?")
                     st.caption("Irreversible.")
                     if st.button("❌ Sí, eliminar", key=f"est_del_{id_}",
-                                 type="primary", use_container_width=True):
+                                 type="primary", width="stretch"):
                         _c = db_conn()
                         try:
                             _c.execute("DELETE FROM estudiantes WHERE id=?", (id_,))
@@ -3400,22 +3405,22 @@ def _admin_proyectos_tfg():
                 _proj_col1, _proj_col2, _proj_col3, _proj_col4 = st.columns(4)
                 with _proj_col1:
                     if estado != "aprobado":
-                        if st.button("✅ Restaurar", key=f"btn_tfg_restore_{id_}", type="primary", use_container_width=True):
+                        if st.button("✅ Restaurar", key=f"btn_tfg_restore_{id_}", type="primary", width="stretch"):
                             _cambiar_estado_proyecto(id_, "aprobado")
                             st.rerun()
                 with _proj_col2:
-                    if st.button("⏸ Pausar", key=f"btn_tfg_pause_{id_}", use_container_width=True):
+                    if st.button("⏸ Pausar", key=f"btn_tfg_pause_{id_}", width="stretch"):
                         _cambiar_estado_proyecto(id_, "pausado")
                         st.rerun()
                 with _proj_col3:
-                    if st.button("🔴 Suspender", key=f"btn_tfg_suspend_{id_}", use_container_width=True):
+                    if st.button("🔴 Suspender", key=f"btn_tfg_suspend_{id_}", width="stretch"):
                         _cambiar_estado_proyecto(id_, "suspendido")
                         st.rerun()
                 with _proj_col4:
-                    with st.popover("🗑️ Eliminar", use_container_width=True):
+                    with st.popover("🗑️ Eliminar", width="stretch"):
                         st.error(f"⚠️ ¿Eliminar '{titulo}'?")
                         st.caption("Irreversible.")
-                        if st.button("❌ Sí, eliminar", key=f"btn_tfg_delete_{id_}", type="primary", use_container_width=True):
+                        if st.button("❌ Sí, eliminar", key=f"btn_tfg_delete_{id_}", type="primary", width="stretch"):
                             _cp = db_conn()
                             _cp.execute("DELETE FROM proyectos_tfg WHERE id=?", (id_,))
                             _cp.commit()
