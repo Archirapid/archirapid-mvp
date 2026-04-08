@@ -1768,7 +1768,7 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
             ("🏠 Comprador", "comprador", "👤 Panel de Cliente", "cliente"),
             ("🎓 Estudiante", "estudiante", "🎓 Estudiantes", "estudiantes"),
             ("📐 Arquitecto", "arquitecto", "Arquitectos (Marketplace)", "arquitectos"),
-            ("🏗️ Constructor", "constructor", "👤 Panel de Proveedor", "proveedor"),
+            ("🏗️ Profesionales", "constructor", "👤 Panel de Proveedor", "proveedor"),
             ("🏠 Prefab", "prefab", "🏠 Portal Prefabricadas", "prefabricadas"),
             ("🏢 Inmo/MLS", "mls", "🏢 Inmobiliarias MLS", "mls")
         ]
