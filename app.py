@@ -1728,66 +1728,52 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
             # ── Acceso directo al portal MLS — 30 días free trial ────────────
             st.link_button("🎁 30 días Free Trial — Acceder al portal MLS →", "/?seccion=mls", width='stretch', type="primary")
 
-        # ── NAVEGACIÓN COMPACTA Y PROFESIONAL ─────────────────────────────────
+        # ── NAVEGACIÓN PROFESIONAL CON ESPACIADO CORREGIDO ─────────────────────────
         st.markdown("""
 <style>
+    .access-grid {
+        display: flex; gap: 10px; justify-content: space-between;
+        margin-bottom: 15px;
+        margin-top: 10px;
+    }
     .access-card {
-        background: white; padding: 10px; border-radius: 8px;
+        flex: 1; background: white; padding: 12px; border-radius: 10px;
         border: 1px solid #e5e7eb; border-top: 4px solid #ccc; text-align: center;
-        transition: all 0.2s; margin: -2px 0;
+        transition: all 0.2s ease-in-out;
+        box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
     }
-    .access-card:hover { transform: translateY(-2px); box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); }
-    .card-label { font-weight: 700; color: #111827; font-size: 0.75rem; margin-bottom: 6px; display: block; }
-    .terreno   { border-top-color: #10b981; }
-    .comprador { border-top-color: #3b82f6; }
-    .estudiante{ border-top-color: #8b5cf6; }
-    .arquitecto{ border-top-color: #f59e0b; }
-    .constructor{border-top-color: #d97706; }
-    .prefab    { border-top-color: #06b6d4; }
-    .mls       { border-top-color: #f43f5e; }
+    .access-card:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1); }
+    .card-label { font-weight: 700; color: #111827; font-size: 0.85rem; margin-bottom: 8px; display: block; }
+
+    .terreno { border-top-color: #10b981; } .comprador { border-top-color: #3b82f6; }
+    .estudiante { border-top-color: #8b5cf6; } .arquitecto { border-top-color: #f59e0b; }
+    .constructor { border-top-color: #d97706; } .prefab { border-top-color: #06b6d4; }
+    .mls { border-top-color: #f43f5e; }
+
     div[data-testid="stButton"] > button {
-        width: 100% !important; height: 26px !important; padding: 0 !important;
-        font-size: 0.7rem !important; font-weight: 600 !important; border-radius: 6px !important;
+        width: 100% !important; height: 30px !important; padding: 0 !important;
+        font-size: 0.75rem !important; font-weight: 600 !important; border-radius: 6px !important;
+        border: 1px solid #d1d5db !important;
     }
-    hr { margin-top: 0.5rem !important; margin-bottom: 0.5rem !important; }
+
+    hr { margin-top: 1.5rem !important; margin-bottom: 1.5rem !important; opacity: 0.2; }
 </style>
 """, unsafe_allow_html=True)
 
-        _acc = st.columns(7, gap="small")
-        _nav_config = [
-            ("📍 Terreno", "terreno", "btn_nav_owner",
-             lambda: (
-                st.session_state.update({"selected_page": "🏠 Propietarios", "query_params": {"page": "propietarios"}})
-                if st.session_state.get("logged_in") and st.session_state.get("role") == "owner"
-                else st.session_state.update({"login_role": "owner", "viewing_login": True})
-            )),
-            ("🏠 Comprador", "comprador", "btn_nav_client",
-             lambda: (
-                st.session_state.update({"selected_page": "👤 Panel de Cliente"})
-                if st.session_state.get("logged_in") and st.session_state.get("role") == "client"
-                else st.session_state.update({"login_role": "client", "viewing_login": True, "_login_show_registro": False})
-            )),
-            ("🎓 Estudiante", "estudiante", "btn_nav_student",
-             lambda: st.session_state.update({"selected_page": "🎓 Estudiantes"})),
-            ("📐 Arquitecto", "arquitecto", "btn_nav_arch",
-             lambda: st.session_state.update({"selected_page": "Arquitectos (Marketplace)"})),
-            ("🏗️ Constructor", "constructor", "btn_nav_builder",
-             lambda: (
-                st.session_state.update({"selected_page": "👤 Panel de Proveedor"})
-                if st.session_state.get("logged_in") and st.session_state.get("role") == "services"
-                else st.session_state.update({"login_role": "services", "viewing_login": True, "_login_show_registro": False})
-            )),
-            ("🏠 Prefab", "prefab", "btn_nav_prefab",
-             lambda: st.session_state.update({"selected_page": "🏠 Portal Prefabricadas"})),
-            ("🏢 Inmo/MLS", "mls", "btn_nav_mls",
-             lambda: st.session_state.update({"selected_page": "🏢 Inmobiliarias MLS"})),
+        cols = st.columns(7, gap="small")
+        roles = [
+            ("📍 Terreno", "terreno", "owner"), ("🏠 Comprador", "comprador", "client"),
+            ("🎓 Estudiante", "estudiante", "student"), ("📐 Arquitecto", "arquitecto", "arch"),
+            ("🏗️ Constructor", "constructor", "builder"), ("🏠 Prefab", "prefab", "prefab"),
+            ("🏢 Inmo/MLS", "mls", "mls")
         ]
 
-        for i, (label, style, key, action) in enumerate(_nav_config):
-            with _acc[i]:
-                st.markdown(f'<div class="access-card {style}"><span class="card-label">{label}</span>', unsafe_allow_html=True)
-                if st.button("Acceder", key=key, use_container_width=True):
-                    action()
+        for i, (label, style_class, page_slug) in enumerate(roles):
+            with cols[i]:
+                st.markdown(f'<div class="access-card {style_class}"><span class="card-label">{label}</span>', unsafe_allow_html=True)
+                if st.button("Acceder", key=f"btn_nav_{page_slug}", use_container_width=True):
+                    st.session_state["selected_page"] = page_slug
+                    st.query_params["page"] = page_slug
                     st.rerun()
                 st.markdown('</div>', unsafe_allow_html=True)
 
