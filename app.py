@@ -59,6 +59,60 @@ _init_app_db()
 import streamlit as st
 st.set_page_config(layout='wide', initial_sidebar_state="expanded")
 
+# ══════════════════════════════════════════════════════════════════
+# URL-FIRST HIJACKER — debe ejecutarse ANTES de cualquier widget UI
+# Resuelve: botón Atrás cambia URL pero _nav_radio restaura la página
+# anterior porque Streamlit lee el widget del session_state primero.
+# ══════════════════════════════════════════════════════════════════
+_HIJACKER_SLUG_TO_PAGE = {
+    "home":          "🏠 Inicio / Marketplace",
+    "admin":         "Intranet",
+    "propietarios":  "🏠 Propietarios",
+    "gemelo":        "Propietario (Gemelo Digital)",
+    "lola":          "💬 Lola",
+    "login":         "Iniciar Sesión",
+    "registro":      "Registro de Usuario",
+    "cliente":       "👤 Panel de Cliente",
+    "disenador":     "Diseñador de Vivienda",
+    "arquitectos":   "Arquitectos (Marketplace)",
+    "proveedor":     "👤 Panel de Proveedor",
+    "registro-pro":  "📝 Registro de Proveedor de Servicios",
+    "mls":           "🏢 Inmobiliarias MLS",
+    "estudiantes":   "🎓 Estudiantes",
+    "prefabricadas": "🏠 Portal Prefabricadas",
+}
+
+def _url_first_hijacker():
+    """Sincronización agresiva URL → session_state.
+    Si la URL cambió (botón Atrás), borra _nav_radio para que el radio
+    del sidebar no restaure la página anterior y fuerza rerun.
+    """
+    url_slug = st.query_params.get("page", "home")
+    target_page = _HIJACKER_SLUG_TO_PAGE.get(url_slug, "🏠 Inicio / Marketplace")
+
+    # Inicializar la primera vez
+    if "selected_page" not in st.session_state:
+        st.session_state["selected_page"] = target_page
+        st.session_state["_nav_radio"] = target_page
+        return
+
+    current_page = st.session_state.get("selected_page", "🏠 Inicio / Marketplace")
+
+    # Discrepancia URL ↔ session_state → la URL manda
+    if current_page != target_page:
+        st.session_state["selected_page"] = target_page
+        # TRUCO MAESTRO: eliminar la key del widget radio para que Streamlit
+        # no restaure el valor antiguo al renderizar el sidebar
+        st.session_state.pop("_nav_radio", None)
+        # Limpiar estado de login si volvemos a home
+        if url_slug in ("home", ""):
+            st.session_state.pop("viewing_login", None)
+            st.session_state.pop("login_role", None)
+        st.rerun()
+
+_url_first_hijacker()
+# ══════════════════════════════════════════════════════════════════
+
 st.markdown("""
     <style>
         /* 1. Atacar el contenedor raíz de Streamlit */
