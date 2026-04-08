@@ -1762,9 +1762,6 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
 
         cols = st.columns(7, gap="small")
 
-        # ── DEFINICIÓN DE PÁGINAS PÚBLICAS (sin autenticación requerida) ──
-        public_pages = ['student', 'prefab']
-
         roles = [
             ("📍 Terreno", "terreno", "owner"), ("🏠 Comprador", "comprador", "client"),
             ("🎓 Estudiante", "estudiante", "student"), ("📐 Arquitecto", "arquitecto", "arch"),
@@ -1776,13 +1773,11 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
             with cols[i]:
                 st.markdown(f'<div class="access-card {style_class}"><span class="card-label">{label}</span>', unsafe_allow_html=True)
                 if st.button("Acceder", key=f"btn_nav_{page_slug}", use_container_width=True):
-                    # ── RE-CABLEADO DE SEGURIDAD ──
-                    if page_slug in public_pages or st.session_state.get("logged_in", False):
-                        st.session_state["selected_page"] = page_slug
-                        st.query_params["page"] = page_slug
-                        st.rerun()
-                    else:
-                        st.toast(f"🔒 El acceso a {label} requiere inicio de sesión", icon="⚠️")
+                    # NAVEGACIÓN DIRECTA (El router de la app manejará el login/registro)
+                    st.session_state["selected_page"] = page_slug
+                    st.session_state["page"] = page_slug  # Sincronización para el router principal
+                    st.query_params["page"] = page_slug
+                    st.rerun()
                 st.markdown('</div>', unsafe_allow_html=True)
 
         st.divider()
