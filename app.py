@@ -90,63 +90,6 @@ st.markdown("""
             gap: 0rem !important;
         }
 
-        /* 6. ESPECÍFICO: Contenedor de 7 columnas de acceso */
-        .access-buttons-container {
-            margin-top: 2rem !important;
-            padding: 1rem 0 !important;
-        }
-
-        /* 7. ESPECÍFICO: Solo las columnas dentro del contenedor de acceso */
-        .access-buttons-container [data-testid="column"] [data-testid="stVerticalBlock"] {
-            border: 3px solid #2471A3 !important;
-            border-radius: 12px !important;
-            background-color: #F8FBFE !important;
-            padding: 15px !important;
-            transition: all 0.3s ease !important;
-            box-shadow: 0px 2px 6px rgba(36, 113, 163, 0.15) !important;
-        }
-
-        /* 8. Efecto de resaltado ESPECÍFICO para acceso */
-        .access-buttons-container [data-testid="column"] [data-testid="stVerticalBlock"]:hover {
-            border-color: #1649A8 !important;
-            border-width: 4px !important;
-            box-shadow: 0px 6px 16px rgba(22, 73, 168, 0.3) !important;
-            transform: translateY(-4px) !important;
-            background-color: #EBF5FB !important;
-        }
-
-        /* 9. Captions ESPECÍFICAS para acceso */
-        .access-buttons-container [data-testid="column"] .stCaption {
-            color: #1C2833 !important;
-            font-weight: 900 !important;
-            font-size: 1rem !important;
-            margin-bottom: 8px !important;
-            letter-spacing: 0.5px !important;
-        }
-
-        /* 10. Botones ESPECÍFICOS para acceso */
-        .access-buttons-container [data-testid="column"] button {
-            background-color: #3498DB !important;
-            border: 2px solid #2471A3 !important;
-            color: white !important;
-            font-weight: 700 !important;
-        }
-
-        .access-buttons-container [data-testid="column"] button:hover {
-            background-color: #2980B9 !important;
-        }
-
-        /* 10. Botones ESPECÍFICOS para acceso */
-        .access-buttons-container [data-testid="column"] button {
-            background-color: #3498DB !important;
-            border: 2px solid #2471A3 !important;
-            color: white !important;
-            font-weight: 700 !important;
-        }
-
-        .access-buttons-container [data-testid="column"] button:hover {
-            background-color: #2980B9 !important;
-        }
     </style>
 """, unsafe_allow_html=True)
 
@@ -1785,84 +1728,102 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
             # ── Acceso directo al portal MLS — 30 días free trial ────────────
             st.link_button("🎁 30 días Free Trial — Acceder al portal MLS →", "/?seccion=mls", width='stretch', type="primary")
 
-        # ── ACCESO RÁPIDO — 7 COLUMNAS PROFESIONALES ─────────────────────────────
-        with st.container():
-            st.markdown('<div class="access-buttons-container">', unsafe_allow_html=True)
+        # ── ACCESO RÁPIDO — 7 MICRO-CARDS ────────────────────────────────────────
+        st.markdown("""
+<style>
+    .access-card {
+        background: white; padding: 12px; border-radius: 10px;
+        border: 1px solid #e5e7eb; border-top: 4px solid #ccc; text-align: center;
+        transition: transform 0.2s;
+    }
+    .access-card:hover { transform: translateY(-3px); box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); }
+    .card-label { font-weight: 700; color: #111827; font-size: 0.85rem; margin-bottom: 8px; display: block; }
+    .terreno   { border-top-color: #10b981; }
+    .comprador { border-top-color: #3b82f6; }
+    .estudiante{ border-top-color: #8b5cf6; }
+    .arquitecto{ border-top-color: #f59e0b; }
+    .constructor{border-top-color: #d97706; }
+    .prefab    { border-top-color: #06b6d4; }
+    .mls       { border-top-color: #f43f5e; }
+    div[data-testid="stButton"] > button {
+        width: 100% !important; height: 28px !important; padding: 0 !important;
+        font-size: 0.75rem !important; font-weight: 600 !important;
+    }
+</style>
+""", unsafe_allow_html=True)
 
-            cols = st.columns(7, gap="small")
+        _acc = st.columns(7, gap="small")
 
-            # Col 0: Terreno
-            with cols[0]:
-                st.caption("📍 Terreno")
-                if st.button("Acceder", width='stretch', key="h1"):
-                    if st.session_state.get("logged_in") and st.session_state.get("role") == "owner":
-                        st.session_state["selected_page"] = "🏠 Propietarios"
-                        st.query_params["page"] = "propietarios"
-                    else:
-                        st.session_state["login_role"] = "owner"
-                        st.session_state["viewing_login"] = True
-                    st.rerun()
+        with _acc[0]:
+            st.markdown('<div class="access-card terreno"><span class="card-label">📍 Terreno</span>', unsafe_allow_html=True)
+            if st.button("Acceder", key="btn_nav_owner", use_container_width=True):
+                if st.session_state.get("logged_in") and st.session_state.get("role") == "owner":
+                    st.session_state["selected_page"] = "🏠 Propietarios"
+                    st.query_params["page"] = "propietarios"
+                else:
+                    st.session_state["login_role"] = "owner"
+                    st.session_state["viewing_login"] = True
+                st.rerun()
+            st.markdown('</div>', unsafe_allow_html=True)
 
-            # Col 1: Comprador
-            with cols[1]:
-                st.caption("🏠 Comprador")
-                if st.button("Acceder", width='stretch', key="h2"):
-                    if st.session_state.get("logged_in") and st.session_state.get("role") == "client":
-                        st.session_state["selected_page"] = "👤 Panel de Cliente"
-                        st.query_params["page"] = "cliente"
-                    else:
-                        st.session_state["login_role"] = "client"
-                        st.session_state["viewing_login"] = True
-                        st.session_state["_login_show_registro"] = False
-                        st.query_params["page"] = "login"
-                    st.rerun()
+        with _acc[1]:
+            st.markdown('<div class="access-card comprador"><span class="card-label">🏠 Comprador</span>', unsafe_allow_html=True)
+            if st.button("Acceder", key="btn_nav_client", use_container_width=True):
+                if st.session_state.get("logged_in") and st.session_state.get("role") == "client":
+                    st.session_state["selected_page"] = "👤 Panel de Cliente"
+                    st.query_params["page"] = "cliente"
+                else:
+                    st.session_state["login_role"] = "client"
+                    st.session_state["viewing_login"] = True
+                    st.session_state["_login_show_registro"] = False
+                    st.query_params["page"] = "login"
+                st.rerun()
+            st.markdown('</div>', unsafe_allow_html=True)
 
-            # Col 2: Estudiante
-            with cols[2]:
-                st.caption("🎓 Estudiante")
-                if st.button("Acceder", width='stretch', key="h3"):
-                    st.session_state["selected_page"] = "🎓 Estudiantes"
-                    st.query_params["page"] = "estudiantes"
-                    st.rerun()
+        with _acc[2]:
+            st.markdown('<div class="access-card estudiante"><span class="card-label">🎓 Estudiante</span>', unsafe_allow_html=True)
+            if st.button("Acceder", key="btn_nav_student", use_container_width=True):
+                st.session_state["selected_page"] = "🎓 Estudiantes"
+                st.query_params["page"] = "estudiantes"
+                st.rerun()
+            st.markdown('</div>', unsafe_allow_html=True)
 
-            # Col 3: Arquitecto
-            with cols[3]:
-                st.caption("📐 Arquitecto")
-                if st.button("Acceder", width='stretch', key="h4"):
-                    st.session_state["selected_page"] = "Arquitectos (Marketplace)"
-                    st.query_params["page"] = "arquitectos"
-                    st.rerun()
+        with _acc[3]:
+            st.markdown('<div class="access-card arquitecto"><span class="card-label">📐 Arquitecto</span>', unsafe_allow_html=True)
+            if st.button("Acceder", key="btn_nav_arch", use_container_width=True):
+                st.session_state["selected_page"] = "Arquitectos (Marketplace)"
+                st.query_params["page"] = "arquitectos"
+                st.rerun()
+            st.markdown('</div>', unsafe_allow_html=True)
 
-            # Col 4: Constructor
-            with cols[4]:
-                st.caption("🏗️ Constructor")
-                if st.button("Acceder", width='stretch', key="h5"):
-                    if st.session_state.get("logged_in") and st.session_state.get("role") == "services":
-                        st.session_state["selected_page"] = "👤 Panel de Proveedor"
-                        st.query_params["page"] = "proveedor"
-                    else:
-                        st.session_state["login_role"] = "services"
-                        st.session_state["viewing_login"] = True
-                        st.session_state["_login_show_registro"] = False
-                        st.query_params["page"] = "login"
-                    st.rerun()
+        with _acc[4]:
+            st.markdown('<div class="access-card constructor"><span class="card-label">🏗️ Constructor</span>', unsafe_allow_html=True)
+            if st.button("Acceder", key="btn_nav_builder", use_container_width=True):
+                if st.session_state.get("logged_in") and st.session_state.get("role") == "services":
+                    st.session_state["selected_page"] = "👤 Panel de Proveedor"
+                    st.query_params["page"] = "proveedor"
+                else:
+                    st.session_state["login_role"] = "services"
+                    st.session_state["viewing_login"] = True
+                    st.session_state["_login_show_registro"] = False
+                    st.query_params["page"] = "login"
+                st.rerun()
+            st.markdown('</div>', unsafe_allow_html=True)
 
-            # Col 5: Prefabricadas
-            with cols[5]:
-                st.caption("🏠 Prefab")
-                if st.button("Acceder", width='stretch', key="h6"):
-                    st.session_state["selected_page"] = "🏠 Portal Prefabricadas"
-                    st.query_params["page"] = "prefabricadas"
-                    st.rerun()
+        with _acc[5]:
+            st.markdown('<div class="access-card prefab"><span class="card-label">🏠 Prefab</span>', unsafe_allow_html=True)
+            if st.button("Acceder", key="btn_nav_prefab", use_container_width=True):
+                st.session_state["selected_page"] = "🏠 Portal Prefabricadas"
+                st.query_params["page"] = "prefabricadas"
+                st.rerun()
+            st.markdown('</div>', unsafe_allow_html=True)
 
-            # Col 6: Inmobiliaria/MLS
-            with cols[6]:
-                st.caption("🏢 Inmo/MLS")
-                if st.button("Acceder", width='stretch', key="h7"):
-                    st.session_state["selected_page"] = "🏢 Inmobiliarias MLS"
-                    st.query_params["page"] = "mls"
-                    st.rerun()
-
+        with _acc[6]:
+            st.markdown('<div class="access-card mls"><span class="card-label">🏢 Inmo/MLS</span>', unsafe_allow_html=True)
+            if st.button("Acceder", key="btn_nav_mls", use_container_width=True):
+                st.session_state["selected_page"] = "🏢 Inmobiliarias MLS"
+                st.query_params["page"] = "mls"
+                st.rerun()
             st.markdown('</div>', unsafe_allow_html=True)
 
         st.markdown("---")
