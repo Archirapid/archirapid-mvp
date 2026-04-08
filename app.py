@@ -1635,7 +1635,7 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
 
     else:
         # ── MURO DE INVITACIÓN ──────────────────────────────────────────────────
-        try:  # ← FUSIBLE HERO: si el banner/waitlist explota, Home sigue mostrando el marketplace
+        try:
             import sqlite3 as _sq3
             _wconn = _sq3.connect("database.db")
             _wc = _wconn.cursor()
@@ -1815,20 +1815,11 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
             with cols[i]:
                 st.markdown(f'<div class="access-card {style_class}"><span class="card-label">{label}</span>', unsafe_allow_html=True)
                 if st.button("Acceder", key=f"btn_nav_{page_slug}", use_container_width=True):
-                    # 1. Seteamos el nombre largo para que el diccionario PAGES lo reconozca
                     st.session_state["selected_page"] = page_name
                     st.session_state["page"] = page_name
-
-                    # 2. Seteamos el slug en minúsculas para que el router de la URL funcione
                     st.query_params["page"] = page_slug
-
-                    # 3. Reinicio limpio para procesar el cambio
                     st.rerun()
                 st.markdown('</div>', unsafe_allow_html=True)
-
-        except Exception as _hero_err:
-            if type(_hero_err).__name__ in _ST_INTERNAL: raise
-            st.warning("⚠️ Error cargando el banner de bienvenida. El marketplace sigue disponible.")
 
         st.divider()
 
