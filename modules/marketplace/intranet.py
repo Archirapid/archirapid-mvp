@@ -106,7 +106,7 @@ def _update_project_status(pid: str, new_status: str) -> bool:
         return False
 
 
-
+def _update_plot_status(pid: str, new_status: str) -> bool:
     """
     Actualiza el estado de un plot con lógica blindada de is_active.
 
@@ -121,12 +121,15 @@ def _update_project_status(pid: str, new_status: str) -> bool:
 
     try:
         _conn = db_conn()
-        _conn.execute(
-            "UPDATE plots SET status=?, is_active=? WHERE id=?",
-            (new_status, is_active, pid)
-        )
-        _conn.commit()
-        _conn.close()
+        try:
+            _conn.execute(
+                "UPDATE plots SET status=?, is_active=? WHERE id=?",
+                (new_status, is_active, pid)
+            )
+            _conn.commit()
+        finally:
+            _conn.close()
+        st.cache_data.clear()
         return True
     except Exception as e:
         st.error(f"Error actualizando estado: {e}")
@@ -341,7 +344,7 @@ def main():
 | Estado | **{p.get('status','—')}** |
 | Dirección | {p.get('address') or '—'} |
 | Ref. catastral | `{p.get('catastral_ref') or '—'}` |
-| Fecha subida | {(p.get('created_at') or '—')[:10]} |
+| Fecha subida | {str(p.get('created_at') or '—')[:10]} |
 """)
                             st.markdown("**👤 Propietario**")
                             st.markdown(f"""
@@ -520,6 +523,8 @@ def main():
                                 st.image(_img_path, width=150, caption="Imagen principal")
 
                             st.markdown("**📋 Datos del proyecto**")
+                            _proj_fecha = str(proj.get('created_at') or '—')[:10]
+                            _proj_autor = proj.get('architect_name') or '—'
                             st.markdown(f"""
 | Campo | Valor |
 |---|---|
@@ -528,7 +533,8 @@ def main():
 | Área | {proj.get('area_m2') or '—'} m² |
 | Precio | €{proj.get('price', 0):,.0f} |
 | Estado | **{_pstatus}** |
-| Fecha subida | {(proj.get('created_at') or '—')[:10]} |
+| Autor | {_proj_autor} |
+| Fecha subida | {_proj_fecha} |
 """)
                             st.markdown("**👤 Creado por**")
                             st.markdown(f"""
@@ -676,6 +682,13 @@ def main():
         st.subheader("🏡 Reservas y Compras de Fincas")
         try:
             _db3b = db_conn()
+            # Asegurar que columnas de comprador existen (migraciones antiguas)
+            for _col_r, _def_r in [("buyer_dni","TEXT"), ("buyer_domicilio","TEXT"), ("buyer_province","TEXT")]:
+                try:
+                    _db3b.execute(f"ALTER TABLE reservations ADD COLUMN {_col_r} {_def_r}")
+                    _db3b.commit()
+                except Exception:
+                    pass
             _df_res3 = _read3(
                 _db3b,
                 """SELECT r.id, r.buyer_name, r.buyer_email,
@@ -1311,64 +1324,60 @@ def main():
                             # ── Aprobar / Bloquear ──
                             _bc1, _bc2, _bc3 = st.columns(3)
                             with _bc1:
-                                if st.button("✅ APROBAR", key=f"btn_prof_approve_{_pid5}",
-                                             use_container_width=True, type="primary"):
-                                    st.write(f"🔴 BOTÓN PRESIONADO - Aprobando {_pid5}")
+                                _is_prim_apr = (_status5 == 'activo')
+                                if st.button("✅ APROBAR 🟢", key=f"btn_prof_approve_{_pid5}",
+                                             use_container_width=True,
+                                             type="primary" if _is_prim_apr else "secondary"):
                                     try:
                                         _ca = db_conn()
-                                        st.write(f"✓ Conexión obtenida")
-                                        _ca.execute("UPDATE service_providers SET active=1, status=?, is_active=? WHERE id=?", ("activo", 1, _pid5))
-                                        st.write(f"✓ UPDATE ejecutado")
-                                        _ca.commit()
-                                        st.write(f"✓ COMMIT completado")
-                                        _ca.close()
+                                        try:
+                                            _ca.execute("UPDATE service_providers SET active=1, status=?, is_active=? WHERE id=?", ("activo", 1, _pid5))
+                                            _ca.commit()
+                                        finally:
+                                            _ca.close()
                                         st.cache_data.clear()
                                         st.success(f"✅ {_name5} aprobado.")
                                         st.rerun()
                                     except Exception as e:
-                                        st.error(f"❌ ERROR: {str(e)}")
-                                        import traceback
-                                        st.code(traceback.format_exc())
+                                        st.error(f"Error: {str(e)}")
 
                             with _bc2:
-                                if st.button("⏳ EN TRÁMITE", key=f"btn_prof_tramite_{_pid5}",
-                                             use_container_width=True):
-                                    st.write(f"🔴 BOTÓN PRESIONADO - Tramitando {_pid5}")
+                                _is_prim_tram = (_status5 == 'tramite')
+                                if st.button("⏳ EN TRÁMITE 🟡", key=f"btn_prof_tramite_{_pid5}",
+                                             use_container_width=True,
+                                             type="primary" if _is_prim_tram else "secondary"):
                                     try:
                                         _cp = db_conn()
-                                        st.write(f"✓ Conexión obtenida")
-                                        _cp.execute("UPDATE service_providers SET status=?, is_active=? WHERE id=?", ("tramite", 0, _pid5))
-                                        st.write(f"✓ UPDATE ejecutado")
-                                        _cp.commit()
-                                        st.write(f"✓ COMMIT completado")
-                                        _cp.close()
+                                        try:
+                                            _cp.execute("UPDATE service_providers SET status=?, is_active=? WHERE id=?", ("tramite", 0, _pid5))
+                                            _cp.commit()
+                                        finally:
+                                            _cp.close()
                                         st.cache_data.clear()
                                         st.info("En trámite")
                                         st.rerun()
                                     except Exception as e:
-                                        st.error(f"❌ ERROR: {str(e)}")
+                                        st.error(f"Error: {str(e)}")
                                         import traceback
                                         st.code(traceback.format_exc())
 
                             with _bc3:
-                                if st.button("🚫 BLOQUEAR", key=f"btn_prof_block_{_pid5}",
-                                             use_container_width=True):
-                                    st.write(f"🔴 BOTÓN PRESIONADO - Bloqueando {_pid5}")
+                                _is_prim_bloq = (_status5 == 'bloqueado')
+                                if st.button("🚫 BLOQUEAR 🔴", key=f"btn_prof_block_{_pid5}",
+                                             use_container_width=True,
+                                             type="primary" if _is_prim_bloq else "secondary"):
                                     try:
                                         _cb = db_conn()
-                                        st.write(f"✓ Conexión obtenida")
-                                        _cb.execute("UPDATE service_providers SET active=0, is_featured=0, status=? WHERE id=?", ("bloqueado", _pid5))
-                                        st.write(f"✓ UPDATE ejecutado")
-                                        _cb.commit()
-                                        st.write(f"✓ COMMIT completado")
-                                        _cb.close()
+                                        try:
+                                            _cb.execute("UPDATE service_providers SET active=0, is_featured=0, status=? WHERE id=?", ("bloqueado", _pid5))
+                                            _cb.commit()
+                                        finally:
+                                            _cb.close()
                                         st.cache_data.clear()
                                         st.warning(f"🚫 {_name5} bloqueado.")
                                         st.rerun()
                                     except Exception as e:
-                                        st.error(f"❌ ERROR: {str(e)}")
-                                        import traceback
-                                        st.code(traceback.format_exc())
+                                        st.error(f"Error: {str(e)}")
 
         except Exception as e:
             st.error(f"Error en Gestión de Profesionales: {e}")
@@ -1494,167 +1503,7 @@ def main():
                     st.error(f"Error en limpieza: {_e}")
 
         st.markdown("---")
-        st.subheader("🏠 Gestión Catálogo de Prefabricadas")
-
-        try:
-            from modules.marketplace.utils import db_conn as _db_conn
-            import os as _os, json as _json, pathlib as _pl
-
-            _MATERIALS = ["Madera","Modular acero","Contenedor","Hormigón prefab","Mixto"]
-
-            def _save_prefab_photos(pf_id, uploaded_files, existing_paths):
-                """Guarda hasta 3 fotos y devuelve lista de rutas."""
-                paths = list(existing_paths)
-                _dest_dir = _pl.Path("uploads/prefab")
-                _dest_dir.mkdir(parents=True, exist_ok=True)
-                for i, uf in enumerate(uploaded_files):
-                    if uf is not None:
-                        _dest = _dest_dir / f"prefab_{pf_id}_img{i+1}_{uf.name}"
-                        with open(_dest, "wb") as _fh:
-                            _fh.write(uf.read())
-                        slot = i
-                        if slot < len(paths):
-                            paths[slot] = str(_dest)
-                        else:
-                            paths.append(str(_dest))
-                return paths[:3]
-
-            # Listar modelos actuales
-            _conn = _db_conn()
-            _cur = _conn.cursor()
-            _cur.execute("""
-                SELECT id, name, m2, rooms, bathrooms, floors, material, price, active,
-                       image_path, image_paths, modulos, price_label
-                FROM prefab_catalog ORDER BY m2
-            """)
-            prefabs = _cur.fetchall()
-            _conn.close()
-
-            st.markdown(f"**{len(prefabs)} modelos en catálogo:**")
-
-            for pf in prefabs:
-                pf_id, name, m2, rooms, bathrooms, floors, material, price, active, \
-                    image_path, image_paths_json, modulos, price_label = pf
-
-                # Parsear fotos existentes
-                try:
-                    existing_photos = _json.loads(image_paths_json) if image_paths_json else []
-                except Exception:
-                    existing_photos = [image_path] if image_path else []
-
-                price_display = price_label if price_label else f"€{price:,.0f}"
-                with st.expander(f"{'✅' if active else '🔴'} [{pf_id}] {name} — {m2} m² · {material} · {price_display}"):
-                    c1, c2 = st.columns([2, 1])
-                    with c1:
-                        new_name     = st.text_input("Nombre",        value=name,       key=f"pf_name_{pf_id}")
-                        new_m2       = st.number_input("m²",          value=float(m2),  key=f"pf_m2_{pf_id}", min_value=10.0, step=5.0)
-                        new_price    = st.number_input("Precio numérico (€)", value=float(price or 0), key=f"pf_price_{pf_id}", min_value=0.0, step=1000.0)
-                        new_price_lbl= st.text_input("Precio texto (ej: Consultar)", value=price_label or "", key=f"pf_plabel_{pf_id}", help="Si rellenas esto, se muestra en lugar del precio numérico")
-                        new_rooms    = st.number_input("Habitaciones", value=int(rooms), key=f"pf_rooms_{pf_id}", min_value=1, max_value=10)
-                        new_baths    = st.number_input("Baños",        value=int(bathrooms), key=f"pf_baths_{pf_id}", min_value=1, max_value=6)
-                        new_floors   = st.number_input("Plantas",      value=int(floors), key=f"pf_floors_{pf_id}", min_value=1, max_value=4)
-                        new_modulos  = st.text_input("Módulos",        value=modulos or "", key=f"pf_mod_{pf_id}", help="Nº o descripción de módulos (ej: 2 módulos 6x3m)")
-                        new_material = st.selectbox("Material", _MATERIALS,
-                                                    index=_MATERIALS.index(material) if material in _MATERIALS else 0,
-                                                    key=f"pf_mat_{pf_id}")
-                        new_active   = st.checkbox("Activo (visible en catálogo)", value=bool(active), key=f"pf_active_{pf_id}")
-                    with c2:
-                        st.markdown("**Fotos actuales:**")
-                        for _pi, _pp in enumerate(existing_photos):
-                            if _pp and _os.path.exists(_pp):
-                                st.image(_pp, width=130, caption=f"Foto {_pi+1}")
-                            else:
-                                st.caption(f"Foto {_pi+1}: no encontrada")
-                        st.markdown("**Subir fotos (máx. 3):**")
-                        new_imgs_raw = st.file_uploader(
-                            "Selecciona hasta 3 fotos",
-                            type=["jpg","jpeg","png","webp"],
-                            accept_multiple_files=True,
-                            key=f"pf_imgs_{pf_id}"
-                        )
-                        new_imgs = list(new_imgs_raw)[:3] if new_imgs_raw else []
-                        # Rellena con None hasta tener 3 slots
-                        new_imgs += [None] * (3 - len(new_imgs))
-
-                    if st.button(f"💾 Guardar cambios — {name}", key=f"pf_save_{pf_id}"):
-                        new_photos = _save_prefab_photos(pf_id, new_imgs, existing_photos)
-                        new_img_path = new_photos[0] if new_photos else (image_path or "")
-                        _conn2 = _db_conn()
-                        _cur2 = _conn2.cursor()
-                        _cur2.execute("""
-                            UPDATE prefab_catalog
-                            SET name=?, m2=?, rooms=?, bathrooms=?, floors=?, material=?,
-                                price=?, active=?, image_path=?, image_paths=?, modulos=?, price_label=?
-                            WHERE id=?
-                        """, (new_name, new_m2, new_rooms, new_baths, new_floors, new_material,
-                              new_price, int(new_active), new_img_path,
-                              _json.dumps(new_photos), new_modulos or None,
-                              new_price_lbl or None, pf_id))
-                        _conn2.commit()
-                        _conn2.close()
-                        st.success(f"✅ Modelo '{new_name}' actualizado.")
-                        st.rerun()
-
-                    if st.button(f"🗑️ Eliminar modelo [{pf_id}]", key=f"pf_del_{pf_id}", type="secondary"):
-                        _conn3 = _db_conn()
-                        _cur3 = _conn3.cursor()
-                        _cur3.execute("DELETE FROM prefab_catalog WHERE id=?", (pf_id,))
-                        _conn3.commit()
-                        _conn3.close()
-                        st.warning(f"Modelo {name} eliminado.")
-                        st.rerun()
-
-            st.markdown("---")
-            st.markdown("**➕ Añadir nuevo modelo**")
-            with st.form("new_prefab_form"):
-                nf_c1, nf_c2 = st.columns(2)
-                with nf_c1:
-                    nf_name     = st.text_input("Nombre del modelo")
-                    nf_m2       = st.number_input("Superficie (m²)", min_value=20.0, value=80.0, step=5.0)
-                    nf_price    = st.number_input("Precio numérico (€)", min_value=0.0, value=80000.0, step=1000.0)
-                    nf_price_lbl= st.text_input("Precio texto (ej: Consultar)", help="Si rellenas esto, se muestra en lugar del precio numérico")
-                    nf_modulos  = st.text_input("Módulos", help="Ej: 2 módulos 6x3m")
-                    nf_desc     = st.text_area("Descripción corta")
-                with nf_c2:
-                    nf_rooms    = st.number_input("Habitaciones", min_value=1, max_value=10, value=3)
-                    nf_baths    = st.number_input("Baños", min_value=1, max_value=6, value=1)
-                    nf_floors   = st.number_input("Plantas", min_value=1, max_value=4, value=1)
-                    nf_material = st.selectbox("Material", _MATERIALS)
-                    nf_imgs_raw = st.file_uploader("Fotos del modelo (máx. 3)", type=["jpg","jpeg","png","webp"], accept_multiple_files=True)
-                if st.form_submit_button("➕ Añadir al catálogo", type="primary"):
-                    if nf_name:
-                        # Guardar fotos
-                        _dest_dir2 = _pl.Path("uploads/prefab")
-                        _dest_dir2.mkdir(parents=True, exist_ok=True)
-                        nf_photos = []
-                        for _i, _uf in enumerate((nf_imgs_raw or [])[:3]):
-                            if _uf:
-                                _dp = _dest_dir2 / f"prefab_new_img{_i+1}_{_uf.name}"
-                                with open(_dp, "wb") as _fh2:
-                                    _fh2.write(_uf.read())
-                                nf_photos.append(str(_dp))
-                        nf_img_path = nf_photos[0] if nf_photos else "assets/branding/logo.png"
-                        _conn4 = _db_conn()
-                        _cur4 = _conn4.cursor()
-                        _cur4.execute("""
-                            INSERT INTO prefab_catalog
-                                (name, m2, rooms, bathrooms, floors, material, price, description,
-                                 image_path, image_paths, modulos, price_label)
-                            VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
-                        """, (nf_name, nf_m2, nf_rooms, nf_baths, nf_floors, nf_material,
-                              nf_price, nf_desc, nf_img_path,
-                              _json.dumps(nf_photos) if nf_photos else None,
-                              nf_modulos or None, nf_price_lbl or None))
-                        _conn4.commit()
-                        _conn4.close()
-                        st.success(f"✅ Modelo '{nf_name}' añadido al catálogo.")
-                        st.rerun()
-                    else:
-                        st.error("El nombre es obligatorio.")
-
-        except Exception as e:
-            import traceback
-            st.error(f"Error gestionando catálogo de prefabricadas: {e}")
+        st.info("🏠 **Gestión del Catálogo de Prefabricadas** → Usa la pestaña **🏠 Prefabricadas** del menú principal.")
 
     elif _admin_seccion == "🎯 Waitlist":
         st.header("Lista de Espera (Waitlist)")
@@ -1694,22 +1543,70 @@ def main():
                 _cw2.close()
                 for _wrow in _data_wl2:
                     _wid, _wname, _wemail, _wprofile, _wdate, _wapproved = _wrow
-                    _badge = "✅ Aprobado" if _wapproved else "⏳ Pendiente"
+                    _wstatus_col = "wl_status"
+                    # Leer estado extendido si existe (tramite/suspendido)
+                    _wext_status = st.session_state.get(f"wl_ext_{_wid}", None)
+                    if _wapproved:
+                        _badge = "✅ Aprobado"
+                    elif _wext_status == "tramite":
+                        _badge = "🟡 En trámite"
+                    elif _wext_status == "suspendido":
+                        _badge = "🔴 Suspendido"
+                    else:
+                        _badge = "⏳ Pendiente"
                     with st.expander(f"{_badge} · {_wname} ({_wemail})"):
                         st.markdown(f"**Perfil:** {_wprofile or '—'}  \n**Fecha:** {_wdate}")
-                        if not _wapproved:
-                            _wa1, _wa2 = st.columns(2)
-                            if _wa1.button("✅ Aprobar", key=f"wl_apr_{_wid}", type="primary", use_container_width=True):
+                        _wa1, _wa2, _wa3, _wa4 = st.columns(4)
+                        with _wa1:
+                            if st.button("✅ Aprobar 🟢", key=f"wl_apr_{_wid}",
+                                         type="primary" if _wapproved else "secondary",
+                                         use_container_width=True):
                                 _cwa = db_conn()
-                                _cwa.execute("UPDATE waitlist SET approved=1 WHERE id=?", (_wid,))
-                                _cwa.commit(); _cwa.close()
+                                try:
+                                    _cwa.execute("UPDATE waitlist SET approved=1 WHERE id=?", (_wid,))
+                                    _cwa.commit()
+                                finally:
+                                    _cwa.close()
+                                st.session_state.pop(f"wl_ext_{_wid}", None)
                                 st.success(f"✅ {_wname} aprobado.")
                                 st.rerun()
-                            if _wa2.button("🗑️ Eliminar", key=f"wl_del_{_wid}", use_container_width=True):
-                                _cwd = db_conn()
-                                _cwd.execute("DELETE FROM waitlist WHERE id=?", (_wid,))
-                                _cwd.commit(); _cwd.close()
+                        with _wa2:
+                            if st.button("⏳ Trámite 🟡", key=f"wl_tram_{_wid}",
+                                         type="primary" if _wext_status == "tramite" else "secondary",
+                                         use_container_width=True):
+                                _cwt = db_conn()
+                                try:
+                                    _cwt.execute("UPDATE waitlist SET approved=0 WHERE id=?", (_wid,))
+                                    _cwt.commit()
+                                finally:
+                                    _cwt.close()
+                                st.session_state[f"wl_ext_{_wid}"] = "tramite"
                                 st.rerun()
+                        with _wa3:
+                            if st.button("🔴 Suspender", key=f"wl_sus_{_wid}",
+                                         type="primary" if _wext_status == "suspendido" else "secondary",
+                                         use_container_width=True):
+                                _cws = db_conn()
+                                try:
+                                    _cws.execute("UPDATE waitlist SET approved=0 WHERE id=?", (_wid,))
+                                    _cws.commit()
+                                finally:
+                                    _cws.close()
+                                st.session_state[f"wl_ext_{_wid}"] = "suspendido"
+                                st.rerun()
+                        with _wa4:
+                            with st.popover("🗑️ Eliminar", use_container_width=True):
+                                st.error(f"⚠️ ¿Eliminar a {_wname}?")
+                                st.caption("Irreversible.")
+                                if st.button("❌ Sí, eliminar", key=f"wl_del_yes_{_wid}",
+                                             type="primary", use_container_width=True):
+                                    _cwd = db_conn()
+                                    try:
+                                        _cwd.execute("DELETE FROM waitlist WHERE id=?", (_wid,))
+                                        _cwd.commit()
+                                    finally:
+                                        _cwd.close()
+                                    st.rerun()
                 st.markdown("---")
                 # Exportar CSV
                 _csv = _dfw.to_csv(index=False).encode('utf-8')
@@ -2529,14 +2426,17 @@ Obtén el token creando un bot con @BotFather en Telegram.
                     except Exception:
                         pass
 
-            # RESET: status a 'aprobada' solo UNA VEZ (igual que profesionales)
-            if not st.session_state.get("_reset_inmos_mls_done", False):
+            # Inicializar status vacíos (solo si es NULL o ''), NO resetea estados ya asignados
+            if not st.session_state.get("_init_inmos_status_done", False):
                 try:
                     _mls_reset = db_conn()
-                    _mls_reset.execute("UPDATE inmobiliarias SET status='aprobada' WHERE status IS NULL OR status=''")
-                    _mls_reset.commit()
-                    _mls_reset.close()
-                    st.session_state["_reset_inmos_mls_done"] = True
+                    try:
+                        _mls_reset.execute("UPDATE inmobiliarias SET status='aprobada' WHERE (status IS NULL OR status='') AND firma_hash IS NOT NULL")
+                        _mls_reset.execute("UPDATE inmobiliarias SET status='pendiente_firma' WHERE (status IS NULL OR status='') AND (firma_hash IS NULL OR firma_hash='')")
+                        _mls_reset.commit()
+                    finally:
+                        _mls_reset.close()
+                    st.session_state["_init_inmos_status_done"] = True
                 except Exception:
                     pass
 
@@ -2549,7 +2449,8 @@ Obtén el token creando un bot con @BotFather en Telegram.
                         continue
                     _anombre = _a.get("nombre_comercial") or _a.get("nombre", "?")
                     _plan_a  = (_a.get("plan") or "ninguno").upper()
-                    _firma_a = "✅" if _a.get("firma_hash") else "⚠️ Pendiente"
+                    _tiene_firma = bool(_a.get("firma_hash"))
+                    _firma_a = "✅ Firmado" if _tiene_firma else "🔴 Sin firma"
                     # Contar fincas activas
                     _n_fincas_a = 0
                     try:
@@ -2573,8 +2474,9 @@ Obtén el token creando un bot con @BotFather en Telegram.
                     except Exception:
                         pass
 
+                    _inmo_icon = "🟢" if _tiene_firma else "🔴"
                     with st.expander(
-                        f"🏢 {_anombre} — Plan {_plan_a} | Firma: {_firma_a} | "
+                        f"{_inmo_icon} {_anombre} — Plan {_plan_a} | Firma: {_firma_a} | "
                         f"Fincas: {_n_fincas_a} | {_a.get('email','')}"
                     ):
                         _ba, _bb = st.columns([3, 1])
@@ -2618,52 +2520,68 @@ Obtén el token creando un bot con @BotFather en Telegram.
 """)
                         with _bb:
                             st.markdown("**Acciones**")
-                            st.caption(f"🔧 Status: `{_imo_status or 'aprobada'}`")
+                            st.caption(f"🔧 Status: `{_imo_status or 'aprobada'}` | Firma: {_firma_a}")
+
+                            if not _tiene_firma:
+                                st.warning("🔴 Sin acuerdo firmado — solo se puede suspender hasta que firme.")
 
                             _mls_c1, _mls_c2, _mls_c3 = st.columns(3)
 
                             with _mls_c1:
-                                if st.button("✅ APROBAR", key=f"mls_apro_{_a['id']}",
-                                           use_container_width=True, type="primary"):
-                                    st.write(f"🔴 BOTÓN PRESIONADO - Aprobando {_a['id']}")
+                                _is_prim_apr_mls = (_imo_status == 'aprobada')
+                                if st.button("✅ APROBAR 🟢", key=f"mls_apro_{_a['id']}",
+                                           use_container_width=True,
+                                           disabled=not _tiene_firma,
+                                           help="Requiere firma del acuerdo MLS" if not _tiene_firma else "",
+                                           type="primary" if _is_prim_apr_mls else "secondary"):
                                     try:
                                         _mls_ap = db_conn()
-                                        _mls_ap.execute("UPDATE inmobiliarias SET status=? WHERE id=?", ("aprobada", _a["id"]))
-                                        _mls_ap.commit()
-                                        _mls_ap.close()
+                                        try:
+                                            _mls_ap.execute("UPDATE inmobiliarias SET status=?, activa=1 WHERE id=?", ("aprobada", _a["id"]))
+                                            _mls_ap.commit()
+                                        finally:
+                                            _mls_ap.close()
                                         st.cache_data.clear()
                                         st.success("✅ Aprobada")
                                         st.rerun()
                                     except Exception as _e:
-                                        st.error(f"❌ ERROR: {_e}")
+                                        st.error(f"Error: {_e}")
 
                             with _mls_c2:
-                                if st.button("⏳ EN TRÁMITE", key=f"mls_tramite_{_a['id']}", use_container_width=True):
-                                    st.write(f"🔴 BOTÓN PRESIONADO - En trámite {_a['id']}")
+                                _is_prim_tram_mls = (_imo_status == 'tramite')
+                                if st.button("⏳ EN TRÁMITE 🟡", key=f"mls_tramite_{_a['id']}",
+                                             use_container_width=True,
+                                             type="primary" if _is_prim_tram_mls else "secondary"):
                                     try:
                                         _mls_tr = db_conn()
-                                        _mls_tr.execute("UPDATE inmobiliarias SET status=? WHERE id=?", ("tramite", _a["id"]))
-                                        _mls_tr.commit()
-                                        _mls_tr.close()
+                                        try:
+                                            _mls_tr.execute("UPDATE inmobiliarias SET status=? WHERE id=?", ("tramite", _a["id"]))
+                                            _mls_tr.commit()
+                                        finally:
+                                            _mls_tr.close()
                                         st.cache_data.clear()
                                         st.info("En trámite")
                                         st.rerun()
                                     except Exception as _e:
-                                        st.error(f"❌ ERROR: {_e}")
+                                        st.error(f"Error: {_e}")
 
                             with _mls_c3:
-                                if st.button("⏸ SUSPENDER", key=f"mls_susp_{_a['id']}", use_container_width=True):
-                                    st.write(f"🔴 BOTÓN PRESIONADO - Suspendiendo {_a['id']}")
+                                _is_prim_susp_mls = (_imo_status in ('suspendida', 'suspended'))
+                                if st.button("⏸ SUSPENDER 🔴", key=f"mls_susp_{_a['id']}",
+                                             use_container_width=True,
+                                             type="primary" if _is_prim_susp_mls else "secondary"):
                                     try:
                                         _mls_su = db_conn()
-                                        _mls_su.execute("UPDATE inmobiliarias SET status=? WHERE id=?", ("suspendida", _a["id"]))
-                                        _mls_su.commit()
-                                        _mls_su.close()
+                                        try:
+                                            _mls_su.execute("UPDATE inmobiliarias SET status=?, activa=0 WHERE id=?", ("suspendida", _a["id"]))
+                                            _mls_su.commit()
+                                        finally:
+                                            _mls_su.close()
                                         st.cache_data.clear()
-                                        st.warning(f"⏸ Suspendida")
+                                        st.warning("⏸ Suspendida")
                                         st.rerun()
                                     except Exception as _e:
-                                        st.error(f"❌ ERROR: {_e}")
+                                        st.error(f"Error: {_e}")
 
         except Exception as _eb:
             st.warning(f"Error sección B: {_eb}")
@@ -3161,7 +3079,8 @@ Obtén el token creando un bot con @BotFather en Telegram.
                     [tuple(r) for r in _rows11],
                     columns=["Email", "Nombre", "Tipo", "Fecha UTC", "Hash SHA-256", "PDF", "Versión"]
                 )
-                _df11["Hash SHA-256"] = _df11["Hash SHA-256"].str[:20] + "..."
+                _df11_display = _df11.copy()
+                _df11_display["Hash SHA-256"] = _df11_display["Hash SHA-256"].str[:20] + "..."
 
                 st.metric("Total aceptaciones registradas", len(_df11))
 
@@ -3169,7 +3088,7 @@ Obtén el token creando un bot con @BotFather en Telegram.
                 _col_a.metric("Diseño IA", int((_df11["Tipo"] == "diseno_ia").sum()))
                 _col_b.metric("Documentación/Pago", int((_df11["Tipo"] == "documentacion_pago").sum()))
 
-                st.dataframe(_df11, use_container_width=True)
+                st.dataframe(_df11_display, use_container_width=True)
 
                 _csv11 = _df11.to_csv(index=False).encode("utf-8")
                 st.download_button(
@@ -3179,6 +3098,38 @@ Obtén el token creando un bot con @BotFather en Telegram.
                     "text/csv",
                     key="dl_disclaimers_csv"
                 )
+
+                st.markdown("---")
+                st.markdown("**📄 Certificados individuales con SHA-256:**")
+                for _idx11, _row11 in _df11.iterrows():
+                    with st.expander(f"📄 {_row11['Email']} — {_row11['Tipo']} ({str(_row11['Fecha UTC'])[:10]})"):
+                        _cert_txt = f"""ARCHIRAPID — REGISTRO DE ACEPTACIÓN DE DISCLAIMER
+=================================================
+Email:       {_row11['Email']}
+Nombre:      {_row11['Nombre']}
+Tipo:        {_row11['Tipo']}
+Versión:     {_row11['Versión']}
+Fecha UTC:   {_row11['Fecha UTC']}
+Hash SHA-256 (completo):
+{_row11['Hash SHA-256']}
+
+Nota: Este registro cumple con el RGPD y eIDAS art.25.
+Conservar durante 5 años como evidencia legal.
+"""
+                        _cert_col1, _cert_col2 = st.columns([3, 1])
+                        with _cert_col1:
+                            st.code(_cert_txt, language=None)
+                        with _cert_col2:
+                            st.download_button(
+                                "⬇️ Descargar certificado",
+                                _cert_txt.encode("utf-8"),
+                                file_name=f"disclaimer_{_row11['Email'].replace('@','_')}_{str(_row11['Fecha UTC'])[:10]}.txt",
+                                mime="text/plain",
+                                key=f"dl_disc_{_idx11}",
+                                use_container_width=True,
+                            )
+                            if _row11.get("PDF") and str(_row11["PDF"]).startswith("http"):
+                                st.link_button("📥 PDF original", _row11["PDF"], use_container_width=True)
             else:
                 st.info("No hay disclaimers registrados aún.")
 
@@ -3281,6 +3232,27 @@ def _admin_solicitudes_estudiantes():
 
 
 def _admin_proyectos_tfg():
+    # Mostrar estudiantes aprobados sin proyectos subidos
+    try:
+        _conn_no_proj = db_conn()
+        try:
+            _est_sin_proj = _conn_no_proj.execute("""
+                SELECT e.email, e.nombre_completo, e.universidad, e.año_tfg, e.estado
+                FROM estudiantes e
+                WHERE e.estado = 'aprobado'
+                  AND NOT EXISTS (
+                      SELECT 1 FROM proyectos_tfg p WHERE p.email_estudiante = e.email
+                  )
+            """).fetchall()
+        finally:
+            _conn_no_proj.close()
+        if _est_sin_proj:
+            st.info(f"ℹ️ {len(_est_sin_proj)} estudiante(s) aprobado(s) sin proyectos subidos aún:")
+            for _es in _est_sin_proj:
+                st.caption(f"• {_es[1]} ({_es[0]}) — {_es[2]}, año {_es[3]}")
+    except Exception:
+        pass
+
     conn = db_conn()
     try:
         cur = conn.cursor()
@@ -3288,8 +3260,11 @@ def _admin_proyectos_tfg():
             SELECT p.id, p.titulo, p.email_estudiante, p.precio_venta,
                    p.modalidad_venta, p.tipologia, p.provincia,
                    p.estado, p.archivo_planos_url, p.imagen_portada_url,
-                   p.hash_documento, p.created_at
+                   p.hash_documento, p.created_at,
+                   COALESCE(e.nombre_completo, p.email_estudiante) as nombre_est,
+                   COALESCE(e.universidad, '—') as universidad
             FROM proyectos_tfg p
+            LEFT JOIN estudiantes e ON p.email_estudiante = e.email
             ORDER BY
                 CASE p.estado WHEN 'pendiente' THEN 0 WHEN 'aprobado' THEN 1 ELSE 2 END,
                 p.created_at DESC
@@ -3303,13 +3278,13 @@ def _admin_proyectos_tfg():
 
     for r in rows:
         id_, titulo, email, precio, modalidad, tipologia, provincia, estado, \
-            url_planos, url_portada, hash_doc, fecha = (
+            url_planos, url_portada, hash_doc, fecha, nombre_est, universidad = (
                 r[0], r[1], r[2], r[3], r[4], r[5], r[6],
-                r[7], r[8], r[9], r[10], r[11]
+                r[7], r[8], r[9], r[10], r[11], r[12], r[13]
             )
         icono = "⏳" if estado == "pendiente" else ("✅" if estado == "aprobado" else "❌")
-        with st.expander(f"{icono} {titulo} — {precio}€ ({estado})"):
-            st.write(f"**Estudiante:** {email}")
+        with st.expander(f"{icono} {titulo} — {precio}€ ({estado}) | {nombre_est}"):
+            st.write(f"**Estudiante:** {nombre_est} ({email}) — {universidad}")
             st.write(f"**Tipología:** {tipologia} | **Provincia:** {provincia}")
             st.write(f"**Modalidad:** {modalidad} | **Precio:** {precio}€")
             st.write(f"**Subido:** {str(fecha)[:10]}")
