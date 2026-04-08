@@ -1762,15 +1762,15 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
 
         cols = st.columns(7, gap="small")
 
-        # --- LISTA DE ROLES CON SLUGS CORREGIDOS ---
+        # --- LISTA DE ROLES CON SLUGS CORREGIDOS (EMOJIS + ESPACIOS = EXACTOS AL DICCIONARIO PAGES) ---
         roles = [
-            ("📍 Terreno", "terreno", "terreno"),
-            ("🏠 Comprador", "comprador", "comprador"),
-            ("🎓 Estudiante", "estudiante", "estudiante"),
-            ("📐 Arquitecto", "arquitecto", "arquitecto"),
-            ("🏗️ Constructor", "constructor", "constructor"),
-            ("🏠 Prefab", "prefab", "prefab"),
-            ("🏢 Inmo/MLS", "mls", "mls")
+            ("📍 Terreno", "terreno", "🏠 Propietarios"),
+            ("🏠 Comprador", "comprador", "👤 Panel de Cliente"),
+            ("🎓 Estudiante", "estudiante", "🎓 Estudiantes"),
+            ("📐 Arquitecto", "arquitecto", "Arquitectos (Marketplace)"),
+            ("🏗️ Constructor", "constructor", "👤 Panel de Proveedor"),
+            ("🏠 Prefab", "prefab", "🏠 Portal Prefabricadas"),
+            ("🏢 Inmo/MLS", "mls", "🏢 Inmobiliarias MLS")
         ]
 
         for i, (label, style_class, page_slug) in enumerate(roles):
