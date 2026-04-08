@@ -141,6 +141,24 @@ _CSS = """
     line-height: 1.5    !important;
   }
 
+  /* ── Navigation Access Cards (Responsive Grid) ── */
+  .access-card {
+    padding: 8px 6px    !important;
+    min-height: 50px    !important;
+    display: flex       !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+  }
+  .card-label {
+    font-size: 0.7rem   !important;
+    margin-bottom: 4px  !important;
+  }
+  [data-testid="stButton"] > button:has(div:contains("Acceder")) {
+    height: 26px        !important;
+    font-size: 0.65rem  !important;
+    padding: 4px 6px    !important;
+  }
+
   /* ── Form submit buttons: prominentes ── */
   [data-testid="stFormSubmitButton"] > button {
     min-height: 48px    !important;
