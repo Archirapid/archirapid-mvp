@@ -60,11 +60,12 @@ import streamlit as st
 st.set_page_config(layout='wide', initial_sidebar_state="expanded")
 
 # ══════════════════════════════════════════════════════════════════
-# URL-FIRST HIJACKER — debe ejecutarse ANTES de cualquier widget UI
-# Resuelve: botón Atrás cambia URL pero _nav_radio restaura la página
-# anterior porque Streamlit lee el widget del session_state primero.
+# SINCRONIZADOR MAESTRO — la URL es la ÚNICA fuente de verdad.
+# Corre ANTES de cualquier widget. Un solo rerun por cambio de URL.
+# Resuelve: botón Atrás cambia URL pero el radio del sidebar restaura
+# la página anterior porque Streamlit rehidrata los widgets primero.
 # ══════════════════════════════════════════════════════════════════
-_HIJACKER_SLUG_TO_PAGE = {
+_SLUG_TO_PAGE_MASTER = {
     "home":          "🏠 Inicio / Marketplace",
     "admin":         "Intranet",
     "propietarios":  "🏠 Propietarios",
@@ -82,35 +83,19 @@ _HIJACKER_SLUG_TO_PAGE = {
     "prefabricadas": "🏠 Portal Prefabricadas",
 }
 
-def _url_first_hijacker():
-    """Sincronización agresiva URL → session_state.
-    Si la URL cambió (botón Atrás), borra _nav_radio para que el radio
-    del sidebar no restaure la página anterior y fuerza rerun.
-    """
-    url_slug = st.query_params.get("page", "home")
-    target_page = _HIJACKER_SLUG_TO_PAGE.get(url_slug, "🏠 Inicio / Marketplace")
-
-    # Inicializar la primera vez
-    if "selected_page" not in st.session_state:
-        st.session_state["selected_page"] = target_page
-        st.session_state["_nav_radio"] = target_page
-        return
-
-    current_page = st.session_state.get("selected_page", "🏠 Inicio / Marketplace")
-
-    # Discrepancia URL ↔ session_state → la URL manda
-    if current_page != target_page:
-        st.session_state["selected_page"] = target_page
-        # TRUCO MAESTRO: eliminar la key del widget radio para que Streamlit
-        # no restaure el valor antiguo al renderizar el sidebar
-        st.session_state.pop("_nav_radio", None)
-        # Limpiar estado de login si volvemos a home
-        if url_slug in ("home", ""):
-            st.session_state.pop("viewing_login", None)
-            st.session_state.pop("login_role", None)
-        st.rerun()
-
-_url_first_hijacker()
+_page_from_url = st.query_params.get("page", "home")
+if st.session_state.get("current_page_sync") != _page_from_url:
+    # URL cambió (botón Atrás o enlace externo) → forzar estado desde URL
+    st.session_state["current_page_sync"] = _page_from_url
+    _target = _SLUG_TO_PAGE_MASTER.get(_page_from_url, "🏠 Inicio / Marketplace")
+    st.session_state["selected_page"] = _target
+    # Borrar la key del widget radio para que Streamlit no restaure el valor antiguo
+    st.session_state.pop("_nav_radio", None)
+    # Limpiar flags de login si volvemos a home
+    if _page_from_url in ("home", ""):
+        st.session_state.pop("viewing_login", None)
+        st.session_state.pop("login_role", None)
+    st.rerun()
 # ══════════════════════════════════════════════════════════════════
 
 st.markdown("""
@@ -737,10 +722,10 @@ _SLUG_TO_PAGE = {
 _current_url_page = st.query_params.get("page", "home")
 _last_sync_page = st.session_state.get("last_synced_page", "home")
 
-# Si la URL ha cambiado (por el botón Atrás) y no coincide con lo último que procesamos
+# Actualizar last_synced_page sin rerun — el Sincronizador Maestro ya hizo
+# el rerun necesario antes de llegar aquí. Solo actualizamos el guard.
 if _current_url_page != _last_sync_page:
     st.session_state["last_synced_page"] = _current_url_page
-    # Mapear el slug de la URL al título de la página
     _target_title = _SLUG_TO_PAGE.get(_current_url_page, "🏠 Inicio / Marketplace")
     st.session_state["selected_page"] = _target_title
     st.session_state["_nav_radio"] = _target_title
@@ -748,7 +733,7 @@ if _current_url_page != _last_sync_page:
         st.session_state["viewing_login"] = True
     else:
         st.session_state["viewing_login"] = False
-    st.rerun()
+    # NO st.rerun() aquí — el Sincronizador Maestro ya resolvió la URL
 
 _url_slug = st.query_params.get("page", "")
 # ?page=login → mostrar formulario de login genérico en home
@@ -1352,6 +1337,28 @@ def sync_navigation():
             st.session_state["selected_page"] = "🏠 Inicio / Marketplace"
 
 sync_navigation()
+
+
+def render_nav_header(titulo: str, back_slug: str = "home"):
+    """Navbar universal: botón Volver + título de página.
+    Úsala al inicio de cualquier portal para evitar callejones sin salida.
+
+    Args:
+        titulo:    Título visible del portal (ej: '👤 Panel de Cliente').
+        back_slug: Slug de la URL destino al pulsar Volver (por defecto 'home').
+    """
+    _nc1, _nc2 = st.columns([1, 6])
+    with _nc1:
+        if st.button("⬅️ Volver", key=f"nav_back_{titulo[:12].replace(' ', '_')}",
+                     use_container_width=True):
+            st.query_params.clear()
+            st.query_params["page"] = back_slug
+            st.session_state.pop("current_page_sync", None)  # forzar redetección
+            st.rerun()
+    with _nc2:
+        st.subheader(titulo)
+    st.divider()
+
 
 # Pre-configurar la key del radio si no existe o si su valor no está en PAGES
 _nav_val = st.session_state.get("_nav_radio")
@@ -2010,6 +2017,7 @@ elif st.session_state.get('selected_page') == "Diseñador de Vivienda":
 
 elif st.session_state.get('selected_page') == "Arquitectos (Marketplace)":
     st.components.v1.html("<script>window.parent.document.querySelector('section.main').scrollTo(0,0);</script>", height=0)
+    render_nav_header("📐 Portal de Arquitectos")
     with st.container():
         # Portal completo del arquitecto (con Modo Estudio, IA, planes, etc.)
         from modules.marketplace import architects
@@ -2024,6 +2032,7 @@ elif st.session_state.get('selected_page') == "Intranet":
 
 elif st.session_state.get('selected_page') == "👤 Panel de Cliente":
     st.components.v1.html("<script>window.parent.document.querySelector('section.main').scrollTo(0,0);</script>", height=0)
+    render_nav_header("👤 Panel de Cliente")
     # escape owners que intenten ir al panel de cliente
     if st.session_state.get('role') == 'owner':
         from modules.marketplace import owners
@@ -2033,6 +2042,7 @@ elif st.session_state.get('selected_page') == "👤 Panel de Cliente":
 
 elif st.session_state.get('selected_page') == "👤 Panel de Proveedor":
     st.components.v1.html("<script>window.parent.document.querySelector('section.main').scrollTo(0,0);</script>", height=0)
+    render_nav_header("🏗️ Portal de Profesionales")
     with st.container():
         from modules.marketplace import service_providers
         service_providers.show_service_provider_panel()
@@ -2143,6 +2153,7 @@ elif st.session_state.get('selected_page') == "🏠 Portal Prefabricadas":
         "<script>window.parent.document.querySelector('section.main').scrollTo(0,0);</script>",
         height=0,
     )
+    render_nav_header("🏠 Portal Prefabricadas")
     with st.container():
         from modules.prefabricadas.portal import main
         main()
