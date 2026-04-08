@@ -75,8 +75,6 @@ def render_admin_prefabricadas():
 
     if not companies:
         st.info("No hay empresas prefabricadas registradas aún. Cuando se registren desde el portal aparecerán aquí.")
-        _render_add_form()
-        return
 
     st.caption("Gestiona el acceso, plan y fechas de cada empresa prefabricada.")
 
@@ -205,42 +203,136 @@ def render_admin_prefabricadas():
                             st.rerun()
 
     st.markdown("---")
-    _render_add_form()
+    _render_catalog_items()
 
 
-def _render_add_form():
-    """Formulario para añadir empresa manualmente desde admin."""
-    st.markdown("### ➕ Añadir empresa prefabricada manualmente")
-    with st.form("add_prefab_company"):
-        _fc1, _fc2 = st.columns(2)
-        with _fc1:
-            _fn = st.text_input("Nombre empresa *")
-            _fe = st.text_input("Email *")
-            _fcif = st.text_input("CIF")
-        with _fc2:
-            _ft = st.text_input("Teléfono")
-            _fp = st.selectbox("Plan inicial", list(_PLANES.keys()),
-                               format_func=lambda p: f"{_PLANES[p]['emoji']} {_PLANES[p]['label']}")
-            _fu = st.text_input("Pagado hasta (YYYY-MM-DD)", placeholder="2026-12-31")
-        _fa = st.checkbox("Activar inmediatamente", value=True)
-        if st.form_submit_button("➕ Añadir empresa", type="primary"):
-            if _fn and _fe:
-                import uuid
-                _nid = uuid.uuid4().hex
-                _ac = db_conn()
-                try:
-                    _ac.execute(
-                        """INSERT INTO prefab_companies
-                           (id, nombre, cif, email, telefono, plan, paid_until, active, status, is_active)
-                           VALUES (?,?,?,?,?,?,?,?,?,?)""",
-                        (_nid, _fn, _fcif or None, _fe, _ft or None, _fp, _fu or None, int(_fa), "pendiente", int(_fa))
-                    )
-                    _ac.commit()
-                    st.success(f"✅ Empresa '{_fn}' añadida.")
-                    st.rerun()
-                except Exception as _ex:
-                    st.error(f"Error: {_ex}")
-                finally:
-                    _ac.close()
-            else:
-                st.error("Nombre y email son obligatorios.")
+def _render_catalog_items():
+    """Gestión de los modelos del catálogo de casas prefabricadas."""
+    st.markdown("### 🏘️ Catálogo de modelos prefabricados")
+    st.caption("Gestiona la disponibilidad de cada modelo en el marketplace.")
+
+    conn = db_conn()
+    try:
+        # Asegurar columna status en prefab_catalog (migración idempotente)
+        try:
+            conn.execute("ALTER TABLE prefab_catalog ADD COLUMN status TEXT DEFAULT 'disponible'")
+            conn.commit()
+        except Exception:
+            pass
+
+        items = conn.execute("""
+            SELECT id, name, m2, rooms, bathrooms, floors, material, price,
+                   active, image_path, modulos, price_label,
+                   COALESCE(status, CASE WHEN active=1 THEN 'disponible' ELSE 'suspendido' END) as status
+            FROM prefab_catalog ORDER BY m2
+        """).fetchall()
+    finally:
+        conn.close()
+
+    if not items:
+        st.info("No hay modelos en el catálogo todavía.")
+        return
+
+    _ITEM_STATUS_ICON = {
+        "disponible": "🟢", "aprobado": "🟢",
+        "pendiente": "🟡",
+        "suspendido": "🔴", "no_disponible": "🔴",
+        "vendida": "🔵", "vendido": "🔵",
+    }
+
+    st.markdown(f"**{len(items)} modelos en catálogo:**")
+
+    for itm in items:
+        (iid, iname, im2, irooms, ibaths, ifloors, imaterial, iprice,
+         iactive, iimg, imodulos, iprice_lbl, istatus) = itm
+
+        _sicon = _ITEM_STATUS_ICON.get(istatus or "disponible", "⚪")
+        _price_disp = iprice_lbl if iprice_lbl else f"€{iprice:,.0f}"
+
+        with st.expander(
+            f"{_sicon} {iname} — {im2} m² · {imaterial} · {_price_disp} | Estado: {istatus or 'disponible'}"
+        ):
+            _ic1, _ic2 = st.columns([3, 2])
+            with _ic1:
+                st.markdown(f"""
+| Campo | Valor |
+|---|---|
+| Habitaciones | {irooms} |
+| Baños | {ibaths} |
+| Plantas | {ifloors} |
+| Material | {imaterial} |
+| Módulos | {imodulos or '—'} |
+| Precio | {_price_disp} |
+| Estado | **{istatus or 'disponible'}** |
+""")
+                import os as _os_pf
+                if iimg and _os_pf.path.exists(iimg):
+                    st.image(iimg, width=160)
+                elif iimg and iimg.startswith("http"):
+                    st.image(iimg, width=160)
+
+            with _ic2:
+                st.markdown("**Cambiar estado**")
+                _pc1, _pc2 = st.columns(2)
+                with _pc1:
+                    if st.button("✅ Aprobar 🟢", key=f"cat_apr_{iid}",
+                                 type="primary" if istatus in ("disponible", "aprobado") else "secondary",
+                                 use_container_width=True):
+                        _cu = db_conn()
+                        try:
+                            _cu.execute("UPDATE prefab_catalog SET status='disponible', active=1 WHERE id=?", (iid,))
+                            _cu.commit()
+                        finally:
+                            _cu.close()
+                        st.rerun()
+                with _pc2:
+                    if st.button("⏳ Pendiente 🟡", key=f"cat_pend_{iid}",
+                                 type="primary" if istatus == "pendiente" else "secondary",
+                                 use_container_width=True):
+                        _cu2 = db_conn()
+                        try:
+                            _cu2.execute("UPDATE prefab_catalog SET status='pendiente', active=0 WHERE id=?", (iid,))
+                            _cu2.commit()
+                        finally:
+                            _cu2.close()
+                        st.rerun()
+
+                _pc3, _pc4 = st.columns(2)
+                with _pc3:
+                    if st.button("🔴 Suspender", key=f"cat_susp_{iid}",
+                                 type="primary" if istatus == "suspendido" else "secondary",
+                                 use_container_width=True):
+                        _cu3 = db_conn()
+                        try:
+                            _cu3.execute("UPDATE prefab_catalog SET status='suspendido', active=0 WHERE id=?", (iid,))
+                            _cu3.commit()
+                        finally:
+                            _cu3.close()
+                        st.rerun()
+                with _pc4:
+                    if st.button("🔵 Vendida", key=f"cat_vend_{iid}",
+                                 type="primary" if istatus in ("vendida", "vendido") else "secondary",
+                                 use_container_width=True,
+                                 help="Marca como vendida — no disponible en marketplace"):
+                        _cu4 = db_conn()
+                        try:
+                            _cu4.execute("UPDATE prefab_catalog SET status='vendida', active=0 WHERE id=?", (iid,))
+                            _cu4.commit()
+                        finally:
+                            _cu4.close()
+                        st.rerun()
+
+                st.markdown("---")
+                with st.popover("🗑️ Eliminar modelo", use_container_width=True):
+                    st.error(f"⚠️ ¿Eliminar '{iname}'?")
+                    st.caption("Irreversible.")
+                    if st.button("❌ Sí, eliminar", key=f"cat_del_{iid}",
+                                 type="primary", use_container_width=True):
+                        _cu5 = db_conn()
+                        try:
+                            _cu5.execute("DELETE FROM prefab_catalog WHERE id=?", (iid,))
+                            _cu5.commit()
+                        finally:
+                            _cu5.close()
+                        st.success(f"'{iname}' eliminado")
+                        st.rerun()

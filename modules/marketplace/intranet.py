@@ -2440,7 +2440,18 @@ Obtén el token creando un bot con @BotFather en Telegram.
                 except Exception:
                     pass
 
-            _activas = _mls.get_inmos_activas()
+            # Consulta directa: mostrar TODAS (activas + suspendidas + en trámite)
+            # get_inmos_activas() filtra activa=1 y pierde las suspendidas
+            _inmo_all_conn = db_conn()
+            try:
+                _activas_raw = _inmo_all_conn.execute(
+                    "SELECT * FROM inmobiliarias WHERE activa=1 OR (status IS NOT NULL AND status != '') ORDER BY created_at DESC"
+                ).fetchall()
+                _inmo_cols = [d[0] for d in _inmo_all_conn.execute("SELECT * FROM inmobiliarias LIMIT 0").description or []]
+            finally:
+                _inmo_all_conn.close()
+            _activas = [dict(zip(_inmo_cols, r)) for r in _activas_raw] if _inmo_cols and _activas_raw else []
+
             if not _activas:
                 st.info("No hay inmobiliarias activas todavía.")
             else:
@@ -2525,7 +2536,7 @@ Obtén el token creando un bot con @BotFather en Telegram.
                             if not _tiene_firma:
                                 st.warning("🔴 Sin acuerdo firmado — solo se puede suspender hasta que firme.")
 
-                            _mls_c1, _mls_c2, _mls_c3 = st.columns(3)
+                            _mls_c1, _mls_c2, _mls_c3, _mls_c4 = st.columns(4)
 
                             with _mls_c1:
                                 _is_prim_apr_mls = (_imo_status == 'aprobada')
@@ -2567,21 +2578,42 @@ Obtén el token creando un bot con @BotFather en Telegram.
 
                             with _mls_c3:
                                 _is_prim_susp_mls = (_imo_status in ('suspendida', 'suspended'))
-                                if st.button("⏸ SUSPENDER 🔴", key=f"mls_susp_{_a['id']}",
+                                if st.button("🔴 SUSPENDER", key=f"mls_susp_{_a['id']}",
                                              use_container_width=True,
                                              type="primary" if _is_prim_susp_mls else "secondary"):
                                     try:
                                         _mls_su = db_conn()
                                         try:
+                                            # Solo suspende — NO elimina el registro
                                             _mls_su.execute("UPDATE inmobiliarias SET status=?, activa=0 WHERE id=?", ("suspendida", _a["id"]))
                                             _mls_su.commit()
                                         finally:
                                             _mls_su.close()
                                         st.cache_data.clear()
-                                        st.warning("⏸ Suspendida")
+                                        st.warning("🔴 Suspendida (registro conservado)")
                                         st.rerun()
                                     except Exception as _e:
                                         st.error(f"Error: {_e}")
+
+                            with _mls_c4:
+                                with st.popover("🗑️ Eliminar", use_container_width=True):
+                                    _inmo_nom_del = _a.get("nombre_comercial") or _a.get("nombre", "?")
+                                    st.error(f"⚠️ ¿Eliminar '{_inmo_nom_del}'?")
+                                    st.caption("Irreversible. El registro se borra de la BBDD.")
+                                    if st.button("❌ Sí, eliminar", key=f"mls_b_del_yes_{_a['id']}",
+                                                 type="primary", use_container_width=True):
+                                        try:
+                                            _mls_del = db_conn()
+                                            try:
+                                                _mls_del.execute("DELETE FROM inmobiliarias WHERE id=?", (_a["id"],))
+                                                _mls_del.commit()
+                                            finally:
+                                                _mls_del.close()
+                                            st.cache_data.clear()
+                                            st.success("Eliminada")
+                                            st.rerun()
+                                        except Exception as _e:
+                                            st.error(f"Error: {_e}")
 
         except Exception as _eb:
             st.warning(f"Error sección B: {_eb}")
@@ -3186,8 +3218,8 @@ def _admin_solicitudes_estudiantes():
         id_, email, nombre, uni, año, ciudad, estado, hash_val, pdf_url, fecha = (
             r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], r[8], r[9]
         )
-        icono = "⏳" if estado == "pendiente" else ("✅" if estado == "aprobado" else "❌")
-        with st.expander(f"{icono} {nombre} — {uni} ({estado})"):
+        _est_icon = {"pendiente": "⏳", "aprobado": "🟢", "rechazado": "🔴", "suspendido": "🔴"}.get(estado, "⚪")
+        with st.expander(f"{_est_icon} {nombre} — {uni} ({estado})"):
             st.write(f"**Email:** {email}")
             st.write(f"**Universidad:** {uni} | **Año TFG:** {año} | **Ciudad:** {ciudad}")
             st.write(f"**Registrado:** {str(fecha)[:10]}")
@@ -3196,39 +3228,40 @@ def _admin_solicitudes_estudiantes():
             if pdf_url:
                 st.markdown(f"[📄 Ver autorización firmada]({pdf_url})")
 
-            if estado == "pendiente":
-                col1, col2 = st.columns(2)
-                with col1:
-                    if st.button("✅ Aprobar", key=f"apr_est_{id_}"):
-                        _cambiar_estado_estudiante(id_, "aprobado")
-                        st.rerun()
-                with col2:
-                    if st.button("❌ Rechazar", key=f"rec_est_{id_}"):
-                        _cambiar_estado_estudiante(id_, "rechazado")
-                        st.rerun()
-            else:
-                # Para estudiantes aprobados o rechazados, ofrecer opciones de cambio de estado
-                _est_col1, _est_col2, _est_col3 = st.columns(3)
-                with _est_col1:
-                    if estado != "aprobado":
-                        if st.button("✅ Restaurar", key=f"btn_est_restore_{id_}", type="primary", use_container_width=True):
-                            _cambiar_estado_estudiante(id_, "aprobado")
-                            st.rerun()
-                with _est_col2:
-                    if st.button("🔴 Suspender", key=f"btn_est_suspend_{id_}", use_container_width=True):
-                        _cambiar_estado_estudiante(id_, "suspendido")
-                        st.rerun()
-                with _est_col3:
-                    with st.popover("🗑️ Eliminar", use_container_width=True):
-                        st.error(f"⚠️ ¿Eliminar a {nombre}?")
-                        st.caption("Irreversible.")
-                        if st.button("❌ Sí, eliminar", key=f"btn_est_delete_{id_}", type="primary", use_container_width=True):
-                            _c = db_conn()
+            # Patrón unificado 4 botones para TODOS los estados
+            _ec1, _ec2, _ec3, _ec4 = st.columns(4)
+            with _ec1:
+                if st.button("✅ Aprobar 🟢", key=f"est_apr_{id_}",
+                             type="primary" if estado == "aprobado" else "secondary",
+                             use_container_width=True):
+                    _cambiar_estado_estudiante(id_, "aprobado")
+                    st.rerun()
+            with _ec2:
+                if st.button("⏳ Pendiente 🟡", key=f"est_pend_{id_}",
+                             type="primary" if estado == "pendiente" else "secondary",
+                             use_container_width=True):
+                    _cambiar_estado_estudiante(id_, "pendiente")
+                    st.rerun()
+            with _ec3:
+                if st.button("🔴 Suspender", key=f"est_susp_{id_}",
+                             type="primary" if estado in ("suspendido", "rechazado") else "secondary",
+                             use_container_width=True):
+                    _cambiar_estado_estudiante(id_, "suspendido")
+                    st.rerun()
+            with _ec4:
+                with st.popover("🗑️ Eliminar", use_container_width=True):
+                    st.error(f"⚠️ ¿Eliminar a {nombre}?")
+                    st.caption("Irreversible.")
+                    if st.button("❌ Sí, eliminar", key=f"est_del_{id_}",
+                                 type="primary", use_container_width=True):
+                        _c = db_conn()
+                        try:
                             _c.execute("DELETE FROM estudiantes WHERE id=?", (id_,))
                             _c.commit()
+                        finally:
                             _c.close()
-                            st.success("Estudiante eliminado")
-                            st.rerun()
+                        st.success("Estudiante eliminado")
+                        st.rerun()
 
 
 def _admin_proyectos_tfg():
