@@ -1762,27 +1762,29 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
 
         cols = st.columns(7, gap="small")
 
-        # --- LISTA DE ROLES CON SLUGS CORREGIDOS (EMOJIS + ESPACIOS = EXACTOS AL DICCIONARIO PAGES) ---
+        # --- CONFIGURACIÓN DE ROLES (Doble Identidad: Visual vs Técnico) ---
         roles = [
-            ("📍 Terreno", "terreno", "🏠 Propietarios"),
-            ("🏠 Comprador", "comprador", "👤 Panel de Cliente"),
-            ("🎓 Estudiante", "estudiante", "🎓 Estudiantes"),
-            ("📐 Arquitecto", "arquitecto", "Arquitectos (Marketplace)"),
-            ("🏗️ Constructor", "constructor", "👤 Panel de Proveedor"),
-            ("🏠 Prefab", "prefab", "🏠 Portal Prefabricadas"),
-            ("🏢 Inmo/MLS", "mls", "🏢 Inmobiliarias MLS")
+            ("📍 Terreno", "terreno", "🏠 Propietarios", "propietarios"),
+            ("🏠 Comprador", "comprador", "👤 Panel de Cliente", "cliente"),
+            ("🎓 Estudiante", "estudiante", "🎓 Estudiantes", "estudiantes"),
+            ("📐 Arquitecto", "arquitecto", "Arquitectos (Marketplace)", "arquitectos"),
+            ("🏗️ Constructor", "constructor", "👤 Panel de Proveedor", "proveedor"),
+            ("🏠 Prefab", "prefab", "🏠 Portal Prefabricadas", "prefabricadas"),
+            ("🏢 Inmo/MLS", "mls", "🏢 Inmobiliarias MLS", "mls")
         ]
 
-        for i, (label, style_class, page_slug) in enumerate(roles):
+        for i, (label, style_class, page_name, page_slug) in enumerate(roles):
             with cols[i]:
                 st.markdown(f'<div class="access-card {style_class}"><span class="card-label">{label}</span>', unsafe_allow_html=True)
                 if st.button("Acceder", key=f"btn_nav_{page_slug}", use_container_width=True):
-                    # NAVEGACIÓN REDUNDANTE (Para asegurar que el router lo vea)
-                    st.session_state["page"] = page_slug
-                    st.session_state["selected_page"] = page_slug
+                    # 1. Seteamos el nombre largo para que el diccionario PAGES lo reconozca
+                    st.session_state["selected_page"] = page_name
+                    st.session_state["page"] = page_name
+
+                    # 2. Seteamos el slug en minúsculas para que el router de la URL funcione
                     st.query_params["page"] = page_slug
 
-                    # Forzamos el reinicio limpio
+                    # 3. Reinicio limpio para procesar el cambio
                     st.rerun()
                 st.markdown('</div>', unsafe_allow_html=True)
 
