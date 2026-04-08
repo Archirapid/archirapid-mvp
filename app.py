@@ -1437,6 +1437,21 @@ if client_logged_in and client_email:
 
 # REMOVED: Conditional sidebar buttons for service providers - navigation is now simplified
 
+# ── Blindaje del router — fusible por portal ──────────────────────────────────
+# StopException y RerunException son señales internas de Streamlit, NO errores.
+# Se re-lanzan siempre. Solo los errores reales muestran el fallback de escape.
+_ST_INTERNAL = ("StopException", "RerunException")
+
+def _portal_error(slug: str, err: Exception) -> None:
+    """Fallback visual cuando un portal explota. El resto de la app sigue OK."""
+    import traceback as _tb
+    st.error(f"⚠️ Error cargando esta sección — `{type(err).__name__}: {err}`")
+    with st.expander("Ver detalle técnico"):
+        st.code(_tb.format_exc())
+    if st.button("🏠 Volver al inicio", key=f"err_back_{slug}"):
+        st.query_params["page"] = "home"
+        st.session_state.pop("current_page_sync", None)
+        st.rerun()
 
 
 # Only handle special pages here; other pages delegate to modules
@@ -1993,169 +2008,241 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
     st.stop()  # Detener ejecución para Home
 
 elif st.session_state.get('selected_page') == "🏠 Propietarios":
-    st.components.v1.html("<script>window.parent.document.querySelector('section.main').scrollTo(0,0);</script>", height=0)
-    with st.container():
-        # Propietarios suben fincas al marketplace inmobiliario
-        from modules.marketplace import owners
-        owners.main()
+    try:
+        st.components.v1.html("<script>window.parent.document.querySelector('section.main').scrollTo(0,0);</script>", height=0)
+        with st.container():
+            from modules.marketplace import owners
+            owners.main()
+    except Exception as _e:
+        if type(_e).__name__ in _ST_INTERNAL: raise
+        _portal_error("propietarios", _e)
 
 elif st.session_state.get('selected_page') == "Propietario (Gemelo Digital)":
-    st.components.v1.html("<script>window.parent.document.querySelector('section.main').scrollTo(0,0);</script>", height=0)
-    with st.container():
-        # Flujo principal: Propietario sube finca → IA genera plan
-        from modules.marketplace import gemelo_digital
-        gemelo_digital.main()
+    try:
+        st.components.v1.html("<script>window.parent.document.querySelector('section.main').scrollTo(0,0);</script>", height=0)
+        with st.container():
+            from modules.marketplace import gemelo_digital
+            gemelo_digital.main()
+    except Exception as _e:
+        if type(_e).__name__ in _ST_INTERNAL: raise
+        _portal_error("gemelo", _e)
 
 elif st.session_state.get('selected_page') == "Diseñador de Vivienda":
-    st.components.v1.html("<script>window.parent.document.querySelector('section.main').scrollTo(0,0);</script>", height=0)
-    with st.container():
-        # Flujo secundario: Cliente diseña vivienda personalizada
-        from modules.marketplace import disenador_vivienda
-        disenador_vivienda.main()
+    try:
+        st.components.v1.html("<script>window.parent.document.querySelector('section.main').scrollTo(0,0);</script>", height=0)
+        with st.container():
+            from modules.marketplace import disenador_vivienda
+            disenador_vivienda.main()
+    except Exception as _e:
+        if type(_e).__name__ in _ST_INTERNAL: raise
+        _portal_error("disenador", _e)
 
 # "Inmobiliaria (Mapa)" route removed — Home now uses `marketplace.main()` directly.
 
 elif st.session_state.get('selected_page') == "Arquitectos (Marketplace)":
-    st.components.v1.html("<script>window.parent.document.querySelector('section.main').scrollTo(0,0);</script>", height=0)
-    render_nav_header("📐 Portal de Arquitectos")
-    with st.container():
-        # Portal completo del arquitecto (con Modo Estudio, IA, planes, etc.)
-        from modules.marketplace import architects
-        architects.main()
+    try:
+        st.components.v1.html("<script>window.parent.document.querySelector('section.main').scrollTo(0,0);</script>", height=0)
+        render_nav_header("📐 Portal de Arquitectos")
+        with st.container():
+            from modules.marketplace import architects
+            architects.main()
+    except Exception as _e:
+        if type(_e).__name__ in _ST_INTERNAL: raise
+        _portal_error("arquitectos", _e)
 
 elif st.session_state.get('selected_page') == "Intranet":
-    st.components.v1.html("<script>window.parent.document.querySelector('section.main').scrollTo(0,0);</script>", height=0)
-    st.write("Cargando Panel de Control...")
-    with st.container():
-        from modules.marketplace import intranet
-        intranet.main()
+    try:
+        st.components.v1.html("<script>window.parent.document.querySelector('section.main').scrollTo(0,0);</script>", height=0)
+        with st.container():
+            from modules.marketplace import intranet
+            intranet.main()
+    except Exception as _e:
+        if type(_e).__name__ in _ST_INTERNAL: raise
+        _portal_error("intranet", _e)
 
 elif st.session_state.get('selected_page') == "👤 Panel de Cliente":
-    st.components.v1.html("<script>window.parent.document.querySelector('section.main').scrollTo(0,0);</script>", height=0)
-    render_nav_header("👤 Panel de Cliente")
-    # escape owners que intenten ir al panel de cliente
-    if st.session_state.get('role') == 'owner':
-        from modules.marketplace import owners
-        owners.main()
-        st.stop()
-    route_main_panel()
+    try:
+        st.components.v1.html("<script>window.parent.document.querySelector('section.main').scrollTo(0,0);</script>", height=0)
+        render_nav_header("👤 Panel de Cliente")
+        if st.session_state.get('role') == 'owner':
+            from modules.marketplace import owners
+            owners.main()
+            st.stop()
+        route_main_panel()
+    except Exception as _e:
+        if type(_e).__name__ in _ST_INTERNAL: raise
+        _portal_error("cliente", _e)
 
 elif st.session_state.get('selected_page') == "👤 Panel de Proveedor":
-    st.components.v1.html("<script>window.parent.document.querySelector('section.main').scrollTo(0,0);</script>", height=0)
-    render_nav_header("🏗️ Portal de Profesionales")
-    with st.container():
-        from modules.marketplace import service_providers
-        service_providers.show_service_provider_panel()
+    try:
+        st.components.v1.html("<script>window.parent.document.querySelector('section.main').scrollTo(0,0);</script>", height=0)
+        render_nav_header("🏗️ Portal de Profesionales")
+        with st.container():
+            from modules.marketplace import service_providers
+            service_providers.show_service_provider_panel()
+    except Exception as _e:
+        if type(_e).__name__ in _ST_INTERNAL: raise
+        _portal_error("proveedor", _e)
 
 elif st.session_state.get('selected_page') == "📝 Registro de Proveedor de Servicios":
-    st.components.v1.html("<script>window.parent.document.querySelector('section.main').scrollTo(0,0);</script>", height=0)
-    with st.container():
-        from modules.marketplace import service_providers
-        service_providers.show_service_provider_registration()
+    try:
+        st.components.v1.html("<script>window.parent.document.querySelector('section.main').scrollTo(0,0);</script>", height=0)
+        with st.container():
+            from modules.marketplace import service_providers
+            service_providers.show_service_provider_registration()
+    except Exception as _e:
+        if type(_e).__name__ in _ST_INTERNAL: raise
+        _portal_error("registro_pro", _e)
 
 elif st.session_state.get('selected_page') == "Iniciar Sesión":
-    st.components.v1.html("<script>window.parent.document.querySelector('section.main').scrollTo(0,0);</script>", height=0)
-    with st.container():
-        from modules.marketplace import auth
-        auth.show_login()
-        st.stop()
+    try:
+        st.components.v1.html("<script>window.parent.document.querySelector('section.main').scrollTo(0,0);</script>", height=0)
+        with st.container():
+            from modules.marketplace import auth
+            auth.show_login()
+    except Exception as _e:
+        if type(_e).__name__ in _ST_INTERNAL: raise
+        _portal_error("login", _e)
+    st.stop()
 
 elif st.session_state.get('selected_page') == "Registro de Usuario":
-    st.components.v1.html("<script>window.parent.document.querySelector('section.main').scrollTo(0,0);</script>", height=0)
-    with st.container():
-        from modules.marketplace import auth
-        auth.show_registration()
-        st.stop()
+    try:
+        st.components.v1.html("<script>window.parent.document.querySelector('section.main').scrollTo(0,0);</script>", height=0)
+        with st.container():
+            from modules.marketplace import auth
+            auth.show_registration()
+    except Exception as _e:
+        if type(_e).__name__ in _ST_INTERNAL: raise
+        _portal_error("registro", _e)
+    st.stop()
 
 elif st.session_state.get('selected_page') == "💬 Lola":
-    st.components.v1.html("<script>window.parent.document.querySelector('section.main').scrollTo(0,0);</script>", height=0)
-    with st.container():
-        from modules.marketplace import virtual_assistant
-        virtual_assistant.main()
-        st.stop()
+    try:
+        st.components.v1.html("<script>window.parent.document.querySelector('section.main').scrollTo(0,0);</script>", height=0)
+        with st.container():
+            from modules.marketplace import virtual_assistant
+            virtual_assistant.main()
+    except Exception as _e:
+        if type(_e).__name__ in _ST_INTERNAL: raise
+        _portal_error("lola", _e)
+    st.stop()
 
 elif st.session_state.get('selected_page') == "🏢 Inmobiliarias MLS":
-    st.components.v1.html(
-        "<script>window.parent.document"
-        ".querySelector('section.main')"
-        ".scrollTo(0,0);</script>",
-        height=0
-    )
-    with st.container():
-        from modules.mls import mls_portal
-        mls_portal.main()
+    try:
+        st.components.v1.html(
+            "<script>window.parent.document"
+            ".querySelector('section.main')"
+            ".scrollTo(0,0);</script>",
+            height=0
+        )
+        with st.container():
+            from modules.mls import mls_portal
+            mls_portal.main()
+    except Exception as _e:
+        if type(_e).__name__ in _ST_INTERNAL: raise
+        _portal_error("mls", _e)
 
 elif st.session_state.get('selected_page') == "_mls_ficha_publica":
-    st.components.v1.html(
-        "<script>window.parent.document"
-        ".querySelector('section.main')"
-        ".scrollTo(0,0);</script>",
-        height=0,
-    )
-    with st.container():
-        from modules.mls.mls_publico import show_ficha_publica
-        show_ficha_publica(st.session_state.get("mls_ficha_id", ""))
+    try:
+        st.components.v1.html(
+            "<script>window.parent.document"
+            ".querySelector('section.main')"
+            ".scrollTo(0,0);</script>",
+            height=0,
+        )
+        with st.container():
+            from modules.mls.mls_publico import show_ficha_publica
+            show_ficha_publica(st.session_state.get("mls_ficha_id", ""))
+    except Exception as _e:
+        if type(_e).__name__ in _ST_INTERNAL: raise
+        _portal_error("mls_ficha", _e)
 
 elif st.session_state.get('selected_page') == "_mls_reservar_publica":
-    st.components.v1.html(
-        "<script>window.parent.document"
-        ".querySelector('section.main')"
-        ".scrollTo(0,0);</script>",
-        height=0,
-    )
-    with st.container():
-        from modules.mls.mls_publico import show_reservar_publico
-        show_reservar_publico(st.session_state.get("mls_reservar_id", ""))
+    try:
+        st.components.v1.html(
+            "<script>window.parent.document"
+            ".querySelector('section.main')"
+            ".scrollTo(0,0);</script>",
+            height=0,
+        )
+        with st.container():
+            from modules.mls.mls_publico import show_reservar_publico
+            show_reservar_publico(st.session_state.get("mls_reservar_id", ""))
+    except Exception as _e:
+        if type(_e).__name__ in _ST_INTERNAL: raise
+        _portal_error("mls_reservar", _e)
 
 elif st.session_state.get('selected_page') == "_mls_contacto_publica":
-    st.components.v1.html(
-        "<script>window.parent.document"
-        ".querySelector('section.main')"
-        ".scrollTo(0,0);</script>",
-        height=0,
-    )
-    with st.container():
-        from modules.mls.mls_publico import show_contacto_publico
-        show_contacto_publico(st.session_state.get("mls_contacto_id", ""))
+    try:
+        st.components.v1.html(
+            "<script>window.parent.document"
+            ".querySelector('section.main')"
+            ".scrollTo(0,0);</script>",
+            height=0,
+        )
+        with st.container():
+            from modules.mls.mls_publico import show_contacto_publico
+            show_contacto_publico(st.session_state.get("mls_contacto_id", ""))
+    except Exception as _e:
+        if type(_e).__name__ in _ST_INTERNAL: raise
+        _portal_error("mls_contacto", _e)
 
 elif st.session_state.get('selected_page') == "_mls_retorno_cliente":
-    st.components.v1.html(
-        "<script>window.parent.document"
-        ".querySelector('section.main')"
-        ".scrollTo(0,0);</script>",
-        height=0,
-    )
-    with st.container():
-        from modules.mls.mls_publico import show_retorno_reserva_cliente
-        show_retorno_reserva_cliente()
+    try:
+        st.components.v1.html(
+            "<script>window.parent.document"
+            ".querySelector('section.main')"
+            ".scrollTo(0,0);</script>",
+            height=0,
+        )
+        with st.container():
+            from modules.mls.mls_publico import show_retorno_reserva_cliente
+            show_retorno_reserva_cliente()
+    except Exception as _e:
+        if type(_e).__name__ in _ST_INTERNAL: raise
+        _portal_error("mls_retorno", _e)
 
 elif st.session_state.get('selected_page') == "_mls_forgot_password":
-    with st.container():
-        from modules.mls.mls_portal import show_mls_forgot_password
-        show_mls_forgot_password()
+    try:
+        with st.container():
+            from modules.mls.mls_portal import show_mls_forgot_password
+            show_mls_forgot_password()
+    except Exception as _e:
+        if type(_e).__name__ in _ST_INTERNAL: raise
+        _portal_error("mls_forgot", _e)
 
 elif st.session_state.get('selected_page') == "_mls_reset_password":
-    with st.container():
-        from modules.mls.mls_portal import show_mls_reset_password
-        show_mls_reset_password(st.session_state.get("mls_reset_token", ""))
+    try:
+        with st.container():
+            from modules.mls.mls_portal import show_mls_reset_password
+            show_mls_reset_password(st.session_state.get("mls_reset_token", ""))
+    except Exception as _e:
+        if type(_e).__name__ in _ST_INTERNAL: raise
+        _portal_error("mls_reset", _e)
 
 elif st.session_state.get('selected_page') == "🎓 Estudiantes":
-    st.components.v1.html(
-        "<script>window.parent.document.querySelector('section.main').scrollTo(0,0);</script>",
-        height=0,
-    )
-    with st.container():
-        from estudiantes import mostrar_modulo_estudiantes
-        mostrar_modulo_estudiantes()
+    try:
+        st.components.v1.html(
+            "<script>window.parent.document.querySelector('section.main').scrollTo(0,0);</script>",
+            height=0,
+        )
+        with st.container():
+            from estudiantes import mostrar_modulo_estudiantes
+            mostrar_modulo_estudiantes()
+    except Exception as _e:
+        if type(_e).__name__ in _ST_INTERNAL: raise
+        _portal_error("estudiantes", _e)
 
 elif st.session_state.get('selected_page') == "🏠 Portal Prefabricadas":
-    st.components.v1.html(
-        "<script>window.parent.document.querySelector('section.main').scrollTo(0,0);</script>",
-        height=0,
-    )
-    render_nav_header("🏠 Portal Prefabricadas")
-    with st.container():
-        from modules.prefabricadas.portal import main
-        main()
-
-
+    try:
+        st.components.v1.html(
+            "<script>window.parent.document.querySelector('section.main').scrollTo(0,0);</script>",
+            height=0,
+        )
+        render_nav_header("🏠 Portal Prefabricadas")
+        with st.container():
+            from modules.prefabricadas.portal import main
+            main()
+    except Exception as _e:
+        if type(_e).__name__ in _ST_INTERNAL: raise
+        _portal_error("prefabricadas", _e)
