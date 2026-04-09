@@ -1517,7 +1517,6 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
         if st.session_state.get('login_role') == 'prefab':
             st.session_state['viewing_login'] = False
             st.session_state['selected_page'] = "🏠 Portal Prefabricadas"
-            st.session_state['_nav_radio'] = "🏠 Portal Prefabricadas"
             st.query_params["page"] = "prefabricadas"
             st.rerun()
 
