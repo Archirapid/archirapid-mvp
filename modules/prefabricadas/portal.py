@@ -5,11 +5,52 @@ import hashlib
 import uuid
 from modules.marketplace.utils import db_conn
 
+PLANES_PREFAB = {
+    "starter": {
+        "label": "🏠 Starter",
+        "precio": 59,
+        "modelos": 3,
+        "features": [
+            "Hasta 3 modelos en catálogo",
+            "Ficha con fotos y descripción",
+            "Recepción de leads directos",
+        ],
+        "price_id": "price_starter_prefab",
+    },
+    "profesional": {
+        "label": "⭐ Profesional",
+        "precio": 129,
+        "modelos": 6,
+        "features": [
+            "Hasta 6 modelos en catálogo",
+            "Badge empresa verificada",
+            "Apareces en panel del comprador al elegir finca",
+            "Todo lo del plan Starter",
+        ],
+        "price_id": "price_profesional_prefab",
+    },
+    "premium": {
+        "label": "🏆 Premium",
+        "precio": 229,
+        "modelos": 12,
+        "features": [
+            "Hasta 12 modelos en catálogo",
+            "Posición prioritaria en home",
+            "Notificación a compradores activos",
+            "Métricas de visitas y leads",
+            "Todo lo del plan Profesional",
+        ],
+        "price_id": "price_premium_prefab",
+    },
+}
+
+# Alias para compatibilidad con lógica existente
 _PLANES = {
-    "normal":    {"label": "Normal",    "precio": 49,  "emoji": "📋",
-                  "descripcion": "Listado en catálogo + ficha propia"},
-    "destacado": {"label": "Destacado", "precio": 149, "emoji": "⭐",
-                  "descripcion": "Badge destacado + primero en home + aparece en panel del comprador"},
+    "starter":     {"label": "Starter",     "precio": 59,  "emoji": "🏠"},
+    "profesional": {"label": "Profesional", "precio": 129, "emoji": "⭐"},
+    "premium":     {"label": "Premium",     "precio": 229, "emoji": "🏆"},
+    "destacado":   {"label": "Destacado",   "precio": 49,  "emoji": "🌟"},
+    "normal":      {"label": "Starter",     "precio": 59,  "emoji": "🏠"},
 }
 
 
@@ -28,13 +69,28 @@ def _ensure_table():
                 email TEXT UNIQUE NOT NULL,
                 telefono TEXT,
                 password_hash TEXT,
-                plan TEXT DEFAULT 'normal',
+                plan TEXT DEFAULT 'starter',
                 paid_until TEXT,
                 active INTEGER DEFAULT 0,
                 created_at TEXT DEFAULT (datetime('now'))
             )
         """)
         conn.commit()
+        # Columnas nuevas — idempotentes
+        for _col, _def in [
+            ("comision_pct", "REAL DEFAULT 4.0"),
+            ("destacado_activo", "INTEGER DEFAULT 0"),
+            ("destacado_hasta", "TEXT"),
+            ("hash_contrato_comision", "TEXT"),
+            ("pdf_contrato_url", "TEXT"),
+        ]:
+            try:
+                conn.execute(
+                    f"ALTER TABLE prefab_companies ADD COLUMN {_col} {_def}"
+                )
+                conn.commit()
+            except Exception:
+                pass  # columna ya existe
     finally:
         conn.close()
 
@@ -43,20 +99,26 @@ def _get_company(email: str):
     conn = db_conn()
     try:
         row = conn.execute(
-            "SELECT id,nombre,cif,email,telefono,plan,paid_until,active FROM prefab_companies WHERE email=?",
+            """SELECT id, nombre, cif, email, telefono, plan, paid_until, active,
+                      comision_pct, destacado_activo, destacado_hasta,
+                      hash_contrato_comision, pdf_contrato_url
+               FROM prefab_companies WHERE email=?""",
             (email,)
         ).fetchone()
     finally:
         conn.close()
     if not row:
         return None
-    return dict(zip(["id","nombre","cif","email","telefono","plan","paid_until","active"], row))
+    return dict(zip([
+        "id", "nombre", "cif", "email", "telefono", "plan", "paid_until", "active",
+        "comision_pct", "destacado_activo", "destacado_hasta",
+        "hash_contrato_comision", "pdf_contrato_url"
+    ], row))
 
 
 def main():
     _ensure_table()
 
-    # Estado de sesión
     _company = st.session_state.get("prefab_company")
 
     if _company:
@@ -96,42 +158,54 @@ def _render_login_register():
         with st.form("pref_register_form"):
             _rc1, _rc2 = st.columns(2)
             with _rc1:
-                _rn  = st.text_input("Nombre empresa *")
-                _re  = st.text_input("Email corporativo *")
+                _rn   = st.text_input("Nombre empresa *")
+                _re   = st.text_input("Email corporativo *")
                 _rcif = st.text_input("CIF")
             with _rc2:
-                _rt  = st.text_input("Teléfono")
-                _rpw = st.text_input("Contraseña *", type="password")
+                _rt   = st.text_input("Teléfono")
+                _rpw  = st.text_input("Contraseña *", type="password")
                 _rpw2 = st.text_input("Repetir contraseña *", type="password")
 
             # Planes
-            st.markdown("**Elige tu plan:**")
-            _pc1, _pc2 = st.columns(2)
-            with _pc1:
-                st.markdown(f"""
-<div style="border:1px solid #334155;border-radius:8px;padding:12px;">
-  <div style="font-size:1.1em;font-weight:700;">📋 Plan Normal — €49/mes</div>
-  <div style="color:#94A3B8;font-size:0.85em;margin-top:4px;">
-    ✅ Listado en catálogo<br>
-    ✅ Ficha propia con fotos<br>
-    ✅ Apareces en resultados de búsqueda
-  </div>
-</div>""", unsafe_allow_html=True)
-            with _pc2:
-                st.markdown(f"""
-<div style="border:2px solid #F59E0B;border-radius:8px;padding:12px;background:rgba(245,158,11,0.05);">
-  <div style="font-size:1.1em;font-weight:700;">⭐ Plan Destacado — €149/mes</div>
-  <div style="color:#94A3B8;font-size:0.85em;margin-top:4px;">
-    ✅ Todo lo del plan Normal<br>
-    ✅ Badge destacado visible<br>
-    ✅ Primero en home y marketplace<br>
-    ✅ Apareces en panel del comprador al elegir finca
-  </div>
-</div>""", unsafe_allow_html=True)
+            st.markdown("#### Elige tu plan de publicación:")
+            _cols_planes = st.columns(3)
+            for i, (plan_key, plan_info) in enumerate(PLANES_PREFAB.items()):
+                with _cols_planes[i]:
+                    st.markdown(
+                        f"**{plan_info['label']}**\n\n"
+                        f"### {plan_info['precio']}€/mes\n\n"
+                        f"*Hasta {plan_info['modelos']} modelos*"
+                    )
+                    for feat in plan_info["features"]:
+                        st.markdown(f"✅ {feat}")
+                    st.markdown("")
 
-            _rplan = st.radio("Plan seleccionado", list(_PLANES.keys()),
-                              format_func=lambda p: f"{_PLANES[p]['emoji']} {_PLANES[p]['label']} — €{_PLANES[p]['precio']}/mes",
-                              horizontal=True, key="pref_reg_plan")
+            _rplan = st.radio(
+                "Plan seleccionado",
+                options=list(PLANES_PREFAB.keys()),
+                format_func=lambda k: f"{PLANES_PREFAB[k]['label']} — {PLANES_PREFAB[k]['precio']}€/mes",
+                horizontal=True,
+                key="prefab_plan_radio"
+            )
+
+            st.markdown("---")
+            st.markdown("**📊 Comisión de venta aplicable**")
+            _comision_reg = st.slider(
+                "Porcentaje de comisión sobre precio de venta final (obligatorio)",
+                min_value=2.5,
+                max_value=8.0,
+                value=4.0,
+                step=0.5,
+                format="%.1f%%",
+                key="prefab_comision_slider",
+                help="ArchiRapid aplicará este porcentaje sobre cada venta "
+                     "intermediada a través de la plataforma."
+            )
+            st.caption(
+                f"⚖️ Comisión acordada: **{_comision_reg}%** sobre precio de venta. "
+                "Quedará reflejada en el contrato de intermediación firmado "
+                "digitalmente con SHA-256."
+            )
 
             if st.form_submit_button("📝 Solicitar registro", type="primary"):
                 if not (_rn and _re and _rpw):
@@ -148,19 +222,41 @@ def _render_login_register():
                         try:
                             _conn_reg.execute(
                                 """INSERT INTO prefab_companies
-                                   (id,nombre,cif,email,telefono,password_hash,plan,active)
-                                   VALUES (?,?,?,?,?,?,?,0)""",
-                                (_new_id, _rn, _rcif or None, _re, _rt or None, _hash_pw(_rpw), _rplan)
+                                   (id, nombre, cif, email, telefono, password_hash,
+                                    plan, comision_pct, active)
+                                   VALUES (?,?,?,?,?,?,?,?,0)""",
+                                (_new_id, _rn, _rcif or None, _re, _rt or None,
+                                 _hash_pw(_rpw), _rplan, _comision_reg)
                             )
                             _conn_reg.commit()
+                            # Generar contrato SHA-256
+                            try:
+                                from disclaimer_legal import generar_contrato_comision
+                                _hash_c, _pdf_c = generar_contrato_comision(
+                                    email=_re,
+                                    nombre=_rn,
+                                    titulo_finca=f"Empresa prefabricada: {_rn}",
+                                    precio=0,
+                                    comision_pct=int(_comision_reg * 10),
+                                    plot_id="prefab"
+                                )
+                                if _hash_c:
+                                    _conn_reg.execute(
+                                        "UPDATE prefab_companies "
+                                        "SET hash_contrato_comision=?, pdf_contrato_url=? "
+                                        "WHERE email=?",
+                                        (_hash_c, _pdf_c, _re)
+                                    )
+                                    _conn_reg.commit()
+                            except Exception:
+                                pass
                             st.success(
                                 "✅ Solicitud enviada. El equipo de ArchiRapid revisará tu cuenta "
                                 "y te avisará por email en menos de 24h."
                             )
-                            # Notificar admin via Telegram si está configurado
                             try:
                                 from modules.marketplace.email_notify import _send
-                                _send(f"🏠 Nueva empresa prefabricada solicita acceso:\n{_rn} ({_re})\nPlan: {_rplan}")
+                                _send(f"🏠 Nueva empresa prefabricada solicita acceso:\n{_rn} ({_re})\nPlan: {_rplan} · Comisión: {_comision_reg}%")
                             except Exception:
                                 pass
                         except Exception as _ex:
@@ -175,7 +271,8 @@ def _render_dashboard(company: dict):
 
     _co1, _co2 = st.columns([5, 1])
     with _co1:
-        _plan_info = _PLANES.get(company.get("plan") or "normal", _PLANES["normal"])
+        _plan_key = company.get("plan") or "starter"
+        _plan_info = _PLANES.get(_plan_key, _PLANES["starter"])
         st.caption(f"Plan: {_plan_info['emoji']} **{_plan_info['label']}** | Email: {company['email']}")
     with _co2:
         if st.button("🚪 Salir", key="pref_logout"):
@@ -183,12 +280,19 @@ def _render_dashboard(company: dict):
             st.rerun()
 
     # Banner estado plan
-    _plan = company.get("plan") or "normal"
+    _plan = company.get("plan") or "starter"
     _paid_until = company.get("paid_until")
-    if _plan == "destacado":
-        st.success(f"⭐ Plan Destacado activo — válido hasta: {_paid_until or 'indefinido'}")
+    _plan_label = _PLANES.get(_plan, _PLANES["starter"])["label"]
+    if _plan in ("profesional", "premium", "destacado"):
+        st.success(f"⭐ Plan {_plan_label} activo — válido hasta: {_paid_until or 'indefinido'}")
     else:
-        st.info(f"📋 Plan Normal activo — válido hasta: {_paid_until or 'indefinido'}")
+        st.info(f"📋 Plan {_plan_label} activo — válido hasta: {_paid_until or 'indefinido'}")
+
+    # Comisión acordada y contrato
+    _comision_display = company.get("comision_pct") or 4.0
+    st.caption(f"📊 Comisión de intermediación acordada: **{_comision_display}%**")
+    if company.get("pdf_contrato_url"):
+        st.markdown(f"[📄 Ver contrato de intermediación]({company['pdf_contrato_url']})")
 
     tab_catalogo, tab_plan, tab_datos = st.tabs(["🏭 Mis modelos", "💳 Mi plan", "📋 Mis datos"])
 
@@ -214,31 +318,41 @@ def _render_dashboard(company: dict):
 
     with tab_plan:
         st.subheader("Cambiar o renovar plan")
-        _cp1, _cp2 = st.columns(2)
-        with _cp1:
-            _border_n = "2px solid #F59E0B" if _plan == "normal" else "1px solid #334155"
-            st.markdown(f"""
-<div style="border:{_border_n};border-radius:8px;padding:16px;margin-bottom:8px;">
-  <div style="font-size:1.1em;font-weight:700;">📋 Plan Normal — €49/mes</div>
-  <div style="color:#94A3B8;font-size:0.85em;margin-top:6px;">
-    ✅ Listado en catálogo · ✅ Ficha propia
-  </div>
-</div>""", unsafe_allow_html=True)
-            if _plan != "normal" and st.button("Cambiar a Normal", key="pref_to_normal",
-                                                use_container_width=True):
-                _checkout_plan("normal", company)
+        _cp1, _cp2, _cp3 = st.columns(3)
 
-        with _cp2:
-            _border_d = "2px solid #F59E0B" if _plan == "destacado" else "1px solid #334155"
-            st.markdown(f"""
-<div style="border:{_border_d};border-radius:8px;padding:16px;background:rgba(245,158,11,0.05);">
-  <div style="font-size:1.1em;font-weight:700;">⭐ Plan Destacado — €149/mes</div>
-  <div style="color:#94A3B8;font-size:0.85em;margin-top:6px;">
-    ✅ Todo Normal · ✅ Badge · ✅ Primero en home · ✅ Panel comprador
-  </div>
+        for col, plan_key in zip([_cp1, _cp2, _cp3], ["starter", "profesional", "premium"]):
+            pinfo = PLANES_PREFAB[plan_key]
+            with col:
+                _border = "2px solid #F59E0B" if _plan == plan_key else "1px solid #334155"
+                _bg = "background:rgba(245,158,11,0.05);" if _plan == plan_key else ""
+                _feats = "".join(f"✅ {f}<br>" for f in pinfo["features"])
+                st.markdown(f"""
+<div style="border:{_border};border-radius:8px;padding:16px;margin-bottom:8px;{_bg}">
+  <div style="font-size:1.1em;font-weight:700;">{pinfo['label']} — €{pinfo['precio']}/mes</div>
+  <div style="color:#94A3B8;font-size:0.85em;margin-top:6px;">{_feats}</div>
 </div>""", unsafe_allow_html=True)
-            if _plan != "destacado" and st.button("⭐ Upgrade a Destacado", key="pref_to_dest",
-                                                   type="primary", use_container_width=True):
+                if _plan != plan_key and st.button(
+                    f"Cambiar a {pinfo['label']}", key=f"pref_to_{plan_key}",
+                    use_container_width=True,
+                    type="primary" if plan_key == "premium" else "secondary"
+                ):
+                    _checkout_plan(plan_key, company)
+
+        st.markdown("---")
+        st.markdown("### 🌟 Destacado Premium")
+        st.caption(
+            "Aparece el primero en la home de ArchiRapid durante 30 días. "
+            "Badge dorado visible. Notificación a compradores activos."
+        )
+
+        _dest_activo = company.get("destacado_activo", 0)
+        _dest_hasta = company.get("destacado_hasta", "")
+
+        if _dest_activo and _dest_hasta:
+            st.success(f"✅ Destacado activo hasta {_dest_hasta}")
+        else:
+            st.info("No tienes destacado activo actualmente.")
+            if st.button("⭐ Activar Destacado — 49€/mes", key="btn_destacado_prefab", type="primary"):
                 _checkout_plan("destacado", company)
 
     with tab_datos:
@@ -250,12 +364,20 @@ def _render_dashboard(company: dict):
 | CIF | {company.get('cif') or '—'} |
 | Email | {company['email']} |
 | Teléfono | {company.get('telefono') or '—'} |
+| Comisión acordada | {company.get('comision_pct') or 4.0}% |
 """)
         st.info("Para modificar tus datos contacta con soporte@archirapid.com")
 
 
 def _checkout_plan(plan: str, company: dict):
     """Redirige a Stripe Checkout para pagar un plan."""
+    PRICE_IDS = {
+        "starter":     "price_starter_prefab",
+        "profesional": "price_profesional_prefab",
+        "premium":     "price_premium_prefab",
+        "destacado":   "price_destacado_prefab_49",
+        "normal":      "price_starter_prefab",
+    }
     try:
         from modules.stripe_utils import _get_base_url
         import stripe, os
@@ -269,7 +391,7 @@ def _checkout_plan(plan: str, company: dict):
             st.error("Stripe no configurado. Contacta con soporte@archirapid.com")
             return
         stripe.api_key = _sk
-        _plan_info = _PLANES[plan]
+        _plan_info = _PLANES.get(plan, _PLANES["starter"])
         _base = _get_base_url()
         session = stripe.checkout.Session.create(
             payment_method_types=["card"],
