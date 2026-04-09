@@ -1572,7 +1572,7 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
                                 conn.close()
                                 st.success("🎉 ¡Registro completado exitosamente!")
                                 st.session_state.update({
-                                    'user_email': email, 'role': new_role, 'user_name': name,
+                                    'user_id': new_id, 'user_email': email, 'role': new_role, 'user_name': name,
                                     'logged_in': True, 'viewing_login': False,
                                     'show_role_selector': False, '_login_show_registro': False,
                                 })
@@ -1815,10 +1815,20 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
             with cols[i]:
                 st.markdown(f'<div class="access-card {style_class}"><span class="card-label">{label}</span>', unsafe_allow_html=True)
                 if st.button("Acceder", key=f"btn_nav_{page_slug}", use_container_width=True):
-                    st.session_state["selected_page"] = page_name
-                    st.session_state["page"] = page_name
-                    st.query_params["page"] = page_slug
-                    st.rerun()
+                    # ── Mapeo de role_slug → login_role (para BD) ──
+                    _role_map = {
+                        'propietarios': 'owner',
+                        'cliente': 'client',
+                        'estudiantes': 'student',
+                        'arquitectos': 'architect',
+                        'proveedor': 'services',
+                        'prefabricadas': 'prefab',
+                        'mls': 'inmo'
+                    }
+                    st.session_state['login_role'] = _role_map.get(page_slug, page_slug)
+                    st.session_state['viewing_login'] = True
+                    st.session_state['_login_show_registro'] = False  # Mostrar login por defecto
+                    st.rerun()  # ← CRÍTICO: sin esto, tarda 1 ciclo extra (doble-clic lag)
                 st.markdown('</div>', unsafe_allow_html=True)
 
         st.divider()
