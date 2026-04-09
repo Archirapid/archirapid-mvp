@@ -223,8 +223,8 @@ def _render_login_register():
                             _conn_reg.execute(
                                 """INSERT INTO prefab_companies
                                    (id, nombre, cif, email, telefono, password_hash,
-                                    plan, comision_pct, active)
-                                   VALUES (?,?,?,?,?,?,?,?,0)""",
+                                    plan, comision_pct, active, status)
+                                   VALUES (?,?,?,?,?,?,?,?,1,'autorizado')""",
                                 (_new_id, _rn, _rcif or None, _re, _rt or None,
                                  _hash_pw(_rpw), _rplan, _comision_reg)
                             )
@@ -250,15 +250,25 @@ def _render_login_register():
                                     _conn_reg.commit()
                             except Exception:
                                 pass
-                            st.success(
-                                "✅ Solicitud enviada. El equipo de ArchiRapid revisará tu cuenta "
-                                "y te avisará por email en menos de 24h."
-                            )
                             try:
                                 from modules.marketplace.email_notify import _send
-                                _send(f"🏠 Nueva empresa prefabricada solicita acceso:\n{_rn} ({_re})\nPlan: {_rplan} · Comisión: {_comision_reg}%")
+                                _send(f"🏠 Nueva empresa prefabricada registrada:\n{_rn} ({_re})\nPlan: {_rplan} · Comisión: {_comision_reg}%")
                             except Exception:
                                 pass
+                            # Acceso inmediato + redirigir a Stripe checkout
+                            st.success("✅ Empresa registrada. Redirigiendo al pago del plan...")
+                            import time
+                            time.sleep(1)
+                            _nueva_empresa = _get_company(_re)
+                            if _nueva_empresa:
+                                st.session_state["prefab_company"] = _nueva_empresa
+                                _checkout_plan(_rplan, _nueva_empresa)
+                            else:
+                                st.info(
+                                    "Registro completado. Accede con tus credenciales "
+                                    "para activar tu plan."
+                                )
+                            st.stop()
                         except Exception as _ex:
                             st.error(f"Error en registro: {_ex}")
                         finally:

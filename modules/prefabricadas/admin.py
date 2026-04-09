@@ -4,9 +4,23 @@ import streamlit as st
 from modules.marketplace.utils import db_conn
 
 _PLANES = {
-    "normal":    {"label": "Normal",    "precio": 49,  "emoji": "📋"},
-    "destacado": {"label": "Destacado", "precio": 149, "emoji": "⭐"},
+    "starter":     {"label": "Starter",     "precio": 59,  "emoji": "🏠"},
+    "profesional": {"label": "Profesional", "precio": 129, "emoji": "⭐"},
+    "premium":     {"label": "Premium",     "precio": 229, "emoji": "🏆"},
+    "destacado":   {"label": "Destacado",   "precio": 49,  "emoji": "🌟"},
+    "cortesia":    {"label": "Cortesía",    "precio": 0,   "emoji": "🎁"},
+    # aliases
+    "normal":      {"label": "Starter",     "precio": 59,  "emoji": "🏠"},
 }
+
+_PLAN_FORMAT = lambda x: {
+    "starter":     "🏠 Starter — 59€/mes",
+    "profesional": "⭐ Profesional — 129€/mes",
+    "premium":     "🏆 Premium — 229€/mes",
+    "destacado":   "🌟 Destacado — 49€/mes add-on",
+    "cortesia":    "🎁 Cortesía (gratuito)",
+    "normal":      "🏠 Starter — 59€/mes",
+}.get(x, x)
 
 
 def _ensure_table():
@@ -61,14 +75,19 @@ def render_admin_prefabricadas():
     # ── KPIs ──────────────────────────────────────────────────────────────────
     _n_total    = len(companies)
     _n_activas  = sum(1 for c in companies if c[7])
+    _n_premium  = sum(1 for c in companies if c[5] in ("premium", "profesional") and c[7])
     _n_dest     = sum(1 for c in companies if c[5] == "destacado" and c[7])
-    _n_normal   = sum(1 for c in companies if c[5] == "normal" and c[7])
-    _mrr        = _n_dest * 149 + _n_normal * 49
+    _mrr        = (
+        sum(59  for c in companies if c[5] in ("starter", "normal") and c[7]) +
+        sum(129 for c in companies if c[5] == "profesional" and c[7]) +
+        sum(229 for c in companies if c[5] == "premium" and c[7]) +
+        sum(49  for c in companies if c[5] == "destacado" and c[7])
+    )
 
     _k1, _k2, _k3, _k4 = st.columns(4)
     _k1.metric("🏭 Empresas registradas", _n_total)
     _k2.metric("✅ Activas", _n_activas)
-    _k3.metric("⭐ Plan Destacado", _n_dest, delta=f"€{_n_dest*149}/mes")
+    _k3.metric("🏆 Premium/Pro", _n_premium, delta=f"+{_n_dest} destacadas")
     _k4.metric("💶 MRR estimado", f"€{_mrr}/mes")
 
     st.markdown("---")
@@ -81,7 +100,7 @@ def render_admin_prefabricadas():
     for row in companies:
         comp = dict(zip(cols_c, row))
         _icon = "🟢" if comp["active"] else "🔴"
-        _plan_info = _PLANES.get(comp["plan"] or "normal", _PLANES["normal"])
+        _plan_info = _PLANES.get(comp["plan"] or "starter", _PLANES["starter"])
         with st.expander(
             f"{_icon} {_plan_info['emoji']} {comp['nombre']} — {comp['email']} | {_plan_info['label']} €{_plan_info['precio']}/mes"
         ):
@@ -103,10 +122,14 @@ def render_admin_prefabricadas():
 
             with _ci2:
                 st.markdown("**Plan y validez**")
+                _plan_opts = ["starter", "profesional", "premium", "destacado", "cortesia"]
+                _plan_actual = comp["plan"] or "starter"
+                if _plan_actual not in _plan_opts:
+                    _plan_actual = "starter"
                 _new_plan = st.selectbox(
-                    "Plan", list(_PLANES.keys()),
-                    index=list(_PLANES.keys()).index(comp["plan"] or "normal"),
-                    format_func=lambda p: f"{_PLANES[p]['emoji']} {_PLANES[p]['label']} — €{_PLANES[p]['precio']}/mes",
+                    "Plan", _plan_opts,
+                    index=_plan_opts.index(_plan_actual),
+                    format_func=_PLAN_FORMAT,
                     key=f"pref_plan_{comp['id']}"
                 )
                 _new_until = st.text_input(
@@ -160,6 +183,39 @@ def render_admin_prefabricadas():
                         _sc.commit(); _sc.close()
                         st.error("Anulada")
                         st.rerun()
+
+                st.markdown("---")
+                st.markdown("**🎁 Acceso de cortesía**")
+                _comp_id = comp["id"]
+                _meses_cortesia = st.selectbox(
+                    "Meses de cortesía",
+                    [1, 2, 3, 6, 12],
+                    key=f"cortesia_meses_{_comp_id}"
+                )
+                if st.button(
+                    f"🎁 Dar {_meses_cortesia} mes(es) cortesía",
+                    key=f"btn_cortesia_{_comp_id}",
+                    use_container_width=True
+                ):
+                    from datetime import datetime, timedelta
+                    _until = (
+                        datetime.utcnow() + timedelta(days=30 * _meses_cortesia)
+                    ).strftime("%Y-%m-%d")
+                    _cn = db_conn()
+                    _cn.execute("""
+                        UPDATE prefab_companies
+                        SET active=1, status='autorizado', is_active=1,
+                            plan='cortesia', paid_until=?,
+                            destacado_activo=0
+                        WHERE id=?
+                    """, (_until, _comp_id))
+                    _cn.commit()
+                    _cn.close()
+                    st.success(
+                        f"✅ Cortesía activada hasta {_until}. "
+                        "La empresa puede acceder y publicar modelos."
+                    )
+                    st.rerun()
 
                 st.markdown("---")
                 _ab1, _ab2, _ab3 = st.columns(3)

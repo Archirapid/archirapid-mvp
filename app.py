@@ -1022,8 +1022,26 @@ if st.query_params.get("page") == "prefabricadas" and st.query_params.get("pago"
                 (_pref_plan, _until_pref, _pref_comp["id"])
             )
             _cp_conn.commit(); _cp_conn.close()
-            # Actualizar sesión
-            st.session_state["prefab_company"] = {**_pref_comp, "plan": _pref_plan, "paid_until": _until_pref}
+            # Activar destacado si el plan pagado es "destacado"
+            if _pref_plan == "destacado":
+                from datetime import datetime as _dt_dest, timedelta as _td_dest
+                _dest_until = (_dt_dest.utcnow() + _td_dest(days=30)).strftime("%Y-%m-%d")
+                _cp_conn2 = _dc_pref()
+                _cp_conn2.execute(
+                    "UPDATE prefab_companies "
+                    "SET destacado_activo=1, destacado_hasta=? "
+                    "WHERE id=?",
+                    (_dest_until, _pref_comp["id"])
+                )
+                _cp_conn2.commit()
+                _cp_conn2.close()
+                st.session_state["prefab_company"] = {
+                    **_pref_comp,
+                    "plan": _pref_plan, "paid_until": _until_pref,
+                    "destacado_activo": 1, "destacado_hasta": _dest_until
+                }
+            else:
+                st.session_state["prefab_company"] = {**_pref_comp, "plan": _pref_plan, "paid_until": _until_pref}
             st.session_state[f"pref_plan_ok_{_pref_comp['id']}_{_pref_plan}"] = True
             st.toast(f"✅ Plan {_pref_plan} activado hasta {_until_pref}", icon="✅")
         except Exception:
@@ -1906,6 +1924,40 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
     st.markdown("---")
     st.markdown("#### 🏠 Adquiere tu Finca y Ponle una Casa Prefabricada")
     st.caption("Modelos entregables desde 45 m² · Madera · Acero modular · Hormigón prefab · Mixto")
+    try:
+        _cn_dest = db_conn()
+        _cur_dest = _cn_dest.cursor()
+        _cur_dest.execute("""
+            SELECT pc.id, pc.nombre, pc.email, pc.plan, pc.destacado_hasta
+            FROM prefab_companies pc
+            WHERE pc.destacado_activo = 1
+              AND pc.active = 1
+              AND (pc.destacado_hasta IS NULL OR pc.destacado_hasta >= date('now'))
+            ORDER BY pc.created_at DESC
+            LIMIT 5
+        """)
+        _dest_companies = _cur_dest.fetchall()
+        _cn_dest.close()
+
+        if _dest_companies:
+            st.markdown("#### 🌟 Empresas Prefabricadas Destacadas")
+            _d_cols = st.columns(min(len(_dest_companies), 5))
+            for _di, _dc in enumerate(_dest_companies):
+                with _d_cols[_di % 5]:
+                    st.markdown(f"**⭐ {_dc[1]}**\n\n🏆 Empresa Destacada")
+                    if st.button("Ver catálogo", key=f"dest_prefab_{_dc[0]}"):
+                        st.query_params["selected_prefab_company"] = _dc[0]
+                        st.rerun()
+            if len(_dest_companies) > 5:
+                _dest_idx_key = "_prefab_dest_idx"
+                if st.button("→ Ver más destacadas", key="next_dest_prefab"):
+                    st.session_state[_dest_idx_key] = (
+                        st.session_state.get(_dest_idx_key, 0) + 1
+                    ) % len(_dest_companies)
+                    st.rerun()
+            st.markdown("#### Todas las empresas prefabricadas")
+    except Exception:
+        pass  # Silencioso — no romper home
     try:
         from src import db as _db
         _conn = _db.get_conn()
