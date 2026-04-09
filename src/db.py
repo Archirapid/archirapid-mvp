@@ -887,6 +887,7 @@ _PG_ALTER_MIGRATIONS = [
     "ALTER TABLE plots ADD COLUMN IF NOT EXISTS is_active INTEGER DEFAULT 1",
     "ALTER TABLE plots ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'published'",
     "ALTER TABLE plots ADD COLUMN IF NOT EXISTS comision_pct INTEGER DEFAULT 6",
+    "ALTER TABLE prefab_catalog ADD COLUMN IF NOT EXISTS prefab_company_id TEXT DEFAULT NULL",
 ]
 
 
@@ -1518,6 +1519,13 @@ def ensure_tables():
                 c.execute(f"ALTER TABLE prefab_catalog ADD COLUMN {_col} {_typedef}")
             except Exception:
                 pass  # columna ya existe
+        try:
+            c.execute(
+                "ALTER TABLE prefab_catalog "
+                "ADD COLUMN prefab_company_id TEXT DEFAULT NULL"
+            )
+        except Exception:
+            pass  # columna ya existe
 
         # Seed: insertar modelos de muestra solo si la tabla está vacía
         c.execute("SELECT COUNT(*) FROM prefab_catalog")
