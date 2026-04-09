@@ -341,6 +341,7 @@ def main():
 | ID | `{p['id'][:16]}…` |
 | Superficie | {p.get('surface_m2', '—')} m² |
 | Precio | €{p.get('price', 0):,.0f} |
+| Comisión acordada | {p.get('comision_pct') or 6}% |
 | Estado | **{p.get('status','—')}** |
 | Dirección | {p.get('address') or '—'} |
 | Ref. catastral | `{p.get('catastral_ref') or '—'}` |

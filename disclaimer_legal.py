@@ -316,3 +316,148 @@ def _subir_pdf_supabase(pdf_bytes: bytes, nombre_archivo: str) -> str | None:
     except Exception as _e:
         print(f"[disclaimer] Supabase Storage upload error: {_e}")
     return None
+
+
+CONTRATO_COMISION_TEXTO = """
+CONTRATO DE ENCARGO DE INTERMEDIACIÓN INMOBILIARIA
+ArchiRapid S.L. — archirapid.com
+
+Entre ArchiRapid S.L., en adelante LA PLATAFORMA, y el propietario
+identificado con los datos de registro, en adelante EL PROPIETARIO,
+
+ACUERDAN:
+
+1. OBJETO: EL PROPIETARIO encarga a LA PLATAFORMA la intermediación
+   en la búsqueda de comprador para el inmueble denominado
+   [TITULO_FINCA], con precio de salida de [PRECIO]€.
+
+2. COMISIÓN: En caso de formalizarse la compraventa, EL PROPIETARIO
+   abonará a LA PLATAFORMA una comisión de intermediación del
+   [COMISION_PCT]% sobre el precio de venta final, equivalente
+   a [COMISION_EUROS]€ estimados al precio de salida indicado.
+
+3. EXCLUSIVIDAD: El presente encargo no tiene carácter de exclusiva
+   salvo pacto expreso por escrito entre las partes.
+
+4. DURACIÓN: El presente contrato tendrá una duración de 12 meses
+   desde la fecha de firma, prorrogable por acuerdo mutuo.
+
+5. OBLIGACIONES DE LA PLATAFORMA: ArchiRapid se compromete a
+   publicar el inmueble en su plataforma digital, realizar acciones
+   de difusión y gestionar las consultas de potenciales compradores.
+
+6. OBLIGACIONES DEL PROPIETARIO: Facilitar documentación veraz del
+   inmueble y comunicar a ArchiRapid cualquier operación que pudiera
+   realizarse durante la vigencia del contrato.
+
+7. LEGISLACIÓN APLICABLE: El presente contrato se rige por la
+   legislación española vigente, en particular la Ley de Ordenación
+   del Comercio Minorista y la normativa autonómica aplicable en
+   materia de intermediación inmobiliaria.
+
+Fecha y hora de firma: [TIMESTAMP_UTC]
+Identificador único del contrato: [HASH_SHA256]
+Referencia de finca: [PLOT_ID]
+Versión del documento: v1.0-2026
+"""
+
+
+def generar_contrato_comision(
+    email: str,
+    nombre: str,
+    titulo_finca: str,
+    precio: float,
+    comision_pct: int,
+    plot_id: str
+) -> tuple:
+    """
+    Genera PDF del contrato de encargo de intermediación con SHA-256.
+    Guarda en Supabase Storage. Registra en disclaimers_aceptados.
+    Devuelve (hash_sha256, pdf_url).
+    """
+    ts = datetime.datetime.utcnow().isoformat() + "Z"
+    comision_euros = precio * comision_pct / 100
+
+    texto = (
+        CONTRATO_COMISION_TEXTO
+        .replace("[TITULO_FINCA]", titulo_finca)
+        .replace("[PRECIO]", f"{precio:,.0f}")
+        .replace("[COMISION_PCT]", str(comision_pct))
+        .replace("[COMISION_EUROS]", f"{comision_euros:,.0f}")
+        .replace("[TIMESTAMP_UTC]", ts)
+        .replace("[PLOT_ID]", plot_id)
+    )
+
+    contenido_hash = f"{texto}{email}{ts}"
+    hash_val = hashlib.sha256(contenido_hash.encode("utf-8")).hexdigest()
+    texto_final = texto.replace("[HASH_SHA256]", hash_val)
+
+    # Generar PDF con reportlab
+    pdf_bytes = b""
+    pdf_url = ""
+    try:
+        from reportlab.lib.pagesizes import A4
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import cm
+
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(
+            buffer, pagesize=A4,
+            leftMargin=2*cm, rightMargin=2*cm,
+            topMargin=2*cm, bottomMargin=2*cm
+        )
+        styles = getSampleStyleSheet()
+        bold = ParagraphStyle("bold", parent=styles["Normal"], fontName="Helvetica-Bold")
+        small = ParagraphStyle("small", parent=styles["Normal"], fontSize=8)
+
+        story = []
+        story.append(Paragraph("ARCHIRAPID — CONTRATO DE ENCARGO DE INTERMEDIACIÓN", bold))
+        story.append(Spacer(1, 0.3*cm))
+        story.append(Paragraph(f"Hash SHA-256: {hash_val}", small))
+        story.append(Paragraph(f"Fecha UTC: {ts}", small))
+        story.append(Paragraph(f"Propietario: {nombre} ({email})", small))
+        story.append(Spacer(1, 0.5*cm))
+
+        for linea in texto_final.split("\n"):
+            linea = linea.strip()
+            if not linea:
+                story.append(Spacer(1, 0.2*cm))
+            elif linea.isupper() and len(linea) > 5:
+                story.append(Paragraph(linea, bold))
+            else:
+                story.append(Paragraph(linea, styles["Normal"]))
+
+        doc.build(story)
+        pdf_bytes = buffer.getvalue()
+
+        # Subir a Supabase Storage
+        nombre_archivo = (
+            f"contratos_comision/"
+            f"{email.replace('@', '_')}_"
+            f"{hash_val[:12]}_{ts[:10]}.pdf"
+        )
+        pdf_url = _subir_pdf_supabase(pdf_bytes, nombre_archivo) or ""
+    except Exception:
+        pass
+
+    # Registrar en BD
+    try:
+        from modules.marketplace.utils import db_conn
+        conn = db_conn()
+        conn.execute("""
+            INSERT INTO disclaimers_aceptados
+            (user_id, email, nombre_completo, tipo_disclaimer,
+             timestamp_utc, hash_sha256, pdf_url, version_texto)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            plot_id, email, nombre,
+            f"contrato_comision_{comision_pct}pct",
+            ts, hash_val, pdf_url, "v1.0-2026"
+        ))
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+
+    return hash_val, pdf_url

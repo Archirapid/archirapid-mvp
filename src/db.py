@@ -886,6 +886,7 @@ _PG_ALTER_MIGRATIONS = [
     # plots — is_active estaba solo en SQLite, añadir también en PG
     "ALTER TABLE plots ADD COLUMN IF NOT EXISTS is_active INTEGER DEFAULT 1",
     "ALTER TABLE plots ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'published'",
+    "ALTER TABLE plots ADD COLUMN IF NOT EXISTS comision_pct INTEGER DEFAULT 6",
 ]
 
 
@@ -1061,6 +1062,10 @@ def ensure_tables():
             pass  # ya existe
         try:
             c.execute("ALTER TABLE plots ADD COLUMN is_active INTEGER DEFAULT 1")
+        except Exception:
+            pass  # Columna ya existe
+        try:
+            c.execute("ALTER TABLE plots ADD COLUMN comision_pct INTEGER DEFAULT 6")
         except Exception:
             pass  # Columna ya existe
         c.execute("""CREATE TABLE IF NOT EXISTS projects (

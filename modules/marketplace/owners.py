@@ -147,7 +147,15 @@ def main():
             st.stop()
 
     # Aviso de comisión
-    st.info("📢 ARCHIRAPID gestiona la venta y el desarrollo de tu finca. Por el uso de la plataforma y la gestión comercial, se aplicará una comisión del 7% al 10% sobre el precio de venta final.")
+    st.info(
+        "📋 **Condiciones de intermediación:** ArchiRapid actúa como "
+        "intermediario en la comercialización de su inmueble. En caso de "
+        "formalizarse una operación de compraventa, se aplicará una comisión "
+        "de intermediación cuyo porcentaje será establecido por el propietario "
+        "en el momento del registro de la finca, dentro del rango permitido "
+        "por la plataforma. Dicha comisión quedará recogida en el documento "
+        "de encargo de intermediación firmado digitalmente."
+    )
 
     # --- 1. LOGIN / IDENTIFICACIÓN ---
     if not (st.session_state.get('logged_in') and st.session_state.get('role') == 'owner'):
@@ -264,7 +272,6 @@ def main():
         
         with col2:
             price = st.number_input("Precio de Venta deseado (€)", min_value=1000.0, step=500.0)
-            st.caption(f"ℹ️ Nuestra comisión: 7% - 10%.")
             services = st.multiselect("Servicios Disponibles", ["Agua", "Luz", "Alcantarillado", "Gas", "Fibra Óptica"])
             
             # AI Description Generator
@@ -457,6 +464,30 @@ def main():
         
         uploaded_photos = st.file_uploader("Fotos del terreno", accept_multiple_files=True, type=['jpg','png'])
 
+        st.markdown("---")
+        st.markdown("**📊 Comisión de intermediación**")
+        comision_pct = st.slider(
+            "Seleccione el porcentaje de comisión aplicable a la venta (obligatorio)",
+            min_value=4,
+            max_value=10,
+            value=6,
+            step=1,
+            format="%d%%",
+            key="slider_comision_pct",
+            help="Este porcentaje se aplicará sobre el precio de venta final "
+                 "y quedará recogido en el contrato de encargo de intermediación."
+        )
+        if price and price > 0:
+            comision_euros = price * comision_pct / 100
+            st.caption(
+                f"💶 Comisión estimada: **{comision_euros:,.0f}€** "
+                f"({comision_pct}% sobre {price:,.0f}€)"
+            )
+        st.caption(
+            "⚠️ La selección del porcentaje de comisión es obligatoria "
+            "para publicar la finca."
+        )
+
         submitted_finca = st.button("📢 PUBLICAR FINCA", type="primary")
 
         if submitted_finca:
@@ -550,7 +581,8 @@ def main():
                         photo_paths.append(save_upload(p, prefix="finca"))
                 
                 # Generar ID y Comision
-                commission_val = price * 0.07 # 7% base
+                comision_pct_final = st.session_state.get("slider_comision_pct", 6)
+                commission_val = price * comision_pct_final / 100
                 
                 # Convertir photo_paths a JSON string
                 import json as json_module
@@ -583,6 +615,7 @@ def main():
                     "propietario_nombre": st.session_state.get("owner_name"),
                     "propietario_email": st.session_state.get("owner_email"),
                     "photo_paths": photo_paths,
+                    "comision_pct": comision_pct_final,
                 }
                 # 2. Crear instancia FincaMVP
                 finca = FincaMVP.desde_dict(finca_dict)
@@ -601,8 +634,36 @@ def main():
                         pass  # Fallback al valor manual introducido por el usuario
                 # 5. Guardar en BD
                 db.insert_plot(finca.a_dict())
+                # Generar contrato de encargo de intermediación con SHA-256
+                try:
+                    from disclaimer_legal import generar_contrato_comision
+                    _owner_email = st.session_state.get("user_email", "")
+                    _owner_name = st.session_state.get("user_name", _owner_email)
+                    _plot_title = title or "Finca sin título"
+                    _hash_contrato, _pdf_url_contrato = generar_contrato_comision(
+                        email=_owner_email,
+                        nombre=_owner_name,
+                        titulo_finca=_plot_title,
+                        precio=price,
+                        comision_pct=comision_pct_final,
+                        plot_id=str(finca.id) if hasattr(finca, 'id') else ""
+                    )
+                except Exception:
+                    _hash_contrato, _pdf_url_contrato = "", ""
                 # 6. Feedback y recarga
-                st.success(f"✅ Finca Publicada. Precio: {price}€ (Comisión est.: {commission_val}€). Disponible en mapa y gestión.")
+                st.success(
+                    f"✅ Finca publicada correctamente. "
+                    f"Precio: {price:,.0f}€ · Comisión acordada: {comision_pct_final}% "
+                    f"({commission_val:,.0f}€ estimados)"
+                )
+                if _hash_contrato:
+                    st.info(
+                        f"📄 Contrato de encargo de intermediación generado y firmado "
+                        f"digitalmente. Referencia SHA-256: {_hash_contrato[:20]}... "
+                        f"Disponible en su portal bajo 'Mis Fincas'."
+                    )
+                if _pdf_url_contrato:
+                    st.markdown(f"[📥 Descargar contrato]({_pdf_url_contrato})")
                 st.session_state['selected_page'] = "🏠 Propietarios"
                 sleep(1.5)
                 st.rerun()
