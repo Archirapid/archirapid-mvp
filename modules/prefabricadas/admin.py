@@ -64,13 +64,15 @@ def render_admin_prefabricadas():
     conn = db_conn()
     try:
         companies = conn.execute("""
-            SELECT id, nombre, cif, email, telefono, plan, paid_until, active, created_at
+            SELECT id, nombre, cif, email, telefono, plan, paid_until, active, created_at,
+                   comision_pct, hash_contrato_comision, pdf_contrato_url
             FROM prefab_companies ORDER BY active DESC, created_at DESC
         """).fetchall()
     finally:
         conn.close()
 
-    cols_c = ["id","nombre","cif","email","telefono","plan","paid_until","active","created_at"]
+    cols_c = ["id","nombre","cif","email","telefono","plan","paid_until","active","created_at",
+              "comision_pct","hash_contrato_comision","pdf_contrato_url"]
 
     # ── KPIs ──────────────────────────────────────────────────────────────────
     _n_total    = len(companies)
@@ -119,6 +121,28 @@ def render_admin_prefabricadas():
 | Registro | {(comp['created_at'] or '')[:10]} |
 """)
                 st.markdown(f"[✉️ Contactar](mailto:{comp['email']})")
+
+                # Contrato de intermediación
+                _hash_c = comp.get("hash_contrato_comision", "")
+                _pdf_c = comp.get("pdf_contrato_url", "")
+                _comision = comp.get("comision_pct") or 4.0
+                st.markdown("---")
+                st.markdown("**📄 Contrato de intermediación**")
+                col_c1, col_c2 = st.columns(2)
+                with col_c1:
+                    st.metric("Comisión acordada", f"{_comision}%")
+                with col_c2:
+                    if _hash_c:
+                        st.caption(f"SHA-256: {_hash_c[:20]}...")
+                    else:
+                        st.caption("Sin contrato generado")
+                if _pdf_c:
+                    st.markdown(f"[📥 Descargar contrato firmado]({_pdf_c})")
+                else:
+                    st.info(
+                        "El contrato se genera automáticamente "
+                        "cuando la empresa completa el registro."
+                    )
 
             with _ci2:
                 st.markdown("**Plan y validez**")
@@ -267,6 +291,29 @@ def _render_catalog_items():
     st.markdown("### 🏘️ Catálogo de modelos prefabricados")
     st.caption("Gestiona la disponibilidad de cada modelo en el marketplace.")
 
+    # Filtro por empresa
+    _cn_f = db_conn()
+    try:
+        _empresas = _cn_f.execute("""
+            SELECT id, nombre, email
+            FROM prefab_companies
+            WHERE active = 1
+            ORDER BY nombre
+        """).fetchall()
+    finally:
+        _cn_f.close()
+
+    _empresa_opts = {"Todas las empresas": None}
+    for _emp in _empresas:
+        _empresa_opts[f"{_emp[1]} ({_emp[2]})"] = _emp[0]
+
+    _filtro_emp = st.selectbox(
+        "Filtrar por empresa",
+        options=list(_empresa_opts.keys()),
+        key="admin_prefab_filtro_empresa"
+    )
+    _filtro_id = _empresa_opts[_filtro_emp]
+
     conn = db_conn()
     try:
         # Asegurar columna status en prefab_catalog (migración idempotente)
@@ -275,13 +322,31 @@ def _render_catalog_items():
             conn.commit()
         except Exception:
             pass
+        try:
+            conn.execute("ALTER TABLE prefab_catalog ADD COLUMN prefab_company_id TEXT")
+            conn.commit()
+        except Exception:
+            pass
 
-        items = conn.execute("""
-            SELECT id, name, m2, rooms, bathrooms, floors, material, price,
-                   active, image_path, modulos, price_label,
-                   COALESCE(status, CASE WHEN active=1 THEN 'disponible' ELSE 'suspendido' END) as status
-            FROM prefab_catalog ORDER BY m2
-        """).fetchall()
+        if _filtro_id:
+            items = conn.execute("""
+                SELECT id, name, m2, rooms, bathrooms, floors, material, price,
+                       active, image_path, modulos, price_label,
+                       COALESCE(status, CASE WHEN active=1 THEN 'disponible' ELSE 'suspendido' END) as status,
+                       prefab_company_id
+                FROM prefab_catalog
+                WHERE prefab_company_id = ?
+                ORDER BY name
+            """, (_filtro_id,)).fetchall()
+        else:
+            items = conn.execute("""
+                SELECT id, name, m2, rooms, bathrooms, floors, material, price,
+                       active, image_path, modulos, price_label,
+                       COALESCE(status, CASE WHEN active=1 THEN 'disponible' ELSE 'suspendido' END) as status,
+                       prefab_company_id
+                FROM prefab_catalog
+                ORDER BY name
+            """).fetchall()
     finally:
         conn.close()
 
@@ -300,13 +365,29 @@ def _render_catalog_items():
 
     for itm in items:
         (iid, iname, im2, irooms, ibaths, ifloors, imaterial, iprice,
-         iactive, iimg, imodulos, iprice_lbl, istatus) = itm
+         iactive, iimg, imodulos, iprice_lbl, istatus, _item_company_id) = itm
 
         _sicon = _ITEM_STATUS_ICON.get(istatus or "disponible", "⚪")
         _price_disp = iprice_lbl if iprice_lbl else f"€{iprice:,.0f}"
 
+        # Nombre de empresa para el header
+        _empresa_nombre = ""
+        if _item_company_id:
+            try:
+                _cn_en = db_conn()
+                try:
+                    _row_en = _cn_en.execute(
+                        "SELECT nombre FROM prefab_companies WHERE id=?",
+                        (_item_company_id,)
+                    ).fetchone()
+                finally:
+                    _cn_en.close()
+                _empresa_nombre = f" · {_row_en[0]}" if _row_en else ""
+            except Exception:
+                pass
+
         with st.expander(
-            f"{_sicon} {iname} — {im2} m² · {imaterial} · {_price_disp} | Estado: {istatus or 'disponible'}"
+            f"{_sicon} {iname}{_empresa_nombre} — {im2} m² · {imaterial} · {_price_disp} | Estado: {istatus or 'disponible'}"
         ):
             _ic1, _ic2 = st.columns([3, 2])
             with _ic1:

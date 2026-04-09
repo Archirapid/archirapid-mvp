@@ -119,6 +119,17 @@ def _get_company(email: str):
 def main():
     _ensure_table()
 
+    # Recuperar sesión si viene de retorno Stripe con ?email=
+    if (
+        not st.session_state.get("prefab_company")
+        and st.query_params.get("pago") == "ok"
+    ):
+        _email_ret = st.query_params.get("email", "")
+        if _email_ret:
+            _comp_ret = _get_company(_email_ret)
+            if _comp_ret:
+                st.session_state["prefab_company"] = _comp_ret
+
     _company = st.session_state.get("prefab_company")
 
     if _company:
@@ -308,23 +319,93 @@ def _render_dashboard(company: dict):
 
     with tab_catalogo:
         st.subheader("Modelos en el catálogo")
+        _company_id = st.session_state.get("prefab_company", {}).get("id", "")
         _conn_cat = db_conn()
         try:
-            _models = _conn_cat.execute(
-                "SELECT id, name, m2, price, price_label, active, material FROM prefab_catalog ORDER BY m2"
-            ).fetchall()
+            _models = _conn_cat.execute("""
+                SELECT id, name, m2, price, price_label,
+                       active, material, status, image_paths,
+                       prefab_company_id
+                FROM prefab_catalog
+                WHERE prefab_company_id = ?
+                ORDER BY m2
+            """, (_company_id,)).fetchall()
         finally:
             _conn_cat.close()
 
         if not _models:
-            st.info("No hay modelos en el catálogo aún. El equipo de ArchiRapid los añadirá por ti.")
+            st.info("No hay modelos en el catálogo aún. Usa el formulario de abajo para añadir el primero.")
         else:
             for _m in _models:
-                _mid, _mname, _mm2, _mprice, _mplabel, _mactive, _mmat = _m
+                _mid, _mname, _mm2, _mprice, _mplabel, _mactive, _mmat, _mst, _mimgs, _mcid = _m
                 _mstatus = "✅ Visible" if _mactive else "🔴 Oculto"
-                st.markdown(f"- **{_mname}** — {_mm2} m² · {_mmat} · {_mplabel or f'€{_mprice:,.0f}'} · {_mstatus}")
+                _mst_label = f" · pendiente revisión" if _mst == "pendiente" else ""
+                st.markdown(f"- **{_mname}** — {_mm2} m² · {_mmat} · {_mplabel or f'€{_mprice:,.0f}'} · {_mstatus}{_mst_label}")
 
-        st.info("Para modificar modelos, añadir fotos o cambiar precios contacta con soporte@archirapid.com")
+        st.markdown("---")
+        st.markdown("### ➕ Añadir nuevo modelo")
+        with st.form("form_nuevo_modelo"):
+            _nm_nombre = st.text_input("Nombre del modelo *")
+            _col1, _col2 = st.columns(2)
+            with _col1:
+                _nm_m2 = st.number_input("Superficie (m²) *", min_value=20.0, step=5.0)
+                _nm_hab = st.number_input("Habitaciones", min_value=1, step=1)
+                _nm_ban = st.number_input("Baños", min_value=1, step=1)
+            with _col2:
+                _nm_mat = st.selectbox(
+                    "Material",
+                    ["Madera", "Hormigón", "Acero modular", "Modular acero",
+                     "Mixto", "Contenedor", "PVC", "Otro"]
+                )
+                _nm_precio = st.number_input("Precio (€, 0 = Consultar)", min_value=0.0, step=1000.0)
+                _nm_plantas = st.number_input("Plantas", min_value=1, step=1)
+            _nm_desc = st.text_area("Descripción", max_chars=500)
+            _nm_img = st.file_uploader("Imagen principal", type=["jpg", "jpeg", "png"])
+            _nm_submit = st.form_submit_button("📤 Enviar modelo para revisión")
+
+            if _nm_submit:
+                if not _nm_nombre:
+                    st.error("El nombre es obligatorio.")
+                else:
+                    _cid_new = st.session_state.get("prefab_company", {}).get("id", "")
+                    _img_url = ""
+                    if _nm_img:
+                        try:
+                            from modules.marketplace.utils import save_upload
+                            _img_url = save_upload(_nm_img, prefix="prefab_modelo")
+                        except Exception:
+                            pass
+                    _precio_label = (
+                        f"{_nm_precio:,.0f}€" if _nm_precio > 0 else "Consultar"
+                    )
+                    try:
+                        _cn_ins = db_conn()
+                        try:
+                            _cn_ins.execute("""
+                                INSERT INTO prefab_catalog
+                                (id, name, m2, rooms, bathrooms,
+                                 floors, material, price,
+                                 description, image_path,
+                                 price_label, active, status,
+                                 prefab_company_id)
+                                VALUES (?,?,?,?,?,?,?,?,?,?,?,0,'pendiente',?)
+                            """, (
+                                __import__('uuid').uuid4().hex,
+                                _nm_nombre, _nm_m2, int(_nm_hab),
+                                int(_nm_ban), int(_nm_plantas),
+                                _nm_mat, _nm_precio, _nm_desc,
+                                _img_url, _precio_label, _cid_new
+                            ))
+                            _cn_ins.commit()
+                        finally:
+                            _cn_ins.close()
+                        st.success(
+                            "✅ Modelo enviado para revisión. "
+                            "El equipo de ArchiRapid lo revisará en 24-48h."
+                        )
+                        st.rerun()
+                    except Exception as _e:
+                        st.error(f"Error guardando modelo: {_e}")
 
     with tab_plan:
         st.subheader("Cambiar o renovar plan")
@@ -416,7 +497,7 @@ def _checkout_plan(plan: str, company: dict):
                 "quantity": 1,
             }],
             metadata={"prefab_company_id": company["id"], "plan": plan},
-            success_url=f"{_base}/?page=prefabricadas&pago=ok&plan={plan}",
+            success_url=f"{_base}/?page=prefabricadas&pago=ok&plan={plan}&email={company['email']}",
             cancel_url=f"{_base}/?page=prefabricadas",
         )
         st.markdown(f'<meta http-equiv="refresh" content="0; url={session.url}">', unsafe_allow_html=True)

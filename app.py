@@ -1011,6 +1011,17 @@ if st.query_params.get("pago") == "ok" and not st.query_params.get("page"):
 if st.query_params.get("page") == "prefabricadas" and st.query_params.get("pago") == "ok":
     _pref_plan = st.query_params.get("plan", "normal")
     _pref_comp = st.session_state.get("prefab_company")
+    if not _pref_comp:
+        # Intentar recuperar por email en query_params (incluido en success_url)
+        _pref_email_ret = st.query_params.get("email", "")
+        if _pref_email_ret:
+            try:
+                from modules.prefabricadas.portal import _get_company
+                _pref_comp = _get_company(_pref_email_ret)
+                if _pref_comp:
+                    st.session_state["prefab_company"] = _pref_comp
+            except Exception:
+                pass
     if _pref_comp and not st.session_state.get(f"pref_plan_ok_{_pref_comp['id']}_{_pref_plan}"):
         try:
             from datetime import datetime as _dt_pref, timedelta as _td_pref
