@@ -305,6 +305,35 @@ def main():
                         # Llamar a la función de extracción de ai_engine
                         resultado = extraer_datos_nota_catastral(save_path)
 
+                        # BLOQUEO FINCAS RÚSTICAS — ArchiRapid solo opera con urbanas/industriales
+                        _clase_detectada = (resultado.get("clase") or "").upper()
+                        _es_rustica = (
+                            "RUST" in _clase_detectada or
+                            _clase_detectada == "RÚSTICO" or
+                            _clase_detectada == "RUSTICO"
+                        )
+
+                        if _es_rustica:
+                            st.error(
+                                "🚫 **Finca rústica detectada — No podemos operar con este tipo de finca**"
+                            )
+                            st.warning(
+                                "ArchiRapid trabaja exclusivamente con fincas **urbanas e industriales** "
+                                "sobre las que sea posible construir una vivienda, aplicar un proyecto "
+                                "arquitectónico o instalar una vivienda prefabricada.\n\n"
+                                "La nota catastral que has subido corresponde a una finca de clase "
+                                f"**{_clase_detectada or 'RÚSTICO'}**, que no cumple estos requisitos.\n\n"
+                                "Si dispones de una finca urbana o industrial, puedes volver "
+                                "en cualquier momento con tu nueva documentación. "
+                                "Tu cuenta permanecerá activa."
+                            )
+                            st.info(
+                                "💡 ¿Tienes dudas sobre el tipo de tu finca? "
+                                "Consulta la Sede Electrónica del Catastro en "
+                                "sedecatastro.gob.es o pregúntale a Lola, nuestra asistente."
+                            )
+                            st.stop()  # Único st.stop() permitido aquí — no dentro de except
+
                         # Verificar si hay error
                         if isinstance(resultado, dict) and "error" in resultado:
                             error_msg = resultado["error"]

@@ -205,6 +205,7 @@ def _parse_catastral_json(text: str) -> dict:
         "referencia_catastral": data.get("referencia_catastral"),
         "superficie_grafica_m2": data.get("superficie_grafica_m2"),
         "municipio": data.get("municipio"),
+        "clase": data.get("clase", ""),
     }
 
 
@@ -238,6 +239,22 @@ def _extraer_con_regex(text: str) -> dict:
     if m:
         result["municipio"] = m.group(1).strip()
 
+    # Detectar clase: RÚSTICO / URBANO / INDUSTRIAL
+    _clase_match = re.search(
+        r'Clase[:\s]*([A-ZÁÉÍÓÚÑ]+)',
+        text, re.IGNORECASE
+    )
+    clase = _clase_match.group(1).strip().upper() if _clase_match else ""
+    # Fallback: buscar la palabra directamente
+    if not clase:
+        if re.search(r'RÚSTICO|RUSTICO', text, re.IGNORECASE):
+            clase = "RÚSTICO"
+        elif re.search(r'URBANO', text, re.IGNORECASE):
+            clase = "URBANO"
+        elif re.search(r'INDUSTRIAL', text, re.IGNORECASE):
+            clase = "INDUSTRIAL"
+    result["clase"] = clase
+
     return result
 
 
@@ -259,7 +276,7 @@ def extraer_datos_nota_catastral(pdf_path: str) -> dict:
             raw_text += doc.load_page(i).get_text()
         doc.close()
     except Exception as e:
-        return {"error": f"No se pudo abrir el PDF: {e}"}
+        return {"error": f"No se pudo abrir el PDF: {e}", "clase": ""}
 
     is_text_pdf = len(raw_text.strip()) >= 100
 
@@ -282,8 +299,9 @@ def extraer_datos_nota_catastral(pdf_path: str) -> dict:
                 import requests as _req
                 prompt = (
                     "Extrae de este texto de nota catastral española: "
-                    "referencia_catastral, superficie_grafica_m2 (número entero), municipio. "
-                    'Devuelve SOLO JSON válido: {"referencia_catastral":"...","superficie_grafica_m2":123,"municipio":"..."}\n\n'
+                    "referencia_catastral, superficie_grafica_m2 (número entero), municipio, "
+                    "clase (exactamente 'URBANO', 'RÚSTICO' o 'INDUSTRIAL' según el campo 'Clase:' del documento). "
+                    'Devuelve SOLO JSON válido: {"referencia_catastral":"...","superficie_grafica_m2":123,"municipio":"...","clase":"URBANO"}\n\n'
                     f"TEXTO:\n{raw_text[:4000]}"
                 )
                 resp = _req.post(
@@ -303,19 +321,20 @@ def extraer_datos_nota_catastral(pdf_path: str) -> dict:
     try:
         api_key = _get_gemini_key()
         if not api_key:
-            return {"error": "No se encontró GEMINI_API_KEY ni GROQ_API_KEY"}
+            return {"error": "No se encontró GEMINI_API_KEY ni GROQ_API_KEY", "clase": ""}
         doc2 = fitz.open(pdf_path)
         pix = doc2.load_page(0).get_pixmap(matrix=fitz.Matrix(1.2, 1.2))
         img_bytes = pix.tobytes("png")
         doc2.close()
         prompt = (
-            "Extrae de esta nota catastral: referencia_catastral, superficie_grafica_m2, municipio. "
-            'Devuelve solo JSON: {"referencia_catastral":"codigo","superficie_grafica_m2":numero,"municipio":"ciudad"}'
+            "Extrae de esta nota catastral: referencia_catastral, superficie_grafica_m2, municipio, "
+            "clase (exactamente 'URBANO', 'RÚSTICO' o 'INDUSTRIAL' según el campo 'Clase:' del documento). "
+            'Devuelve solo JSON: {"referencia_catastral":"codigo","superficie_grafica_m2":numero,"municipio":"ciudad","clase":"URBANO"}'
         )
         text = _gemini_rest(api_key, prompt, img_bytes)
         return _parse_catastral_json(text)
     except Exception as e:
-        return {"error": f"Error al procesar la nota catastral: {str(e)}"}
+        return {"error": f"Error al procesar la nota catastral: {str(e)}", "clase": ""}
 
 def extraer_datos_catastral_completo(pdf_path: str) -> dict:
     """
