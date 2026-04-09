@@ -1320,7 +1320,7 @@ def render_portal_cliente_proyecto():
 # Lógica de navegación robusta
 
 def sync_navigation():
-    """Reset quirúrgico: si URL no tiene ?page= (o es home), limpiar sesión y fijar home.
+    """Reset quirúrgico: si URL no tiene ?page= (o es home), fijar home sin borrar sesión.
     Evita que basura de sesiones previas (como _nav_radio='👤 Panel de Cliente')
     haga que el sidebar radio sobreescriba selected_page tras un botón 'Volver'.
     """
@@ -1330,11 +1330,13 @@ def sync_navigation():
             "👤 Panel de Cliente", "🏢 Inmobiliarias MLS",
             "🏠 Propietarios", "Diseñador de Vivienda",
             "👤 Panel de Proveedor", "🏠 Portal Prefabricadas",
+            "🎓 Estudiantes", "📐 Portal de Arquitectos",
         }
         if st.session_state.get("_nav_radio") in _portal_pages:
-            st.session_state.clear()
+            # Resetear solo navegación — NO tocar login ni datos Stripe
             st.session_state["_nav_radio"] = "🏠 Inicio / Marketplace"
             st.session_state["selected_page"] = "🏠 Inicio / Marketplace"
+            st.session_state["_nav_programmatic"] = True
 
 sync_navigation()
 
@@ -1351,6 +1353,7 @@ def render_nav_header(titulo: str, back_slug: str = "home"):
     with _nc1:
         if st.button("⬅️ Volver", key=f"nav_back_{titulo[:12].replace(' ', '_')}",
                      use_container_width=True):
+            st.session_state["_nav_programmatic"] = True   # evitar sobreescritura del radio oculto
             st.query_params.clear()
             st.query_params["page"] = back_slug
             st.session_state.pop("current_page_sync", None)  # forzar redetección
@@ -1373,8 +1376,12 @@ selected_page = st.sidebar.radio(
     key="_nav_radio",
 )
 
-# Sincronizamos por si el usuario cambia el radio manualmente
-st.session_state['selected_page'] = selected_page
+# Solo sincronizar si el usuario cambió el radio manualmente
+# (el sidebar está oculto — no debe sobreescribir navegación programática)
+if st.session_state.get("_nav_programmatic"):
+    st.session_state.pop("_nav_programmatic", None)
+else:
+    st.session_state['selected_page'] = selected_page
 
 # ── Panic Button de Hard Reset (último en sidebar) ─────────────────────
 st.sidebar.divider()
@@ -1980,6 +1987,7 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
 elif st.session_state.get('selected_page') == "🏠 Propietarios":
     try:
         st.components.v1.html("<script>window.parent.document.querySelector('section.main').scrollTo(0,0);</script>", height=0)
+        render_nav_header("📍 Portal de Propietarios")
         with st.container():
             from modules.marketplace import owners
             owners.main()
@@ -2105,6 +2113,7 @@ elif st.session_state.get('selected_page') == "🏢 Inmobiliarias MLS":
             ".scrollTo(0,0);</script>",
             height=0
         )
+        render_nav_header("🏢 Portal Inmobiliarias MLS")
         with st.container():
             from modules.mls import mls_portal
             mls_portal.main()
@@ -2196,6 +2205,7 @@ elif st.session_state.get('selected_page') == "🎓 Estudiantes":
             "<script>window.parent.document.querySelector('section.main').scrollTo(0,0);</script>",
             height=0,
         )
+        render_nav_header("🎓 Portal de Estudiantes")
         with st.container():
             from estudiantes import mostrar_modulo_estudiantes
             mostrar_modulo_estudiantes()
