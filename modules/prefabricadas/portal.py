@@ -380,7 +380,6 @@ def _render_login_register():
                                         "Registro completado. Accede con tus credenciales "
                                         "para activar tu plan."
                                     )
-                            st.stop()
                         except (KeyboardInterrupt, SystemExit):
                             raise
                         except Exception as _ex:
