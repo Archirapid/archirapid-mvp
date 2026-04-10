@@ -127,6 +127,9 @@ if _qp_invite and not st.session_state.get(f"_invite_processed_{_qp_invite}"):
             st.session_state["selected_page"] = _SLUG_TO_PAGE_MASTER.get(
                 _inv_slug, "🏠 Inicio / Marketplace"
             )
+            st.session_state["_nav_radio"] = _SLUG_TO_PAGE_MASTER.get(
+                _inv_slug, "🏠 Inicio / Marketplace"
+            )
             st.query_params["page"] = _inv_slug
             try:
                 del st.query_params["invite"]
