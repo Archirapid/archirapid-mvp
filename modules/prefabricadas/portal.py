@@ -381,6 +381,8 @@ def _render_login_register():
                                         "para activar tu plan."
                                     )
                             st.stop()
+                        except (KeyboardInterrupt, SystemExit):
+                            raise
                         except Exception as _ex:
                             st.error(f"Error en registro: {_ex}")
                         finally:
