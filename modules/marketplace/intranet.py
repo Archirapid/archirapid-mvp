@@ -1590,6 +1590,16 @@ def main():
                                             _ca.close()
                                         st.cache_data.clear()
                                         st.success(f"✅ {_name5} aprobado.")
+                                        try:
+                                            from modules.marketplace.email_notify import notify_account_activated
+                                            notify_account_activated(
+                                                _email5, _name5,
+                                                "profesional/constructor",
+                                                "https://archirapid.streamlit.app/?page=proveedor",
+                                                "Tu perfil ya es visible para propietarios y arquitectos de tu zona."
+                                            )
+                                        except Exception:
+                                            pass
                                         st.rerun()
                                     except Exception as e:
                                         st.error(f"Error: {str(e)}")
@@ -3555,6 +3565,16 @@ def _admin_solicitudes_estudiantes():
                              type="primary" if estado == "aprobado" else "secondary",
                              width="stretch"):
                     _cambiar_estado_estudiante(id_, "aprobado")
+                    try:
+                        from modules.marketplace.email_notify import notify_account_activated
+                        notify_account_activated(
+                            email, nombre,
+                            "estudiante",
+                            "https://archirapid.streamlit.app/?page=estudiante",
+                            "Puedes acceder al portal, subir tu TFG y usar las herramientas de diseño IA."
+                        )
+                    except Exception:
+                        pass
                     st.rerun()
             with _ec2:
                 if st.button("⏳ Pendiente 🟡", key=f"est_pend_{id_}",

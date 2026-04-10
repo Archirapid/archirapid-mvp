@@ -190,6 +190,16 @@ def render_admin_prefabricadas():
                         _sa.execute("UPDATE prefab_companies SET status=?, is_active=1, active=1 WHERE id=?", ("autorizado", comp["id"]))
                         _sa.commit(); _sa.close()
                         st.success("Autorizada ✅")
+                        try:
+                            from modules.marketplace.email_notify import notify_account_activated
+                            notify_account_activated(
+                                comp["email"], comp["nombre"],
+                                "empresa prefabricada",
+                                "https://archirapid.streamlit.app/?page=prefabricadas",
+                                "Si subiste modelos al catálogo, serán visibles tras nuestra revisión (24-48h)."
+                            )
+                        except Exception:
+                            pass
                         st.rerun()
 
                 with _sb3:
@@ -239,6 +249,17 @@ def render_admin_prefabricadas():
                         f"✅ Cortesía activada hasta {_until}. "
                         "La empresa puede acceder y publicar modelos."
                     )
+                    try:
+                        from modules.marketplace.email_notify import notify_account_activated
+                        notify_account_activated(
+                            comp["email"], comp["nombre"],
+                            "empresa prefabricada (plan Cortesía)",
+                            "https://archirapid.streamlit.app/?page=prefabricadas",
+                            f"Tu acceso de cortesía está activo hasta <strong>{_until}</strong>. "
+                            "Puedes subir modelos al catálogo; serán publicados tras revisión."
+                        )
+                    except Exception:
+                        pass
                     st.rerun()
 
                 st.markdown("---")
@@ -259,6 +280,16 @@ def render_admin_prefabricadas():
                             _ud.execute("UPDATE prefab_companies SET active=1 WHERE id=?", (comp["id"],))
                             _ud.commit(); _ud.close()
                             st.success("Activada ✅")
+                            try:
+                                from modules.marketplace.email_notify import notify_account_activated
+                                notify_account_activated(
+                                    comp["email"], comp["nombre"],
+                                    "empresa prefabricada",
+                                    "https://archirapid.streamlit.app/?page=prefabricadas",
+                                    "Si subiste modelos al catálogo, serán visibles tras nuestra revisión."
+                                )
+                            except Exception:
+                                pass
                             st.rerun()
                 with _ab2:
                     if st.button("⏸ Pausar", key=f"btn_pref_pause_{comp['id']}",
@@ -421,6 +452,22 @@ def _render_catalog_items():
                             _cu.commit()
                         finally:
                             _cu.close()
+                        # Notificar a la empresa que su modelo ya está publicado
+                        if _item_company_id:
+                            try:
+                                _cn_em = db_conn()
+                                try:
+                                    _row_em = _cn_em.execute(
+                                        "SELECT nombre, email FROM prefab_companies WHERE id=?",
+                                        (_item_company_id,)
+                                    ).fetchone()
+                                finally:
+                                    _cn_em.close()
+                                if _row_em:
+                                    from modules.marketplace.email_notify import notify_catalog_item_published
+                                    notify_catalog_item_published(_row_em[1], _row_em[0], iname)
+                            except Exception:
+                                pass
                         st.rerun()
                 with _pc2:
                     if st.button("⏳ Pendiente 🟡", key=f"cat_pend_{iid}",

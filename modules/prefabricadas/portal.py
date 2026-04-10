@@ -421,6 +421,14 @@ def _render_dashboard(company: dict):
                 st.markdown(f"- **{_mname}** — {_mm2} m² · {_mmat} · {_mplabel or f'€{_mprice:,.0f}'} · {_mstatus}{_mst_label}")
 
         st.markdown("---")
+        # ── Límite cortesía: máximo 3 modelos en catálogo ──────────────────────
+        _plan_portal = (company.get("plan") or "starter").lower()
+        _limite_alcanzado = (_plan_portal == "cortesia" and len(_models) >= 3)
+        if _limite_alcanzado:
+            st.warning(
+                f"🎁 **Plan Cortesía** — límite de **3 modelos** en catálogo alcanzado "
+                f"({len(_models)} actuales). Elimina uno de los anteriores para poder añadir otro."
+            )
         st.markdown("### ➕ Añadir nuevo modelo")
         with st.form("form_nuevo_modelo"):
             _nm_nombre = st.text_input("Nombre del modelo *")
@@ -439,7 +447,11 @@ def _render_dashboard(company: dict):
                 _nm_plantas = st.number_input("Plantas", min_value=1, step=1)
             _nm_desc = st.text_area("Descripción", max_chars=500)
             _nm_img = st.file_uploader("Imagen principal", type=["jpg", "jpeg", "png"])
-            _nm_submit = st.form_submit_button("📤 Enviar modelo para revisión")
+            _nm_submit = st.form_submit_button(
+                "📤 Enviar modelo para revisión",
+                disabled=_limite_alcanzado,
+                help="Límite de 3 modelos alcanzado en plan Cortesía." if _limite_alcanzado else None
+            )
 
             if _nm_submit:
                 if not _nm_nombre:

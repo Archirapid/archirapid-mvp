@@ -349,6 +349,125 @@ def notify_constructor_offer_accepted(email: str, name: str, project_name: str,
         pass
 
 
+def notify_account_activated(
+    to_email: str,
+    nombre: str,
+    role_label: str,
+    portal_url: str,
+    extra_note: str = "",
+) -> None:
+    """
+    Email al cliente cuando admin activa su cuenta.
+    role_label: ej. "empresa prefabricada", "profesional/constructor", "estudiante"
+    portal_url: URL directa al portal del rol
+    extra_note: texto HTML adicional (modelos publicados, etc.)
+    """
+    import os as _osa
+    try:
+        import streamlit as _st
+        _rkey = str(_st.secrets.get("RESEND_API_KEY", "")).strip()
+    except Exception:
+        _rkey = _osa.getenv("RESEND_API_KEY", "").strip()
+    if not _rkey:
+        return
+    _html = f"""<!DOCTYPE html>
+<html><body style="font-family:Arial,sans-serif;background:#f8fafc;padding:32px;margin:0;">
+  <div style="max-width:520px;margin:0 auto;background:white;border-radius:12px;
+              padding:32px;border:1px solid #e2e8f0;">
+    <div style="font-size:1.2rem;font-weight:900;color:#1E3A5F;margin-bottom:4px;">
+      ✅ Tu cuenta en ArchiRapid está activa
+    </div>
+    <div style="color:#64748b;font-size:13px;margin-bottom:24px;">
+      Acceso activado por el equipo de ArchiRapid
+    </div>
+    <p style="color:#0f172a;font-size:15px;">Hola <strong>{nombre}</strong>,</p>
+    <p style="color:#0f172a;">Tu cuenta como <strong>{role_label}</strong> en ArchiRapid
+    ha sido activada. Ya puedes acceder y operar en el portal.</p>
+    {"<p style='color:#0f172a;'>" + extra_note + "</p>" if extra_note else ""}
+    <div style="margin-top:24px;text-align:center;">
+      <a href="{portal_url}" style="display:inline-block;background:#1E3A5F;
+         color:white;padding:12px 28px;border-radius:8px;text-decoration:none;
+         font-weight:700;font-size:14px;">Acceder al portal →</a>
+    </div>
+    <p style="color:#64748b;font-size:13px;margin-top:24px;">
+      ¿Dudas? Escríbenos a
+      <a href="mailto:hola@archirapid.com" style="color:#1E3A5F;">hola@archirapid.com</a><br>
+      El equipo de ArchiRapid
+    </p>
+    <p style="color:#94a3b8;font-size:11px;margin-top:16px;text-align:center;">
+      ArchiRapid · <a href="https://archirapid.streamlit.app" style="color:#94a3b8;">archirapid.streamlit.app</a>
+    </p>
+  </div>
+</body></html>"""
+    try:
+        _requests.post(
+            "https://api.resend.com/emails",
+            headers={"Authorization": f"Bearer {_rkey}", "Content-Type": "application/json"},
+            json={
+                "from": "ArchiRapid <noreply@archirapid.com>",
+                "to": [to_email],
+                "subject": "✅ Tu cuenta en ArchiRapid está activa",
+                "html": _html,
+            },
+            timeout=10,
+        )
+    except Exception:
+        pass
+
+
+def notify_catalog_item_published(
+    to_email: str,
+    empresa_nombre: str,
+    model_name: str,
+) -> None:
+    """Email a la empresa cuando admin aprueba uno de sus modelos del catálogo."""
+    import os as _osb
+    try:
+        import streamlit as _st2
+        _rkey2 = str(_st2.secrets.get("RESEND_API_KEY", "")).strip()
+    except Exception:
+        _rkey2 = _osb.getenv("RESEND_API_KEY", "").strip()
+    if not _rkey2:
+        return
+    _portal_url = "https://archirapid.streamlit.app/?page=prefabricadas"
+    _html2 = f"""<!DOCTYPE html>
+<html><body style="font-family:Arial,sans-serif;background:#f8fafc;padding:32px;margin:0;">
+  <div style="max-width:520px;margin:0 auto;background:white;border-radius:12px;
+              padding:32px;border:1px solid #e2e8f0;">
+    <div style="font-size:1.2rem;font-weight:900;color:#16a34a;margin-bottom:4px;">
+      🏠 Tu modelo ya está publicado en ArchiRapid
+    </div>
+    <p style="color:#0f172a;font-size:15px;">Hola <strong>{empresa_nombre}</strong>,</p>
+    <p style="color:#0f172a;">Tu modelo <strong>"{model_name}"</strong> ha sido revisado
+    y aprobado por el equipo de ArchiRapid. Ya es visible en el marketplace para
+    compradores y propietarios de fincas.</p>
+    <div style="margin-top:24px;text-align:center;">
+      <a href="{_portal_url}" style="display:inline-block;background:#16a34a;
+         color:white;padding:12px 28px;border-radius:8px;text-decoration:none;
+         font-weight:700;font-size:14px;">Ver mi catálogo →</a>
+    </div>
+    <p style="color:#64748b;font-size:13px;margin-top:24px;">
+      ¿Dudas? <a href="mailto:hola@archirapid.com" style="color:#1E3A5F;">hola@archirapid.com</a><br>
+      El equipo de ArchiRapid
+    </p>
+  </div>
+</body></html>"""
+    try:
+        _requests.post(
+            "https://api.resend.com/emails",
+            headers={"Authorization": f"Bearer {_rkey2}", "Content-Type": "application/json"},
+            json={
+                "from": "ArchiRapid <noreply@archirapid.com>",
+                "to": [to_email],
+                "subject": f"🏠 Tu modelo '{model_name}' ya está publicado en ArchiRapid",
+                "html": _html2,
+            },
+            timeout=10,
+        )
+    except Exception:
+        pass
+
+
 def notify_client_offer_received(email: str, client_name: str,
                                   project_name: str, n_offers: int) -> None:
     """Email al cliente cuando recibe nuevas ofertas de constructores."""

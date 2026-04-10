@@ -319,6 +319,14 @@ def main():
 
     st.write(f"Conectado como: **{st.session_state.arch_name}**")
 
+    # Warning cortesía: registro via link de invitación → activación pendiente (24h)
+    if st.session_state.get("_invite_activo") and st.session_state.get("_invite_tipo") == "arquitectos":
+        st.warning(
+            "⏳ Hemos recibido tu solicitud de acceso por cortesía. "
+            "En un plazo de **24 horas** recibirás un email de confirmación con tu cuenta activa. "
+            "Mientras tanto, puedes explorar el portal."
+        )
+
     sub_status = check_subscription(st.session_state["arch_id"])
     if sub_status["active"]:
         st.caption(f"Suscripcion Activa: **Plan {sub_status['plan']}** (Renueva: {sub_status['end_date']})")
@@ -343,7 +351,7 @@ def main():
 
         c_ia_1, c_ia_2 = st.columns(2)
         with c_ia_1:
-            ia_m2 = st.number_input("Superficie Finca (m²)", 200, 5000, 1000)
+            ia_m2 = st.number_input("Superficie Finca (m²)", 200, 5000, 1000, key="ia_tab_m2")
             ia_habs = st.slider("Habitaciones", 1, 6, 3)
             if st.button("✨ Generar Distribución", key="btn_gen_dist"):
                 with st.spinner("Generando distribución con IA..."):
@@ -477,7 +485,7 @@ def main():
                 with _fc1:
                     _e_ref     = st.text_input("Referencia Catastral (opcional)", "")
                     _e_address = st.text_input("Dirección del Solar", "")
-                    _e_m2      = st.number_input("Superficie Finca (m²)", min_value=50, max_value=20000, value=500)
+                    _e_m2      = st.number_input("Superficie Finca (m²)", min_value=50, max_value=20000, value=500, key="estudio_tab_m2")
                     _e_rooms   = st.slider("Habitaciones deseadas", 1, 8, 3)
                 with _fc2:
                     _e_style   = st.selectbox("Estilo Arquitectónico", ["Moderno", "Mediterráneo", "Industrial", "Minimalista", "Rústico", "Montaña"])
