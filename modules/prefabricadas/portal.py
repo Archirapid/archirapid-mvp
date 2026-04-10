@@ -178,6 +178,14 @@ def _render_login_register():
                 f"{_invite_meses} mes(es) · Plan {_invite_plan}"
             )
 
+        # Si el registro acaba de completarse, ir al dashboard
+        if st.session_state.get("_prefab_registro_ok"):
+            st.session_state.pop("_prefab_registro_ok", None)
+            _comp_ok = st.session_state.get("prefab_company")
+            if _comp_ok:
+                _render_dashboard(_comp_ok)
+                return
+
         with st.form("pref_register_form"):
             _rc1, _rc2 = st.columns(2)
             with _rc1:
@@ -338,6 +346,7 @@ def _render_login_register():
                                         f"{_invite_meses} mes(es) está activo. "
                                         "Accediendo a tu panel..."
                                     )
+                                    st.session_state["_prefab_registro_ok"] = True
                                     st.rerun()
                                 else:
                                     st.error(
@@ -350,6 +359,7 @@ def _render_login_register():
                                 time.sleep(1)
                                 if _nueva_empresa:
                                     st.session_state["prefab_company"] = _nueva_empresa
+                                    st.session_state["_prefab_registro_ok"] = True
                                     _checkout_plan(_rplan, _nueva_empresa)
                                 else:
                                     st.info(
