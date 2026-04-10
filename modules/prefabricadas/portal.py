@@ -127,27 +127,13 @@ def _get_company(email: str):
 def main():
     _ensure_table()
 
-    # PRIORIDAD 1: Si ya hay sesión activa → dashboard directo
+    # Si hay sesión activa → dashboard directo
     _company = st.session_state.get("prefab_company")
     if _company:
         _render_dashboard(_company)
         return
 
-    # PRIORIDAD 2: Registro recién completado via invite
-    if st.session_state.get("_prefab_registro_ok"):
-        st.session_state.pop("_prefab_registro_ok", None)
-        _email_nuevo = st.session_state.get("_prefab_email_nuevo", "")
-        if _email_nuevo:
-            _comp_nuevo = _get_company(_email_nuevo)
-            if _comp_nuevo:
-                st.session_state["prefab_company"] = _comp_nuevo
-                st.session_state.pop("_prefab_email_nuevo", None)
-                _render_dashboard(_comp_nuevo)
-                return
-        # Si no encuentra empresa, mostrar mensaje y login
-        st.success("✅ Registro completado. Accede con tus credenciales.")
-
-    # PRIORIDAD 3: Retorno Stripe
+    # Retorno Stripe: recuperar sesión por email si no está en session_state
     if st.query_params.get("pago") == "ok":
         _email_ret = st.query_params.get("email", "")
         if _email_ret:
@@ -200,14 +186,6 @@ def _render_login_register():
                 f"🎟️ Invitación válida — Acceso gratuito "
                 f"{_invite_meses} mes(es) · Plan {_invite_plan}"
             )
-
-        # Si el registro acaba de completarse, ir al dashboard
-        if st.session_state.get("_prefab_registro_ok"):
-            st.session_state.pop("_prefab_registro_ok", None)
-            _comp_ok = st.session_state.get("prefab_company")
-            if _comp_ok:
-                _render_dashboard(_comp_ok)
-                return
 
         with st.form("pref_register_form"):
             _rc1, _rc2 = st.columns(2)
@@ -282,6 +260,9 @@ def _render_login_register():
                         st.warning("Ya existe una cuenta con ese email. Usa el login.")
                     else:
                         _new_id = uuid.uuid4().hex
+                        # ── FASE 1: solo DB — sin st.rerun/st.stop aquí ──
+                        _reg_ok = False
+                        _reg_err = None
                         _conn_reg = db_conn()
                         try:
                             _conn_reg.execute(
@@ -293,15 +274,12 @@ def _render_login_register():
                                  _hash_pw(_rpw), _rplan, _comision_reg)
                             )
                             _conn_reg.commit()
-                            # Generar contrato SHA-256
                             try:
                                 from disclaimer_legal import generar_contrato_comision
                                 _hash_c, _pdf_c = generar_contrato_comision(
-                                    email=_re,
-                                    nombre=_rn,
+                                    email=_re, nombre=_rn,
                                     titulo_finca=f"Empresa prefabricada: {_rn}",
-                                    precio=0,
-                                    comision_pct=int(_comision_reg * 10),
+                                    precio=0, comision_pct=int(_comision_reg * 10),
                                     plot_id="prefab"
                                 )
                                 if _hash_c:
@@ -319,10 +297,19 @@ def _render_login_register():
                                 _send(f"🏠 Nueva empresa prefabricada registrada:\n{_rn} ({_re})\nPlan: {_rplan} · Comisión: {_comision_reg}%")
                             except Exception:
                                 pass
-                            # Acceso inmediato + redirigir según si hay token de invitación
+                            _reg_ok = True
+                        except Exception as _ex:
+                            _reg_err = str(_ex)
+                        finally:
+                            _conn_reg.close()
+
+                        # ── FASE 2: navegación fuera de try/except ──
+                        if _reg_err:
+                            st.error(f"Error en registro: {_reg_err}")
+                        elif _reg_ok:
                             _tiene_invite = bool(_invite_activo and _invite_token)
                             if _tiene_invite:
-                                # Actualizar plan con cortesía
+                                # Cortesía: UPDATE plan + marcar invitación usada
                                 import datetime as _dt_inv
                                 _until_inv = (
                                     _dt_inv.datetime.utcnow()
@@ -332,15 +319,12 @@ def _render_login_register():
                                     _cn_upd = db_conn()
                                     _cn_upd.execute("""
                                         UPDATE prefab_companies
-                                        SET plan=?, paid_until=?,
-                                            active=1, status='autorizado'
+                                        SET plan=?, paid_until=?, active=1, status='autorizado'
                                         WHERE email=?
                                     """, (_invite_plan, _until_inv, _re))
                                     _cn_upd.execute("""
                                         UPDATE invitaciones
-                                        SET estado='usado',
-                                            usado_at=?,
-                                            usado_por_email=?
+                                        SET estado='usado', usado_at=?, usado_por_email=?
                                         WHERE token=?
                                     """, (
                                         _dt_inv.datetime.utcnow().isoformat() + "Z",
@@ -350,50 +334,31 @@ def _render_login_register():
                                     _cn_upd.close()
                                 except Exception as _eu:
                                     st.error(f"Error activando cortesía: {_eu}")
-
-                                # Intentar recargar empresa — si Supabase es lento, usar datos del form
+                                # Construir sesión (Supabase puede tardar → usar datos del form)
                                 _empresa_final = _get_company(_re)
-                                if _empresa_final:
-                                    _comp_manual = _empresa_final
-                                else:
-                                    _comp_manual = {
-                                        "id": _new_id,
-                                        "nombre": _rn,
-                                        "email": _re,
-                                        "plan": _invite_plan,
-                                        "active": 1,
-                                        "status": "autorizado",
-                                        "comision_pct": _comision_reg,
-                                        "paid_until": _until_inv,
-                                        "destacado_activo": 0,
-                                    }
-                                st.session_state["prefab_company"] = _comp_manual
-                                st.session_state["_prefab_email_nuevo"] = _re
+                                _comp_inv = _empresa_final or {
+                                    "id": _new_id, "nombre": _rn, "email": _re,
+                                    "plan": _invite_plan, "active": 1,
+                                    "status": "autorizado", "comision_pct": _comision_reg,
+                                    "paid_until": _until_inv, "destacado_activo": 0,
+                                }
+                                st.session_state["prefab_company"] = _comp_inv
                                 st.session_state["_invite_completado"] = True
                                 st.session_state.pop("_invite_activo", None)
                                 st.session_state.pop("_invite_token", None)
                                 st.session_state.pop("_invite_plan", None)
                                 st.session_state.pop("_invite_meses", None)
-                                st.session_state["_prefab_registro_ok"] = True
-                                st.rerun()
+                                st.rerun()  # ← fuera de try/except — seguro
                             else:
+                                # Sin invite: ir a Stripe
                                 st.success("✅ Empresa registrada. Redirigiendo al pago del plan...")
                                 _nueva_empresa = _get_company(_re)
                                 if _nueva_empresa:
-                                    # NO setear prefab_company aquí — el retorno de Stripe
-                                    # lo gestiona en app.py usando ?email= en success_url
+                                    st.session_state["prefab_company"] = _nueva_empresa
                                     _checkout_plan(_rplan, _nueva_empresa)
                                 else:
-                                    st.info(
-                                        "Registro completado. Accede con tus credenciales "
-                                        "para activar tu plan."
-                                    )
-                        except (KeyboardInterrupt, SystemExit):
-                            raise
-                        except Exception as _ex:
-                            st.error(f"Error en registro: {_ex}")
-                        finally:
-                            _conn_reg.close()
+                                    st.info("Registro completado. Accede con tus credenciales para activar tu plan.")
+                                st.stop()  # ← fuera de try/except — seguro
 
 
 def _render_dashboard(company: dict):
