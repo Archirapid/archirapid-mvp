@@ -813,6 +813,20 @@ def main():
                                              width="stretch", type="primary" if _is_primary else "secondary"):
                                     if _update_project_status(proj['id'], 'activo'):
                                         st.success("✅ Proyecto activo")
+                                        try:
+                                            from modules.marketplace.email_notify import notify_account_activated
+                                            _arch_email_pj = proj.get('architect_email') or ''
+                                            _arch_name_pj  = proj.get('architect_name') or 'Arquitecto'
+                                            if _arch_email_pj:
+                                                notify_account_activated(
+                                                    _arch_email_pj, _arch_name_pj,
+                                                    "arquitecto",
+                                                    "https://archirapid.streamlit.app/?page=arquitectos",
+                                                    f"Tu proyecto <strong>{proj['title']}</strong> ha sido publicado "
+                                                    "y ya es visible para propietarios de fincas en el marketplace."
+                                                )
+                                        except Exception:
+                                            pass
                                         st.rerun()
 
                             # RESERVADO
