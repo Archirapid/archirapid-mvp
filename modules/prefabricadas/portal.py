@@ -151,16 +151,6 @@ def _render_login_register():
     st.title("🏠 Portal de Empresas Prefabricadas")
     st.caption("Gestiona tu presencia en ArchiRapid y llega a clientes que ya han elegido su terreno.")
 
-    # ── Guard: URL Stripe pendiente (registro sin invite) ──────────────────────
-    # Guardada en session_state por el form submit para salir del contexto form
-    if st.session_state.get("_prefab_reg_stripe_url"):
-        _checkout_url = st.session_state.pop("_prefab_reg_stripe_url")
-        st.success("✅ Empresa registrada. Completa el pago para activar tu plan.")
-        st.link_button("💳 Ir al pago seguro →", _checkout_url,
-                       type="primary", use_container_width=True)
-        st.caption("Pago seguro con Stripe. Vuelve aquí tras completar el pago.")
-        return
-
     tab_login, tab_register = st.tabs(["🔐 Acceder", "📝 Registrarse"])
 
     with tab_login:
@@ -360,45 +350,14 @@ def _render_login_register():
                                 st.session_state.pop("_invite_meses", None)
                                 st.rerun()  # ← fuera de try/except — seguro
                             else:
-                                # Sin invite: generar URL Stripe y guardar en session_state
-                                # NO setear prefab_company aquí — el rerun vería la sesión
-                                # y saltaría al dashboard ignorando el pago
+                                # Sin invite: ir directo a Stripe (NO setear prefab_company aquí)
+                                st.success("✅ Empresa registrada. Redirigiendo al pago del plan...")
                                 _nueva_empresa = _get_company(_re)
-                                _stripe_url_gen = None
                                 if _nueva_empresa:
-                                    try:
-                                        from modules.stripe_utils import _get_base_url as _gbu_reg
-                                        import stripe as _st_reg, os as _os_reg
-                                        _sk_reg = _os_reg.getenv("STRIPE_SECRET_KEY") or ""
-                                        try:
-                                            import streamlit as _stt_reg
-                                            _sk_reg = _stt_reg.secrets.get("STRIPE_SECRET_KEY", _sk_reg)
-                                        except Exception:
-                                            pass
-                                        _st_reg.api_key = _sk_reg
-                                        _pi = _PLANES.get(_rplan, _PLANES["starter"])
-                                        _base_reg = _gbu_reg()
-                                        _sess_reg = _st_reg.checkout.Session.create(
-                                            payment_method_types=["card"],
-                                            mode="payment",
-                                            customer_email=_re,
-                                            line_items=[{"price_data": {
-                                                "currency": "eur",
-                                                "product_data": {"name": f"ArchiRapid Prefabricadas — Plan {_pi['label']}"},
-                                                "unit_amount": _pi["precio"] * 100,
-                                            }, "quantity": 1}],
-                                            metadata={"prefab_company_id": _new_id, "plan": _rplan},
-                                            success_url=f"{_base_reg}/?page=prefabricadas&pago=ok&plan={_rplan}&email={_re}",
-                                            cancel_url=f"{_base_reg}/?page=prefabricadas",
-                                        )
-                                        _stripe_url_gen = _sess_reg.url
-                                    except Exception as _ex_reg:
-                                        st.error(f"Error generando pago: {_ex_reg}")
-                                if _stripe_url_gen:
-                                    st.session_state["_prefab_reg_stripe_url"] = _stripe_url_gen
+                                    _checkout_plan(_rplan, _nueva_empresa)
                                 else:
                                     st.info("Registro completado. Accede con tus credenciales para activar tu plan.")
-                                st.rerun()  # ← sale del form context, muestra el link_button arriba
+                                st.stop()
 
 
 def _render_dashboard(company: dict):
