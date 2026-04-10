@@ -83,6 +83,68 @@ _SLUG_TO_PAGE_MASTER = {
     "prefabricadas": "🏠 Portal Prefabricadas",
 }
 
+# ── TOKEN DE INVITACIÓN ──────────────────────────────────────────────────────
+_qp_invite      = st.query_params.get("invite", "")
+_qp_invite_tipo = st.query_params.get("tipo", "")
+
+if _qp_invite and not st.session_state.get(f"_invite_processed_{_qp_invite}"):
+    try:
+        from modules.marketplace.utils import db_conn as _dbc_inv
+        _cn_inv = _dbc_inv()
+        try:
+            _cur_inv = _cn_inv.cursor()
+            _cur_inv.execute("""
+                SELECT id, tipo, plan, meses_cortesia, estado
+                FROM invitaciones
+                WHERE token = ? AND estado = 'activo'
+                LIMIT 1
+            """, (_qp_invite,))
+            _inv_row = _cur_inv.fetchone()
+        finally:
+            _cn_inv.close()
+
+        if _inv_row:
+            _inv_id   = _inv_row[0]
+            _inv_tipo = _inv_row[1]
+            _inv_plan = _inv_row[2]
+            _inv_mes  = _inv_row[3]
+
+            st.session_state["_invite_token"]  = _qp_invite
+            st.session_state["_invite_tipo"]   = _inv_tipo
+            st.session_state["_invite_plan"]   = _inv_plan
+            st.session_state["_invite_meses"]  = _inv_mes
+            st.session_state["_invite_activo"] = True
+            st.session_state[f"_invite_processed_{_qp_invite}"] = True
+
+            _inv_slug_map = {
+                "prefabricadas": "prefabricadas",
+                "arquitectos":   "arquitectos",
+                "estudiantes":   "estudiantes",
+                "profesionales": "proveedor",
+                "demo":          "home",
+            }
+            _inv_slug = _inv_slug_map.get(_inv_tipo, "home")
+            st.session_state["selected_page"] = _SLUG_TO_PAGE_MASTER.get(
+                _inv_slug, "🏠 Inicio / Marketplace"
+            )
+            st.query_params["page"] = _inv_slug
+            try:
+                del st.query_params["invite"]
+            except Exception:
+                pass
+            try:
+                del st.query_params["tipo"]
+            except Exception:
+                pass
+            st.rerun()
+        else:
+            st.warning(
+                "⚠️ Este enlace de invitación no es válido o ya ha sido utilizado."
+            )
+    except Exception:
+        pass
+# ─────────────────────────────────────────────────────────────────────────────
+
 _page_from_url = st.query_params.get("page", "home")
 if st.session_state.get("current_page_sync") != _page_from_url:
     # URL cambió (botón Atrás o enlace externo) → forzar estado desde URL
@@ -591,67 +653,6 @@ def _registrar_visita_demo(origen, nombre, accion):
     except Exception:
         pass
 
-# ── TOKEN DE INVITACIÓN ──────────────────────────────────────────────────────
-_qp_invite      = st.query_params.get("invite", "")
-_qp_invite_tipo = st.query_params.get("tipo", "")
-
-if _qp_invite and not st.session_state.get(f"_invite_processed_{_qp_invite}"):
-    try:
-        from modules.marketplace.utils import db_conn as _dbc_inv
-        _cn_inv = _dbc_inv()
-        try:
-            _cur_inv = _cn_inv.cursor()
-            _cur_inv.execute("""
-                SELECT id, tipo, plan, meses_cortesia, estado
-                FROM invitaciones
-                WHERE token = ? AND estado = 'activo'
-                LIMIT 1
-            """, (_qp_invite,))
-            _inv_row = _cur_inv.fetchone()
-        finally:
-            _cn_inv.close()
-
-        if _inv_row:
-            _inv_id   = _inv_row[0]
-            _inv_tipo = _inv_row[1]
-            _inv_plan = _inv_row[2]
-            _inv_mes  = _inv_row[3]
-
-            st.session_state["_invite_token"]  = _qp_invite
-            st.session_state["_invite_tipo"]   = _inv_tipo
-            st.session_state["_invite_plan"]   = _inv_plan
-            st.session_state["_invite_meses"]  = _inv_mes
-            st.session_state["_invite_activo"] = True
-            st.session_state[f"_invite_processed_{_qp_invite}"] = True
-
-            _inv_slug_map = {
-                "prefabricadas": "prefabricadas",
-                "arquitectos":   "arquitectos",
-                "estudiantes":   "estudiantes",
-                "profesionales": "proveedor",
-                "demo":          "home",
-            }
-            _inv_slug = _inv_slug_map.get(_inv_tipo, "home")
-            st.session_state["selected_page"] = _SLUG_TO_PAGE_MASTER.get(
-                _inv_slug, "🏠 Inicio / Marketplace"
-            )
-            st.query_params["page"] = _inv_slug
-            try:
-                del st.query_params["invite"]
-            except Exception:
-                pass
-            try:
-                del st.query_params["tipo"]
-            except Exception:
-                pass
-            st.rerun()
-        else:
-            st.warning(
-                "⚠️ Este enlace de invitación no es válido o ya ha sido utilizado."
-            )
-    except Exception:
-        pass
-# ─────────────────────────────────────────────────────────────────────────────
 
 _qp_seccion = st.query_params.get("seccion", "")
 _qp_from    = st.query_params.get("from", "")
