@@ -141,8 +141,8 @@ if _qp_invite and not st.session_state.get(f"_invite_processed_{_qp_invite}"):
             st.warning(
                 "⚠️ Este enlace de invitación no es válido o ya ha sido utilizado."
             )
-    except Exception:
-        pass
+    except Exception as _inv_err:
+        st.error(f"Debug invite: {_inv_err}")
 # ─────────────────────────────────────────────────────────────────────────────
 
 _page_from_url = st.query_params.get("page", "home")
@@ -1473,7 +1473,8 @@ selected_page = st.sidebar.radio(
 if st.session_state.get("_nav_programmatic"):
     st.session_state.pop("_nav_programmatic", None)
 else:
-    st.session_state['selected_page'] = selected_page
+    if not st.session_state.get("_invite_activo"):
+        st.session_state['selected_page'] = selected_page
 
 # ── Panic Button de Hard Reset (último en sidebar) ─────────────────────
 st.sidebar.divider()
