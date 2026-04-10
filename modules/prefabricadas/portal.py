@@ -166,6 +166,18 @@ def _render_login_register():
         st.subheader("Registro de empresa")
         st.info("Una vez registrada, el equipo de ArchiRapid revisará tu solicitud en menos de 24h.")
 
+        # Detectar si viene con token de invitación
+        _invite_activo = st.session_state.get("_invite_activo", False)
+        _invite_plan   = st.session_state.get("_invite_plan", "starter")
+        _invite_meses  = st.session_state.get("_invite_meses", 3)
+        _invite_token  = st.session_state.get("_invite_token", "")
+
+        if _invite_activo:
+            st.success(
+                f"🎟️ Invitación válida — Acceso gratuito "
+                f"{_invite_meses} mes(es) · Plan {_invite_plan}"
+            )
+
         with st.form("pref_register_form"):
             _rc1, _rc2 = st.columns(2)
             with _rc1:
@@ -266,19 +278,58 @@ def _render_login_register():
                                 _send(f"🏠 Nueva empresa prefabricada registrada:\n{_rn} ({_re})\nPlan: {_rplan} · Comisión: {_comision_reg}%")
                             except Exception:
                                 pass
-                            # Acceso inmediato + redirigir a Stripe checkout
-                            st.success("✅ Empresa registrada. Redirigiendo al pago del plan...")
-                            import time
-                            time.sleep(1)
+                            # Acceso inmediato + redirigir según si hay token de invitación
                             _nueva_empresa = _get_company(_re)
-                            if _nueva_empresa:
-                                st.session_state["prefab_company"] = _nueva_empresa
-                                _checkout_plan(_rplan, _nueva_empresa)
-                            else:
-                                st.info(
-                                    "Registro completado. Accede con tus credenciales "
-                                    "para activar tu plan."
+                            if _invite_activo and _invite_token and _nueva_empresa:
+                                # Activar plan de cortesía por invitación
+                                try:
+                                    import datetime as _dt_inv
+                                    _until_inv = (
+                                        _dt_inv.datetime.utcnow()
+                                        + _dt_inv.timedelta(days=30 * _invite_meses)
+                                    ).strftime("%Y-%m-%d")
+                                    _cn_inv2 = db_conn()
+                                    try:
+                                        _cn_inv2.execute("""
+                                            UPDATE prefab_companies
+                                            SET plan=?, paid_until=?, active=1
+                                            WHERE email=?
+                                        """, (_invite_plan, _until_inv, _re))
+                                        _cn_inv2.execute("""
+                                            UPDATE invitaciones
+                                            SET estado='usado',
+                                                usado_at=?,
+                                                usado_por_email=?
+                                            WHERE token=?
+                                        """, (
+                                            _dt_inv.datetime.utcnow().isoformat() + "Z",
+                                            _re, _invite_token
+                                        ))
+                                        _cn_inv2.commit()
+                                    finally:
+                                        _cn_inv2.close()
+                                    st.session_state.pop("_invite_activo", None)
+                                    st.session_state.pop("_invite_token", None)
+                                except Exception:
+                                    pass
+                                st.success(
+                                    f"✅ Empresa registrada. Plan {_invite_plan} activado "
+                                    f"hasta {_until_inv}. ¡Bienvenida a ArchiRapid!"
                                 )
+                                st.session_state["prefab_company"] = _get_company(_re)
+                                st.rerun()
+                            else:
+                                st.success("✅ Empresa registrada. Redirigiendo al pago del plan...")
+                                import time
+                                time.sleep(1)
+                                if _nueva_empresa:
+                                    st.session_state["prefab_company"] = _nueva_empresa
+                                    _checkout_plan(_rplan, _nueva_empresa)
+                                else:
+                                    st.info(
+                                        "Registro completado. Accede con tus credenciales "
+                                        "para activar tu plan."
+                                    )
                             st.stop()
                         except Exception as _ex:
                             st.error(f"Error en registro: {_ex}")

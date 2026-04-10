@@ -788,6 +788,23 @@ _PG_DDL = [
         contactado INTEGER DEFAULT 0,
         contratado INTEGER DEFAULT 0
     )""",
+    # ── Tokens de invitación ───────────────────────────────────────────────────
+    """CREATE TABLE IF NOT EXISTS invitaciones (
+        id TEXT PRIMARY KEY,
+        token TEXT UNIQUE NOT NULL,
+        tipo TEXT NOT NULL,
+        plan TEXT DEFAULT 'starter',
+        meses_cortesia INTEGER DEFAULT 3,
+        email_destino TEXT,
+        nombre_destino TEXT,
+        notas TEXT,
+        creado_por TEXT DEFAULT 'admin',
+        creado_at TEXT NOT NULL,
+        usado_at TEXT,
+        usado_por_email TEXT,
+        estado TEXT DEFAULT 'activo',
+        url_generada TEXT
+    )""",
 ]
 
 _PG_INDEXES = [
@@ -825,6 +842,9 @@ _PG_INDEXES = [
     # ── Matching engine ────────────────────────────────────────────────────────
     "CREATE INDEX IF NOT EXISTS idx_ofertas_plot ON ofertas_matching(plot_id)",
     "CREATE INDEX IF NOT EXISTS idx_ofertas_profesional ON ofertas_matching(email_profesional)",
+    # ── Tokens de invitación ───────────────────────────────────────────────────
+    "CREATE INDEX IF NOT EXISTS idx_invitaciones_token ON invitaciones(token)",
+    "CREATE INDEX IF NOT EXISTS idx_invitaciones_estado ON invitaciones(estado)",
 ]
 
 _PG_PREFAB_SEED = [
@@ -1910,6 +1930,35 @@ def ensure_tables():
             pass
         try:
             c.execute("CREATE INDEX IF NOT EXISTS idx_ofertas_profesional ON ofertas_matching(email_profesional)")
+        except Exception:
+            pass
+
+        # ── Tokens de invitación ──────────────────────────────────────────────
+        try:
+            c.execute("""CREATE TABLE IF NOT EXISTS invitaciones (
+                id TEXT PRIMARY KEY,
+                token TEXT UNIQUE NOT NULL,
+                tipo TEXT NOT NULL,
+                plan TEXT DEFAULT 'starter',
+                meses_cortesia INTEGER DEFAULT 3,
+                email_destino TEXT,
+                nombre_destino TEXT,
+                notas TEXT,
+                creado_por TEXT DEFAULT 'admin',
+                creado_at TEXT NOT NULL,
+                usado_at TEXT,
+                usado_por_email TEXT,
+                estado TEXT DEFAULT 'activo',
+                url_generada TEXT
+            )""")
+        except Exception:
+            pass
+        try:
+            c.execute("CREATE INDEX IF NOT EXISTS idx_invitaciones_token ON invitaciones(token)")
+        except Exception:
+            pass
+        try:
+            c.execute("CREATE INDEX IF NOT EXISTS idx_invitaciones_estado ON invitaciones(estado)")
         except Exception:
             pass
 

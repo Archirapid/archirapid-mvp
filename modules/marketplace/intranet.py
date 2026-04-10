@@ -136,6 +136,257 @@ def _update_plot_status(pid: str, new_status: str) -> bool:
         return False
 
 
+def _render_tokens_accesos():
+    import uuid as _uuid
+    import datetime as _dt
+    from modules.marketplace.utils import db_conn as _dbc
+
+    st.header("🎟️ Tokens de Invitación y Accesos")
+    st.caption(
+        "Genera enlaces únicos para dar acceso gratuito "
+        "a empresas, arquitectos, estudiantes o demos."
+    )
+
+    _tab_gen, _tab_activos, _tab_demos = st.tabs([
+        "➕ Generar token",
+        "📋 Tokens activos",
+        "🔗 Links demo"
+    ])
+
+    # ── TAB 1: GENERAR TOKEN ──────────────────────────────
+    with _tab_gen:
+        st.subheader("Nuevo token de invitación")
+
+        _col1, _col2 = st.columns(2)
+        with _col1:
+            _tipo = st.selectbox(
+                "Tipo de acceso *",
+                ["prefabricadas", "arquitectos",
+                 "estudiantes", "profesionales", "demo"],
+                format_func=lambda x: {
+                    "prefabricadas": "🏠 Empresa Prefabricadas",
+                    "arquitectos":   "📐 Arquitecto",
+                    "estudiantes":   "🎓 Estudiante",
+                    "profesionales": "🏗️ Profesional/Constructor",
+                    "demo":          "👁️ Demo / Visitante",
+                }.get(x, x),
+                key="tok_tipo"
+            )
+            _plan = st.selectbox(
+                "Plan a activar",
+                ["starter", "profesional", "premium",
+                 "cortesia", "demo"],
+                format_func=lambda x: {
+                    "starter":     "🏠 Starter",
+                    "profesional": "⭐ Profesional",
+                    "premium":     "🏆 Premium",
+                    "cortesia":    "🎁 Cortesía (sin pago)",
+                    "demo":        "👁️ Solo demo",
+                }.get(x, x),
+                key="tok_plan"
+            )
+        with _col2:
+            _meses = st.selectbox(
+                "Meses de acceso gratuito",
+                [1, 2, 3, 6, 12],
+                index=2,
+                key="tok_meses"
+            )
+            _email_dest = st.text_input(
+                "Email destino (opcional)",
+                placeholder="empresa@ejemplo.com",
+                key="tok_email"
+            )
+            _nombre_dest = st.text_input(
+                "Nombre/empresa (opcional)",
+                key="tok_nombre"
+            )
+
+        _notas = st.text_area(
+            "Notas internas (no visibles al destinatario)",
+            key="tok_notas",
+            max_chars=300
+        )
+
+        if st.button(
+            "🎟️ Generar token de invitación",
+            type="primary",
+            key="btn_gen_token"
+        ):
+            _token = _uuid.uuid4().hex[:16].upper()
+            _tok_id = _uuid.uuid4().hex
+            _now = _dt.datetime.utcnow().isoformat() + "Z"
+
+            _base = "https://archirapid.streamlit.app"
+            _url = f"{_base}/?invite={_token}&tipo={_tipo}"
+
+            try:
+                _cn = _dbc()
+                try:
+                    _cn.execute("""
+                        INSERT INTO invitaciones
+                        (id, token, tipo, plan, meses_cortesia,
+                         email_destino, nombre_destino, notas,
+                         creado_por, creado_at, estado, url_generada)
+                        VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+                    """, (
+                        _tok_id, _token, _tipo, _plan, _meses,
+                        _email_dest or None,
+                        _nombre_dest or None,
+                        _notas or None,
+                        "admin", _now, "activo", _url
+                    ))
+                    _cn.commit()
+                finally:
+                    _cn.close()
+                st.success(f"✅ Token generado: **{_token}**")
+                st.code(_url, language=None)
+                st.caption(
+                    f"Plan: {_plan} · {_meses} mes(es) · Tipo: {_tipo}"
+                )
+                st.info(
+                    "Copia el enlace y envíalo al destinatario. "
+                    "Se activará automáticamente al registrarse."
+                )
+            except Exception as _e:
+                st.error(f"Error generando token: {_e}")
+
+    # ── TAB 2: TOKENS ACTIVOS ─────────────────────────────
+    with _tab_activos:
+        st.subheader("Tokens generados")
+
+        try:
+            _cn2 = _dbc()
+            try:
+                _cur2 = _cn2.cursor()
+                _cur2.execute("""
+                    SELECT token, tipo, plan, meses_cortesia,
+                           email_destino, nombre_destino,
+                           creado_at, usado_at, usado_por_email,
+                           estado, url_generada, notas, id
+                    FROM invitaciones
+                    ORDER BY creado_at DESC
+                    LIMIT 100
+                """)
+                _rows = _cur2.fetchall()
+            finally:
+                _cn2.close()
+
+            _activos = [r for r in _rows if r[9] == "activo"]
+            _usados  = [r for r in _rows if r[9] == "usado"]
+
+            _col_m1, _col_m2, _col_m3 = st.columns(3)
+            _col_m1.metric("Total generados", len(_rows))
+            _col_m2.metric("Activos", len(_activos))
+            _col_m3.metric("Usados/convertidos", len(_usados))
+
+            st.markdown("---")
+
+            for _r in _rows:
+                (
+                    _tok, _tipo_r, _plan_r, _meses_r,
+                    _email_r, _nombre_r, _cat, _uat,
+                    _umail, _estado_r, _url_r, _notas_r,
+                    _rid
+                ) = _r
+
+                _icono = (
+                    "✅" if _estado_r == "activo"
+                    else "🔵" if _estado_r == "usado"
+                    else "⚫"
+                )
+                _label = (
+                    f"{_icono} {_tok} · {_tipo_r} · "
+                    f"{_plan_r} · {_estado_r}"
+                )
+                with st.expander(_label):
+                    _ci1, _ci2 = st.columns(2)
+                    with _ci1:
+                        st.write(f"**Token:** `{_tok}`")
+                        st.write(f"**Tipo:** {_tipo_r}")
+                        st.write(f"**Plan:** {_plan_r}")
+                        st.write(f"**Meses:** {_meses_r}")
+                        if _nombre_r:
+                            st.write(f"**Destinatario:** {_nombre_r}")
+                        if _email_r:
+                            st.write(f"**Email destino:** {_email_r}")
+                    with _ci2:
+                        st.write(f"**Creado:** {str(_cat)[:10]}")
+                        if _uat:
+                            st.write(f"**Usado:** {str(_uat)[:10]}")
+                        if _umail:
+                            st.write(f"**Usado por:** {_umail}")
+                        if _notas_r:
+                            st.caption(f"📝 {_notas_r}")
+
+                    if _url_r:
+                        st.code(_url_r, language=None)
+
+                    if _estado_r == "activo":
+                        _bcol1, _bcol2 = st.columns(2)
+                        with _bcol1:
+                            if st.button("❌ Revocar token", key=f"rev_{_rid}"):
+                                _cn_rev = _dbc()
+                                try:
+                                    _cn_rev.execute(
+                                        "UPDATE invitaciones "
+                                        "SET estado='revocado' "
+                                        "WHERE id=?",
+                                        (_rid,)
+                                    )
+                                    _cn_rev.commit()
+                                finally:
+                                    _cn_rev.close()
+                                st.rerun()
+                        with _bcol2:
+                            if st.button("📋 Copiar URL", key=f"copy_{_rid}"):
+                                st.code(_url_r or "", language=None)
+
+        except Exception as _e:
+            st.error(f"Error cargando tokens: {_e}")
+
+    # ── TAB 3: LINKS DEMO ────────────────────────────────
+    with _tab_demos:
+        st.subheader("🔗 Links de acceso demo centralizados")
+        st.caption(
+            "Estos links están activos permanentemente "
+            "para demos y captación comercial."
+        )
+
+        _DEMO_LINKS = {
+            "Demo Arquitecto (estudio)": (
+                "https://archirapid.streamlit.app/"
+                "?seccion=arquitecto&modo=estudio&demo=true"
+            ),
+            "Demo Arquitecto (LinkedIn)": (
+                "https://archirapid.streamlit.app/"
+                "?seccion=arquitecto&demo=true&from=linkedin"
+            ),
+            "Demo MLS Inmobiliarias": (
+                "https://archirapid.streamlit.app/"
+                "?seccion=mls&demo=true"
+            ),
+            "Home ArchiRapid": "https://archirapid.streamlit.app/",
+            "Portal Prefabricadas directo": (
+                "https://archirapid.streamlit.app/?page=prefabricadas"
+            ),
+            "Portal Arquitectos directo": (
+                "https://archirapid.streamlit.app/?page=arquitectos"
+            ),
+            "Portal MLS directo": (
+                "https://archirapid.streamlit.app/?page=mls"
+            ),
+            "Portal Estudiantes directo": (
+                "https://archirapid.streamlit.app/?page=estudiantes"
+            ),
+        }
+
+        for _lnombre, _lurl in _DEMO_LINKS.items():
+            with st.expander(f"🔗 {_lnombre}"):
+                st.code(_lurl, language=None)
+                st.markdown(f"[Abrir en nueva pestaña]({_lurl})")
+
+
 def main():
     st.title("🔐 Intranet — Gestión Interna de ARCHIRAPID")
 
@@ -301,6 +552,7 @@ def main():
         "⚖️ Disclaimers Legales",
         "🎓 Estudiantes",
         "🏠 Prefabricadas",
+        "🎟️ Tokens & Accesos",
     ]
     # Badge de leads MLS en la opción Analytics
     _analytics_label = f"📊 Analytics{_leads_nuevos_badge}" if _leads_nuevos_badge else "📊 Analytics"
@@ -3245,6 +3497,9 @@ Conservar durante 5 años como evidencia legal.
             render_admin_prefabricadas()
         except Exception as _eh_pref:
             st.warning(f"Error sección Prefabricadas: {_eh_pref}")
+
+    elif _admin_seccion == "🎟️ Tokens & Accesos":
+        _render_tokens_accesos()
 
 # ─── ADMIN ESTUDIANTES ────────────────────────────────────────────────────────
 
