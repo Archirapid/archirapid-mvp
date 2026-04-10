@@ -76,7 +76,7 @@ def _ensure_table():
             )
         """)
         conn.commit()
-        # Columnas nuevas — idempotentes
+        # Columnas nuevas en prefab_companies — idempotentes
         for _col, _def in [
             ("comision_pct", "REAL DEFAULT 4.0"),
             ("destacado_activo", "INTEGER DEFAULT 0"),
@@ -91,6 +91,14 @@ def _ensure_table():
                 conn.commit()
             except Exception:
                 pass  # columna ya existe
+        # Migración prefab_catalog — añadir columna que vincula modelo con empresa
+        try:
+            conn.execute(
+                "ALTER TABLE prefab_catalog ADD COLUMN prefab_company_id TEXT"
+            )
+            conn.commit()
+        except Exception:
+            pass  # columna ya existe o tabla no existe aún
     finally:
         conn.close()
 
@@ -372,9 +380,8 @@ def _render_login_register():
                                 st.success("✅ Empresa registrada. Redirigiendo al pago del plan...")
                                 _nueva_empresa = _get_company(_re)
                                 if _nueva_empresa:
-                                    st.session_state["prefab_company"] = _nueva_empresa
-                                    st.session_state["_prefab_email_nuevo"] = _re
-                                    st.session_state["_prefab_registro_ok"] = True
+                                    # NO setear prefab_company aquí — el retorno de Stripe
+                                    # lo gestiona en app.py usando ?email= en success_url
                                     _checkout_plan(_rplan, _nueva_empresa)
                                 else:
                                     st.info(
@@ -424,6 +431,7 @@ def _render_dashboard(company: dict):
         st.subheader("Modelos en el catálogo")
         _company_id = st.session_state.get("prefab_company", {}).get("id", "")
         _conn_cat = db_conn()
+        _models = []
         try:
             _models = _conn_cat.execute("""
                 SELECT id, name, m2, price, price_label,
@@ -433,6 +441,8 @@ def _render_dashboard(company: dict):
                 WHERE prefab_company_id = ?
                 ORDER BY m2
             """, (_company_id,)).fetchall()
+        except Exception:
+            pass  # columna prefab_company_id puede no existir aún
         finally:
             _conn_cat.close()
 
