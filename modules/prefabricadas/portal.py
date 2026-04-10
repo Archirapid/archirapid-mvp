@@ -127,6 +127,14 @@ def _get_company(email: str):
 def main():
     _ensure_table()
 
+    # Redirect a Stripe pendiente (viene de form submit → rerun)
+    # Ejecutar FUERA del form context para que meta-refresh funcione
+    if st.session_state.get("_prefab_stripe_pending"):
+        _ps = st.session_state.pop("_prefab_stripe_pending")
+        st.info("Redirigiendo al pago... Si no ocurre automáticamente, pulsa el botón.")
+        _checkout_plan(_ps["plan"], _ps["comp"])
+        st.stop()
+
     # Si hay sesión activa → dashboard directo
     _company = st.session_state.get("prefab_company")
     if _company:
@@ -350,17 +358,19 @@ def _render_login_register():
                                 st.session_state.pop("_invite_meses", None)
                                 st.rerun()  # ← fuera de try/except — seguro
                             else:
-                                # Sin invite: ir directo a Stripe (NO setear prefab_company aquí)
-                                # Construir dict sin releer BD (puede haber lag en Supabase)
-                                st.success("✅ Empresa registrada. Redirigiendo al pago del plan...")
-                                _comp_new = {
-                                    "id": _new_id, "nombre": _rn, "email": _re,
-                                    "plan": _rplan, "active": 1, "status": "autorizado",
-                                    "comision_pct": _comision_reg,
-                                    "paid_until": None, "destacado_activo": 0,
+                                # Sin invite: marcar pending y rerun para salir del form context
+                                # _checkout_plan necesita ejecutarse fuera de with st.form()
+                                # para que la meta-refresh no sea anulada por el rerun de Streamlit
+                                st.session_state["_prefab_stripe_pending"] = {
+                                    "plan": _rplan,
+                                    "comp": {
+                                        "id": _new_id, "nombre": _rn, "email": _re,
+                                        "plan": _rplan, "active": 1, "status": "autorizado",
+                                        "comision_pct": _comision_reg,
+                                        "paid_until": None, "destacado_activo": 0,
+                                    },
                                 }
-                                _checkout_plan(_rplan, _comp_new)
-                                st.stop()
+                                st.rerun()
 
 
 def _render_dashboard(company: dict):
