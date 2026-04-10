@@ -384,25 +384,24 @@ def show_service_provider_panel():
                 sp_login_email = st.text_input("Email profesional", key="sp_login_email")
                 sp_login_pwd   = st.text_input("Contraseña", type="password", key="sp_login_pwd")
                 submitted = st.form_submit_button("Entrar al Portal", type="primary", use_container_width=True)
-
-            if submitted:
-                if not sp_login_email or not sp_login_pwd:
-                    st.error("Introduce email y contraseña.")
-                else:
-                    from modules.marketplace.auth import authenticate_user
-                    user = authenticate_user(sp_login_email, sp_login_pwd)
-                    if user and user.get("role") == "services":
-                        st.session_state["logged_in"]   = True
-                        st.session_state["user_email"]  = sp_login_email
-                        st.session_state["user_name"]   = user.get("name", "")
-                        st.session_state["role"]        = "services"
-                        st.session_state["selected_page"] = "👤 Panel de Proveedor"
-                        st.query_params["page"] = "proveedor"
-                        st.rerun()
-                    elif user:
-                        st.error("Esta cuenta no es de profesional. Usa el acceso correspondiente a tu rol.")
+                if submitted:
+                    if not sp_login_email or not sp_login_pwd:
+                        st.error("Introduce email y contraseña.")
                     else:
-                        st.error("Credenciales incorrectas. Verifica email y contraseña.")
+                        from modules.marketplace.auth import authenticate_user
+                        user = authenticate_user(sp_login_email, sp_login_pwd)
+                        if user and user.get("role") == "services":
+                            st.session_state["logged_in"]   = True
+                            st.session_state["user_email"]  = sp_login_email
+                            st.session_state["user_name"]   = user.get("name", "")
+                            st.session_state["role"]        = "services"
+                            st.session_state["selected_page"] = "👤 Panel de Proveedor"
+                            st.query_params["page"] = "proveedor"
+                            st.rerun()
+                        elif user:
+                            st.error("Esta cuenta no es de profesional. Usa el acceso correspondiente a tu rol.")
+                        else:
+                            st.error("Credenciales incorrectas. Verifica email y contraseña.")
         else:
             st.info("Completa el formulario para darte de alta como Profesional en ArchiRapid.")
             show_service_provider_registration()
