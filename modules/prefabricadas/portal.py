@@ -121,17 +121,25 @@ def main():
 
     # Check registro recién completado — dar tiempo a Supabase y redirigir al dashboard
     if st.session_state.get("_prefab_registro_ok"):
-        st.session_state.pop("_prefab_registro_ok", None)
         _email_nuevo = st.session_state.get("_prefab_email_nuevo", "")
-        if _email_nuevo:
+        _comp_directo = st.session_state.get("prefab_company")
+        if _comp_directo:
+            # Ya tenemos la empresa en sesión — ir al dashboard
+            st.session_state.pop("_prefab_registro_ok", None)
+            st.session_state.pop("_prefab_email_nuevo", None)
+            _render_dashboard(_comp_directo)
+            return
+        elif _email_nuevo:
             import time
-            time.sleep(0.5)  # dar tiempo a Supabase para confirmar el registro
+            time.sleep(0.5)
             _comp_nuevo = _get_company(_email_nuevo)
             if _comp_nuevo:
                 st.session_state["prefab_company"] = _comp_nuevo
+                st.session_state.pop("_prefab_registro_ok", None)
                 st.session_state.pop("_prefab_email_nuevo", None)
                 _render_dashboard(_comp_nuevo)
                 return
+            # Si aún no está en Supabase, mantener el flag para el siguiente rerun
 
     # Recuperar sesión si viene de retorno Stripe con ?email=
     if (
@@ -311,8 +319,11 @@ def _render_login_register():
                             except Exception:
                                 pass
                             # Acceso inmediato + redirigir según si hay token de invitación
+                            import time as _time_reg
+                            _time_reg.sleep(1)
                             _nueva_empresa = _get_company(_re)
-                            if _invite_activo and _invite_token and _nueva_empresa:
+                            _tiene_invite = bool(_invite_activo and _invite_token)
+                            if _tiene_invite and _nueva_empresa:
                                 # Actualizar plan con cortesía
                                 import datetime as _dt_inv
                                 _until_inv = (
@@ -366,6 +377,24 @@ def _render_login_register():
                                         "Registro completado pero no se pudo "
                                         "cargar el panel. Accede con tus credenciales."
                                     )
+                            elif _tiene_invite and not _nueva_empresa:
+                                # Supabase tardó — usar sesión construida directamente
+                                st.session_state["prefab_company"] = {
+                                    "id": _new_id,
+                                    "nombre": _rn,
+                                    "email": _re,
+                                    "plan": _invite_plan,
+                                    "active": 1,
+                                    "status": "autorizado",
+                                    "comision_pct": _comision_reg,
+                                }
+                                st.session_state["_invite_completado"] = True
+                                st.session_state.pop("_invite_activo", None)
+                                st.session_state.pop("_invite_token", None)
+                                st.session_state.pop("_invite_plan", None)
+                                st.session_state.pop("_invite_meses", None)
+                                st.success("✅ Registro completado. Accediendo a tu panel...")
+                                st.rerun()
                             else:
                                 st.success("✅ Empresa registrada. Redirigiendo al pago del plan...")
                                 import time
