@@ -308,6 +308,7 @@ def _render_login_register():
                                         _cn_inv2.commit()
                                     finally:
                                         _cn_inv2.close()
+                                    st.session_state["_invite_completado"] = True
                                     st.session_state.pop("_invite_activo", None)
                                     st.session_state.pop("_invite_token", None)
                                 except Exception:
