@@ -78,6 +78,8 @@ def _ensure_table():
         conn.commit()
         # Columnas nuevas en prefab_companies — idempotentes
         for _col, _def in [
+            ("status", "TEXT DEFAULT 'pendiente'"),
+            ("is_active", "INTEGER DEFAULT 0"),
             ("comision_pct", "REAL DEFAULT 4.0"),
             ("destacado_activo", "INTEGER DEFAULT 0"),
             ("destacado_hasta", "TEXT"),
@@ -313,6 +315,7 @@ def _render_login_register():
 
                         # ── FASE 2: navegación fuera de try/except ──
                         if _reg_err:
+                            st.toast(f"❌ {_reg_err}", icon="❌")
                             st.error(f"Error en registro: {_reg_err}")
                         elif _reg_ok:
                             _tiene_invite = bool(_invite_activo and _invite_token)
@@ -602,8 +605,15 @@ def _checkout_plan(plan: str, company: dict):
             success_url=f"{_base}/?page=prefabricadas&pago=ok&plan={plan}&email={company['email']}",
             cancel_url=f"{_base}/?page=prefabricadas",
         )
+        # JavaScript redirect (más fiable que meta-refresh en Streamlit)
+        st.components.v1.html(
+            f'<script>window.parent.location.href = "{session.url}";</script>',
+            height=0,
+        )
         st.markdown(f'<meta http-equiv="refresh" content="0; url={session.url}">', unsafe_allow_html=True)
+        st.success("✅ Sesión de pago creada. Si no redirige automáticamente:")
         st.link_button(f"💳 Ir a pago — {_plan_info['label']} €{_plan_info['precio']}/mes →",
                        session.url, type="primary", use_container_width=True)
     except Exception as _ex:
-        st.error(f"Error generando pago: {_ex}")
+        st.error(f"❌ Error al conectar con Stripe: {_ex}")
+        st.warning("Contacta con soporte@archirapid.com indicando el error anterior.")
