@@ -119,6 +119,20 @@ def _get_company(email: str):
 def main():
     _ensure_table()
 
+    # Check registro recién completado — dar tiempo a Supabase y redirigir al dashboard
+    if st.session_state.get("_prefab_registro_ok"):
+        st.session_state.pop("_prefab_registro_ok", None)
+        _email_nuevo = st.session_state.get("_prefab_email_nuevo", "")
+        if _email_nuevo:
+            import time
+            time.sleep(0.5)  # dar tiempo a Supabase para confirmar el registro
+            _comp_nuevo = _get_company(_email_nuevo)
+            if _comp_nuevo:
+                st.session_state["prefab_company"] = _comp_nuevo
+                st.session_state.pop("_prefab_email_nuevo", None)
+                _render_dashboard(_comp_nuevo)
+                return
+
     # Recuperar sesión si viene de retorno Stripe con ?email=
     if (
         not st.session_state.get("prefab_company")
@@ -339,8 +353,7 @@ def _render_login_register():
                                     st.session_state.pop("_invite_meses", None)
                                     # Setear sesión empresa
                                     st.session_state["prefab_company"] = _empresa_final
-                                    # NO hacer st.rerun() aquí — dejar que el flujo
-                                    # continúe naturalmente al dashboard
+                                    st.session_state["_prefab_email_nuevo"] = _re
                                     st.success(
                                         f"✅ Bienvenido/a. Tu acceso gratuito de "
                                         f"{_invite_meses} mes(es) está activo. "
@@ -359,6 +372,7 @@ def _render_login_register():
                                 time.sleep(1)
                                 if _nueva_empresa:
                                     st.session_state["prefab_company"] = _nueva_empresa
+                                    st.session_state["_prefab_email_nuevo"] = _re
                                     st.session_state["_prefab_registro_ok"] = True
                                     _checkout_plan(_rplan, _nueva_empresa)
                                 else:
