@@ -351,12 +351,15 @@ def _render_login_register():
                                 st.rerun()  # ← fuera de try/except — seguro
                             else:
                                 # Sin invite: ir directo a Stripe (NO setear prefab_company aquí)
+                                # Construir dict sin releer BD (puede haber lag en Supabase)
                                 st.success("✅ Empresa registrada. Redirigiendo al pago del plan...")
-                                _nueva_empresa = _get_company(_re)
-                                if _nueva_empresa:
-                                    _checkout_plan(_rplan, _nueva_empresa)
-                                else:
-                                    st.info("Registro completado. Accede con tus credenciales para activar tu plan.")
+                                _comp_new = {
+                                    "id": _new_id, "nombre": _rn, "email": _re,
+                                    "plan": _rplan, "active": 1, "status": "autorizado",
+                                    "comision_pct": _comision_reg,
+                                    "paid_until": None, "destacado_activo": 0,
+                                }
+                                _checkout_plan(_rplan, _comp_new)
                                 st.stop()
 
 
