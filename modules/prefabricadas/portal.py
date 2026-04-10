@@ -190,26 +190,36 @@ def _render_login_register():
                 _rpw2 = st.text_input("Repetir contraseña *", type="password")
 
             # Planes
-            st.markdown("#### Elige tu plan de publicación:")
-            _cols_planes = st.columns(3)
-            for i, (plan_key, plan_info) in enumerate(PLANES_PREFAB.items()):
-                with _cols_planes[i]:
-                    st.markdown(
-                        f"**{plan_info['label']}**\n\n"
-                        f"### {plan_info['precio']}€/mes\n\n"
-                        f"*Hasta {plan_info['modelos']} modelos*"
-                    )
-                    for feat in plan_info["features"]:
-                        st.markdown(f"✅ {feat}")
-                    st.markdown("")
+            if not _invite_activo:
+                st.markdown("#### Elige tu plan de publicación:")
+                _cols_planes = st.columns(3)
+                for i, (plan_key, plan_info) in enumerate(PLANES_PREFAB.items()):
+                    with _cols_planes[i]:
+                        st.markdown(
+                            f"**{plan_info['label']}**\n\n"
+                            f"### {plan_info['precio']}€/mes\n\n"
+                            f"*Hasta {plan_info['modelos']} modelos*"
+                        )
+                        for feat in plan_info["features"]:
+                            st.markdown(f"✅ {feat}")
+                        st.markdown("")
 
-            _rplan = st.radio(
-                "Plan seleccionado",
-                options=list(PLANES_PREFAB.keys()),
-                format_func=lambda k: f"{PLANES_PREFAB[k]['label']} — {PLANES_PREFAB[k]['precio']}€/mes",
-                horizontal=True,
-                key="prefab_plan_radio"
-            )
+                _rplan = st.radio(
+                    "Plan seleccionado",
+                    options=list(PLANES_PREFAB.keys()),
+                    format_func=lambda k: f"{PLANES_PREFAB[k]['label']} — {PLANES_PREFAB[k]['precio']}€/mes",
+                    horizontal=True,
+                    key="prefab_plan_radio"
+                )
+            else:
+                st.info(
+                    f"✅ Plan **{_invite_plan}** activado automáticamente "
+                    f"por tu invitación — {_invite_meses} mes(es) gratuitos. "
+                    "No es necesario seleccionar ningún plan."
+                )
+                # Forzar el plan del invite en session_state
+                # para que el INSERT lo use
+                _rplan = _invite_plan
 
             st.markdown("---")
             st.markdown("**📊 Comisión de venta aplicable**")
@@ -281,44 +291,59 @@ def _render_login_register():
                             # Acceso inmediato + redirigir según si hay token de invitación
                             _nueva_empresa = _get_company(_re)
                             if _invite_activo and _invite_token and _nueva_empresa:
-                                # Activar plan de cortesía por invitación
+                                # Actualizar plan con cortesía
+                                import datetime as _dt_inv
+                                _until_inv = (
+                                    _dt_inv.datetime.utcnow()
+                                    + _dt_inv.timedelta(days=30 * int(_invite_meses))
+                                ).strftime("%Y-%m-%d")
                                 try:
-                                    import datetime as _dt_inv
-                                    _until_inv = (
-                                        _dt_inv.datetime.utcnow()
-                                        + _dt_inv.timedelta(days=30 * _invite_meses)
-                                    ).strftime("%Y-%m-%d")
-                                    _cn_inv2 = db_conn()
-                                    try:
-                                        _cn_inv2.execute("""
-                                            UPDATE prefab_companies
-                                            SET plan=?, paid_until=?, active=1
-                                            WHERE email=?
-                                        """, (_invite_plan, _until_inv, _re))
-                                        _cn_inv2.execute("""
-                                            UPDATE invitaciones
-                                            SET estado='usado',
-                                                usado_at=?,
-                                                usado_por_email=?
-                                            WHERE token=?
-                                        """, (
-                                            _dt_inv.datetime.utcnow().isoformat() + "Z",
-                                            _re, _invite_token
-                                        ))
-                                        _cn_inv2.commit()
-                                    finally:
-                                        _cn_inv2.close()
+                                    _cn_upd = db_conn()
+                                    _cn_upd.execute("""
+                                        UPDATE prefab_companies
+                                        SET plan=?, paid_until=?,
+                                            active=1, status='autorizado'
+                                        WHERE email=?
+                                    """, (_invite_plan, _until_inv, _re))
+                                    _cn_upd.execute("""
+                                        UPDATE invitaciones
+                                        SET estado='usado',
+                                            usado_at=?,
+                                            usado_por_email=?
+                                        WHERE token=?
+                                    """, (
+                                        _dt_inv.datetime.utcnow().isoformat() + "Z",
+                                        _re, _invite_token
+                                    ))
+                                    _cn_upd.commit()
+                                    _cn_upd.close()
+                                except Exception as _eu:
+                                    st.error(f"Error activando cortesía: {_eu}")
+
+                                # Recargar empresa con datos actualizados
+                                _empresa_final = _get_company(_re)
+                                if _empresa_final:
+                                    # Limpiar flags invite
                                     st.session_state["_invite_completado"] = True
                                     st.session_state.pop("_invite_activo", None)
                                     st.session_state.pop("_invite_token", None)
-                                except Exception:
-                                    pass
-                                st.success(
-                                    f"✅ Empresa registrada. Plan {_invite_plan} activado "
-                                    f"hasta {_until_inv}. ¡Bienvenida a ArchiRapid!"
-                                )
-                                st.session_state["prefab_company"] = _get_company(_re)
-                                st.rerun()
+                                    st.session_state.pop("_invite_plan", None)
+                                    st.session_state.pop("_invite_meses", None)
+                                    # Setear sesión empresa
+                                    st.session_state["prefab_company"] = _empresa_final
+                                    # NO hacer st.rerun() aquí — dejar que el flujo
+                                    # continúe naturalmente al dashboard
+                                    st.success(
+                                        f"✅ Bienvenido/a. Tu acceso gratuito de "
+                                        f"{_invite_meses} mes(es) está activo. "
+                                        "Accediendo a tu panel..."
+                                    )
+                                    st.rerun()
+                                else:
+                                    st.error(
+                                        "Registro completado pero no se pudo "
+                                        "cargar el panel. Accede con tus credenciales."
+                                    )
                             else:
                                 st.success("✅ Empresa registrada. Redirigiendo al pago del plan...")
                                 import time

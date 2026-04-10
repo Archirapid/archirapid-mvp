@@ -147,18 +147,22 @@ if _qp_invite and not st.session_state.get(f"_invite_processed_{_qp_invite}"):
 
 _page_from_url = st.query_params.get("page", "home")
 if st.session_state.get("current_page_sync") != _page_from_url:
-    # URL cambió (botón Atrás o enlace externo) → forzar estado desde URL
-    st.session_state["current_page_sync"] = _page_from_url
-    _target = _SLUG_TO_PAGE_MASTER.get(_page_from_url, "🏠 Inicio / Marketplace")
-    st.session_state["selected_page"] = _target
-    # Borrar la key del widget radio para que Streamlit no restaure el valor antiguo
-    if not st.session_state.get("_invite_activo"):
+    if st.session_state.get("_invite_activo") or \
+       st.session_state.get("_invite_completado"):
+        st.session_state["current_page_sync"] = _page_from_url
+        # No hacer nada más — el invite ya configuró la página
+    else:
+        # URL cambió (botón Atrás o enlace externo) → forzar estado desde URL
+        st.session_state["current_page_sync"] = _page_from_url
+        _target = _SLUG_TO_PAGE_MASTER.get(_page_from_url, "🏠 Inicio / Marketplace")
+        st.session_state["selected_page"] = _target
+        # Borrar la key del widget radio para que Streamlit no restaure el valor antiguo
         st.session_state.pop("_nav_radio", None)
-    # Limpiar flags de login si volvemos a home
-    if _page_from_url in ("home", ""):
-        st.session_state.pop("viewing_login", None)
-        st.session_state.pop("login_role", None)
-    st.rerun()
+        # Limpiar flags de login si volvemos a home
+        if _page_from_url in ("home", ""):
+            st.session_state.pop("viewing_login", None)
+            st.session_state.pop("login_role", None)
+        st.rerun()
 # ══════════════════════════════════════════════════════════════════
 
 st.markdown("""
