@@ -221,21 +221,42 @@ def _render_tokens_accesos():
             _url = f"{_base}/?invite={_token}&tipo={_tipo}"
 
             try:
-                _cn = _dbc()
+                # Forzar escritura en PostgreSQL/Supabase para tokens
                 try:
-                    _cn.execute("""
-                        INSERT INTO invitaciones
-                        (id, token, tipo, plan, meses_cortesia,
-                         email_destino, nombre_destino, notas,
-                         creado_por, creado_at, estado, url_generada)
-                        VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
-                    """, (
-                        _tok_id, _token, _tipo, _plan, _meses,
-                        _email_dest or None,
-                        _nombre_dest or None,
-                        _notas or None,
-                        "admin", _now, "activo", _url
-                    ))
+                    from src.db import get_conn as _get_pg_conn
+                    _cn = _get_pg_conn()
+                    _uses_pg = True
+                except Exception:
+                    _cn = _dbc()
+                    _uses_pg = False
+
+                try:
+                    if _uses_pg:
+                        # PostgreSQL usa %s
+                        _cn.execute("""
+                            INSERT INTO invitaciones
+                            (id, token, tipo, plan, meses_cortesia,
+                             email_destino, nombre_destino, notas,
+                             creado_por, creado_at, estado, url_generada)
+                            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                        """, (
+                            _tok_id, _token, _tipo, _plan, _meses,
+                            _email_dest or None, _nombre_dest or None,
+                            _notas or None, "admin", _now, "activo", _url
+                        ))
+                    else:
+                        # SQLite usa ?
+                        _cn.execute("""
+                            INSERT INTO invitaciones
+                            (id, token, tipo, plan, meses_cortesia,
+                             email_destino, nombre_destino, notas,
+                             creado_por, creado_at, estado, url_generada)
+                            VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+                        """, (
+                            _tok_id, _token, _tipo, _plan, _meses,
+                            _email_dest or None, _nombre_dest or None,
+                            _notas or None, "admin", _now, "activo", _url
+                        ))
                     _cn.commit()
                 finally:
                     _cn.close()
