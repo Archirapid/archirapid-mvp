@@ -394,7 +394,21 @@ def _render_dashboard(company: dict):
     _plan = company.get("plan") or "starter"
     _paid_until = company.get("paid_until")
     _plan_label = _PLANES.get(_plan, _PLANES["starter"])["label"]
-    if _plan in ("profesional", "premium", "destacado"):
+    _plan_actual = company.get("plan", "starter")
+    _status = company.get("status", "")
+
+    if _plan_actual == "cortesia":
+        st.warning(
+            f"🎁 **Acceso de cortesía activo** — válido hasta: "
+            f"{_paid_until or 'sin fecha definida'}.\n\n"
+            "Puedes subir hasta **3 modelos** ahora mismo. "
+            "Tu catálogo será visible en el marketplace una vez que "
+            "el equipo de ArchiRapid lo revise y apruebe "
+            "**(máximo 48 horas)**.\n\n"
+            "Recibirás un email en cuanto esté operativo. "
+            "Si tienes dudas escríbenos a **hola@archirapid.com**"
+        )
+    elif _plan in ("profesional", "premium", "destacado"):
         st.success(f"⭐ Plan {_plan_label} activo — válido hasta: {_paid_until or 'indefinido'}")
     else:
         st.info(f"📋 Plan {_plan_label} activo — válido hasta: {_paid_until or 'indefinido'}")
