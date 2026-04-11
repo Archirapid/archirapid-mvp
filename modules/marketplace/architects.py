@@ -925,11 +925,6 @@ def _main_body():
 
 
 def main():
-    if st.session_state.get("_architects_rendering"):
-        return
-    st.session_state["_architects_rendering"] = True
-    try:
-        _main_body()
-    finally:
-        st.session_state.pop("_architects_rendering", None)
+    st.session_state.pop("_architects_rendering", None)
+    _main_body()
 
