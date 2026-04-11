@@ -76,7 +76,7 @@ def _activate_subscription_after_payment(arch_id, plan_key, session_id):
         return False
 
 
-def main():
+def _main_body():
     st.header("🏗️ Portal para Arquitectos")
 
     # --- 0. RETORNO DESDE STRIPE (pago de suscripción) ---
@@ -351,7 +351,7 @@ def main():
 
         c_ia_1, c_ia_2 = st.columns(2)
         with c_ia_1:
-            ia_m2 = st.number_input("Superficie Finca (m²)", 200, 5000, 1000, key="ia_tab_m2")
+            ia_m2 = st.number_input("Superficie Finca (m²)", 200, 500000, 1000, key="ia_tab_m2")
             ia_habs = st.slider("Habitaciones", 1, 6, 3)
             if st.button("✨ Generar Distribución", key="btn_gen_dist"):
                 with st.spinner("Generando distribución con IA..."):
@@ -922,4 +922,14 @@ def main():
                     _sopa_conn.close()
             except Exception as _esop:
                 st.warning(f"Soporte no disponible: {_esop}")
+
+
+def main():
+    if st.session_state.get("_architects_rendering"):
+        return
+    st.session_state["_architects_rendering"] = True
+    try:
+        _main_body()
+    finally:
+        st.session_state.pop("_architects_rendering", None)
 
