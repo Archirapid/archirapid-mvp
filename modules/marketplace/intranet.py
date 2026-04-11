@@ -221,8 +221,46 @@ def _render_tokens_accesos():
             _url = f"{_base}/?invite={_token}&tipo={_tipo}"
 
             try:
-                _cn = _dbc()
+                _inserted = False
+
+                # Intentar insertar via Supabase Python client (garantiza PG en producción)
                 try:
+                    import os as _os_inv
+                    _sb_url = _os_inv.environ.get("SUPABASE_URL", "")
+                    _sb_key = _os_inv.environ.get("SUPABASE_SERVICE_KEY", "") or \
+                              _os_inv.environ.get("SUPABASE_KEY", "")
+                    if not _sb_url:
+                        try:
+                            import streamlit as _st_inv
+                            _sb_url = _st_inv.secrets.get("SUPABASE_URL", "")
+                            _sb_key = (_st_inv.secrets.get("SUPABASE_SERVICE_KEY", "") or
+                                       _st_inv.secrets.get("SUPABASE_KEY", ""))
+                        except Exception:
+                            pass
+                    if _sb_url and _sb_key:
+                        from supabase import create_client as _sb_create
+                        _sb_inv = _sb_create(_sb_url, _sb_key)
+                        _sb_inv.table("invitaciones").insert({
+                            "id": _tok_id,
+                            "token": _token,
+                            "tipo": _tipo,
+                            "plan": _plan,
+                            "meses_cortesia": _meses,
+                            "email_destino": _email_dest or None,
+                            "nombre_destino": _nombre_dest or None,
+                            "notas": _notas or None,
+                            "creado_por": "admin",
+                            "creado_at": _now,
+                            "estado": "activo",
+                            "url_generada": _url,
+                        }).execute()
+                        _inserted = True
+                except Exception as _sb_err:
+                    pass  # fallback a db_conn
+
+                # Fallback: db_conn (funciona en local)
+                if not _inserted:
+                    _cn = _dbc()
                     _cn.execute("""
                         INSERT INTO invitaciones
                         (id, token, tipo, plan, meses_cortesia,
@@ -231,13 +269,10 @@ def _render_tokens_accesos():
                         VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
                     """, (
                         _tok_id, _token, _tipo, _plan, _meses,
-                        _email_dest or None,
-                        _nombre_dest or None,
-                        _notas or None,
-                        "admin", _now, "activo", _url
+                        _email_dest or None, _nombre_dest or None,
+                        _notas or None, "admin", _now, "activo", _url
                     ))
                     _cn.commit()
-                finally:
                     _cn.close()
                 st.success(f"✅ Token generado: **{_token}**")
                 st.code(_url, language=None)
