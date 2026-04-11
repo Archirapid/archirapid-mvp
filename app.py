@@ -1482,7 +1482,8 @@ if st.session_state.get("_nav_programmatic"):
     st.session_state.pop("_nav_programmatic", None)
 else:
     if not (st.session_state.get("_invite_activo") or
-            st.session_state.get("_invite_completado")):
+            st.session_state.get("_invite_completado") or
+            st.session_state.get("_prefab_stripe_pending")):
         st.session_state['selected_page'] = selected_page
 
 # ── Panic Button de Hard Reset (último en sidebar) ─────────────────────
