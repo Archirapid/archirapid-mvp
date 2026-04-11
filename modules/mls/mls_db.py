@@ -107,70 +107,110 @@ def create_inmo(datos: dict, ip: str = None) -> str | None:
         return v
 
     inmo_id = uuid.uuid4().hex
-    conn = _db.get_conn()
+    # Intentar insertar via Supabase client directo (garantiza PG en producción)
+    _inserted = False
     try:
-        conn.execute(
-            """INSERT INTO inmobiliarias
-               (id, nombre, cif, email, password_hash,
-                nombre_sociedad, nombre_comercial,
-                telefono, telefono_secundario, telegram_contacto, web,
-                direccion, localidad, provincia, codigo_postal, pais,
-                contacto_nombre, contacto_cargo, contacto_email,
-                contacto_telefono, contacto_telegram,
-                factura_razon_social, factura_cif, factura_direccion,
-                factura_email, iban, banco_nombre, banco_titular, email_login,
-                plan, plan_activo, activa, ip_registro, created_at)
-               VALUES (
-                ?,?,?,?,?,
-                ?,?,
-                ?,?,?,?,
-                ?,?,?,?,?,
-                ?,?,?,
-                ?,?,
-                ?,?,?,
-                ?,?,?,?,?,
-                'ninguno',0,0,?,?)""",
-            (
-                inmo_id,
-                (datos.get("nombre") or "").strip(),
-                (datos.get("cif") or "").strip().upper(),
-                (datos.get("email") or "").strip().lower(),
-                datos.get("password_hash", ""),
-                _s("nombre_sociedad"),
-                _s("nombre_comercial"),
-                _s("telefono"),
-                _s("telefono_secundario"),
-                _s("telegram_contacto"),
-                _s("web"),
-                _s("direccion"),
-                _s("localidad"),
-                _s("provincia"),
-                _s("codigo_postal"),
-                datos.get("pais") or "España",
-                _s("contacto_nombre"),
-                _s("contacto_cargo"),
-                _s("contacto_email", lower=True),
-                _s("contacto_telefono"),
-                _s("contacto_telegram"),
-                _s("factura_razon_social"),
-                _s("factura_cif", upper=True),
-                _s("factura_direccion"),
-                _s("factura_email", lower=True),
-                _s("iban", upper=True),
-                _s("banco_nombre"),
-                _s("banco_titular"),
-                _s("email_login", lower=True),
-                ip or datos.get("ip_registro") or "unknown",
-                _now_utc(),
+        import os as _os_mls
+        import streamlit as _st_mls
+        _sb_url = _os_mls.environ.get("SUPABASE_URL", "")
+        _sb_key = (_os_mls.environ.get("SUPABASE_SERVICE_KEY", "") or
+                   _os_mls.environ.get("SUPABASE_KEY", ""))
+        if not _sb_url:
+            try:
+                _sb_url = _st_mls.secrets.get("SUPABASE_URL", "")
+                _sb_key = (_st_mls.secrets.get("SUPABASE_SERVICE_KEY", "") or
+                           _st_mls.secrets.get("SUPABASE_KEY", ""))
+            except Exception:
+                pass
+        if _sb_url and _sb_key:
+            from supabase import create_client as _sb_create_mls
+            _sb_mls = _sb_create_mls(_sb_url, _sb_key)
+            # Construir dict con todos los campos del INSERT
+            _row = {
+                "id": inmo_id,
+                "nombre": _s("nombre"),
+                "cif": _s("cif", upper=True),
+                "email": _s("email", lower=True),
+                "password_hash": datos.get("password_hash"),
+                "nombre_sociedad": _s("nombre_sociedad"),
+                "nombre_comercial": _s("nombre_comercial"),
+                "telefono": _s("telefono"),
+                "telefono_secundario": _s("telefono_secundario"),
+                "telegram_contacto": _s("telegram_contacto"),
+                "web": _s("web", lower=True),
+                "direccion": _s("direccion"),
+                "localidad": _s("localidad"),
+                "provincia": _s("provincia"),
+                "codigo_postal": _s("codigo_postal"),
+                "pais": _s("pais") or "España",
+                "contacto_nombre": _s("contacto_nombre"),
+                "contacto_cargo": _s("contacto_cargo"),
+                "contacto_email": _s("contacto_email", lower=True),
+                "contacto_telefono": _s("contacto_telefono"),
+                "contacto_telegram": _s("contacto_telegram"),
+                "factura_razon_social": _s("factura_razon_social"),
+                "factura_cif": _s("factura_cif", upper=True),
+                "factura_direccion": _s("factura_direccion"),
+                "factura_email": _s("factura_email", lower=True),
+                "iban": _s("iban", upper=True),
+                "banco_nombre": _s("banco_nombre"),
+                "banco_titular": _s("banco_titular"),
+                "email_login": _s("email_login", lower=True),
+                "plan": datos.get("plan", "trial"),
+                "plan_activo": datos.get("plan_activo", 0),
+                "activa": 0,
+                "ip_registro": ip or datos.get("ip_registro") or "unknown",
+                "created_at": _now_utc(),
+            }
+            # Eliminar None para no pisar defaults de Supabase
+            _row_clean = {k: v for k, v in _row.items() if v is not None}
+            _sb_mls.table("inmobiliarias").insert(_row_clean).execute()
+            _inserted = True
+    except Exception as _sb_err:
+        logger.error("create_inmo Supabase error: %s", _sb_err)
+
+    # Fallback: get_conn() para SQLite local
+    if not _inserted:
+        conn = _db.get_conn()
+        try:
+            conn.execute(
+                """INSERT INTO inmobiliarias
+                   (id, nombre, cif, email, password_hash,
+                    nombre_sociedad, nombre_comercial,
+                    telefono, telefono_secundario, telegram_contacto, web,
+                    direccion, localidad, provincia, codigo_postal, pais,
+                    contacto_nombre, contacto_cargo, contacto_email,
+                    contacto_telefono, contacto_telegram,
+                    factura_razon_social, factura_cif, factura_direccion,
+                    factura_email, iban, banco_nombre, banco_titular,
+                    email_login, plan, plan_activo, activa,
+                    ip_registro, created_at)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                (inmo_id, _s("nombre"), _s("cif", upper=True),
+                 _s("email", lower=True), datos.get("password_hash"),
+                 _s("nombre_sociedad"), _s("nombre_comercial"),
+                 _s("telefono"), _s("telefono_secundario"),
+                 _s("telegram_contacto"), _s("web", lower=True),
+                 _s("direccion"), _s("localidad"), _s("provincia"),
+                 _s("codigo_postal"), _s("pais") or "España",
+                 _s("contacto_nombre"), _s("contacto_cargo"),
+                 _s("contacto_email", lower=True), _s("contacto_telefono"),
+                 _s("contacto_telegram"), _s("factura_razon_social"),
+                 _s("factura_cif", upper=True), _s("factura_direccion"),
+                 _s("factura_email", lower=True), _s("iban", upper=True),
+                 _s("banco_nombre"), _s("banco_titular"),
+                 _s("email_login", lower=True),
+                 datos.get("plan", "trial"), datos.get("plan_activo", 0),
+                 0, ip or datos.get("ip_registro") or "unknown", _now_utc())
             )
-        )
-        conn.commit()
-        return inmo_id
-    except Exception as e:
-        logger.error("create_inmo error: %s", e)
-        raise  # propaga al caller para que muestre el error real en UI
-    finally:
-        conn.close()
+            conn.commit()
+        except Exception as e:
+            logger.error("create_inmo fallback error: %s", e)
+            raise
+        finally:
+            conn.close()
+
+    return inmo_id
 
 
 def update_inmo_activa(inmo_id: str, activa: int) -> bool:
