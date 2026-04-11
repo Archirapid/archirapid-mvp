@@ -477,11 +477,23 @@ def ui_login_registro() -> None:
                         st.error(f"Error al registrar: {msg}")
 
                 if _reg_success:
+                    # Cargar la inmo recién registrada y mostrar pantalla de pendiente
+                    try:
+                        _inmo_nueva = mls_db.get_inmo_by_email(
+                            datos.get("email_login", "").strip().lower()
+                        )
+                        if _inmo_nueva:
+                            st.session_state[_SESSION_KEY] = _inmo_nueva
+                            st.rerun()
+                    except Exception:
+                        pass
+                    # Fallback si no se puede cargar
                     st.success("✅ ¡Solicitud de alta enviada correctamente!")
                     st.info(
                         "**Tu solicitud está siendo revisada.**\n\n"
-                        "Recibirás un **email de confirmación** en cuanto sea aprobada (24-48h hábiles).\n\n"
-                        "Una vez aprobada, vuelve aquí e inicia sesión en la pestaña **🔑 Acceder**."
+                        "Recibirás un **email de confirmación** en cuanto "
+                        "sea aprobada (24-48h hábiles).\n\n"
+                        "Una vez aprobada, vuelve aquí e inicia sesión."
                     )
                     st.stop()
 
