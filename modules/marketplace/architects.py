@@ -614,89 +614,105 @@ def _main_body():
 
     if tab_planes is not None:
      with tab_planes:
-        st.subheader("💎 Elige tu plan")
-
-        # Banner plan activo
-        if sub_status["active"]:
-            st.success(f"Plan activo: **{sub_status['plan']}** — vence el {sub_status['end_date']}")
-        else:
-            st.warning("Sin plan activo. Suscribete para publicar proyectos y acceder al Modo Estudio ilimitado.")
-
-        # Aviso tarjeta de prueba Stripe (entorno test)
-        st.info("**Entorno de pruebas Stripe** — Usa la tarjeta: `4242 4242 4242 4242` "
-                "· Fecha: cualquier fecha futura (ej. 12/26) · CVC: cualquier 3 digitos")
-
-        st.markdown("---")
-
-        def _make_stripe_btn(stripe_key, plan_label, col_container):
-            """Helper: genera sesión Stripe y muestra botón de pago."""
-            import urllib.parse
-            _url_key = f"sub_stripe_url_{stripe_key}"
-            _arch_id    = st.session_state.get("arch_id", "")
-            _arch_email = urllib.parse.quote(st.session_state.get("arch_email", ""))
-            _arch_name  = urllib.parse.quote(st.session_state.get("arch_name", ""))
-            with col_container:
-                if st.session_state.get(_url_key):
-                    st.link_button(f"💳 Ir al pago — {plan_label}", st.session_state[_url_key],
-                                   type="primary", use_container_width=True)
-                    if st.button("← Cancelar", key=f"cancel_{stripe_key}", use_container_width=True):
-                        del st.session_state[_url_key]
-                        st.rerun()
-                else:
-                    if st.button(f"Contratar {plan_label}", key=f"plan_{stripe_key}",
-                                 type="primary", use_container_width=True):
-                        try:
-                            from modules.stripe_utils import create_checkout_session
-                            base = _get_base_url()
-                            success_url = (
-                                f"{base}/?page=Arquitectos (Marketplace)"
-                                f"&sub_session={{CHECKOUT_SESSION_ID}}&sub_plan={stripe_key}"
-                                f"&arch_id={_arch_id}&arch_email={_arch_email}&arch_name={_arch_name}"
-                            )
-                            cancel_url = f"{base}/?page=Arquitectos (Marketplace)&arch_id={_arch_id}&arch_email={_arch_email}&arch_name={_arch_name}"
-                            url, _sid = create_checkout_session(
-                                [stripe_key], stripe_key,
-                                st.session_state.get("arch_email", ""),
-                                success_url, cancel_url)
-                            st.session_state[_url_key] = url
+        _es_cortesia = (
+            st.session_state.get("_invite_activo") and
+            st.session_state.get("_invite_tipo") == "arquitectos"
+        ) or st.session_state.get("_invite_completado")
+        if not _es_cortesia:
+            st.subheader("💎 Elige tu plan")
+    
+            # Banner plan activo
+            if sub_status["active"]:
+                st.success(f"Plan activo: **{sub_status['plan']}** — vence el {sub_status['end_date']}")
+            else:
+                st.warning("Sin plan activo. Suscribete para publicar proyectos y acceder al Modo Estudio ilimitado.")
+    
+            # Aviso tarjeta de prueba Stripe (entorno test)
+            st.info("**Entorno de pruebas Stripe** — Usa la tarjeta: `4242 4242 4242 4242` "
+                    "· Fecha: cualquier fecha futura (ej. 12/26) · CVC: cualquier 3 digitos")
+    
+            st.markdown("---")
+    
+            def _make_stripe_btn(stripe_key, plan_label, col_container):
+                """Helper: genera sesión Stripe y muestra botón de pago."""
+                import urllib.parse
+                _url_key = f"sub_stripe_url_{stripe_key}"
+                _arch_id    = st.session_state.get("arch_id", "")
+                _arch_email = urllib.parse.quote(st.session_state.get("arch_email", ""))
+                _arch_name  = urllib.parse.quote(st.session_state.get("arch_name", ""))
+                with col_container:
+                    if st.session_state.get(_url_key):
+                        st.link_button(f"💳 Ir al pago — {plan_label}", st.session_state[_url_key],
+                                       type="primary", use_container_width=True)
+                        if st.button("← Cancelar", key=f"cancel_{stripe_key}", use_container_width=True):
+                            del st.session_state[_url_key]
                             st.rerun()
-                        except Exception as e:
-                            st.error(f"Error Stripe: {e}")
-
-        # Fila 1: BASIC / PRO / ENTERPRISE
-        c1, c2, c3 = st.columns(3)
-        plans_info = [
-            {"name": "BASIC",      "price": "29€/mes",  "features": ["1 proyecto activo", "Modo Estudio €19/proyecto", "10% comisión"],              "key": "sub_basic",     "col": c1},
-            {"name": "PRO",        "price": "99€/mes",  "features": ["5 proyectos activos", "Modo Estudio ilimitado", "8% comisión", "Badge verificado"], "key": "sub_pro",    "col": c2},
-            {"name": "ENTERPRISE", "price": "299€/mes", "features": ["Proyectos ilimitados", "Modo Estudio ilimitado", "5% comisión", "Soporte prioritario"], "key": "sub_enterprise", "col": c3},
-        ]
-        for p in plans_info:
-            with p["col"]:
-                with st.container(border=True):
-                    st.markdown(f"### {p['name']}")
-                    st.markdown(f"#### {p['price']}")
-                    for feat in p["features"]:
-                        st.write(f"✓ {feat}")
-                    st.markdown("")
-            _make_stripe_btn(p["key"], p["name"], p["col"])
-
-        st.markdown("---")
-
-        # Fila 2: PRO Anual destacado
-        with st.container(border=True):
-            ca1, ca2 = st.columns([3, 1])
-            with ca1:
-                st.markdown("### ⭐ PRO Anual — **890€/año** *(ahorras €298 vs mensual)*")
-                st.write("✓ Modo Estudio ilimitado  ·  ✓ 999 proyectos activos  ·  ✓ 8% comisión  ·  ✓ Badge verificado")
-                st.caption("Equivale a €74/mes — 3 meses gratis respecto al plan mensual")
-            _make_stripe_btn("sub_pro_anual", "PRO Anual", ca2)
-
-        st.markdown("---")
-        st.caption("💡 Los pagos se procesan de forma segura con Stripe. Recibirás un email de confirmación tras el pago.")
+                    else:
+                        if st.button(f"Contratar {plan_label}", key=f"plan_{stripe_key}",
+                                     type="primary", use_container_width=True):
+                            try:
+                                from modules.stripe_utils import create_checkout_session
+                                base = _get_base_url()
+                                success_url = (
+                                    f"{base}/?page=Arquitectos (Marketplace)"
+                                    f"&sub_session={{CHECKOUT_SESSION_ID}}&sub_plan={stripe_key}"
+                                    f"&arch_id={_arch_id}&arch_email={_arch_email}&arch_name={_arch_name}"
+                                )
+                                cancel_url = f"{base}/?page=Arquitectos (Marketplace)&arch_id={_arch_id}&arch_email={_arch_email}&arch_name={_arch_name}"
+                                url, _sid = create_checkout_session(
+                                    [stripe_key], stripe_key,
+                                    st.session_state.get("arch_email", ""),
+                                    success_url, cancel_url)
+                                st.session_state[_url_key] = url
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Error Stripe: {e}")
+    
+            # Fila 1: BASIC / PRO / ENTERPRISE
+            c1, c2, c3 = st.columns(3)
+            plans_info = [
+                {"name": "BASIC",      "price": "29€/mes",  "features": ["1 proyecto activo", "Modo Estudio €19/proyecto", "10% comisión"],              "key": "sub_basic",     "col": c1},
+                {"name": "PRO",        "price": "99€/mes",  "features": ["5 proyectos activos", "Modo Estudio ilimitado", "8% comisión", "Badge verificado"], "key": "sub_pro",    "col": c2},
+                {"name": "ENTERPRISE", "price": "299€/mes", "features": ["Proyectos ilimitados", "Modo Estudio ilimitado", "5% comisión", "Soporte prioritario"], "key": "sub_enterprise", "col": c3},
+            ]
+            for p in plans_info:
+                with p["col"]:
+                    with st.container(border=True):
+                        st.markdown(f"### {p['name']}")
+                        st.markdown(f"#### {p['price']}")
+                        for feat in p["features"]:
+                            st.write(f"✓ {feat}")
+                        st.markdown("")
+                _make_stripe_btn(p["key"], p["name"], p["col"])
+    
+            st.markdown("---")
+    
+            # Fila 2: PRO Anual destacado
+            with st.container(border=True):
+                ca1, ca2 = st.columns([3, 1])
+                with ca1:
+                    st.markdown("### ⭐ PRO Anual — **890€/año** *(ahorras €298 vs mensual)*")
+                    st.write("✓ Modo Estudio ilimitado  ·  ✓ 999 proyectos activos  ·  ✓ 8% comisión  ·  ✓ Badge verificado")
+                    st.caption("Equivale a €74/mes — 3 meses gratis respecto al plan mensual")
+                _make_stripe_btn("sub_pro_anual", "PRO Anual", ca2)
+    
+            st.markdown("---")
+            st.caption("💡 Los pagos se procesan de forma segura con Stripe. Recibirás un email de confirmación tras el pago.")
 
     with tab_subir:
-        if not sub_status["active"]:
+        _es_cortesia_sub = (
+            st.session_state.get("_invite_activo") and
+            st.session_state.get("_invite_tipo") == "arquitectos"
+        ) or st.session_state.get("_invite_completado")
+
+        if not sub_status["active"] and not _es_cortesia_sub:
             st.error("Necesitas un plan activo para subir proyectos.")
+        elif not sub_status["active"] and _es_cortesia_sub:
+            st.info(
+                "🎁 Acceso de cortesía activo. Puedes subir proyectos "
+                "pero estarán pendientes de revisión por ArchiRapid "
+                "antes de publicarse."
+            )
         else:
             st.subheader("Nuevo Proyecto de Catálogo")
             st.info("Los proyectos se 'emparejan' automáticamente con fincas compatibles basándose en la edificabilidad.")
