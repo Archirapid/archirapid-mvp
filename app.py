@@ -1623,6 +1623,13 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
             st.query_params["page"] = "prefabricadas"
             st.rerun()
 
+        if st.session_state.get('login_role') == 'inmo':
+            st.session_state['viewing_login'] = False
+            st.session_state['selected_page'] = "🏢 Inmobiliarias MLS"
+            st.session_state['_nav_radio'] = "🏢 Inmobiliarias MLS"
+            st.query_params["page"] = "mls"
+            st.rerun()
+
         try:
             st.markdown("---")
             _login_role = st.session_state.get('login_role')
