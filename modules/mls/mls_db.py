@@ -251,23 +251,52 @@ def update_inmo_plan(inmo_id: str, plan: str,
 
 
 def update_inmo_firma(inmo_id: str, firma_hash: str,
-                      firma_timestamp: str) -> bool:
-    """Registra la firma digital del acuerdo de colaboración."""
-    conn = _db.get_conn()
+                      firma_timestamp: str, doc_hash: str = "") -> bool:
+    """Registra la firma digital del acuerdo de colaboración.
+    Intenta Supabase client directo; fallback a get_conn() (SQLite local).
+    """
+    _updated = False
     try:
-        conn.execute(
-            """UPDATE inmobiliarias
-               SET firma_hash = ?, firma_timestamp = ?
-               WHERE id = ?""",
-            (firma_hash, firma_timestamp, inmo_id)
-        )
-        conn.commit()
-        return True
-    except Exception as e:
-        logger.error("update_inmo_firma error: %s", e)
-        return False
-    finally:
-        conn.close()
+        import os as _os_f
+        import streamlit as _st_f
+        _sb_url = _os_f.environ.get("SUPABASE_URL", "")
+        _sb_key = (_os_f.environ.get("SUPABASE_SERVICE_KEY", "") or
+                   _os_f.environ.get("SUPABASE_KEY", ""))
+        if not _sb_url:
+            try:
+                _sb_url = _st_f.secrets.get("SUPABASE_URL", "")
+                _sb_key = (_st_f.secrets.get("SUPABASE_SERVICE_KEY", "") or
+                           _st_f.secrets.get("SUPABASE_KEY", ""))
+            except Exception:
+                pass
+        if _sb_url and _sb_key:
+            from supabase import create_client as _sb_c
+            _sb = _sb_c(_sb_url, _sb_key)
+            _sb.table("inmobiliarias").update({
+                "firma_hash": firma_hash,
+                "firma_timestamp": firma_timestamp,
+                "doc_hash": doc_hash,
+            }).eq("id", inmo_id).execute()
+            _updated = True
+    except Exception:
+        pass
+    if not _updated:
+        conn = _db.get_conn()
+        try:
+            conn.execute(
+                """UPDATE inmobiliarias
+                   SET firma_hash = ?, firma_timestamp = ?, doc_hash = ?
+                   WHERE id = ?""",
+                (firma_hash, firma_timestamp, doc_hash, inmo_id)
+            )
+            conn.commit()
+            _updated = True
+        except Exception as e:
+            logger.error("update_inmo_firma error: %s", e)
+            return False
+        finally:
+            conn.close()
+    return True
 
 
 def get_inmos_pendientes() -> list:

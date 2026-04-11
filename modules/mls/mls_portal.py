@@ -352,9 +352,32 @@ def ui_login_registro() -> None:
 
             st.divider()
 
+            # ── Acuerdo de Colaboración MLS con firma digital ──
+            st.markdown("---")
+            st.markdown("#### 📋 Acuerdo de Colaboración MLS")
+            st.caption(
+                "Lee el acuerdo completo antes de firmar. "
+                "La firma es electrónica (eIDAS Art. 25) con validez legal plena."
+            )
+            with st.expander("📄 Leer Acuerdo de Colaboración MLS completo"):
+                from modules.mls.mls_firma import TEXTO_ACUERDO_MLS
+                st.text_area(
+                    "Acuerdo de Colaboración",
+                    value=TEXTO_ACUERDO_MLS,
+                    height=300,
+                    disabled=True,
+                    key="mls_reg_acuerdo_texto"
+                )
+            acuerdo_leido = st.checkbox(
+                "He leído íntegramente el Acuerdo de Colaboración MLS "
+                "y lo acepto en su totalidad (firma electrónica eIDAS Art. 25)",
+                key="mls_reg_acuerdo_check"
+            )
+
             aceptar = st.checkbox(
-                "Acepto las condiciones de uso de ArchiRapid MLS, el Acuerdo de Colaboración "
-                "y la política de privacidad (RGPD). Confirmo que los datos facilitados son verídicos."
+                "Acepto la política de privacidad (RGPD) y confirmo "
+                "que los datos facilitados son verídicos.",
+                key="mls_reg_aceptar"
             )
             enviado = st.form_submit_button("📩 Solicitar alta", use_container_width=True, type="primary")
 
@@ -406,7 +429,9 @@ def ui_login_registro() -> None:
             if pwd1.strip() != pwd2.strip():
                 errores.append("Las contraseñas no coinciden.")
             if not aceptar:
-                errores.append("Debes aceptar las condiciones de uso y la política de privacidad.")
+                errores.append("Debes aceptar la política de privacidad.")
+            if not acuerdo_leido:
+                errores.append("Debes leer y aceptar el Acuerdo de Colaboración MLS.")
 
             if errores:
                 for e in errores:
@@ -453,6 +478,23 @@ def ui_login_registro() -> None:
                         inmo_id = None
 
                     if inmo_id:
+                        # Firmar el acuerdo digitalmente con SHA-256
+                        try:
+                            from modules.mls import mls_firma as _mls_firma_reg
+                            _firma_datos = _mls_firma_reg.firmar_acuerdo(
+                                inmo_id=inmo_id,
+                                cif=datos.get("cif", "").strip().upper(),
+                                ip=ip or "unknown"
+                            )
+                            if _firma_datos and _firma_datos.get("firma_hash"):
+                                mls_db.update_inmo_firma(
+                                    inmo_id=inmo_id,
+                                    firma_hash=_firma_datos["firma_hash"],
+                                    firma_timestamp=_firma_datos["firma_timestamp"],
+                                    doc_hash=_firma_datos.get("doc_hash", "")
+                                )
+                        except Exception as _firma_err:
+                            pass  # No bloquear registro si falla la firma
                         # Notificar al admin
                         try:
                             mls_notificaciones.notif_nuevo_registro(
