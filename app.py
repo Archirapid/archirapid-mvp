@@ -2010,87 +2010,144 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
     st.markdown("#### 🏠 Adquiere tu Finca y Ponle una Casa Prefabricada")
     st.caption("Modelos entregables desde 45 m² · Madera · Acero modular · Hormigón prefab · Mixto")
     try:
-        _cn_dest = db_conn()
-        _cur_dest = _cn_dest.cursor()
-        _cur_dest.execute("""
-            SELECT pc.id, pc.nombre, pc.email, pc.plan, pc.destacado_hasta
-            FROM prefab_companies pc
-            WHERE pc.destacado_activo = 1
-              AND pc.active = 1
-              AND (pc.destacado_hasta IS NULL OR pc.destacado_hasta >= date('now'))
-            ORDER BY pc.created_at DESC
+        import json as _pfjson, os as _pfos, base64 as _pfb64
+        _cn_pf = db_conn()
+        _cur_pf = _cn_pf.cursor()
+
+        # Modelos DESTACADOS: tienen empresa con destacado_activo=1
+        _cur_pf.execute("""
+            SELECT pc.id, pc.name, pc.m2, pc.rooms, pc.material,
+                   pc.price_label, pc.image_paths, pc.image_path, pc.price
+            FROM prefab_catalog pc
+            JOIN prefab_companies pco ON pc.prefab_company_id = pco.id
+            WHERE pc.active = 1
+              AND pc.status = 'disponible'
+              AND pco.destacado_activo = 1
+              AND pco.active = 1
+            ORDER BY RANDOM()
             LIMIT 5
         """)
-        _dest_companies = _cur_dest.fetchall()
-        _cn_dest.close()
+        _dest_pf = _cur_pf.fetchall()
 
-        if _dest_companies:
-            st.markdown("#### 🌟 Empresas Prefabricadas Destacadas")
-            _d_cols = st.columns(min(len(_dest_companies), 5))
-            for _di, _dc in enumerate(_dest_companies):
-                with _d_cols[_di % 5]:
-                    st.markdown(f"**⭐ {_dc[1]}**\n\n🏆 Empresa Destacada")
-                    if st.button("Ver catálogo", key=f"dest_prefab_{_dc[0]}"):
-                        st.query_params["selected_prefab_company"] = _dc[0]
-                        st.rerun()
-            if len(_dest_companies) > 5:
-                _dest_idx_key = "_prefab_dest_idx"
-                if st.button("→ Ver más destacadas", key="next_dest_prefab"):
-                    st.session_state[_dest_idx_key] = (
-                        st.session_state.get(_dest_idx_key, 0) + 1
-                    ) % len(_dest_companies)
-                    st.rerun()
-            st.markdown("#### Todas las empresas prefabricadas")
-    except Exception:
-        pass  # Silencioso — no romper home
-    try:
-        from src import db as _db
-        _conn = _db.get_conn()
-        _cur = _conn.cursor()
-        _cur.execute("SELECT id, name, m2, rooms, bathrooms, floors, material, price, image_path, image_paths, price_label FROM prefab_catalog WHERE active=1 ORDER BY m2 LIMIT 10")
-        prefabs = _cur.fetchall()
-        _conn.close()
-        if prefabs:
-            import base64 as _b64, json as _pfjson
-            _N = 5
-            _cols = st.columns(_N)
-            for _idx, _pf in enumerate(prefabs[:_N * 2]):
-                _pf_id, _nm, _m2, _rms, _bths, _fls, _mat, _prc, _img, _imgs_j, _plbl = _pf
-                # Primera foto válida
-                _thumb = None
-                try:
-                    for _ip in (_pfjson.loads(_imgs_j) if _imgs_j else []):
-                        if _ip:
-                            _ip = _ip.replace("\\", "/")
-                            if os.path.exists(_ip):
-                                _thumb = _ip; break
-                    if not _thumb and _img:
-                        _img = _img.replace("\\", "/")
-                        if os.path.exists(_img):
-                            _thumb = _img
-                except Exception:
-                    pass
-                # Precio
-                _pdsp = (_plbl.strip() if _plbl and _plbl.strip() else
-                         (f"€{float(_prc):,.0f}" if _prc and float(_prc) > 0 else "PRECIO A CONSULTAR"))
-                with _cols[_idx % _N]:
-                    if _thumb:
-                        try:
-                            with open(_thumb, "rb") as _tf:
-                                _tb64 = _b64.b64encode(_tf.read()).decode()
-                            _ext = _thumb.rsplit(".", 1)[-1].lower()
+        # Modelos NORMALES: activos y aprobados (incluye demos sin company_id)
+        _cur_pf.execute("""
+            SELECT pc.id, pc.name, pc.m2, pc.rooms, pc.material,
+                   pc.price_label, pc.image_paths, pc.image_path, pc.price
+            FROM prefab_catalog pc
+            WHERE pc.active = 1
+              AND (pc.status = 'disponible' OR pc.status IS NULL)
+            ORDER BY RANDOM()
+            LIMIT 10
+        """)
+        _norm_pf = _cur_pf.fetchall()
+        _cn_pf.close()
+
+        def _pf_thumb(imgs_j, img_p):
+            """Obtiene thumbnail de un modelo prefabricado."""
+            try:
+                for _ip in (_pfjson.loads(imgs_j) if imgs_j else []):
+                    if _ip:
+                        _ip = _ip.replace("\\", "/")
+                        if _ip.startswith("http"):
+                            return ("url", _ip)
+                        if _pfos.path.exists(_ip):
+                            return ("path", _ip)
+            except Exception:
+                pass
+            if img_p:
+                img_p = img_p.replace("\\", "/")
+                if img_p.startswith("http"):
+                    return ("url", img_p)
+                if _pfos.path.exists(img_p):
+                    return ("path", img_p)
+            return None
+
+        def _render_pf_card(col, item, key_prefix):
+            _id, _nm, _m2, _rms, _mat, _plbl, _imgs_j, _img, _prc = item
+            _pdsp = (_plbl.strip() if _plbl and _plbl.strip()
+                     else (f"€{float(_prc):,.0f}" if _prc and float(_prc) > 0
+                           else "PRECIO A CONSULTAR"))
+            with col:
+                _thumb = _pf_thumb(_imgs_j, _img)
+                if _thumb:
+                    _kind, _src = _thumb
+                    try:
+                        if _kind == "url":
+                            st.markdown(
+                                f'<img src="{_src}" style="width:100%;height:140px;'
+                                f'object-fit:cover;border-radius:10px;display:block;'
+                                f'margin-bottom:6px;">',
+                                unsafe_allow_html=True
+                            )
+                        else:
+                            with open(_src, "rb") as _tf:
+                                _tb64 = _pfb64.b64encode(_tf.read()).decode()
+                            _ext = _src.rsplit(".", 1)[-1].lower()
                             _mime = "image/png" if _ext == "png" else "image/jpeg"
-                            st.markdown(f'<img src="data:{_mime};base64,{_tb64}" style="width:100%;height:140px;object-fit:cover;border-radius:10px;display:block;margin-bottom:6px;">', unsafe_allow_html=True)
-                        except Exception:
-                            st.markdown('<div style="height:140px;background:#F0F9FF;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:2.5em;margin-bottom:6px;">🏠</div>', unsafe_allow_html=True)
-                    else:
-                        st.markdown('<div style="height:140px;background:#F0F9FF;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:2.5em;margin-bottom:6px;">🏠</div>', unsafe_allow_html=True)
-                    st.markdown(f'<div style="font-weight:700;font-size:0.85em;color:#0D1B2A;">{_nm}</div><div style="font-size:0.76em;color:#64748B;">{_m2} m² · {_rms}hab · {_mat}</div><div style="font-weight:700;color:#2563EB;font-size:0.88em;margin-top:4px;">{_pdsp}</div>', unsafe_allow_html=True)
-                    if st.button("Ver modelo →", key=f"prefab_home_{_pf_id}", width='stretch'):
-                        st.query_params["selected_prefab"] = str(_pf_id)
-                        st.rerun()
-    except Exception as _e:
-        if type(_e).__name__ in _ST_INTERNAL: raise
+                            st.markdown(
+                                f'<img src="data:{_mime};base64,{_tb64}" '
+                                f'style="width:100%;height:140px;object-fit:cover;'
+                                f'border-radius:10px;display:block;margin-bottom:6px;">',
+                                unsafe_allow_html=True
+                            )
+                    except Exception:
+                        st.markdown(
+                            '<div style="height:140px;background:#F0F9FF;'
+                            'border-radius:10px;display:flex;align-items:center;'
+                            'justify-content:center;font-size:2.5em;'
+                            'margin-bottom:6px;">🏠</div>',
+                            unsafe_allow_html=True
+                        )
+                else:
+                    st.markdown(
+                        '<div style="height:140px;background:#F0F9FF;'
+                        'border-radius:10px;display:flex;align-items:center;'
+                        'justify-content:center;font-size:2.5em;'
+                        'margin-bottom:6px;">🏠</div>',
+                        unsafe_allow_html=True
+                    )
+                st.markdown(
+                    f'<div style="font-weight:700;font-size:0.85em;color:#0D1B2A;">'
+                    f'{_nm}</div>'
+                    f'<div style="font-size:0.76em;color:#64748B;">'
+                    f'{_m2} m² · {_rms}hab · {_mat}</div>'
+                    f'<div style="font-weight:700;color:#2563EB;font-size:0.88em;'
+                    f'margin-top:4px;">{_pdsp}</div>',
+                    unsafe_allow_html=True
+                )
+                if st.button("Ver modelo →",
+                             key=f"{key_prefix}_{_id}",
+                             use_container_width=True):
+                    st.query_params["selected_prefab"] = str(_id)
+                    st.rerun()
+
+        # FILA SUPERIOR: destacados (si los hay)
+        if _dest_pf:
+            st.markdown(
+                '<div style="display:flex;align-items:center;gap:8px;'
+                'margin-bottom:8px;">'
+                '<span style="background:#F59E0B;color:white;padding:2px 10px;'
+                'border-radius:12px;font-size:0.8em;font-weight:700;">⭐ DESTACADOS</span>'
+                '</div>',
+                unsafe_allow_html=True
+            )
+            _dcols = st.columns(min(len(_dest_pf), 5))
+            for _di, _dp in enumerate(_dest_pf):
+                _render_pf_card(_dcols[_di], _dp, "dest_pf")
+            st.markdown("---")
+
+        # FILA INFERIOR: todos los modelos activos
+        if _norm_pf:
+            _N = 5
+            _ncols = st.columns(_N)
+            for _ni, _np in enumerate(_norm_pf[:_N * 2]):
+                _render_pf_card(_ncols[_ni % _N], _np, "norm_pf")
+        else:
+            st.info("Catálogo de prefabricadas próximamente disponible.")
+
+    except Exception as _e_pf:
+        if type(_e_pf).__name__ in _ST_INTERNAL:
+            raise
         st.info("Catálogo de prefabricadas próximamente disponible.")
 
     # Footer
