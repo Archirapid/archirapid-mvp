@@ -446,7 +446,12 @@ def ui_login_registro() -> None:
                         "email_login":       email_login.strip().lower(),
                         "ip_registro":       ip,
                     }
-                    inmo_id = mls_db.create_inmo(datos, ip=ip)
+                    try:
+                        inmo_id = mls_db.create_inmo(datos, ip=ip)
+                    except Exception as _create_err:
+                        st.error(f"❌ Error técnico en registro: {_create_err}")
+                        inmo_id = None
+
                     if inmo_id:
                         # Notificar al admin
                         try:
@@ -460,7 +465,8 @@ def ui_login_registro() -> None:
                             pass
                         _reg_success = True
                     else:
-                        st.error("Error al guardar. Comprueba que el CIF y el email de acceso no estén ya registrados.")
+                        if not st.session_state.get("_mls_create_error_shown"):
+                            st.error("Error al guardar el registro. Inténtalo de nuevo.")
                 except Exception as exc:
                     msg = str(exc)
                     if "UNIQUE" in msg and "cif" in msg.lower():
