@@ -478,7 +478,9 @@ def ui_login_registro() -> None:
                         inmo_id = None
 
                     if inmo_id:
-                        # Firmar el acuerdo digitalmente con SHA-256
+                        # Calcular firma SHA-256 ANTES de notificar
+                        _firma_hash = ""
+                        _firma_ts = ""
                         try:
                             from modules.mls import mls_firma as _mls_firma_reg
                             _firma_datos = _mls_firma_reg.firmar_acuerdo(
@@ -486,19 +488,41 @@ def ui_login_registro() -> None:
                                 cif=datos.get("cif", "").strip().upper(),
                                 ip=ip or "unknown"
                             )
-                            if _firma_datos and _firma_datos.get("firma_hash"):
-                                mls_db.update_inmo_firma(
-                                    inmo_id=inmo_id,
-                                    firma_hash=_firma_datos["firma_hash"],
-                                    firma_timestamp=_firma_datos["timestamp"],
-                                    doc_hash=_firma_datos.get("doc_hash", "")
-                                )
-                        except Exception as _firma_err:
-                            st.error(f"DEBUG firma error: {_firma_err}")
-                        # Notificar al admin
+                            _firma_hash = _firma_datos.get("firma_hash", "")
+                            _firma_ts = _firma_datos.get("timestamp", "")
+                        except Exception:
+                            pass
+
+                        # Guardar firma directamente en Supabase
+                        if _firma_hash:
+                            try:
+                                import os as _os_fw
+                                import streamlit as _st_fw
+                                _sb_url = _os_fw.environ.get("SUPABASE_URL", "")
+                                _sb_key = (_os_fw.environ.get("SUPABASE_SERVICE_KEY","") or
+                                           _os_fw.environ.get("SUPABASE_KEY",""))
+                                if not _sb_url:
+                                    try:
+                                        _sb_url = _st_fw.secrets.get("SUPABASE_URL","")
+                                        _sb_key = (_st_fw.secrets.get("SUPABASE_SERVICE_KEY","") or
+                                                   _st_fw.secrets.get("SUPABASE_KEY",""))
+                                    except Exception:
+                                        pass
+                                if _sb_url and _sb_key:
+                                    from supabase import create_client as _sb_fw_c
+                                    _sb_fw = _sb_fw_c(_sb_url, _sb_key)
+                                    _sb_fw.table("inmobiliarias").update({
+                                        "firma_hash": _firma_hash,
+                                        "firma_timestamp": _firma_ts,
+                                    }).eq("id", inmo_id).execute()
+                            except Exception:
+                                pass
+
+                        # Notificar admin
                         try:
                             mls_notificaciones.notif_nuevo_registro(
-                                nombre=datos.get("nombre_comercial", datos.get("nombre", "")),
+                                nombre=datos.get("nombre_comercial",
+                                       datos.get("nombre", "")),
                                 cif=datos.get("cif", ""),
                                 email=datos.get("email", ""),
                                 ip=ip,
@@ -536,7 +560,8 @@ def ui_login_registro() -> None:
                         "plan_activo": False,
                         "trial_active": True,
                         "trial_start_date": _now_iso,
-                        "firma_hash": "",         # activa=False manda a espera_aprobacion
+                        "firma_hash": _firma_hash,
+                        "firma_timestamp": _firma_ts,
                     }
 
                     st.session_state[_SESSION_KEY] = _inmo_sesion
