@@ -1436,6 +1436,10 @@ def main() -> None:
     # ── 2. Obtener sesión ─────────────────────────────────────────────────────
     inmo = _get_inmo()
 
+    # DEBUG — verificar que mls_inmo llega al router
+    st.write(f"DEBUG inmo: {inmo is not None}, keys: {list(inmo.keys()) if inmo else 'None'}")
+    st.write(f"DEBUG session keys: {[k for k in st.session_state.keys() if 'mls' in k.lower()]}")
+
     # Fallback robusto: si la sesión se perdió tras registro, recuperar por último id
     if inmo is None:
         _last_id = st.session_state.get("mls_last_inmo_id")
