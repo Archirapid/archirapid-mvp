@@ -526,6 +526,7 @@ def ui_login_registro() -> None:
                         )
                         if _inmo_nueva:
                             st.session_state[_SESSION_KEY] = _inmo_nueva
+                            st.session_state["mls_last_inmo_id"] = _inmo_nueva.get("id")
                             st.session_state["_mls_registro_ok"] = True
 
                             # Navegación programática: evita que el sidebar.radio (oculto) vuelva a "registro/home"
@@ -1430,6 +1431,24 @@ def main() -> None:
 
     # ── 2. Obtener sesión ─────────────────────────────────────────────────────
     inmo = _get_inmo()
+
+    # Fallback robusto: si la sesión se perdió tras registro, recuperar por último id
+    if inmo is None:
+        _last_id = st.session_state.get("mls_last_inmo_id")
+        if _last_id:
+            try:
+                _c = _db.get_conn()
+                try:
+                    _row = _c.execute(
+                        "SELECT * FROM inmobiliarias WHERE id = ?", (_last_id,)
+                    ).fetchone()
+                    if _row:
+                        _login_inmo(dict(_row))
+                        inmo = _get_inmo()
+                finally:
+                    _c.close()
+            except Exception:
+                pass
 
     # ── 3. Handler ?mls_pago=ok — retorno desde Stripe (suscripción) ─────────
     if st.query_params.get("mls_pago") == "ok":
