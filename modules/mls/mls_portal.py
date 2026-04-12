@@ -494,7 +494,7 @@ def ui_login_registro() -> None:
                                     doc_hash=_firma_datos.get("doc_hash", "")
                                 )
                         except Exception as _firma_err:
-                            pass  # No bloquear registro si falla la firma
+                            st.error(f"DEBUG firma error: {_firma_err}")
                         # Notificar al admin
                         try:
                             mls_notificaciones.notif_nuevo_registro(
