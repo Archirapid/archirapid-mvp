@@ -547,7 +547,6 @@ def ui_login_registro() -> None:
                     # Navegación programática al portal MLS
                     st.session_state["selected_page"] = "🏢 Inmobiliarias MLS"
                     st.session_state["_nav_programmatic"] = True
-                    st.query_params["page"] = "mls"
 
                     st.rerun()
 
