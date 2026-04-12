@@ -522,7 +522,7 @@ def ui_login_registro() -> None:
                     # Cargar la inmo recién registrada y mostrar pantalla de pendiente
                     try:
                         _inmo_nueva = mls_db.get_inmo_by_email(
-                            datos.get("email_login", "").strip().lower()
+                            datos.get("email", "").strip().lower()
                         )
                         if _inmo_nueva:
                             st.session_state[_SESSION_KEY] = _inmo_nueva
