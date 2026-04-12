@@ -490,7 +490,7 @@ def ui_login_registro() -> None:
                                 mls_db.update_inmo_firma(
                                     inmo_id=inmo_id,
                                     firma_hash=_firma_datos["firma_hash"],
-                                    firma_timestamp=_firma_datos["firma_timestamp"],
+                                    firma_timestamp=_firma_datos["timestamp"],
                                     doc_hash=_firma_datos.get("doc_hash", "")
                                 )
                         except Exception as _firma_err:
