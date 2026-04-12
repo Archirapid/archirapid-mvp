@@ -527,6 +527,12 @@ def ui_login_registro() -> None:
                         if _inmo_nueva:
                             st.session_state[_SESSION_KEY] = _inmo_nueva
                             st.session_state["_mls_registro_ok"] = True
+
+                            # Navegación programática: evita que el sidebar.radio (oculto) vuelva a "registro/home"
+                            st.session_state["selected_page"] = "🏢 Inmobiliarias MLS"
+                            st.session_state["_nav_radio"] = "🏢 Inmobiliarias MLS"
+                            st.session_state["_nav_programmatic"] = True
+
                             st.rerun()
                     except Exception:
                         pass

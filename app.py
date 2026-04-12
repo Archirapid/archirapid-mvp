@@ -1488,9 +1488,9 @@ else:
             st.session_state.get("_mls_registro_ok")):
         st.session_state['selected_page'] = selected_page
 
-    if st.session_state.get("_mls_registro_ok"):
-        if st.session_state.get("mls_inmo"):
-            st.session_state.pop("_mls_registro_ok", None)
+# Limpiar flag temporal MLS tras primer rerun (siempre)
+if st.session_state.get("_mls_registro_ok") and st.session_state.get("mls_inmo"):
+    st.session_state.pop("_mls_registro_ok", None)
 
 # ── Panic Button de Hard Reset (último en sidebar) ─────────────────────
 st.sidebar.divider()
