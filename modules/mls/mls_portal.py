@@ -540,12 +540,15 @@ def ui_login_registro() -> None:
                     }
 
                     st.session_state[_SESSION_KEY] = _inmo_sesion
+                    # Copia de seguridad: clave que ningún guard de app.py toca
+                    st.session_state["_mls_registro_sesion"] = _inmo_sesion
                     st.session_state["_mls_registro_ok"] = True
 
                     # Navegación programática al portal MLS
                     st.session_state["selected_page"] = "🏢 Inmobiliarias MLS"
                     st.session_state["_nav_radio"] = "🏢 Inmobiliarias MLS"
                     st.session_state["_nav_programmatic"] = True
+                    st.query_params["page"] = "mls"
 
                     st.rerun()
 
@@ -1451,6 +1454,13 @@ def main() -> None:
                     _c.close()
             except Exception:
                 pass
+
+    # Fallback final: recuperar sesión desde copia de seguridad post-registro
+    if inmo is None:
+        _backup_sesion = st.session_state.pop("_mls_registro_sesion", None)
+        if _backup_sesion:
+            st.session_state[_SESSION_KEY] = _backup_sesion
+            inmo = _backup_sesion
 
     # ── 3. Handler ?mls_pago=ok — retorno desde Stripe (suscripción) ─────────
     if st.query_params.get("mls_pago") == "ok":
