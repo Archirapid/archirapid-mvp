@@ -252,10 +252,7 @@ def update_inmo_plan(inmo_id: str, plan: str,
 
 def update_inmo_firma(inmo_id: str, firma_hash: str,
                       firma_timestamp: str, doc_hash: str = "") -> bool:
-    """Registra la firma digital del acuerdo de colaboración.
-    Intenta Supabase client directo; fallback a get_conn() (SQLite local).
-    """
-    _updated = False
+    # Intentar Supabase client directo primero
     try:
         import os as _os_f
         import streamlit as _st_f
@@ -277,26 +274,28 @@ def update_inmo_firma(inmo_id: str, firma_hash: str,
                 "firma_timestamp": firma_timestamp,
                 "doc_hash": doc_hash,
             }).eq("id", inmo_id).execute()
-            _updated = True
-    except Exception:
-        pass
-    if not _updated:
-        conn = _db.get_conn()
-        try:
-            conn.execute(
-                """UPDATE inmobiliarias
-                   SET firma_hash = ?, firma_timestamp = ?, doc_hash = ?
-                   WHERE id = ?""",
-                (firma_hash, firma_timestamp, doc_hash, inmo_id)
-            )
-            conn.commit()
-            _updated = True
-        except Exception as e:
-            logger.error("update_inmo_firma error: %s", e)
-            return False
-        finally:
-            conn.close()
-    return True
+            return True
+    except Exception as _e:
+        logger.error("update_inmo_firma Supabase error: %s", _e)
+
+    # Fallback SQLite
+    conn = _db.get_conn()
+    try:
+        conn.execute(
+            """UPDATE inmobiliarias
+               SET firma_hash = ?,
+                   firma_timestamp = ?,
+                   doc_hash = ?
+               WHERE id = ?""",
+            (firma_hash, firma_timestamp, doc_hash, inmo_id)
+        )
+        conn.commit()
+        return True
+    except Exception as e:
+        logger.error("update_inmo_firma fallback error: %s", e)
+        return False
+    finally:
+        conn.close()
 
 
 def get_inmos_pendientes() -> list:
