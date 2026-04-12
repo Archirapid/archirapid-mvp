@@ -269,6 +269,7 @@ def update_inmo_firma(inmo_id: str, firma_hash: str,
         if _sb_url and _sb_key:
             from supabase import create_client as _sb_c
             _sb = _sb_c(_sb_url, _sb_key)
+            _st_f.write(f"DEBUG update_firma: inmo_id={inmo_id}, hash={firma_hash[:8] if firma_hash else None}")
             _sb.table("inmobiliarias").update({
                 "firma_hash": firma_hash,
                 "firma_timestamp": firma_timestamp,
@@ -277,6 +278,8 @@ def update_inmo_firma(inmo_id: str, firma_hash: str,
             return True
     except Exception as _e:
         logger.error("update_inmo_firma Supabase error: %s", _e)
+        import streamlit as _st_dbg
+        _st_dbg.error(f"DEBUG update_firma error: {_e}")
 
     # Fallback SQLite
     conn = _db.get_conn()
