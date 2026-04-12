@@ -1483,8 +1483,14 @@ if st.session_state.get("_nav_programmatic"):
 else:
     if not (st.session_state.get("_invite_activo") or
             st.session_state.get("_invite_completado") or
-            st.session_state.get("_prefab_stripe_pending")):
+            st.session_state.get("_prefab_stripe_pending") or
+            st.session_state.get("mls_inmo") or
+            st.session_state.get("_mls_registro_ok")):
         st.session_state['selected_page'] = selected_page
+
+    if st.session_state.get("_mls_registro_ok"):
+        if st.session_state.get("mls_inmo"):
+            st.session_state.pop("_mls_registro_ok", None)
 
 # ── Panic Button de Hard Reset (último en sidebar) ─────────────────────
 st.sidebar.divider()

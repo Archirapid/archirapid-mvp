@@ -526,6 +526,7 @@ def ui_login_registro() -> None:
                         )
                         if _inmo_nueva:
                             st.session_state[_SESSION_KEY] = _inmo_nueva
+                            st.session_state["_mls_registro_ok"] = True
                             st.rerun()
                     except Exception:
                         pass
