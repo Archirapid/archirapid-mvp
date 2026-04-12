@@ -519,33 +519,35 @@ def ui_login_registro() -> None:
                         st.error(f"Error al registrar: {msg}")
 
                 if _reg_success:
-                    # Cargar la inmo recién registrada y mostrar pantalla de pendiente
-                    try:
-                        _inmo_nueva = mls_db.get_inmo_by_email(
-                            datos.get("email", "").strip().lower()
-                        )
-                        if _inmo_nueva:
-                            st.session_state[_SESSION_KEY] = _inmo_nueva
-                            st.session_state["mls_last_inmo_id"] = _inmo_nueva.get("id")
-                            st.session_state["_mls_registro_ok"] = True
+                    # Redirect robusto en Cloud/Supabase: no depender de lecturas SQL locales tras insertar por REST
+                    _now_iso = datetime.now(timezone.utc).isoformat()
 
-                            # Navegación programática: evita que el sidebar.radio (oculto) vuelva a "registro/home"
-                            st.session_state["selected_page"] = "🏢 Inmobiliarias MLS"
-                            st.session_state["_nav_radio"] = "🏢 Inmobiliarias MLS"
-                            st.session_state["_nav_programmatic"] = True
+                    _inmo_sesion = {
+                        "id": inmo_id,
+                        "nombre": datos.get("nombre_comercial") or datos.get("nombre") or "Inmobiliaria",
+                        "nombre_sociedad": datos.get("nombre_sociedad"),
+                        "nombre_comercial": datos.get("nombre_comercial"),
+                        "cif": datos.get("cif"),
+                        "email": datos.get("email"),
+                        "email_login": datos.get("email_login"),
 
-                            st.rerun()
-                    except Exception:
-                        pass
-                    # Fallback si no se puede cargar
-                    st.success("✅ ¡Solicitud de alta enviada correctamente!")
-                    st.info(
-                        "**Tu solicitud está siendo revisada.**\n\n"
-                        "Recibirás un **email de confirmación** en cuanto "
-                        "sea aprobada (24-48h hábiles).\n\n"
-                        "Una vez aprobada, vuelve aquí e inicia sesión."
-                    )
-                    st.stop()
+                        # Campos que usa _estado_inmo()
+                        "activa": False,          # aprobación manual
+                        "plan_activo": False,
+                        "trial_active": True,
+                        "trial_start_date": _now_iso,
+                        "firma_hash": "",         # activa=False manda a espera_aprobacion
+                    }
+
+                    st.session_state[_SESSION_KEY] = _inmo_sesion
+                    st.session_state["_mls_registro_ok"] = True
+
+                    # Navegación programática al portal MLS
+                    st.session_state["selected_page"] = "🏢 Inmobiliarias MLS"
+                    st.session_state["_nav_radio"] = "🏢 Inmobiliarias MLS"
+                    st.session_state["_nav_programmatic"] = True
+
+                    st.rerun()
 
 
 def _get_client_ip() -> str:
