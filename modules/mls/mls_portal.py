@@ -517,6 +517,19 @@ def ui_login_registro() -> None:
                                     }).eq("id", inmo_id).execute()
                             except Exception:
                                 pass
+                            # Guardar firma también en SQLite / fallback
+                            try:
+                                _fw_conn = _db.get_conn()
+                                try:
+                                    _fw_conn.execute(
+                                        "UPDATE inmobiliarias SET firma_hash=?, firma_timestamp=? WHERE id=?",
+                                        (_firma_hash, _firma_ts, inmo_id)
+                                    )
+                                    _fw_conn.commit()
+                                finally:
+                                    _fw_conn.close()
+                            except Exception:
+                                pass
 
                         # Notificar admin
                         try:
