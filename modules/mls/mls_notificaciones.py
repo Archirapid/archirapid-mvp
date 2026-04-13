@@ -216,7 +216,7 @@ def notif_aprobacion(nombre: str, email: str, aprobada: bool) -> None:
             f"que ofreces a las colaboradoras.</li>"
             f"</ol>"
             f"<p style='margin-top:20px;'>"
-            f"<a href='https://archirapid.streamlit.app' "
+            f"<a href='https://archirapid.com' "
             f"style='background:{_NAVY};color:#fff;padding:12px 28px;"
             f"border-radius:8px;text-decoration:none;font-weight:700;"
             f"display:inline-block;'>"
