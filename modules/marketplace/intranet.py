@@ -2616,6 +2616,20 @@ Obtén el token creando un bot con @BotFather en Telegram.
                 _c.commit()
             finally:
                 _c.close()
+            # Workaround doble escritura hasta unificación db abstraction
+            try:
+                from src import db as _src_db
+                _conn2 = _src_db.get_conn()
+                try:
+                    _conn2.execute(
+                        "UPDATE inmobiliarias SET status=?, activa=? WHERE id=?",
+                        (new_status, _activa_val, inmo_id)
+                    )
+                    _conn2.commit()
+                finally:
+                    _conn2.close()
+            except Exception:
+                pass  # silent fallback — db_conn() ya escribió
             st.cache_data.clear()
 
         # ══ MIGRACIÓN: garantizar columnas status/is_active ══════════════════

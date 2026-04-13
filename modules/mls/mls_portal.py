@@ -89,7 +89,7 @@ def _estado_inmo(inmo: dict) -> str:
     Trial activo sustituye al plan de pago para pasar de sin_plan a firma_pendiente.
     """
     from datetime import datetime, timezone
-    if not inmo.get("activa"):
+    if inmo.get("status", "pending") != "active" or not inmo.get("activa"):
         return "espera_aprobacion"
     if not inmo.get("plan_activo"):
         _trial_ok = False

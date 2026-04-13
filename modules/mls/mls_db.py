@@ -159,6 +159,7 @@ def create_inmo(datos: dict, ip: str = None) -> str | None:
                 "plan": datos.get("plan", "trial"),
                 "plan_activo": datos.get("plan_activo", 0),
                 "activa": 0,
+                "status": "pending",
                 "ip_registro": ip or datos.get("ip_registro") or "unknown",
                 "created_at": _now_utc(),
             }
@@ -183,9 +184,9 @@ def create_inmo(datos: dict, ip: str = None) -> str | None:
                     contacto_telefono, contacto_telegram,
                     factura_razon_social, factura_cif, factura_direccion,
                     factura_email, iban, banco_nombre, banco_titular,
-                    email_login, plan, plan_activo, activa,
+                    email_login, plan, plan_activo, activa, status,
                     ip_registro, created_at)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (inmo_id, _s("nombre"), _s("cif", upper=True),
                  _s("email", lower=True), datos.get("password_hash"),
                  _s("nombre_sociedad"), _s("nombre_comercial"),
@@ -201,7 +202,7 @@ def create_inmo(datos: dict, ip: str = None) -> str | None:
                  _s("banco_nombre"), _s("banco_titular"),
                  _s("email_login", lower=True),
                  datos.get("plan", "trial"), datos.get("plan_activo", 0),
-                 0, ip or datos.get("ip_registro") or "unknown", _now_utc())
+                 0, "pending", ip or datos.get("ip_registro") or "unknown", _now_utc())
             )
             conn.commit()
         except Exception as e:
