@@ -145,6 +145,10 @@ def send_trial_email(
         return _send_checkin(inmo_email, inmo_nombre, days_remaining or 23)
     elif tipo == "urgencia":
         return _send_urgencia(inmo_email, inmo_nombre, trial_start_date)
+    elif tipo == "aviso_2dias":
+        return _send_aviso_2dias(inmo_email, inmo_nombre)
+    elif tipo == "aviso_1dia":
+        return _send_aviso_1dia(inmo_email, inmo_nombre)
     else:
         logger.warning("send_trial_email: tipo desconocido '%s'", tipo)
         return False
@@ -303,6 +307,105 @@ def _send_urgencia(email: str, nombre: str, trial_start_date: str | None) -> boo
         to=email,
         subject="Tu acceso gratuito a ArchiRapid MLS termina en 5 dias",
         body_html=_wrap_html("Tu trial termina pronto", cuerpo),
+    )
+    return True
+
+
+def _send_aviso_2dias(email: str, nombre: str) -> bool:
+    """Tipo 'aviso_2dias' — 2 días antes de que expire el trial."""
+    cuerpo = f"""
+<h2 style="color:{_GOLD};margin-top:0;">Tu período de prueba expira en 2 días</h2>
+<p>Hola <strong>{nombre}</strong>,</p>
+<p>Tu trial gratuito de ArchiRapid MLS termina en <strong>2 días</strong>.</p>
+<p>Si la plataforma te ha sido útil, activa un plan para seguir operando sin interrupciones.
+Tus fincas y datos se conservarán.</p>
+
+<table width="100%" cellpadding="0" cellspacing="0"
+       style="margin:18px 0;border-collapse:collapse;">
+  <tr>
+    <td style="padding:12px 14px;border-radius:8px;
+               background:rgba(74,144,217,0.15);
+               border:1px solid rgba(74,144,217,0.3);">
+      <p style="margin:0;font-weight:700;color:#4A90D9;">STARTER &mdash; 39€/mes</p>
+      <p style="margin:4px 0 0 0;font-size:13px;color:{_TEXT};">Hasta 5 fincas activas</p>
+    </td>
+  </tr>
+  <tr><td style="height:8px;"></td></tr>
+  <tr>
+    <td style="padding:12px 14px;border-radius:8px;
+               background:rgba(245,166,35,0.15);
+               border:2px solid rgba(245,166,35,0.5);">
+      <p style="margin:0;font-weight:700;color:{_GOLD};">AGENCY &mdash; 99€/mes
+        <span style="font-size:11px;font-weight:400;margin-left:8px;
+              background:{_GOLD};color:{_BG};padding:2px 8px;border-radius:12px;">
+          El más contratado
+        </span>
+      </p>
+      <p style="margin:4px 0 0 0;font-size:13px;color:{_TEXT};">Hasta 20 fincas + reservas de colaboración</p>
+    </td>
+  </tr>
+  <tr><td style="height:8px;"></td></tr>
+  <tr>
+    <td style="padding:12px 14px;border-radius:8px;
+               background:rgba(27,42,107,0.4);
+               border:1px solid rgba(27,42,107,0.6);">
+      <p style="margin:0;font-weight:700;color:{_TEXT};">PRO &mdash; 199€/mes</p>
+      <p style="margin:4px 0 0 0;font-size:13px;color:{_MUTED};">Hasta 50 fincas + soporte prioritario</p>
+    </td>
+  </tr>
+</table>
+
+<p style="margin-top:20px;text-align:center;">
+  <a href="{_PORTAL_URL}"
+     style="background:{_GOLD};color:{_BG};padding:14px 32px;
+            border-radius:8px;text-decoration:none;font-weight:800;
+            display:inline-block;font-size:15px;">
+    Activar mi plan ahora →
+  </a>
+</p>
+<p style="color:{_MUTED};font-size:12px;text-align:center;">Sin permanencia · Cancela cuando quieras</p>
+<p style="color:{_MUTED};font-size:12px;margin-top:20px;">
+  ¿Tienes dudas? Llámanos: {_CONTACT_PHONE}
+  o escribe a <a href="mailto:{_CONTACT_EMAIL}" style="color:{_GOLD};">{_CONTACT_EMAIL}</a><br>
+  El equipo de ArchiRapid
+</p>
+"""
+    _send_email(
+        to=email,
+        subject="⏰ Tu prueba MLS expira en 2 días — activa tu plan",
+        body_html=_wrap_html("Tu trial expira en 2 días", cuerpo),
+    )
+    return True
+
+
+def _send_aviso_1dia(email: str, nombre: str) -> bool:
+    """Tipo 'aviso_1dia' — 1 día antes de que expire el trial."""
+    cuerpo = f"""
+<h2 style="color:#EF4444;margin-top:0;">Último día de prueba — activa tu plan hoy</h2>
+<p>Hola <strong>{nombre}</strong>,</p>
+<p>Tu trial gratuito de ArchiRapid MLS <strong>expira mañana</strong>.</p>
+<p>Activa un plan hoy para no perder el acceso a tus fincas, tu ficha en el mercado MLS
+y todas las colaboraciones en curso.</p>
+
+<p style="margin-top:24px;text-align:center;">
+  <a href="{_PORTAL_URL}"
+     style="background:#EF4444;color:#fff;padding:16px 36px;
+            border-radius:8px;text-decoration:none;font-weight:800;
+            display:inline-block;font-size:16px;">
+    Activar mi plan ahora →
+  </a>
+</p>
+<p style="color:{_MUTED};font-size:12px;text-align:center;">Sin permanencia · Cancela cuando quieras</p>
+<p style="color:{_MUTED};font-size:12px;margin-top:20px;">
+  ¿Tienes dudas? Llámanos: {_CONTACT_PHONE}
+  o escribe a <a href="mailto:{_CONTACT_EMAIL}" style="color:{_GOLD};">{_CONTACT_EMAIL}</a><br>
+  El equipo de ArchiRapid
+</p>
+"""
+    _send_email(
+        to=email,
+        subject="🚨 Último día de prueba MLS — no pierdas tu acceso",
+        body_html=_wrap_html("Último día de trial", cuerpo),
     )
     return True
 

@@ -106,6 +106,15 @@ def _estado_inmo(inmo: dict) -> str:
             return "sin_plan"
     if not inmo.get("firma_hash"):
         return "firma_pendiente"
+    if inmo.get("trial_active") and not inmo.get("plan_activo"):
+        try:
+            _start = datetime.fromisoformat(inmo["trial_start_date"])
+            if _start.tzinfo is None:
+                _start = _start.replace(tzinfo=timezone.utc)
+            if (datetime.now(timezone.utc) - _start).days >= 30:
+                return "trial_expirado"
+        except Exception:
+            pass
     return "operativo"
 
 
@@ -794,6 +803,54 @@ def _iniciar_checkout_plan(plan_key: str, inmo: dict) -> None:
         st.error(f"Error al iniciar pago Stripe: {type(exc).__name__}: {exc}")
 
 
+# ── UI: Trial expirado ────────────────────────────────────────────────────────
+
+def ui_trial_expirado(inmo: dict) -> None:
+    """Pantalla de bloqueo cuando el trial de 30 días ha finalizado."""
+    st.error("Tu período de prueba de 30 días ha finalizado.")
+    st.info("Activa un plan para recuperar el acceso completo. Tus datos están seguros.")
+    if st.button("Ver planes MLS", key="mls_trial_exp_ver_planes", type="primary"):
+        st.session_state["mls_ir_a_planes"] = True
+        st.rerun()
+    st.link_button("Contactar soporte", "mailto:hola@archirapid.com")
+    st.divider()
+    if st.button("Cerrar sesión", type="secondary", key="mls_trial_exp_logout"):
+        _logout_inmo()
+        st.rerun()
+
+
+def _check_trial_expiry_alerts(inmo: dict) -> None:
+    """Envía email de aviso al admin/inmo si quedan 1 o 2 días de trial. Una vez por sesión."""
+    if st.session_state.get("_trial_alert_checked"):
+        return
+    st.session_state["_trial_alert_checked"] = True
+    try:
+        _start = datetime.fromisoformat(inmo["trial_start_date"])
+        if _start.tzinfo is None:
+            _start = _start.replace(tzinfo=timezone.utc)
+        _days_left = 30 - (datetime.now(timezone.utc) - _start).days
+        if _days_left in (1, 2):
+            tipo = "aviso_2dias" if _days_left == 2 else "aviso_1dia"
+            _nombre = inmo.get("nombre_comercial") or inmo.get("nombre", "")
+            from modules.mls.mls_trial_emails import send_trial_email
+            send_trial_email(
+                inmo_email=inmo["email"],
+                inmo_nombre=_nombre,
+                tipo=tipo,
+                days_remaining=_days_left,
+            )
+            try:
+                from modules.mls.mls_notificaciones import _send_telegram
+                _send_telegram(
+                    f"⏰ <b>Trial expira en {_days_left} día(s)</b>\n"
+                    f"Inmo: <b>{_nombre}</b>\nEmail: {inmo['email']}"
+                )
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+
 # ── UI: Portal operativo ──────────────────────────────────────────────────────
 
 def _ui_contacto_archirapid_btn(inmo: dict) -> None:
@@ -1000,9 +1057,9 @@ def ui_portal_operativo(inmo: dict) -> None:
             f"</div>"
             f"<div style='background:#f0fdf4;border:1px solid #86efac;border-radius:6px;"
             f"padding:8px 14px;font-size:0.82em;color:#166534;margin-bottom:10px;'>"
-            f"⚠️ <b>Durante el trial</b> puedes usar todas las herramientas del portal, "
-            f"pero las fincas no se publican en el Mercado MLS hasta que actives un plan de pago. "
-            f"Elige tu plan antes de que expire para empezar a operar."
+            f"✅ <b>Durante el trial</b> puedes publicar hasta <b>3 fincas</b> en el Mercado MLS "
+            f"y acceder a todas las herramientas del portal. "
+            f"Activa un plan antes de que expire para seguir operando sin límites."
             f"</div>",
             unsafe_allow_html=True,
         )
@@ -1028,6 +1085,41 @@ def ui_portal_operativo(inmo: dict) -> None:
             "ni reservar fincas hasta activar un plan.",
             icon="⏰",
         )
+
+    # ── FIX 5: Alertas de expiración (1 vez por sesión) ──────────────────────
+    if inmo.get("trial_active") and not inmo.get("plan_activo"):
+        _check_trial_expiry_alerts(inmo)
+
+    # ── FIX 2: Banners urgencia días 1 y 2 antes del fin del trial ────────────
+    if inmo.get("trial_active") and not inmo.get("plan_activo") and inmo.get("trial_start_date"):
+        try:
+            _start_date_parsed = datetime.fromisoformat(inmo["trial_start_date"])
+            if _start_date_parsed.tzinfo is None:
+                _start_date_parsed = _start_date_parsed.replace(tzinfo=timezone.utc)
+            _days_left = 30 - (datetime.now(timezone.utc) - _start_date_parsed).days
+            if _days_left == 2:
+                st.warning(
+                    "⏰ Tu período de prueba expira en 2 días. "
+                    "Si ArchiRapid MLS te ha sido útil, activa un plan para seguir operando. "
+                    "Tus fincas se conservarán."
+                )
+                if st.button("Activar plan ahora", key="mls_trial_2d_planes"):
+                    st.session_state["mls_ir_a_planes"] = True
+                    st.rerun()
+            elif _days_left == 1:
+                st.error(
+                    "🚨 Tu período de prueba expira MAÑANA. "
+                    "Activa un plan hoy para no perder el acceso a tus fincas "
+                    "y tu ficha en el mercado MLS."
+                )
+                if st.button("Activar plan ahora", key="mls_trial_1d_planes"):
+                    st.session_state["mls_ir_a_planes"] = True
+                    st.rerun()
+            elif _days_left <= 0:
+                ui_trial_expirado(inmo)
+                return
+        except Exception:
+            pass
 
     _col_titulo, _col_logout = st.columns([5, 1])
     with _col_titulo:
@@ -1104,8 +1196,31 @@ def ui_portal_operativo(inmo: dict) -> None:
             # Lista de fincas directamente — sin sub-tabs
             mls_fincas.ui_mis_fincas(inmo)
             st.divider()
-            with st.expander("➕ Publicar nueva finca", expanded=False):
-                mls_fincas.ui_subir_finca(inmo)
+            # FIX 1: Límite de 3 fincas durante el período de prueba
+            _trial_finca_limit_reached = False
+            if inmo.get("trial_active") and not inmo.get("plan_activo"):
+                _conn_trial = _db.get_conn()
+                try:
+                    _finca_count = _conn_trial.execute(
+                        "SELECT COUNT(*) FROM fincas_mls WHERE inmo_id = ?",
+                        (inmo["id"],),
+                    ).fetchone()[0]
+                finally:
+                    _conn_trial.close()
+                if _finca_count >= 3:
+                    _trial_finca_limit_reached = True
+                    st.warning(
+                        "⚠️ Has alcanzado el límite de 3 fincas del período de prueba. "
+                        "Activa un plan para publicar más fincas."
+                    )
+                    if st.button("Ver planes", key="mls_trial_finca_ver_planes"):
+                        st.session_state["mls_ir_a_planes"] = True
+                        st.rerun()
+                else:
+                    st.info(f"Período de prueba: {_finca_count} de 3 fincas usadas.")
+            if not _trial_finca_limit_reached:
+                with st.expander("➕ Publicar nueva finca", expanded=False):
+                    mls_fincas.ui_subir_finca(inmo)
         except Exception as exc:
             st.error(f"Error en Mis Fincas: {exc}")
 
@@ -1572,6 +1687,9 @@ def main() -> None:
         if st.button("Cerrar sesión", type="secondary"):
             _logout_inmo()
             st.rerun()
+
+    elif estado == "trial_expirado":
+        ui_trial_expirado(inmo)
 
     elif estado == "operativo":
         ui_portal_operativo(inmo)
