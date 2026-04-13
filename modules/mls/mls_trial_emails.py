@@ -152,50 +152,41 @@ def send_trial_email(
 
 def _send_bienvenida(email: str, nombre: str, trial_start_date: str | None) -> bool:
     """Tipo 'bienvenida' — día 0 cuando admin aprueba."""
-    # Calcular fecha fin del trial
-    if trial_start_date:
-        fecha_fin = _fecha_fin_trial(trial_start_date)
-    else:
-        fecha_fin = _fecha_fin_trial(datetime.now(timezone.utc).isoformat())
-
     cuerpo = f"""
-<h2 style="color:{_GOLD};margin-top:0;">¡Tu acceso a ArchiRapid MLS está listo!</h2>
+<h2 style="color:{_GOLD};margin-top:0;">¡Bienvenida a ArchiRapid MLS!</h2>
 <p>Hola <strong>{nombre}</strong>,</p>
-<p>Tu cuenta en ArchiRapid MLS ha sido aprobada. Tienes <strong>30 días de acceso
-completo gratuito</strong> al plan Starter.</p>
+<p>Tu registro como inmobiliaria colaboradora en <strong>ArchiRapid MLS</strong> ha sido aprobado por nuestro equipo.</p>
 
 <div style="background:rgba(245,166,35,0.12);border-left:4px solid {_GOLD};
             border-radius:6px;padding:14px 18px;margin:18px 0;">
-  <p style="margin:0 0 8px 0;font-weight:700;color:{_GOLD};">Lo primero que te recomendamos hacer:</p>
-  <ol style="margin:0;padding-left:20px;line-height:2;">
-    <li>Entra en <strong>"Inmobiliarias MLS"</strong> en <a href="{_PORTAL_URL}"
-        style="color:{_GOLD};">{_PORTAL_URL}</a></li>
-    <li>Publica tu primera finca (necesitas la Referencia Catastral del IBI)</li>
-    <li>Explora el Mercado MLS y ve qué fincas de otras inmobiliarias puedes trabajar</li>
+  <p style="margin:0 0 12px 0;font-weight:700;color:{_GOLD};">Para comenzar a operar, debes completar dos pasos:</p>
+  <ol style="margin:0;padding-left:20px;line-height:1.8;color:{_TEXT};">
+    <li><strong style="color:{_GOLD};">Firma el Acuerdo de Colaboración</strong> — accede a la plataforma y firma digitalmente el acuerdo MLS (eIDAS art. 25).</li>
+    <li><strong style="color:{_GOLD};">Publica tu primera finca</strong> — introduce la referencia catastral validada, el precio y el split de comisión que ofreces a las colaboradoras.</li>
   </ol>
 </div>
 
-<p>Tu trial termina el <strong>{fecha_fin}</strong>. Sin tarjeta. Sin compromiso.
-Si decides continuar, elige tu plan desde el panel.</p>
-
-<p style="margin-top:24px;">
+<p style="margin-top:24px;text-align:center;">
   <a href="{_PORTAL_URL}"
      style="background:{_NAVY};color:#fff;padding:12px 28px;
             border-radius:8px;text-decoration:none;font-weight:700;
             display:inline-block;">
-    Acceder al portal MLS →
+    Acceder a ArchiRapid MLS →
   </a>
 </p>
 
-<p style="color:{_MUTED};font-size:12px;margin-top:24px;">
-  Cualquier duda: <a href="mailto:{_CONTACT_EMAIL}" style="color:{_GOLD};">{_CONTACT_EMAIL}</a>
-  o {_CONTACT_PHONE}<br>
-  El equipo de ArchiRapid
+<p style="color:{_TEXT};margin-top:24px;">
+  Si tienes cualquier duda, responde a este email o escríbenos a <a href="mailto:{_CONTACT_EMAIL}" style="color:{_GOLD};">{_CONTACT_EMAIL}</a>.
+</p>
+
+<p style="color:{_MUTED};font-size:12px;margin-top:28px;border-top:1px solid {_CARD};padding-top:16px;">
+  © 2026 ArchiRapid MLS · <a href="mailto:{_CONTACT_EMAIL}" style="color:{_GOLD};">{_CONTACT_EMAIL}</a> · {_CONTACT_PHONE}<br>
+  <a href="{_PORTAL_URL}" style="color:{_GOLD};">{_PORTAL_URL}</a>
 </p>
 """
     _send_email(
         to=email,
-        subject="Tu cuenta en ArchiRapid MLS ha sido aprobada — empieza tu prueba de 30 dias",
+        subject="¡Bienvenida a ArchiRapid MLS! Tu registro ha sido aprobado",
         body_html=_wrap_html("Bienvenida a ArchiRapid MLS", cuerpo),
     )
     return True
