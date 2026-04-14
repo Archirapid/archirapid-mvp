@@ -563,17 +563,49 @@ def render_map(plots):
         img_src = get_popup_image_b64(plot)
         location_note = "<small style='color:orange;'>Ubicación aproximada</small><br>" if plot.get('approximate_location') else ""
         img_tag = f'<img src="{img_src}" style="width:100%;height:100px;object-fit:cover;border-radius:5px;display:block;margin-bottom:6px;" alt="">' if img_src else ''
+
+        # Badge de estado
+        _status = plot.get('status', 'available')
+        _status_cfg = {
+            'available':  ('#16A34A', '✅ Disponible'),
+            'reserved':   ('#D97706', '⏳ Reservada'),
+            'sold':       ('#1D4ED8', '🔵 Vendida'),
+            'suspended':  ('#6B7280', '⛔ Suspendida'),
+        }.get(_status, ('#6B7280', _status))
+        _badge = (
+            f'<span style="background:{_status_cfg[0]};color:white;'
+            f'font-size:10px;font-weight:700;padding:2px 7px;'
+            f'border-radius:10px;display:inline-block;margin-bottom:4px;">'
+            f'{_status_cfg[1]}</span>'
+        )
+
+        # Botón condicional según estado
+        if _status in ('reserved', 'sold'):
+            _btn = (
+                f'<a href="/?selected_plot={_pid}" target="_blank"'
+                f' style="margin-top:6px;padding:5px 10px;background:#64748B;color:white;'
+                f'text-decoration:none;border-radius:3px;display:inline-block;'
+                f'font-weight:600;">'
+                f'Ver ficha →'
+                f'</a>'
+            )
+        else:
+            _btn = (
+                f'<a href="/?selected_plot={_pid}" target="_blank"'
+                f' style="margin-top:6px;padding:5px 10px;background:#ff4b4b;color:white;'
+                f'text-decoration:none;border-radius:3px;display:inline-block;font-weight:600;">'
+                f'Ver más detalles'
+                f'</a>'
+            )
+
         popup_html = f'''
         <div style="width:180px;font-family:sans-serif;font-size:13px;">
             {img_tag}
+            {_badge}
             <b style="font-size:13px;">{plot['title']}</b><br>
             {location_note}
             <span style="color:#64748B;">{plot.get('m2', 'N/A')} m²</span><br>
-            <a href="/?selected_plot={_pid}" target="_blank"
-               style="margin-top:6px;padding:5px 10px;background:#ff4b4b;color:white;
-                      text-decoration:none;border-radius:3px;display:inline-block;font-weight:600;">
-                Ver más detalles
-            </a>
+            {_btn}
         </div>
         '''
         marker = folium.Marker([lat, lon], icon=icon,
