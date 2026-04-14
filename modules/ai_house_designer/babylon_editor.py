@@ -17,6 +17,9 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
     """
 
     import json
+    for r in rooms_data:
+        if "floor" not in r or r["floor"] is None:
+            r["floor"] = 0
     rooms_js = json.dumps(rooms_data, ensure_ascii=False)
 
     html = f"""<!DOCTYPE html>
@@ -440,6 +443,7 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
         const roofType = "{roof_type}";
         const houseStyle = "{house_style}";
         const WALL_H = 2.7;
+        const FLOOR_TO_FLOOR = 3.0;
         const WALL_T = 0.15;
         // Color de pared exterior según estilo elegido en Paso 1
         const STYLE_WALL_COLORS = {{
@@ -615,13 +619,15 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
 
         function buildRoom(i) {{
             const room = roomsData[i];
+            const floorN = (room.floor ?? 0);
+            const yBase  = floorN * FLOOR_TO_FLOOR;
             const rx = room.x, rz = room.z, rw = room.width, rd = room.depth;
 
             // Suelo
             const floor = BABYLON.MeshBuilder.CreateBox(`floor_${{i}}`, {{
                 width: rw - 0.05, height: 0.06, depth: rd - 0.05
             }}, scene);
-            floor.position.set(rx + rw/2, 0.03, rz + rd/2);
+            floor.position.set(rx + rw/2, 0.03 + yBase, rz + rd/2);
             const fMat = new BABYLON.StandardMaterial(`fMat_${{i}}`, scene);
 
             // Color por zona
@@ -644,28 +650,29 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
 
             // Paredes solo en zonas habitables
             if (zone !== 'garden' && zone !== 'exterior') {{
-                _buildWalls(i, rx, rz, rw, rd);
-                _buildWindows(i, rx, rz, rw, rd);
+                _buildWalls(i, rx, rz, rw, rd, yBase);
+                _buildWindows(i, rx, rz, rw, rd, yBase);
             }}
 
             // Etiqueta
-            _buildLabel(i, rx, rz, rw, rd);
+            _buildLabel(i, rx, rz, rw, rd, yBase);
         }}
 
-        function _buildWalls(i, rx, rz, rw, rd) {{
+        function _buildWalls(i, rx, rz, rw, rd, yBase) {{
+            yBase = yBase || 0;
             const wMat = new BABYLON.StandardMaterial(`wMat_${{i}}`, scene);
             wMat.diffuseColor = WALL_COLOR;
 
             // Trasera (z-)
             const bw = BABYLON.MeshBuilder.CreateBox(`wall_back_${{i}}`,
                 {{width: rw, height: WALL_H, depth: WALL_T}}, scene);
-            bw.position.set(rx+rw/2, WALL_H/2, rz);
+            bw.position.set(rx+rw/2, WALL_H/2 + yBase, rz);
             bw.material = wMat;
 
             // Frontal (z+) semi-transparente
             const fw = BABYLON.MeshBuilder.CreateBox(`wall_front_${{i}}`,
                 {{width: rw, height: WALL_H, depth: WALL_T}}, scene);
-            fw.position.set(rx+rw/2, WALL_H/2, rz+rd);
+            fw.position.set(rx+rw/2, WALL_H/2 + yBase, rz+rd);
             const fwMat = wMat.clone(`fwMat_${{i}}`);
             fwMat.alpha = 0.28;
             fw.material = fwMat;
@@ -673,13 +680,13 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             // Izquierda
             const lw = BABYLON.MeshBuilder.CreateBox(`wall_left_${{i}}`,
                 {{width: WALL_T, height: WALL_H, depth: rd}}, scene);
-            lw.position.set(rx, WALL_H/2, rz+rd/2);
+            lw.position.set(rx, WALL_H/2 + yBase, rz+rd/2);
             lw.material = wMat;
 
             // Derecha
             const rw_ = BABYLON.MeshBuilder.CreateBox(`wall_right_${{i}}`,
                 {{width: WALL_T, height: WALL_H, depth: rd}}, scene);
-            rw_.position.set(rx+rw, WALL_H/2, rz+rd/2);
+            rw_.position.set(rx+rw, WALL_H/2 + yBase, rz+rd/2);
             rw_.material = wMat;
 
             // Sombras — paredes como emisores
@@ -697,18 +704,18 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                 // Porche: puerta centrada en pared norte (z-) hacia salón
                 const d = BABYLON.MeshBuilder.CreateBox(`door_${{i}}`,
                     {{width: DOOR_W, height: DOOR_H, depth: DOOR_D}}, scene);
-                d.position.set(rx + rw/2, DOOR_H/2, rz - 0.08);
+                d.position.set(rx + rw/2, DOOR_H/2 + yBase, rz - 0.08);
                 d.material = doorMat;
             }} else if (zone === 'day') {{
                 // Salón/cocina: puerta en z- (hacia porche)
                 const d1 = BABYLON.MeshBuilder.CreateBox(`door_${{i}}_a`,
                     {{width: DOOR_W, height: DOOR_H, depth: DOOR_D}}, scene);
-                d1.position.set(rx + rw*0.25, DOOR_H/2, rz - 0.08);
+                d1.position.set(rx + rw*0.25, DOOR_H/2 + yBase, rz - 0.08);
                 d1.material = doorMat;
                 // Segunda puerta en z+ (hacia pasillo)
                 const d2 = BABYLON.MeshBuilder.CreateBox(`door_${{i}}_b`,
                     {{width: DOOR_W, height: DOOR_H, depth: DOOR_D}}, scene);
-                d2.position.set(rx + rw*0.25, DOOR_H/2, rz + rd + 0.08);
+                d2.position.set(rx + rw*0.25, DOOR_H/2 + yBase, rz + rd + 0.08);
                 d2.material = doorMat;
             }} else if (zone === 'service') {{
                 // Garaje: portón en z- (fachada) + puerta peatonal en x- (hacia salón)
@@ -716,17 +723,17 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                 portMat.diffuseColor = new BABYLON.Color3(0.8, 0.5, 0.1);
                 const port = BABYLON.MeshBuilder.CreateBox(`door_${{i}}_port`,
                     {{width: DOOR_W*2.5, height: DOOR_H, depth: DOOR_D}}, scene);
-                port.position.set(rx + rw/2, DOOR_H/2, rz - 0.08);
+                port.position.set(rx + rw/2, DOOR_H/2 + yBase, rz - 0.08);
                 port.material = portMat;
                 const dp = BABYLON.MeshBuilder.CreateBox(`door_${{i}}_ped`,
                     {{width: DOOR_D, height: DOOR_H, depth: DOOR_W}}, scene);
-                dp.position.set(rx, DOOR_H/2, rz + rd/2);
+                dp.position.set(rx, DOOR_H/2 + yBase, rz + rd/2);
                 dp.material = doorMat;
             }} else if (zone === 'night' || zone === 'wet') {{
                 // Dormitorios/baños: puerta en z- (hacia pasillo)
                 const d = BABYLON.MeshBuilder.CreateBox(`door_${{i}}`,
                     {{width: DOOR_W, height: DOOR_H, depth: DOOR_D}}, scene);
-                d.position.set(rx + rw*0.25, DOOR_H/2, rz - 0.08);
+                d.position.set(rx + rw*0.25, DOOR_H/2 + yBase, rz - 0.08);
                 d.material = doorMat;
             }}
         }}
@@ -786,7 +793,8 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             return true;
         }}
 
-        function _buildWindows(i, rx, rz, rw, rd) {{
+        function _buildWindows(i, rx, rz, rw, rd, yBase) {{
+            yBase = yBase || 0;
             const zone = (roomsData[i].zone || '').toLowerCase();
             if (!['day','night','wet','service','circ'].includes(zone)) return;
             const isWet   = (zone === 'wet');
@@ -820,13 +828,14 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                 }}
                 const win = BABYLON.MeshBuilder.CreateBox(
                     `win_${{i}}_${{side}}`, {{width: bw, height: WIN_H, depth: bd}}, scene);
-                win.position.set(bx, winY, bz);
+                win.position.set(bx, winY + yBase, bz);
                 win.material = winMat.clone(`winMat_${{i}}_${{side}}`);
                 win.isPickable = false;
             }});
         }}
 
-        function _buildLabel(i, rx, rz, rw, rd) {{
+        function _buildLabel(i, rx, rz, rw, rd, yBase) {{
+            yBase = yBase || 0;
             // Limpiar etiqueta anterior si existe (rebuild)
             const oldCtrl = roomGuiUI.getControlByName(`lbl_txt_${{i}}`);
             if (oldCtrl) roomGuiUI.removeControl(oldCtrl);
@@ -847,7 +856,7 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             roomGuiUI.addControl(lbl);
 
             const node = new BABYLON.TransformNode(`lbl_node_${{i}}`, scene);
-            node.position.set(rx + rw/2, WALL_H * 0.45, rz + rd/2);
+            node.position.set(rx + rw/2, WALL_H * 0.45 + yBase, rz + rd/2);
             lbl.linkWithMesh(node);
             lbl.linkOffsetY = -12;
         }}
@@ -1089,11 +1098,12 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
 
             _disposeWalls(i);
             const zoneS = (roomsData[i].zone || '').toLowerCase();
+            const yBaseS = ((roomsData[i].floor ?? 0) * FLOOR_TO_FLOOR);
             if (zoneS !== 'garden' && zoneS !== 'exterior') {{
-                _buildWalls(i, rx, rz, rw, rd);
-                _buildWindows(i, rx, rz, rw, rd);
+                _buildWalls(i, rx, rz, rw, rd, yBaseS);
+                _buildWindows(i, rx, rz, rw, rd, yBaseS);
             }}
-            _buildLabel(i, rx, rz, rw, rd);
+            _buildLabel(i, rx, rz, rw, rd, yBaseS);
         }}
 
         // ================================================
