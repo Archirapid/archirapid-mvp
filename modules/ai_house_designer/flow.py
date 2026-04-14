@@ -2703,36 +2703,11 @@ def render_step3_editor():
     # Botón abrir editor - DESTACADO
     st.markdown("### 🏗️ Diseña tu casa")
 
-    # ── HERRAMIENTAS ────────────────────────────────────────────────────────
-    with st.expander("🛠️ Herramientas", expanded=False):
-        st.markdown("#### 📍 Posición en parcela")
-        st.caption("Ajusta la ubicación de tu casa dentro del terreno.")
-
-        _h_col1, _h_col2 = st.columns(2)
-        with _h_col1:
-            _pos_x = st.slider(
-                "X (m)",
-                min_value=-20.0, max_value=20.0,
-                value=st.session_state.get("house_offset_x", 0.0),
-                step=0.5, key="house_offset_x_slider",
-                help="Derecha (+) / Izquierda (-)"
-            )
-            st.session_state["house_offset_x"] = _pos_x
-        with _h_col2:
-            _pos_z = st.slider(
-                "Z (m)",
-                min_value=-20.0, max_value=20.0,
-                value=st.session_state.get("house_offset_z", 0.0),
-                step=0.5, key="house_offset_z_slider",
-                help="Adelante (+) / Atrás (-)"
-            )
-            st.session_state["house_offset_z"] = _pos_z
-
-        # Botón aplicar posición sin construir
-        if st.button("🔄 Aplicar posición al editor", width='stretch', key="apply_position_offset"):
-            st.session_state.pop("babylon_html", None)
-            st.session_state["editor_needs_rebuild"] = True
-            st.rerun()
+    # ── Inicializar offsets de posición (controlados dentro del editor Babylon) ──
+    if "house_offset_x" not in st.session_state:
+        st.session_state["house_offset_x"] = 0.0
+    if "house_offset_z" not in st.session_state:
+        st.session_state["house_offset_z"] = 0.0
 
     if st.button("🏠 Construir mi Casa — Ver en 3D", type="primary", width='stretch', key="open_babylon"):
 
