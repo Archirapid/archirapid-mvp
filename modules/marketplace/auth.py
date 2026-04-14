@@ -1,5 +1,6 @@
 import streamlit as st
 import uuid
+from datetime import datetime as _dt
 from modules.marketplace.utils import get_user_by_email, db_conn
 from werkzeug.security import check_password_hash
 
@@ -230,11 +231,12 @@ def show_registration():
                 new_id = str(uuid.uuid4())
                 c.execute("""
                     INSERT INTO users (id, email, name, role, is_professional, password_hash, phone, address, company, specialty, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     new_id, email, nombre, role,
                     1 if role in ['architect', 'owner'] else 0,
-                    hashed_password, telefono, direccion, empresa, especialidad
+                    hashed_password, telefono, direccion, empresa, especialidad,
+                    _dt.utcnow().isoformat()
                 ))
 
                 conn.commit()
