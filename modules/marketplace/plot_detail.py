@@ -9,7 +9,9 @@ import os
 import json
 import base64
 import re
-from modules.marketplace.utils import calculate_edificability, reserve_plot, create_or_update_client_user
+import uuid
+from datetime import datetime
+from modules.marketplace.utils import calculate_edificability, reserve_plot, create_or_update_client_user, db_conn
 from modules.marketplace.catastro_api import fetch_by_ref_catastral
 from modules.marketplace.marketplace import get_plot_image_path
 from modules.marketplace.compatibilidad import get_proyectos_compatibles
@@ -423,6 +425,49 @@ def show_plot_detail_page(plot_id: str):
                     st.error(f"Error en verificación IA completa: {str(e)}")
 
     st.markdown("---")
+
+    # ── Control de estado antes de reserva ────────────────────────────────────
+    _plot_status = plot.get('status', 'available')
+
+    if _plot_status == 'sold':
+        st.error("🔵 Esta finca ha sido vendida. Ya no está disponible.")
+        st.stop()
+
+    elif _plot_status == 'reserved':
+        st.warning("⏳ Esta finca está actualmente reservada.")
+        st.markdown("**¿Te interesa si queda disponible?**")
+        with st.form(key=f"waitlist_{plot.get('id','')}"):
+            _wl_nombre = st.text_input("Nombre completo *")
+            _wl_email = st.text_input("Email *")
+            _wl_tel = st.text_input("Teléfono (opcional)")
+            _wl_submit = st.form_submit_button(
+                "📩 Avisarme si queda disponible",
+                use_container_width=True
+            )
+            if _wl_submit:
+                if _wl_nombre and _wl_email:
+                    try:
+                        _wl_conn = db_conn()
+                        _wl_conn.execute(
+                            """INSERT OR IGNORE INTO waitlist_plots
+                               (id, plot_id, nombre, email, telefono, created_at)
+                               VALUES (?, ?, ?, ?, ?, ?)""",
+                            (uuid.uuid4().hex, plot.get('id',''),
+                             _wl_nombre, _wl_email, _wl_tel,
+                             datetime.utcnow().isoformat())
+                        )
+                        _wl_conn.commit()
+                        _wl_conn.close()
+                    except Exception:
+                        pass
+                    st.success("✅ Te avisaremos si la finca queda disponible.")
+                else:
+                    st.error("Nombre y email son obligatorios.")
+        st.stop()
+
+    elif _plot_status in ('suspended', 'no_available'):
+        st.info("⛔ Esta finca no está disponible en este momento.")
+        st.stop()
 
     # ── Sección de reserva de finca ──────────────────────────────────────────
     st.subheader("🏡 Reservar esta Finca")

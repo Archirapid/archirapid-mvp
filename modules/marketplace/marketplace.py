@@ -559,7 +559,16 @@ def render_map(plots):
         lon = float(plot['lon'])
         _pid = plot['id']
 
-        icon = folium.Icon(color='blue', icon='home', prefix='fa', icon_color='white')
+        # Color del icono según estado
+        _plot_status = plot.get('status', 'available')
+        if _plot_status == 'sold':
+            _icon_color = 'red'
+        elif _plot_status == 'reserved':
+            _icon_color = 'orange'
+        else:
+            _icon_color = 'blue'
+        icon = folium.Icon(color=_icon_color, icon='home', prefix='fa', icon_color='white')
+
         img_src = get_popup_image_b64(plot)
         location_note = "<small style='color:orange;'>Ubicación aproximada</small><br>" if plot.get('approximate_location') else ""
         img_tag = f'<img src="{img_src}" style="width:100%;height:100px;object-fit:cover;border-radius:5px;display:block;margin-bottom:6px;" alt="">' if img_src else ''

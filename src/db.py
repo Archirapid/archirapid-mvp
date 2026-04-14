@@ -805,6 +805,15 @@ _PG_DDL = [
         estado TEXT DEFAULT 'activo',
         url_generada TEXT
     )""",
+    # ── Waitlist de fincas ─────────────────────────────────────────────────────
+    """CREATE TABLE IF NOT EXISTS waitlist_plots (
+        id TEXT PRIMARY KEY,
+        plot_id TEXT NOT NULL,
+        nombre TEXT NOT NULL,
+        email TEXT NOT NULL,
+        telefono TEXT,
+        created_at TEXT
+    )""",
 ]
 
 _PG_INDEXES = [
@@ -1143,7 +1152,15 @@ def ensure_tables():
             plot_id TEXT, buyer_name TEXT, buyer_email TEXT, amount REAL, kind TEXT, created_at TEXT,
             buyer_dni TEXT, buyer_domicilio TEXT, buyer_province TEXT
         )""")
-        
+        c.execute("""CREATE TABLE IF NOT EXISTS waitlist_plots (
+            id TEXT PRIMARY KEY,
+            plot_id TEXT NOT NULL,
+            nombre TEXT NOT NULL,
+            email TEXT NOT NULL,
+            telefono TEXT,
+            created_at TEXT
+        )""")
+
         # Tablón de obras y ofertas de construcción
         c.execute("""CREATE TABLE IF NOT EXISTS project_tablon (
             id           TEXT PRIMARY KEY,
