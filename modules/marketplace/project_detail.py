@@ -471,7 +471,7 @@ def show_project_detail_page(project_id: str):
                     # Registrar usuario en base de datos
                     try:
                         import uuid as _uuid
-                        from datetime import datetime as _dt_reg
+                        from datetime import datetime as _dt_reg, timezone as _tz_reg
                         from werkzeug.security import generate_password_hash
                         conn = db.get_conn()
                         cursor = conn.cursor()
@@ -490,24 +490,31 @@ def show_project_detail_page(project_id: str):
                             cursor.execute("""
                                 INSERT INTO users (id, email, full_name, role, is_professional, password_hash, created_at)
                                 VALUES (?, ?, ?, 'client', 0, ?, ?)
-                            """, (new_user_id, email, full_name, hashed_password, _dt_reg.utcnow().isoformat()))
+                            """, (new_user_id, email, full_name, hashed_password, _dt_reg.now(_tz_reg.utc).isoformat()))
 
-                            # También insertar en clients para compatibilidad V2
-                            cursor.execute("""
-                                INSERT OR IGNORE INTO clients (name, email, phone, address, created_at)
-                                VALUES (?, ?, ?, ?, datetime('now'))
-                            """, (full_name, email, telefono, direccion))
+                            # También insertar en clients para compatibilidad V2 (skip si ya existe)
+                            cursor.execute("SELECT id FROM clients WHERE email = ?", (email,))
+                            if not cursor.fetchone():
+                                cursor.execute("""
+                                    INSERT INTO clients (id, name, email, phone, address, created_at)
+                                    VALUES (?, ?, ?, ?, ?, ?)
+                                """, (str(_uuid.uuid4()), full_name, email, telefono, direccion, _dt_reg.now(_tz_reg.utc).isoformat()))
 
                             st.success("✅ Registro completado. Accediendo al portal...")
 
                         conn.commit()
 
-                        # Guardar interés en el proyecto
+                        # Guardar interés en el proyecto (skip si ya existe)
                         try:
-                            cursor.execute("""
-                                INSERT OR IGNORE INTO client_interests (email, project_id, created_at)
-                                VALUES (?, ?, datetime('now'))
-                            """, (email, project_id))
+                            cursor.execute(
+                                "SELECT id FROM client_interests WHERE email = ? AND project_id = ?",
+                                (email, project_id)
+                            )
+                            if not cursor.fetchone():
+                                cursor.execute("""
+                                    INSERT INTO client_interests (id, email, project_id, created_at)
+                                    VALUES (?, ?, ?, ?)
+                                """, (str(_uuid.uuid4()), email, project_id, _dt_reg.now(_tz_reg.utc).isoformat()))
                             conn.commit()
                         except Exception as e:
                             st.warning(f"No se pudo guardar el interés: {e}")

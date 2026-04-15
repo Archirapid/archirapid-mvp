@@ -651,9 +651,10 @@ def _registrar_visita_demo(origen, nombre, accion):
         from datetime import datetime as _dt
         from modules.marketplace.utils import db_conn as _dbc
         _conn = _dbc(); _c = _conn.cursor()
-        _c.execute("""INSERT OR IGNORE INTO visitas_demo
+        _c.execute("""INSERT INTO visitas_demo
                       (id,timestamp,origen,nombre_usuario,accion_realizada,session_id)
-                      VALUES (?,?,?,?,?,?)""",
+                      VALUES (?,?,?,?,?,?)
+                      ON CONFLICT (id) DO NOTHING""",
                    (_uuid.uuid4().hex, _dt.utcnow().isoformat(),
                     origen, nombre, accion,
                     st.session_state.get("_demo_session_id", "")))

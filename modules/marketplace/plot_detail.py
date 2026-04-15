@@ -449,9 +449,10 @@ def show_plot_detail_page(plot_id: str):
                     try:
                         _wl_conn = db_conn()
                         _wl_conn.execute(
-                            """INSERT OR IGNORE INTO waitlist_plots
+                            """INSERT INTO waitlist_plots
                                (id, plot_id, nombre, email, telefono, created_at)
-                               VALUES (?, ?, ?, ?, ?, ?)""",
+                               VALUES (?, ?, ?, ?, ?, ?)
+                               ON CONFLICT (id) DO NOTHING""",
                             (uuid.uuid4().hex, plot.get('id',''),
                              _wl_nombre, _wl_email, _wl_tel,
                              datetime.utcnow().isoformat())
