@@ -1530,10 +1530,15 @@ if _cur_page == "🏠 Inicio / Marketplace":
             if st.query_params.get("page") != "login":
                 st.query_params.clear()
                 st.query_params["page"] = "login"
+                # Sincronizar current_page_sync para que el Sincronizador Maestro
+                # no dispare st.rerun() en la siguiente interacción del usuario,
+                # lo que causaba que el primer clic en "Crear cuenta" fuera comido.
+                st.session_state["current_page_sync"] = "login"
         else:
             if st.query_params.get("page") != "home":
                 st.query_params.clear()
                 st.query_params["page"] = "home"
+                st.session_state["current_page_sync"] = "home"
 elif _cur_page in _PAGE_TO_SLUG:
     _target_slug = _PAGE_TO_SLUG[_cur_page]
     if st.query_params.get("page") != _target_slug:
