@@ -609,6 +609,30 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
         const hlLayer = new BABYLON.HighlightLayer("hl", scene);
 
         // ================================================
+        // ROOTS — contenedores jerárquicos
+        // houseRoot: padre de TODAS las geometrías de la casa
+        //            (rooms, walls, roof, foundation, MEP, etc.)
+        // siteRoot:  padre de elementos de parcela/entorno
+        //            (suelo, grid, bordes, árboles, piscina, etc.)
+        // ================================================
+        const houseRoot = new BABYLON.TransformNode("houseRoot", scene);
+        const siteRoot  = new BABYLON.TransformNode("siteRoot",  scene);
+
+        // Clasifica si una habitación pertenece a la casa (true) o al jardín/exterior (false).
+        // El porche siempre va con la casa aunque su zone sea 'exterior'.
+        function isHouseRoom(room) {{
+            const zone = (room.zone || '').toLowerCase();
+            const code = (room.code || '').toLowerCase();
+            if (code.includes('porche')) return true;
+            return zone !== 'garden' && zone !== 'exterior';
+        }}
+
+        // Devuelve el mesh de suelo de la habitación i (puede ser null si aún no se construyó).
+        function getRoomFloorMesh(i) {{
+            return scene.getMeshByName('floor_' + i);
+        }}
+
+        // ================================================
         // CONSTRUIR HABITACIONES
         // ================================================
         // roomsData[i] → suelo + 4 paredes + etiqueta
@@ -647,6 +671,7 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
 
             floor.material = fMat;
             floor.receiveShadows = true;
+            if (isHouseRoom(room)) floor.parent = houseRoot;
 
             // Paredes solo en zonas habitables
             if (zone !== 'garden' && zone !== 'exterior') {{
@@ -691,6 +716,8 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
 
             // Sombras — paredes como emisores
             [bw, fw, lw, rw_].forEach(w => shadowGen.addShadowCaster(w, false));
+            // Parenting — _buildWalls solo se invoca para zonas de casa
+            [bw, fw, lw, rw_].forEach(w => w.parent = houseRoot);
 
             // Marcador de puerta — caja delgada sobre la pared correcta según zona
             const zone = (roomsData[i].zone || '').toLowerCase();
@@ -706,17 +733,20 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                     {{width: DOOR_W, height: DOOR_H, depth: DOOR_D}}, scene);
                 d.position.set(rx + rw/2, DOOR_H/2 + yBase, rz - 0.08);
                 d.material = doorMat;
+                d.parent = houseRoot;
             }} else if (zone === 'day') {{
                 // Salón/cocina: puerta en z- (hacia porche)
                 const d1 = BABYLON.MeshBuilder.CreateBox(`door_${{i}}_a`,
                     {{width: DOOR_W, height: DOOR_H, depth: DOOR_D}}, scene);
                 d1.position.set(rx + rw*0.25, DOOR_H/2 + yBase, rz - 0.08);
                 d1.material = doorMat;
+                d1.parent = houseRoot;
                 // Segunda puerta en z+ (hacia pasillo)
                 const d2 = BABYLON.MeshBuilder.CreateBox(`door_${{i}}_b`,
                     {{width: DOOR_W, height: DOOR_H, depth: DOOR_D}}, scene);
                 d2.position.set(rx + rw*0.25, DOOR_H/2 + yBase, rz + rd + 0.08);
                 d2.material = doorMat;
+                d2.parent = houseRoot;
             }} else if (zone === 'service') {{
                 // Garaje: portón en z- (fachada) + puerta peatonal en x- (hacia salón)
                 const portMat = new BABYLON.StandardMaterial(`portMat_${{i}}`, scene);
@@ -725,16 +755,19 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                     {{width: DOOR_W*2.5, height: DOOR_H, depth: DOOR_D}}, scene);
                 port.position.set(rx + rw/2, DOOR_H/2 + yBase, rz - 0.08);
                 port.material = portMat;
+                port.parent = houseRoot;
                 const dp = BABYLON.MeshBuilder.CreateBox(`door_${{i}}_ped`,
                     {{width: DOOR_D, height: DOOR_H, depth: DOOR_W}}, scene);
                 dp.position.set(rx, DOOR_H/2 + yBase, rz + rd/2);
                 dp.material = doorMat;
+                dp.parent = houseRoot;
             }} else if (zone === 'night' || zone === 'wet') {{
                 // Dormitorios/baños: puerta en z- (hacia pasillo)
                 const d = BABYLON.MeshBuilder.CreateBox(`door_${{i}}`,
                     {{width: DOOR_W, height: DOOR_H, depth: DOOR_D}}, scene);
                 d.position.set(rx + rw*0.25, DOOR_H/2 + yBase, rz - 0.08);
                 d.material = doorMat;
+                d.parent = houseRoot;
             }}
         }}
 
@@ -831,6 +864,7 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                 win.position.set(bx, winY + yBase, bz);
                 win.material = winMat.clone(`winMat_${{i}}_${{side}}`);
                 win.isPickable = false;
+                win.parent = houseRoot;
             }});
         }}
 
@@ -857,6 +891,7 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
 
             const node = new BABYLON.TransformNode(`lbl_node_${{i}}`, scene);
             node.position.set(rx + rw/2, WALL_H * 0.45 + yBase, rz + rd/2);
+            if (isHouseRoom(roomsData[i])) node.parent = houseRoot;
             lbl.linkWithMesh(node);
             lbl.linkOffsetY = -12;
         }}
@@ -872,15 +907,27 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
         // Guardar posiciones base de todos los meshes de la casa (excepto entorno)
         const _ENV_NAMES = new Set(['ground','plotPlane','gridPlane']);
         function _storeBaseMeshPositions() {{
+            // Always overwrite — called after generateLayoutJS normalization to capture real positions
             scene.meshes.forEach(m => {{
                 if (_ENV_NAMES.has(m.name) || m.name.startsWith('border_')) return;
-                if (!_basePosByName[m.name]) {{
-                    _basePosByName[m.name] = {{ x: m.position.x, z: m.position.z }};
+                _basePosByName[m.name] = {{ x: m.position.x, z: m.position.z }};
+            }});
+            scene.transformNodes.forEach(n => {{
+                if (n.name.startsWith('lbl_node_')) {{
+                    _basePosByName[n.name] = {{ x: n.position.x, z: n.position.z }};
                 }}
             }});
         }}
 
         function _applyHouseOffset(dx, dz) {{
+            // Dispose tejado ANTES del for-loop — evita que se mueva por position
+            if (typeof roofActive !== 'undefined' && roofActive) {{
+                if (roofMesh) {{ roofMesh.dispose(); roofMesh = null; }}
+                for (let _ri = 0; _ri < 4; _ri++) {{
+                    const _rm = scene.getMeshByName('roof_' + _ri);
+                    if (_rm) _rm.dispose();
+                }}
+            }}
             // Snapshot any new meshes that appeared since last call (roof, foundation, etc.)
             scene.meshes.forEach(m => {{
                 if (_ENV_NAMES.has(m.name) || m.name.startsWith('border_')) return;
@@ -892,7 +939,18 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             }});
             for (const [nm, base] of Object.entries(_basePosByName)) {{
                 const m = scene.getMeshByName(nm);
-                if (m) {{ m.position.x = base.x + dx; m.position.z = base.z + dz; }}
+                if (m) {{ m.position.x = base.x + dx; m.position.z = base.z + dz; continue; }}
+                const tn = scene.getTransformNodeByName(nm);
+                if (tn) {{ tn.position.x = base.x + dx; tn.position.z = base.z + dz; }}
+            }}
+            // Rebuild tejado y paneles con offset correcto (vértices, no position)
+            if (typeof roofActive !== 'undefined' && roofActive) {{
+                buildRoof(dx, dz);
+                solarMeshes.forEach(m => {{
+                    try {{ m.material && m.material.dispose(); m.dispose(); }} catch(e) {{}}
+                }});
+                solarMeshes = [];
+                buildSolarPanels(dx, dz);
             }}
         }}
 
@@ -1216,6 +1274,11 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             }}
             selectedMesh = null;
             selectedIndex = null;
+            // Re-sync base positions with rebuilt room positions, then re-apply current offset
+            _storeBaseMeshPositions();
+            if (_houseOffsetX !== 0 || _houseOffsetZ !== 0) {{
+                _applyHouseOffset(_houseOffsetX, _houseOffsetZ);
+            }}
             updateBudget();
             showToast('✅ Planta redistribuida sin colisiones');
         }}
@@ -1915,7 +1978,9 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
         let roofMesh = null;
         let roofActive = false;
 
-        function buildRoof() {{
+        function buildRoof(ox, oz) {{
+            ox = (ox !== undefined) ? ox : _houseOffsetX;
+            oz = (oz !== undefined) ? oz : _houseOffsetZ;
             if (roofMesh) {{ roofMesh.dispose(); roofMesh = null; }}
 
             // Calcular bounding box de TODA la casa (solo habitaciones interiores)
@@ -1923,14 +1988,23 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             const houseRooms = roomsData.filter(r => interiorZones.includes((r.zone||'').toLowerCase()));
             if (houseRooms.length === 0) return;
 
-            const minX = Math.min(...houseRooms.map(r => r.x));
-            const minZ = Math.min(...houseRooms.map(r => r.z));
-            const maxX = Math.max(...houseRooms.map(r => r.x + r.width));
-            const maxZ = Math.max(...houseRooms.map(r => r.z + r.depth));
+            // Leer posición REAL de los suelos — incluye offset parcela ya aplicado
+            // (consistente con _basePosByName + dx usado por el for-loop)
+            let minX = Infinity, minZ = Infinity, maxX = -Infinity, maxZ = -Infinity;
+            houseRooms.forEach(r => {{
+                const idx = roomsData.indexOf(r);
+                const fl = scene.getMeshByName('floor_' + idx);
+                if (!fl) return;
+                minX = Math.min(minX, fl.position.x - r.width / 2);
+                minZ = Math.min(minZ, fl.position.z - r.depth / 2);
+                maxX = Math.max(maxX, fl.position.x + r.width / 2);
+                maxZ = Math.max(maxZ, fl.position.z + r.depth / 2);
+            }});
+            if (!isFinite(minX)) return;
             const hW = maxX - minX;  // ancho total casa
             const hD = maxZ - minZ;  // fondo total casa
-            const hCX = minX + hW / 2;  // centro X
-            const hCZ = minZ + hD / 2;  // centro Z
+            const hCX = minX + hW / 2;  // centro X real (con offset)
+            const hCZ = minZ + hD / 2;  // centro Z real (con offset)
             const wallH = 2.7;           // altura paredes
             const roofH = hW * 0.28;     // altura cumbrera (28% del ancho)
             const overhang = 0.6;        // voladizo perimetral
@@ -2019,6 +2093,8 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                 roofMesh.material = rMat;
                 roofMesh.isPickable = false;
                 shadowGen.addShadowCaster(roofMesh, false);
+                _ENV_NAMES.add('roof');
+                for (let _ri = 0; _ri < 4; _ri++) _ENV_NAMES.add('roof_' + _ri);
             }}
         }}
 
@@ -2175,7 +2251,7 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
         function changeOverhang(val) {{
             currentOverhang = parseFloat(val) / 10;
             document.getElementById('overhang-val').textContent = currentOverhang.toFixed(1) + 'm';
-            if (roofActive) {{ buildRoof(); }}
+            if (roofActive) {{ buildRoof(_houseOffsetX, _houseOffsetZ); }}
         }}
 
         function toggleRoof() {{
@@ -2200,13 +2276,13 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                 try {{ buildMEPLayers(roomsData); }} catch(e) {{}}
 
             }} else {{
-                buildRoof();
+                buildRoof(_houseOffsetX, _houseOffsetZ);
                 roofActive = true;
                 btn.textContent = '🏠 Tejado ON';
                 btn.classList.add('active');
                 document.getElementById('roof-panel').style.display = 'block';
                 showToast('Tejado: ' + roofType.split('(')[0].trim());
-                buildSolarPanels();
+                buildSolarPanels(_houseOffsetX, _houseOffsetZ);
                 try {{ buildMEPLayers(roomsData); }} catch(e) {{}}
             }}
         }}                                                                                                                             
@@ -2215,7 +2291,9 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
         // ================================================
         let solarMeshes = [];
 
-        function buildSolarPanels() {{
+        function buildSolarPanels(ox, oz) {{
+            ox = (ox !== undefined) ? ox : _houseOffsetX;
+            oz = (oz !== undefined) ? oz : _houseOffsetZ;
             // Limpiar paneles previos
             solarMeshes.forEach(m => {{ m.material && m.material.dispose(); m.dispose(); }});
             solarMeshes = [];
@@ -2242,10 +2320,18 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             }});
             if (houseRooms.length === 0) return;
 
-            const minX = Math.min(...houseRooms.map(r => r.x));
-            const maxX = Math.max(...houseRooms.map(r => r.x + r.width));
-            const minZ = Math.min(...houseRooms.map(r => r.z));
-            const maxZ = Math.max(...houseRooms.map(r => r.z + r.depth));
+            // Leer posición REAL de los suelos — incluye offset parcela ya aplicado
+            let minX = Infinity, minZ = Infinity, maxX = -Infinity, maxZ = -Infinity;
+            houseRooms.forEach(r => {{
+                const idx = roomsData.indexOf(r);
+                const fl = scene.getMeshByName('floor_' + idx);
+                if (!fl) return;
+                minX = Math.min(minX, fl.position.x - r.width / 2);
+                minZ = Math.min(minZ, fl.position.z - r.depth / 2);
+                maxX = Math.max(maxX, fl.position.x + r.width / 2);
+                maxZ = Math.max(maxZ, fl.position.z + r.depth / 2);
+            }});
+            if (!isFinite(minX)) return;
             const houseW = maxX - minX;
             const houseCX = (minX + maxX) / 2;
 
@@ -2803,6 +2889,8 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
         // ================================================
         const initialLayout = generateLayoutJS(roomsData);
         rebuildScene(initialLayout);
+        // Refresh base positions AFTER normalization (generateLayoutJS adds ≥2m offset)
+        _storeBaseMeshPositions();
         // Aplicar automáticamente el estilo elegido en el Paso 1
         applyStyleUI(houseStyle);
 
