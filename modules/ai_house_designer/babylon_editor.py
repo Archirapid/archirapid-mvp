@@ -1607,6 +1607,9 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             const _mepRectCache = new Map();
             rooms.forEach((r, i) => {{ _mepRectCache.set(i, _getRoomWorldRect(i)); }});
             const _getMepRect = (r) => _mepRectCache.get(rooms.indexOf(r));
+            // FIX(offset): offset guard for raw-roomsData fallback paths
+            const _mepOX = (typeof _houseOffsetX !== 'undefined' ? _houseOffsetX : 0);
+            const _mepOZ = (typeof _houseOffsetZ !== 'undefined' ? _houseOffsetZ : 0);
 
             // FIX(sync): compute house bounds from floor mesh world coords (not stale roomsData)
             let houseMinX = Infinity, houseMinZ = Infinity, houseMaxX = -Infinity, houseMaxZ = -Infinity;
@@ -1713,7 +1716,9 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             // ── ELÉCTRICO ─────────────────────────────────────────────────────
             const ELC = new BABYLON.Color3(1.0, 0.45, 0.0);
             const panelX  = houseMinX + 0.3;
-            const trunkZ  = _baseRooms[0] ? _baseRooms[0].z + _baseRooms[0].depth / 2 : houseMaxZ * 0.5;
+            // FIX(offset): use world rect for trunkZ instead of raw roomsData.z
+            const _r0 = _baseRooms[0] ? _getMepRect(_baseRooms[0]) : null;
+            const trunkZ  = _r0 ? _r0.cz : (_baseRooms[0] ? _baseRooms[0].z + _baseRooms[0].depth / 2 + _mepOZ : houseMaxZ * 0.5);
             // Cuadro eléctrico / ICP en fachada exterior oeste (caja amarilla)
             const elecBox = BABYLON.MeshBuilder.CreateBox('elec_cuadro',
                 {{width:0.15, height:0.45, depth:0.35}}, scene);
@@ -1735,7 +1740,10 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                 new BABYLON.Vector3(houseMaxX + 0.1, ELEC_Y, trunkZ)
             ], ELC, MEPLayers.electrical);
             _baseRooms.forEach((r, idx) => {{
-                const cx = r.x + r.width / 2, cz = r.z + r.depth / 2;
+                // FIX(offset): use world rect; fallback adds _mepOX/OZ to raw roomsData coords
+                const _er = _getMepRect(r);
+                const cx = _er ? _er.cx : r.x + r.width / 2 + _mepOX;
+                const cz = _er ? _er.cz : r.z + r.depth / 2 + _mepOZ;
                 mepLine(`elec_drop_${{idx}}`, [
                     new BABYLON.Vector3(cx, ELEC_Y, trunkZ),
                     new BABYLON.Vector3(cx, ELEC_Y, cz)
@@ -1768,7 +1776,10 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                 new BABYLON.Vector3(houseMaxX + 0.1, ELEC_Y - 0.15, trunkZ)
             ], DOM, MEPLayers.domotics);
             _baseRooms.forEach((r, idx) => {{
-                const cx = r.x + r.width / 2, cz = r.z + r.depth / 2;
+                // FIX(offset): use world rect; fallback adds _mepOX/OZ to raw roomsData coords
+                const _dr = _getMepRect(r);
+                const cx = _dr ? _dr.cx : r.x + r.width / 2 + _mepOX;
+                const cz = _dr ? _dr.cz : r.z + r.depth / 2 + _mepOZ;
                 mepLine(`dom_drop_${{idx}}`, [
                     new BABYLON.Vector3(cx, ELEC_Y - 0.15, trunkZ),
                     new BABYLON.Vector3(cx, ELEC_Y - 0.15, cz)
@@ -2155,8 +2166,9 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
         function buildStyleExtras(overrideStyle) {{
             clearStyleExtras();
             const conf = STYLE_3D_CONFIG[overrideStyle || houseStyle] || STYLE_3D_CONFIG['Moderno'];
-            const hX = totalWidth / 2;
-            const hZ = totalDepth / 2;
+            // FIX(offset): centre of the house in world coords (follows parcel slider)
+            const hX = totalWidth / 2 + (_houseOffsetX || 0);
+            const hZ = totalDepth / 2 + (_houseOffsetZ || 0);
             const wallH = 2.7;
 
             // --- CHIMENEA — centrada sobre la casa, visible desde cámara NE ---
@@ -2177,11 +2189,13 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
 
             // --- EXTRAS SEGÚN ESTILO ---
             // Árboles en los laterales este/oeste — siempre visibles desde cámara NE
+            // FIX(offset): tree positions in world coords — explicit offX/offZ to avoid hZ*factor distortion
+            const _sxOX = _houseOffsetX || 0, _sxOZ = _houseOffsetZ || 0;
             const treePositions = [
-                [-3.2, hZ * 0.5],              // oeste, cuarto norte
-                [totalWidth + 3.2, hZ * 0.5],  // este, cuarto norte
-                [-3.2, hZ * 1.5],              // oeste, cuarto sur
-                [totalWidth + 3.2, hZ * 1.5]   // este, cuarto sur
+                [-3.2 + _sxOX, _sxOZ + totalDepth * 0.25],              // oeste, cuarto norte
+                [totalWidth + _sxOX + 3.2, _sxOZ + totalDepth * 0.25],  // este, cuarto norte
+                [-3.2 + _sxOX, _sxOZ + totalDepth * 0.75],              // oeste, cuarto sur
+                [totalWidth + _sxOX + 3.2, _sxOZ + totalDepth * 0.75]   // este, cuarto sur
             ];
             let treeCount = 0;
             conf.extras.forEach((extra) => {{
@@ -2190,14 +2204,14 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                     const bordeMat = new BABYLON.StandardMaterial('poolBordeMat', scene);
                     bordeMat.diffuseColor = new BABYLON.Color3(0.90, 0.88, 0.82);
                     const borde = BABYLON.MeshBuilder.CreateBox('pool_borde', {{width:5.2, height:0.22, depth:3.8}}, scene);
-                    borde.position.set(hX, 0.11, totalDepth + 3.5);
+                    borde.position.set(hX, 0.11, totalDepth + (_houseOffsetZ||0) + 3.5);
                     borde.material = bordeMat; borde.isPickable = false;
                     styleMeshes.push(borde);
                     const poolMat = new BABYLON.StandardMaterial('poolMat', scene);
                     poolMat.diffuseColor = new BABYLON.Color3(0.20, 0.55, 0.85);
                     poolMat.alpha = 0.88;
                     const pool = BABYLON.MeshBuilder.CreateBox('pool', {{width:4.5, height:0.55, depth:3.1}}, scene);
-                    pool.position.set(hX, 0.28, totalDepth + 3.5);
+                    pool.position.set(hX, 0.28, totalDepth + (_houseOffsetZ||0) + 3.5);
                     pool.material = poolMat; pool.isPickable = false;
                     styleMeshes.push(pool);
 
@@ -2208,7 +2222,7 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                     const terr = BABYLON.MeshBuilder.CreateBox('terrace', {{
                         width: Math.max(totalWidth * 0.65, 4), height: 0.14, depth: 2.8
                     }}, scene);
-                    terr.position.set(hX, 0.07, totalDepth + 1.8);
+                    terr.position.set(hX, 0.07, totalDepth + (_houseOffsetZ||0) + 1.8);
                     terr.material = terrMat; terr.isPickable = false;
                     styleMeshes.push(terr);
 
@@ -2217,13 +2231,13 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                     const patioMat = new BABYLON.StandardMaterial('patioMat', scene);
                     patioMat.diffuseColor = new BABYLON.Color3(0.85, 0.78, 0.65);
                     const patio = BABYLON.MeshBuilder.CreateBox('patio', {{width:3.5, height:0.08, depth:3.5}}, scene);
-                    patio.position.set(totalWidth + 2.5, 0.04, hZ);
+                    patio.position.set(totalWidth + (_houseOffsetX||0) + 2.5, 0.04, hZ);
                     patio.material = patioMat; patio.isPickable = false;
                     styleMeshes.push(patio);
                     const fuenteMat = new BABYLON.StandardMaterial('fuenteMat', scene);
                     fuenteMat.diffuseColor = new BABYLON.Color3(0.20, 0.45, 0.75);
                     const fuente = BABYLON.MeshBuilder.CreateCylinder('fuente', {{diameter:0.9, height:0.45, tessellation:12}}, scene);
-                    fuente.position.set(totalWidth + 2.5, 0.27, hZ);
+                    fuente.position.set(totalWidth + (_houseOffsetX||0) + 2.5, 0.27, hZ);
                     fuente.material = fuenteMat; fuente.isPickable = false;
                     styleMeshes.push(fuente);
 
