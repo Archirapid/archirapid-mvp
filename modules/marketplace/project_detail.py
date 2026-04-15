@@ -470,6 +470,8 @@ def show_project_detail_page(project_id: str):
                 else:
                     # Registrar usuario en base de datos
                     try:
+                        import uuid as _uuid
+                        from datetime import datetime as _dt_reg
                         from werkzeug.security import generate_password_hash
                         conn = db.get_conn()
                         cursor = conn.cursor()
@@ -484,10 +486,11 @@ def show_project_detail_page(project_id: str):
                             # Insertar nuevo usuario con contraseña
                             full_name = f"{nombre} {apellidos}".strip()
                             hashed_password = generate_password_hash(password)
+                            new_user_id = str(_uuid.uuid4())
                             cursor.execute("""
-                                INSERT INTO users (email, full_name, role, is_professional, password_hash, created_at)
-                                VALUES (?, ?, 'client', 0, ?, datetime('now'))
-                            """, (email, full_name, hashed_password))
+                                INSERT INTO users (id, email, full_name, role, is_professional, password_hash, created_at)
+                                VALUES (?, ?, ?, 'client', 0, ?, ?)
+                            """, (new_user_id, email, full_name, hashed_password, _dt_reg.utcnow().isoformat()))
 
                             # También insertar en clients para compatibilidad V2
                             cursor.execute("""

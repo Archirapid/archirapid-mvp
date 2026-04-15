@@ -1141,6 +1141,12 @@ if "selected_prefab" in st.query_params and not page_from_query:
         st.error(f"Error mostrando detalle de prefabricada: {e}")
     st.stop()
 
+# Respaldo: si session_state tiene proyecto pendiente y el param no llegó, lo inyectamos
+_ss_goto = st.session_state.pop("_goto_project_v2", None)
+if _ss_goto and "selected_project_v2" not in st.query_params:
+    st.query_params["selected_project_v2"] = _ss_goto
+    st.rerun()
+
 if "selected_project_v2" in st.query_params and not page_from_query:
     try:
         project_id = st.query_params["selected_project_v2"]
@@ -2009,6 +2015,8 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
                         st.markdown(f"**{title[:28]}{'…' if len(title)>28 else ''}**")
                         st.caption(f"💰 €{p.get('price',0):,.0f}  ·  📐 {p.get('area_m2',0)} m²")
                         if st.button("Ver Detalles →", key=f"proj_home_{p['id']}", width='stretch'):
+                            # Respaldo session_state + query_param para evitar lag Cloud
+                            st.session_state["_goto_project_v2"] = p['id']
                             st.query_params["selected_project_v2"] = p['id']
                             st.rerun()
             else:
