@@ -1545,11 +1545,15 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             }});
             const _baseRooms = habRooms.length > 0 ? habRooms : rooms;
 
+            // FIX(sync): cache world bounding rects once to avoid repeated getBoundingInfo calls
+            const _mepRectCache = new Map();
+            rooms.forEach((r, i) => {{ _mepRectCache.set(i, _getRoomWorldRect(i)); }});
+            const _getMepRect = (r) => _mepRectCache.get(rooms.indexOf(r));
+
             // FIX(sync): compute house bounds from floor mesh world coords (not stale roomsData)
             let houseMinX = Infinity, houseMinZ = Infinity, houseMaxX = -Infinity, houseMaxZ = -Infinity;
             _baseRooms.forEach(r => {{
-                const idx = rooms.indexOf(r);
-                const rect = _getRoomWorldRect(idx);
+                const rect = _getMepRect(r);
                 if (rect) {{
                     houseMinX = Math.min(houseMinX, rect.minX); houseMaxX = Math.max(houseMaxX, rect.maxX);
                     houseMinZ = Math.min(houseMinZ, rect.minZ); houseMaxZ = Math.max(houseMaxZ, rect.maxZ);
@@ -1558,7 +1562,7 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                     houseMinZ = Math.min(houseMinZ, r.z); houseMaxZ = Math.max(houseMaxZ, r.z + r.depth);
                 }}
             }});
-            if (!isFinite(houseMinX)) return;
+            if (!isFinite(houseMinX) || !isFinite(houseMaxX) || !isFinite(houseMinZ) || !isFinite(houseMaxZ)) return;
 
             // Wet rooms: need water + sewage
             const wetRooms = _baseRooms.filter(r =>
@@ -1576,9 +1580,8 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                 new BABYLON.Vector3(houseMaxX, BURIED_Y, collectorZ)
             ], SEW, MEPLayers.sewage);
             wetRooms.forEach((r, idx) => {{
-                // FIX(sync): use world coords from floor mesh
-                const roomIdx = rooms.indexOf(r);
-                const rect = _getRoomWorldRect(roomIdx);
+                // FIX(sync): use world coords from floor mesh (cached)
+                const rect = _getMepRect(r);
                 const cx = rect ? rect.cx : r.x + r.width / 2, cz = rect ? rect.cz : r.z + r.depth / 2;
                 mepTube(`sewage_drop_${{idx}}`, [
                     new BABYLON.Vector3(cx, 0, cz),
@@ -1639,9 +1642,8 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                 new BABYLON.Vector3(houseMaxX + 0.2, WATER_Y, manifoldZ)
             ], WAT, MEPLayers.water);
             wetRooms.forEach((r, idx) => {{
-                // FIX(sync): use world coords from floor mesh
-                const roomIdx = rooms.indexOf(r);
-                const rect = _getRoomWorldRect(roomIdx);
+                // FIX(sync): use world coords from floor mesh (cached)
+                const rect = _getMepRect(r);
                 const cx = rect ? rect.cx : r.x + r.width / 2, cz = rect ? rect.cz : r.z + r.depth / 2;
                 mepLine(`water_branch_${{idx}}`, [
                     new BABYLON.Vector3(cx, WATER_Y, manifoldZ),
@@ -1653,8 +1655,8 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             // ── ELÉCTRICO ─────────────────────────────────────────────────────
             const ELC = new BABYLON.Color3(1.0, 0.45, 0.0);
             const panelX  = houseMinX + 0.3;
-            // FIX(sync): trunkZ from first room's floor mesh world coords
-            const _trunkRect = _baseRooms[0] ? _getRoomWorldRect(rooms.indexOf(_baseRooms[0])) : null;
+            // FIX(sync): trunkZ from first room's floor mesh world coords (cached)
+            const _trunkRect = _baseRooms[0] ? _getMepRect(_baseRooms[0]) : null;
             const trunkZ = _trunkRect ? _trunkRect.cz : (houseMinZ + houseMaxZ) / 2;
             // Cuadro eléctrico / ICP en fachada exterior oeste (caja amarilla)
             const elecBox = BABYLON.MeshBuilder.CreateBox('elec_cuadro',
@@ -1677,9 +1679,8 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                 new BABYLON.Vector3(houseMaxX + 0.1, ELEC_Y, trunkZ)
             ], ELC, MEPLayers.electrical);
             _baseRooms.forEach((r, idx) => {{
-                // FIX(sync): use world coords from floor mesh
-                const roomIdx = rooms.indexOf(r);
-                const rect = _getRoomWorldRect(roomIdx);
+                // FIX(sync): use world coords from floor mesh (cached)
+                const rect = _getMepRect(r);
                 const cx = rect ? rect.cx : r.x + r.width / 2, cz = rect ? rect.cz : r.z + r.depth / 2;
                 mepLine(`elec_drop_${{idx}}`, [
                     new BABYLON.Vector3(cx, ELEC_Y, trunkZ),
@@ -1715,9 +1716,8 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                 new BABYLON.Vector3(houseMaxX + 0.1, ELEC_Y - 0.15, trunkZ)
             ], DOM, MEPLayers.domotics);
             _baseRooms.forEach((r, idx) => {{
-                // FIX(sync): use world coords from floor mesh
-                const roomIdx = rooms.indexOf(r);
-                const rect = _getRoomWorldRect(roomIdx);
+                // FIX(sync): use world coords from floor mesh (cached)
+                const rect = _getMepRect(r);
                 const cx = rect ? rect.cx : r.x + r.width / 2, cz = rect ? rect.cz : r.z + r.depth / 2;
                 mepLine(`dom_drop_${{idx}}`, [
                     new BABYLON.Vector3(cx, ELEC_Y - 0.15, trunkZ),
@@ -1859,7 +1859,7 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             if (_srX) _srX.value = 0;
             if (_srZ) _srZ.value = 0;
             // Clear base-position cache so _storeBaseMeshPositions re-registers at offset=0
-            for (const key in _basePosByName) delete _basePosByName[key];
+            Object.keys(_basePosByName).forEach(k => delete _basePosByName[k]);
             // Limpiar cerramientos personalizados
             window.customWalls.forEach(cw => {{
                 const m = scene.getMeshByName(cw.id);
