@@ -41,7 +41,7 @@ Cuando el usuario movía los sliders de "Posición en parcela" (offset X/Z):
 | Archivo | Qué cambió |
 |---------|-----------|
 | `modules/ai_house_designer/babylon_editor.py` | Todo: houseRoot, _storeBaseMeshPositions, _applyHouseOffset, _getRoomWorldRect, buildMEPLayers, buildFoundation, resetLayout |
-| `modules/ai_house_designer/floor_plan_svg.py` | Sin cambios (2D independiente del offset 3D) |
+| `modules/ai_house_designer/floor_plan_svg.py` | Sin cambios aquí; los planos 2D se generan a partir de los datos exportados por el editor 3D. |
 
 ---
 
