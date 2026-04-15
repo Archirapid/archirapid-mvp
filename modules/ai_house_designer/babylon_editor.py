@@ -1990,15 +1990,17 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
 
             // Leer posición REAL de los suelos — incluye offset parcela ya aplicado
             // (consistente con _basePosByName + dx usado por el for-loop)
+            // Usar getAbsolutePosition() para manejar correctamente jerarquía de padres
             let minX = Infinity, minZ = Infinity, maxX = -Infinity, maxZ = -Infinity;
             houseRooms.forEach(r => {{
                 const idx = roomsData.indexOf(r);
                 const fl = scene.getMeshByName('floor_' + idx);
                 if (!fl) return;
-                minX = Math.min(minX, fl.position.x - r.width / 2);
-                minZ = Math.min(minZ, fl.position.z - r.depth / 2);
-                maxX = Math.max(maxX, fl.position.x + r.width / 2);
-                maxZ = Math.max(maxZ, fl.position.z + r.depth / 2);
+                const absPos = fl.getAbsolutePosition();
+                minX = Math.min(minX, absPos.x - r.width / 2);
+                minZ = Math.min(minZ, absPos.z - r.depth / 2);
+                maxX = Math.max(maxX, absPos.x + r.width / 2);
+                maxZ = Math.max(maxZ, absPos.z + r.depth / 2);
             }});
             if (!isFinite(minX)) return;
             const hW = maxX - minX;  // ancho total casa
@@ -2321,15 +2323,17 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             if (houseRooms.length === 0) return;
 
             // Leer posición REAL de los suelos — incluye offset parcela ya aplicado
+            // Usar getAbsolutePosition() para manejar correctamente jerarquía de padres
             let minX = Infinity, minZ = Infinity, maxX = -Infinity, maxZ = -Infinity;
             houseRooms.forEach(r => {{
                 const idx = roomsData.indexOf(r);
                 const fl = scene.getMeshByName('floor_' + idx);
                 if (!fl) return;
-                minX = Math.min(minX, fl.position.x - r.width / 2);
-                minZ = Math.min(minZ, fl.position.z - r.depth / 2);
-                maxX = Math.max(maxX, fl.position.x + r.width / 2);
-                maxZ = Math.max(maxZ, fl.position.z + r.depth / 2);
+                const absPos = fl.getAbsolutePosition();
+                minX = Math.min(minX, absPos.x - r.width / 2);
+                minZ = Math.min(minZ, absPos.z - r.depth / 2);
+                maxX = Math.max(maxX, absPos.x + r.width / 2);
+                maxZ = Math.max(maxZ, absPos.z + r.depth / 2);
             }});
             if (!isFinite(minX)) return;
             const houseW = maxX - minX;
