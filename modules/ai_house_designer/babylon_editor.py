@@ -871,9 +871,13 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
 
         // Guardar posiciones base de todos los meshes de la casa (excepto entorno)
         const _ENV_NAMES = new Set(['ground','plotPlane','gridPlane']);
+        // FIX(sync): fence_* meshes belong to the PARCEL (fixed boundary), not the house
+        function _isFenceOrEnv(m) {{
+            return _ENV_NAMES.has(m.name) || m.name.startsWith('border_') || m.name.startsWith('fence_');
+        }}
         function _storeBaseMeshPositions() {{
             scene.meshes.forEach(m => {{
-                if (_ENV_NAMES.has(m.name) || m.name.startsWith('border_')) return;
+                if (_isFenceOrEnv(m)) return;
                 if (!_basePosByName[m.name]) {{
                     _basePosByName[m.name] = {{ x: m.position.x, z: m.position.z }};
                 }}
@@ -882,8 +886,9 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
 
         function _applyHouseOffset(dx, dz) {{
             // Snapshot any new meshes that appeared since last call (roof, foundation, etc.)
+            // FIX(sync): exclude fence_* so parcel boundary stays fixed when house moves
             scene.meshes.forEach(m => {{
-                if (_ENV_NAMES.has(m.name) || m.name.startsWith('border_')) return;
+                if (_isFenceOrEnv(m)) return;
                 if (!_basePosByName[m.name]) {{
                     // Mesh appeared AFTER initial store — its current position already carries
                     // the previous offset, so record base = current - previous offset
@@ -894,6 +899,17 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                 const m = scene.getMeshByName(nm);
                 if (m) {{ m.position.x = base.x + dx; m.position.z = base.z + dz; }}
             }}
+        }}
+
+        // FIX(sync): helper — world bounding rect of floor mesh at index idx.
+        // Returns {{minX,maxX,minZ,maxZ,cx,cz,w,d}} or null if mesh not found.
+        function _getRoomWorldRect(idx) {{
+            const fl = scene.getMeshByName('floor_' + idx);
+            if (!fl) return null;
+            const bb = fl.getBoundingInfo().boundingBox;
+            const minX = bb.minimumWorld.x, maxX = bb.maximumWorld.x;
+            const minZ = bb.minimumWorld.z, maxZ = bb.maximumWorld.z;
+            return {{ minX, maxX, minZ, maxZ, cx: (minX+maxX)/2, cz: (minZ+maxZ)/2, w: maxX-minX, d: maxZ-minZ }};
         }}
 
         // Store initial positions once all rooms are built
@@ -1529,10 +1545,20 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             }});
             const _baseRooms = habRooms.length > 0 ? habRooms : rooms;
 
-            // Room bounding box — solo habitaciones interiores
-            const houseMaxZ = Math.max(..._baseRooms.map(r => r.z + r.depth));
-            const houseMaxX = Math.max(..._baseRooms.map(r => r.x + r.width));
-            const houseMinX = Math.min(..._baseRooms.map(r => r.x));
+            // FIX(sync): compute house bounds from floor mesh world coords (not stale roomsData)
+            let houseMinX = Infinity, houseMinZ = Infinity, houseMaxX = -Infinity, houseMaxZ = -Infinity;
+            _baseRooms.forEach(r => {{
+                const idx = rooms.indexOf(r);
+                const rect = _getRoomWorldRect(idx);
+                if (rect) {{
+                    houseMinX = Math.min(houseMinX, rect.minX); houseMaxX = Math.max(houseMaxX, rect.maxX);
+                    houseMinZ = Math.min(houseMinZ, rect.minZ); houseMaxZ = Math.max(houseMaxZ, rect.maxZ);
+                }} else {{
+                    houseMinX = Math.min(houseMinX, r.x); houseMaxX = Math.max(houseMaxX, r.x + r.width);
+                    houseMinZ = Math.min(houseMinZ, r.z); houseMaxZ = Math.max(houseMaxZ, r.z + r.depth);
+                }}
+            }});
+            if (!isFinite(houseMinX)) return;
 
             // Wet rooms: need water + sewage
             const wetRooms = _baseRooms.filter(r =>
@@ -1550,7 +1576,10 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                 new BABYLON.Vector3(houseMaxX, BURIED_Y, collectorZ)
             ], SEW, MEPLayers.sewage);
             wetRooms.forEach((r, idx) => {{
-                const cx = r.x + r.width / 2, cz = r.z + r.depth / 2;
+                // FIX(sync): use world coords from floor mesh
+                const roomIdx = rooms.indexOf(r);
+                const rect = _getRoomWorldRect(roomIdx);
+                const cx = rect ? rect.cx : r.x + r.width / 2, cz = rect ? rect.cz : r.z + r.depth / 2;
                 mepTube(`sewage_drop_${{idx}}`, [
                     new BABYLON.Vector3(cx, 0, cz),
                     new BABYLON.Vector3(cx, BURIED_Y, cz)
@@ -1561,7 +1590,7 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                 ], SEW, MEPLayers.sewage);
             }});
             // Fosa séptica — semisumergida, tapa visible al nivel del suelo
-            const fosaX = houseMaxX + 2.5, fosaZ = houseMaxZ * 0.5;
+            const fosaX = houseMaxX + 2.5, fosaZ = (houseMinZ + houseMaxZ) / 2;
             const fosa  = BABYLON.MeshBuilder.CreateBox('sewage_fosa',
                 {{width:2, height:1.2, depth:1.5}}, scene);
             fosa.position.set(fosaX, -0.8, fosaZ);   // mayormente enterrada
@@ -1590,7 +1619,7 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
 
             // ── AGUA ──────────────────────────────────────────────────────────
             const WAT = new BABYLON.Color3(0.18, 0.45, 0.85);
-            const manifoldZ = houseMaxZ * 0.5;
+            const manifoldZ = (houseMinZ + houseMaxZ) / 2;
             // Acometida agua — esfera azul oscuro en fachada oeste (red municipal)
             const watAcometida = BABYLON.MeshBuilder.CreateSphere('water_acometida',
                 {{diameter:0.35, segments:8}}, scene);
@@ -1610,7 +1639,10 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                 new BABYLON.Vector3(houseMaxX + 0.2, WATER_Y, manifoldZ)
             ], WAT, MEPLayers.water);
             wetRooms.forEach((r, idx) => {{
-                const cx = r.x + r.width / 2, cz = r.z + r.depth / 2;
+                // FIX(sync): use world coords from floor mesh
+                const roomIdx = rooms.indexOf(r);
+                const rect = _getRoomWorldRect(roomIdx);
+                const cx = rect ? rect.cx : r.x + r.width / 2, cz = rect ? rect.cz : r.z + r.depth / 2;
                 mepLine(`water_branch_${{idx}}`, [
                     new BABYLON.Vector3(cx, WATER_Y, manifoldZ),
                     new BABYLON.Vector3(cx, WATER_Y, cz),
@@ -1621,7 +1653,9 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             // ── ELÉCTRICO ─────────────────────────────────────────────────────
             const ELC = new BABYLON.Color3(1.0, 0.45, 0.0);
             const panelX  = houseMinX + 0.3;
-            const trunkZ  = _baseRooms[0] ? _baseRooms[0].z + _baseRooms[0].depth / 2 : houseMaxZ * 0.5;
+            // FIX(sync): trunkZ from first room's floor mesh world coords
+            const _trunkRect = _baseRooms[0] ? _getRoomWorldRect(rooms.indexOf(_baseRooms[0])) : null;
+            const trunkZ = _trunkRect ? _trunkRect.cz : (houseMinZ + houseMaxZ) / 2;
             // Cuadro eléctrico / ICP en fachada exterior oeste (caja amarilla)
             const elecBox = BABYLON.MeshBuilder.CreateBox('elec_cuadro',
                 {{width:0.15, height:0.45, depth:0.35}}, scene);
@@ -1643,7 +1677,10 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                 new BABYLON.Vector3(houseMaxX + 0.1, ELEC_Y, trunkZ)
             ], ELC, MEPLayers.electrical);
             _baseRooms.forEach((r, idx) => {{
-                const cx = r.x + r.width / 2, cz = r.z + r.depth / 2;
+                // FIX(sync): use world coords from floor mesh
+                const roomIdx = rooms.indexOf(r);
+                const rect = _getRoomWorldRect(roomIdx);
+                const cx = rect ? rect.cx : r.x + r.width / 2, cz = rect ? rect.cz : r.z + r.depth / 2;
                 mepLine(`elec_drop_${{idx}}`, [
                     new BABYLON.Vector3(cx, ELEC_Y, trunkZ),
                     new BABYLON.Vector3(cx, ELEC_Y, cz)
@@ -1657,12 +1694,14 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                 new BABYLON.Vector3(houseMinX - 0.2, gutY, houseMaxZ + 0.2),
                 new BABYLON.Vector3(houseMaxX + 0.2, gutY, houseMaxZ + 0.2)
             ], RAIN, MEPLayers.rainwater);
+            // FIX(sync): back gutter uses houseMinZ (world), not hardcoded -0.2
             mepLine('rain_gutter_back', [
-                new BABYLON.Vector3(houseMinX - 0.2, gutY, -0.2),
-                new BABYLON.Vector3(houseMaxX + 0.2, gutY, -0.2)
+                new BABYLON.Vector3(houseMinX - 0.2, gutY, houseMinZ - 0.2),
+                new BABYLON.Vector3(houseMaxX + 0.2, gutY, houseMinZ - 0.2)
             ], RAIN, MEPLayers.rainwater);
-            [[-0.2, houseMaxZ + 0.2],[houseMaxX + 0.2, houseMaxZ + 0.2],
-             [-0.2, -0.2],[houseMaxX + 0.2, -0.2]].forEach(([dx, dz], idx) => {{
+            // FIX(sync): corner downspouts use world houseMin/MaxX/Z
+            [[houseMinX - 0.2, houseMaxZ + 0.2],[houseMaxX + 0.2, houseMaxZ + 0.2],
+             [houseMinX - 0.2, houseMinZ - 0.2],[houseMaxX + 0.2, houseMinZ - 0.2]].forEach(([dx, dz], idx) => {{
                 mepLine(`rain_down_${{idx}}`, [
                     new BABYLON.Vector3(dx, gutY, dz),
                     new BABYLON.Vector3(dx, 0, dz)
@@ -1676,7 +1715,10 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                 new BABYLON.Vector3(houseMaxX + 0.1, ELEC_Y - 0.15, trunkZ)
             ], DOM, MEPLayers.domotics);
             _baseRooms.forEach((r, idx) => {{
-                const cx = r.x + r.width / 2, cz = r.z + r.depth / 2;
+                // FIX(sync): use world coords from floor mesh
+                const roomIdx = rooms.indexOf(r);
+                const rect = _getRoomWorldRect(roomIdx);
+                const cx = rect ? rect.cx : r.x + r.width / 2, cz = rect ? rect.cz : r.z + r.depth / 2;
                 mepLine(`dom_drop_${{idx}}`, [
                     new BABYLON.Vector3(cx, ELEC_Y - 0.15, trunkZ),
                     new BABYLON.Vector3(cx, ELEC_Y - 0.15, cz)
@@ -1809,6 +1851,15 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
         // ================================================
         function resetLayout() {{
             saveSnapshot();
+            // FIX(sync): reset parcel offset so sliders, variables and base tracking are in sync
+            _houseOffsetX = 0;
+            _houseOffsetZ = 0;
+            const _srX = document.getElementById('slider-offset-x');
+            const _srZ = document.getElementById('slider-offset-z');
+            if (_srX) _srX.value = 0;
+            if (_srZ) _srZ.value = 0;
+            // Clear base-position cache so _storeBaseMeshPositions re-registers at offset=0
+            for (const key in _basePosByName) delete _basePosByName[key];
             // Limpiar cerramientos personalizados
             window.customWalls.forEach(cw => {{
                 const m = scene.getMeshByName(cw.id);
@@ -1821,6 +1872,8 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             // Reconstruir escena
             const newLayout = generateLayoutJS(roomsData);
             rebuildScene(newLayout);
+            // Re-store base mesh positions at the reset (offset=0) positions
+            _storeBaseMeshPositions();
             showToast('↩️ Layout restaurado al original');
         }}
 
@@ -2655,10 +2708,19 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                     return z !== 'garden' && z !== 'exterior';
                 }});
                 if (houseRooms.length === 0) return;
-                const minX = Math.min(...houseRooms.map(r => r.x));
-                const maxX = Math.max(...houseRooms.map(r => r.x + r.width));
-                const minZ = Math.min(...houseRooms.map(r => r.z));
-                const maxZ = Math.max(...houseRooms.map(r => r.z + r.depth));
+                // FIX(sync): use floor mesh world bounding boxes (follow parcel offset)
+                let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+                houseRooms.forEach(r => {{
+                    const idx = roomsData.indexOf(r);
+                    const rect = _getRoomWorldRect(idx);
+                    if (rect) {{
+                        minX = Math.min(minX, rect.minX); maxX = Math.max(maxX, rect.maxX);
+                        minZ = Math.min(minZ, rect.minZ); maxZ = Math.max(maxZ, rect.maxZ);
+                    }} else {{
+                        minX = Math.min(minX, r.x); maxX = Math.max(maxX, r.x + r.width);
+                        minZ = Math.min(minZ, r.z); maxZ = Math.max(maxZ, r.z + r.depth);
+                    }}
+                }});
                 const losa = BABYLON.MeshBuilder.CreateBox('found_losa', {{
                     width: maxX - minX + 0.3,
                     height: 0.60,
@@ -2674,12 +2736,18 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                 roomsData.forEach((room, i) => {{
                     const z = (room.zone||'').toLowerCase();
                     if (z === 'garden' || z === 'exterior') return;
+                    // FIX(sync): use floor mesh world bounding box
+                    const rect = _getRoomWorldRect(i);
+                    const cx = rect ? rect.cx : room.x + room.width/2;
+                    const cz = rect ? rect.cz : room.z + room.depth/2;
+                    const w  = rect ? rect.w  : room.width;
+                    const d  = rect ? rect.d  : room.depth;
                     const zap = BABYLON.MeshBuilder.CreateBox(`found_zap_${{i}}`, {{
-                        width: room.width - 0.2,
+                        width: w - 0.2,
                         height: 1.20,
-                        depth: room.depth - 0.2
+                        depth: d - 0.2
                     }}, scene);
-                    zap.position.set(room.x + room.width/2, -0.60, room.z + room.depth/2);
+                    zap.position.set(cx, -0.60, cz);
                     zap.material = mat;
                     zap.isPickable = false;
                     foundMeshes.push(zap);
@@ -2690,11 +2758,17 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                 roomsData.forEach((room, i) => {{
                     const z = (room.zone||'').toLowerCase();
                     if (z === 'garden' || z === 'exterior') return;
+                    // FIX(sync): use floor mesh world bounding box
+                    const rect = _getRoomWorldRect(i);
+                    const rMinX = rect ? rect.minX : room.x;
+                    const rMaxX = rect ? rect.maxX : room.x + room.width;
+                    const rMinZ = rect ? rect.minZ : room.z;
+                    const rMaxZ = rect ? rect.maxZ : room.z + room.depth;
                     const corners = [
-                        [room.x + 0.3, room.z + 0.3],
-                        [room.x + room.width - 0.3, room.z + 0.3],
-                        [room.x + 0.3, room.z + room.depth - 0.3],
-                        [room.x + room.width - 0.3, room.z + room.depth - 0.3]
+                        [rMinX + 0.3, rMinZ + 0.3],
+                        [rMaxX - 0.3, rMinZ + 0.3],
+                        [rMinX + 0.3, rMaxZ - 0.3],
+                        [rMaxX - 0.3, rMaxZ - 0.3]
                     ];
                     corners.forEach((c, j) => {{
                         const pil = BABYLON.MeshBuilder.CreateCylinder(`found_pil_${{i}}_${{j}}`, {{
