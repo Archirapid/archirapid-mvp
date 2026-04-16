@@ -2976,9 +2976,24 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
         // ================================================
         // INICIALIZACIÓN — construir escena al cargar
         // ================================================
-        const initialLayout = generateLayoutJS(roomsData);
+        // Python ya calculó x,z,width,depth exactos (misma fuente que el SVG Paso 2).
+        // Usamos esas coordenadas directamente para garantizar sync perfecto.
+        // generateLayoutJS() solo se llama en REBUILDS (cuando el usuario cambia medidas).
+        const _hasPyCoords = roomsData.length > 0 && roomsData[0].x != null && roomsData[0].width != null;
+        const initialLayout = _hasPyCoords
+            ? roomsData.map(r => ({{
+                x:       r.x,
+                z:       r.z,
+                width:   r.width,
+                depth:   r.depth,
+                name:    r.name  || '',
+                code:    r.code  || '',
+                zone:    r.zone  || classifyZone(r.code||'', r.name||''),
+                area_m2: r.area_m2 || 2,
+              }}))
+            : generateLayoutJS(roomsData);   // fallback si Python no inyectó coords
         rebuildScene(initialLayout);
-        // Refresh base positions AFTER normalization (generateLayoutJS adds ≥2m offset)
+        // Refresh base positions AFTER scene build
         _storeBaseMeshPositions();
         // Aplicar automáticamente el estilo elegido en el Paso 1
         applyStyleUI(houseStyle);
