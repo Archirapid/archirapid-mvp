@@ -208,15 +208,12 @@ class ArchitectLayout:
                 r.d = FILA1_D
                 garaje_w += gw
 
-        day_w_available = house_w - garaje_w
+        day_w_available = house_w  # garaje va lateral, no resta ancho día
         day_w_available = max(day_w_available, 5.0)
 
-        # z_dia: DESPUÉS del porche y el pasillo de entrada
-        # ORDEN CORRECTO: porche(entrada) → salón/cocina → pasillo → dormitorios
-        # Porche se calcula después pero necesitamos su profundidad para z_dia
-        # Estimamos porche_d provisionalmente (se recalcula abajo)
-        PORCHE_D_EST = 2.0  # estimación conservadora
-        z_dia = PORCHE_D_EST
+        # Zona día arranca en z=0. Porche va a z negativo (delante, sur)
+        # → normalización lo lleva a z_MIN = fachada entrada visible
+        z_dia = 0.0
 
         # Distribuir zona día en el espacio disponible
         if day:
@@ -249,8 +246,8 @@ class ArchitectLayout:
             layout.append(self._d(r))
             x_otros += r.w
 
-        # Garaje en fila día (pegado a la derecha)
-        x_garaje = house_w - garaje_w
+        # Garaje lateral este (fuera de la huella de la casa, junto a zona día)
+        x_garaje = house_w + 1.0
         for r in garajes:
             r.x = x_garaje
             r.z = z_dia
@@ -309,7 +306,7 @@ class ArchitectLayout:
             r.w = house_w
             r.d = max(round(r.area / house_w, 1), 2.0)
             r.x = 0.0
-            r.z = 0.0
+            r.z = -r.d  # delante de zona día (z negativo → normaliz. lo pone en z_MIN = entrada)
             layout.append(self._d(r))
 
         # ================================================
@@ -320,7 +317,7 @@ class ArchitectLayout:
             r.w = max(round(math.sqrt(r.area * 2.0), 1), 5.0)
             r.d = round(r.area / r.w, 1)
             r.x = (house_w - r.w) / 2  # centrada
-            r.z = -r.d - 3.0            # 3m detrás
+            r.z = z_casa_bottom + 1.0    # NORTE: jardín privado trasero, 1m tras zona noche
             layout.append(self._d(r))
 
         # ================================================
@@ -328,8 +325,8 @@ class ArchitectLayout:
         # Huerto, caseta, otros
         # ================================================
         
-        x_lat = house_w + 3.0
-        z_lat = 0.0
+        x_lat = house_w + 1.0
+        z_lat = z_fila3  # junto a zona noche, sin solapamiento con garaje (z_dia)
         for r in laterales:
             r.w = round(math.sqrt(r.area * 1.3), 1)
             r.d = round(r.area / r.w, 1)

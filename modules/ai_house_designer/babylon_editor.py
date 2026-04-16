@@ -504,7 +504,7 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
 
         // Cámara isométrica
         const camera = new BABYLON.ArcRotateCamera(
-            "cam", Math.PI/4, Math.PI/3.2, Math.max(plotW, plotD, totalWidth, totalDepth) * 1.55,
+            "cam", -Math.PI/4, Math.PI/3.2, Math.max(plotW, plotD, totalWidth, totalDepth) * 1.55,
             new BABYLON.Vector3(totalWidth/2, 0, totalDepth/2), scene
         );
         camera.attachControl(canvas, true);
@@ -909,7 +909,7 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
         function _storeBaseMeshPositions() {{
             // Always overwrite — called after generateLayoutJS normalization to capture real positions
             scene.meshes.forEach(m => {{
-                if (_ENV_NAMES.has(m.name) || m.name.startsWith('border_')) return;
+                if (_ENV_NAMES.has(m.name) || m.name.startsWith('border_') || m.name.startsWith('fence_')) return;
                 _basePosByName[m.name] = {{ x: m.position.x, z: m.position.z }};
             }});
             scene.transformNodes.forEach(n => {{
@@ -930,7 +930,7 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             }}
             // Snapshot any new meshes that appeared since last call (roof, foundation, etc.)
             scene.meshes.forEach(m => {{
-                if (_ENV_NAMES.has(m.name) || m.name.startsWith('border_')) return;
+                if (_ENV_NAMES.has(m.name) || m.name.startsWith('border_') || m.name.startsWith('fence_')) return;
                 if (!_basePosByName[m.name]) {{
                     // Mesh appeared AFTER initial store — its current position already carries
                     // the previous offset, so record base = current - previous offset
@@ -955,7 +955,7 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
         }}
 
         // FIX(sync): helper — world bounding rect of floor mesh at index idx.
-        // Returns {minX,maxX,minZ,maxZ,cx,cz,w,d} or null if mesh not found.
+        // Returns {{minX,maxX,minZ,maxZ,cx,cz,w,d}} or null if mesh not found.
         function _getRoomWorldRect(idx) {{
             const fl = scene.getMeshByName('floor_' + idx);
             if (!fl) return null;
@@ -1205,7 +1205,8 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             const gdn   = rs.filter(r => r.zone === 'garden');
             const garajes   = svc.filter(r => (r.code||'').toLowerCase().includes('garaje') || (r.code||'').toLowerCase().includes('garage'));
             const otrosSvc  = svc.filter(r => !garajes.includes(r));
-            const laterales = gdn.filter(r => !((r.code||'').toLowerCase().includes('piscin') || (r.code||'').toLowerCase().includes('pool')));
+            const piscinas  = gdn.filter(r => (r.code||'').toLowerCase().includes('piscin') || (r.code||'').toLowerCase().includes('pool'));
+            const laterales = gdn.filter(r => !piscinas.includes(r));
             const layout = [];
             // Ancho casa desde fila noche
             const nightW = night.map(r => Math.max(Math.round(r.area/FILA3_D*10)/10, 2.8));
@@ -1218,33 +1219,42 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             }}
             while (bi < wet.length) {{ fila3.push({{r:wet[bi], w:banoW[bi], d:FILA3_D}}); bi++; }}
             let houseW = Math.min(Math.max(fila3.reduce((s,i)=>s+i.w,0), 8), 18);
-            // Fila 1: día + garaje
+            // ORDEN: porche(z negativo=entrada SUR) → día(z=0) → pasillo → noche → piscina(z_MAX)
+            // Porche a z negativo → normalización lo lleva a z_MIN = fachada entrada visible
+            ext.forEach(r => {{
+                const d = Math.max(Math.round(r.area/houseW*10)/10, 2);
+                layout.push({{x:0, z:-d, width:houseW, depth:d, name:r.name, code:r.code, zone:r.zone, area_m2:r.area}});
+            }});
+            // Fila 1: día (z=0). Garaje va lateral.
+            const zDia = 0;
             let garajeW = 0;
             const garajeItems = garajes.map(r => {{ const gw=Math.max(Math.round(r.area/FILA1_D*10)/10,3.5); garajeW+=gw; return {{r,w:gw}}; }});
-            const dayAvail = Math.max(houseW - garajeW, 5);
+            const dayAvail = Math.max(houseW, 5);
             const dayTotal = day.reduce((s,r)=>s+r.area,0) || 1;
             let xd = 0;
             day.forEach((r,idx) => {{
                 let w = idx===day.length-1 ? Math.max(dayAvail-xd,3) : Math.max(Math.round(dayAvail*(r.area/dayTotal)*10)/10,3);
-                layout.push({{x:xd, z:0, width:w, depth:FILA1_D, name:r.name, code:r.code, zone:r.zone, area_m2:r.area}});
+                layout.push({{x:xd, z:zDia, width:w, depth:FILA1_D, name:r.name, code:r.code, zone:r.zone, area_m2:r.area}});
                 xd += w;
             }});
             let xo = xd;
-            otrosSvc.forEach(r => {{ const w=Math.max(Math.round(r.area/FILA1_D*10)/10,2); layout.push({{x:xo,z:0,width:w,depth:FILA1_D,name:r.name,code:r.code,zone:r.zone,area_m2:r.area}}); xo+=w; }});
-            let xg = houseW - garajeW;
-            garajeItems.forEach(item => {{ layout.push({{x:xg,z:0,width:item.w,depth:FILA1_D,name:item.r.name,code:item.r.code,zone:item.r.zone,area_m2:item.r.area}}); xg+=item.w; }});
+            otrosSvc.forEach(r => {{ const w=Math.max(Math.round(r.area/FILA1_D*10)/10,2); layout.push({{x:xo,z:zDia,width:w,depth:FILA1_D,name:r.name,code:r.code,zone:r.zone,area_m2:r.area}}); xo+=w; }});
+            // Garaje LATERAL este (x=houseW+1, z=zDia)
+            let xg = houseW + 1;
+            garajeItems.forEach(item => {{ layout.push({{x:xg,z:zDia,width:item.w,depth:FILA1_D,name:item.r.name,code:item.r.code,zone:item.r.zone,area_m2:item.r.area}}); xg+=item.w; }});
             // Pasillo
             const pasilloR = rs.find(r=>r.zone==='circ');
-            layout.push({{x:0, z:FILA1_D, width:houseW, depth:PASILLO_H, name:pasilloR?pasilloR.name:'Distribuidor', code:pasilloR?pasilloR.code:'pasillo', zone:'circ', area_m2:houseW*PASILLO_H}});
-            // Fila 3: noche
-            const zF3 = FILA1_D + PASILLO_H;
+            const zPas = zDia + FILA1_D;
+            layout.push({{x:0, z:zPas, width:houseW, depth:PASILLO_H, name:pasilloR?pasilloR.name:'Distribuidor', code:pasilloR?pasilloR.code:'pasillo', zone:'circ', area_m2:houseW*PASILLO_H}});
+            // Fila 3: noche (NORTE, tras pasillo)
+            const zF3 = zPas + PASILLO_H;
             let xc = 0;
             fila3.forEach(item => {{ layout.push({{x:xc,z:zF3,width:item.w,depth:item.d,name:item.r.name,code:item.r.code,zone:item.r.zone,area_m2:item.r.area}}); xc+=item.w; }});
-            const zBot = zF3 + FILA3_D;
-            // Porche
-            ext.forEach(r => {{ const d=Math.max(Math.round(r.area/houseW*10)/10,2); layout.push({{x:0,z:zBot,width:houseW,depth:d,name:r.name,code:r.code,zone:r.zone,area_m2:r.area}}); }});
-            // Laterales
-            let xl=houseW+3, zl=0;
+            // Piscinas NORTE (detrás zona noche — jardín privado trasero)
+            const zBot = zF3 + FILA3_D + 1;
+            piscinas.forEach(r => {{ const pw=Math.max(Math.round(Math.sqrt(r.area*2)*10)/10,5); const pd=Math.round(r.area/pw*10)/10; layout.push({{x:(houseW-pw)/2,z:zBot,width:pw,depth:pd,name:r.name,code:r.code,zone:r.zone,area_m2:r.area}}); }});
+            // Laterales junto a zona noche (z=zF3), sin solapar con garaje (z=zDia)
+            let xl=houseW+1, zl=zF3;
             laterales.forEach(r => {{ const lw=Math.round(Math.sqrt(r.area*1.3)*10)/10; const ld=Math.round(r.area/lw*10)/10; layout.push({{x:xl,z:zl,width:lw,depth:ld,name:r.name,code:r.code,zone:r.zone,area_m2:r.area}}); zl+=ld+1; }});
             // Normalizar
             if (layout.length > 0) {{
@@ -1422,7 +1432,7 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             camera.setTarget(new BABYLON.Vector3(totalWidth/2, 0, totalDepth/2));
         }}
         function setIsoView() {{
-            camera.alpha  = Math.PI/4;
+            camera.alpha  = -Math.PI/4;
             camera.beta   = Math.PI/3.2;
             camera.radius = Math.max(totalWidth, totalDepth) * 2.2;
             camera.setTarget(new BABYLON.Vector3(totalWidth/2, 0, totalDepth/2));
@@ -1619,8 +1629,8 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                     houseMinX = Math.min(houseMinX, rect.minX); houseMaxX = Math.max(houseMaxX, rect.maxX);
                     houseMinZ = Math.min(houseMinZ, rect.minZ); houseMaxZ = Math.max(houseMaxZ, rect.maxZ);
                 }} else {{
-                    houseMinX = Math.min(houseMinX, r.x); houseMaxX = Math.max(houseMaxX, r.x + r.width);
-                    houseMinZ = Math.min(houseMinZ, r.z); houseMaxZ = Math.max(houseMaxZ, r.z + r.depth);
+                    houseMinX = Math.min(houseMinX, r.x + _mepOX); houseMaxX = Math.max(houseMaxX, r.x + r.width + _mepOX);
+                    houseMinZ = Math.min(houseMinZ, r.z + _mepOZ); houseMaxZ = Math.max(houseMaxZ, r.z + r.depth + _mepOZ);
                 }}
             }});
             if (!isFinite(houseMinX) || !isFinite(houseMaxX) || !isFinite(houseMinZ) || !isFinite(houseMaxZ)) return;
@@ -1642,8 +1652,8 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             ], SEW, MEPLayers.sewage);
             wetRooms.forEach((r, idx) => {{
                 const rect = _getMepRect(r);
-                const cx = rect ? rect.cx : r.x + r.width / 2;
-                const cz = rect ? rect.cz : r.z + r.depth / 2;
+                const cx = rect ? rect.cx : r.x + r.width / 2 + _mepOX;
+                const cz = rect ? rect.cz : r.z + r.depth / 2 + _mepOZ;
                 mepTube(`sewage_drop_${{idx}}`, [
                     new BABYLON.Vector3(cx, 0, cz),
                     new BABYLON.Vector3(cx, BURIED_Y, cz)
@@ -1654,7 +1664,7 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                 ], SEW, MEPLayers.sewage);
             }});
             // Fosa séptica — semisumergida, tapa visible al nivel del suelo
-            const fosaX = houseMaxX + 2.5, fosaZ = houseMaxZ * 0.5;
+            const fosaX = houseMaxX + 2.5, fosaZ = (houseMinZ + houseMaxZ) / 2;
             const fosa  = BABYLON.MeshBuilder.CreateBox('sewage_fosa',
                 {{width:2, height:1.2, depth:1.5}}, scene);
             fosa.position.set(fosaX, -0.8, fosaZ);   // mayormente enterrada
@@ -1683,7 +1693,7 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
 
             // ── AGUA ──────────────────────────────────────────────────────────
             const WAT = new BABYLON.Color3(0.18, 0.45, 0.85);
-            const manifoldZ = houseMaxZ * 0.5;
+            const manifoldZ = (houseMinZ + houseMaxZ) / 2;
             // Acometida agua — esfera azul oscuro en fachada oeste (red municipal)
             const watAcometida = BABYLON.MeshBuilder.CreateSphere('water_acometida',
                 {{diameter:0.35, segments:8}}, scene);
@@ -1704,8 +1714,8 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             ], WAT, MEPLayers.water);
             wetRooms.forEach((r, idx) => {{
                 const rect = _getMepRect(r);
-                const cx = rect ? rect.cx : r.x + r.width / 2;
-                const cz = rect ? rect.cz : r.z + r.depth / 2;
+                const cx = rect ? rect.cx : r.x + r.width / 2 + _mepOX;
+                const cz = rect ? rect.cz : r.z + r.depth / 2 + _mepOZ;
                 mepLine(`water_branch_${{idx}}`, [
                     new BABYLON.Vector3(cx, WATER_Y, manifoldZ),
                     new BABYLON.Vector3(cx, WATER_Y, cz),
@@ -2592,7 +2602,7 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                 {{ name: 'norte',                 alpha: 0,            beta: Math.PI/3.5 }},
                 {{ name: 'este',                  alpha: Math.PI/2,    beta: Math.PI/3.5 }},
                 {{ name: 'oeste',                 alpha: -Math.PI/2,   beta: Math.PI/3.5 }},
-                {{ name: 'planta_cenital',         alpha: Math.PI/4,   beta: 0.15 }},
+                {{ name: 'planta_cenital',         alpha: -Math.PI/4,  beta: 0.15 }},
             ];
 
             let idx = 0;
