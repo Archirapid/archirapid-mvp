@@ -2731,19 +2731,21 @@ def render_step3_editor():
             req_sync["extras"].setdefault("bodega_has_exterior_door", bool(st.session_state["bodega_puerta_exterior"]))
         st.session_state["ai_house_requirements"] = req_sync
 
-        # OVERWRITE: usar dict para evitar duplicados garaje/bodega
-        _rooms_dict = {}
+        # Fuente única de verdad: design.rooms (igual que SVG)
+        # — códigos normalizados (bano, not bano_1/bano_principal)
+        # — áreas con sliders aplicados
+        # — extras desmarcados ya removidos por design.rooms.pop()
         _bodega_ext_door = req_sync.get("extras", {}).get("bodega_has_exterior_door", False)
-        for _code, _area in req.get("ai_room_proposal", {}).items():
+        rooms_data = []
+        for _room in design.rooms:
             _room_entry = {
-                'code': _code,
-                'name': _code,
-                'area_m2': _area
+                'code': _room.room_type.code,
+                'name': _room.room_type.name,
+                'area_m2': float(_room.area_m2),
             }
-            if 'bodega' in _code.lower():
+            if 'bodega' in _room.room_type.code.lower():
                 _room_entry['wants_bodega_exterior_door'] = bool(_bodega_ext_door)
-            _rooms_dict[_code] = _room_entry
-        rooms_data = list(_rooms_dict.values())
+            rooms_data.append(_room_entry)
 
         layout_result = generate_layout(rooms_data, house_shape)
 
