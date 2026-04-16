@@ -904,12 +904,16 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
         let _houseOffsetX = 0, _houseOffsetZ = 0;
         const _basePosByName = {{}};
 
-        // Guardar posiciones base de todos los meshes de la casa (excepto entorno)
+        // Guardar posiciones base de todos los meshes de la casa (excepto entorno y MEP)
+        // MEP se excluye del sistema de offset-por-posición porque sus vértices son
+        // world-space absolutos (CreateLines/Tube): se reconstruye desde cero en _applyHouseOffset.
         const _ENV_NAMES = new Set(['ground','plotPlane','gridPlane']);
+        const _isMepMesh = (name) => ['sewage_','fosa','water_','elec_','rain_','dom_'].some(p => name.startsWith(p));
         function _storeBaseMeshPositions() {{
-            // Always overwrite — called after generateLayoutJS normalization to capture real positions
+            // Always overwrite — called after layout normalization to capture real positions
             scene.meshes.forEach(m => {{
                 if (_ENV_NAMES.has(m.name) || m.name.startsWith('border_') || m.name.startsWith('fence_')) return;
+                if (_isMepMesh(m.name)) return;  // MEP reconstruido, no position-tracked
                 _basePosByName[m.name] = {{ x: m.position.x, z: m.position.z }};
             }});
             scene.transformNodes.forEach(n => {{
@@ -928,22 +932,22 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                     if (_rm) _rm.dispose();
                 }}
             }}
-            // Snapshot any new meshes that appeared since last call (roof, foundation, etc.)
+            // Snapshot new non-MEP meshes (roof, foundation…)
             scene.meshes.forEach(m => {{
                 if (_ENV_NAMES.has(m.name) || m.name.startsWith('border_') || m.name.startsWith('fence_')) return;
+                if (_isMepMesh(m.name)) return;  // MEP se reconstruye al final, no se snapshottea
                 if (!_basePosByName[m.name]) {{
-                    // Mesh appeared AFTER initial store — its current position already carries
-                    // the previous offset, so record base = current - previous offset
                     _basePosByName[m.name] = {{ x: m.position.x - _houseOffsetX, z: m.position.z - _houseOffsetZ }};
                 }}
             }});
+            // Mover todos los meshes de la casa (floors, walls, labels…)
             for (const [nm, base] of Object.entries(_basePosByName)) {{
                 const m = scene.getMeshByName(nm);
                 if (m) {{ m.position.x = base.x + dx; m.position.z = base.z + dz; continue; }}
                 const tn = scene.getTransformNodeByName(nm);
                 if (tn) {{ tn.position.x = base.x + dx; tn.position.z = base.z + dz; }}
             }}
-            // Rebuild tejado y paneles con offset correcto (vértices, no position)
+            // Rebuild tejado y paneles (vértices world-space, no position)
             if (typeof roofActive !== 'undefined' && roofActive) {{
                 buildRoof(dx, dz);
                 solarMeshes.forEach(m => {{
@@ -952,13 +956,18 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
                 solarMeshes = [];
                 buildSolarPanels(dx, dz);
             }}
+            // Rebuild MEP desde cero usando posiciones world reales de los floors ya desplazados.
+            // CreateLines/Tube usan vértices world-space: reconstruir es la única forma correcta.
+            try {{ buildMEPLayers(roomsData); }} catch(e) {{ console.warn('MEP offset rebuild:', e); }}
         }}
 
-        // FIX(sync): helper — world bounding rect of floor mesh at index idx.
-        // Returns {{minX,maxX,minZ,maxZ,cx,cz,w,d}} or null if mesh not found.
+        // World bounding rect of floor mesh at index idx.
+        // computeWorldMatrix(true) fuerza actualización — sin esto getBoundingBox.minimumWorld
+        // puede ser stale si el mesh o su parent se movió en el mismo tick JS.
         function _getRoomWorldRect(idx) {{
             const fl = scene.getMeshByName('floor_' + idx);
             if (!fl) return null;
+            fl.computeWorldMatrix(true);
             const bb = fl.getBoundingInfo().boundingBox;
             const minX = bb.minimumWorld.x, maxX = bb.maximumWorld.x;
             const minZ = bb.minimumWorld.z, maxZ = bb.maximumWorld.z;
@@ -1763,19 +1772,21 @@ def generate_babylon_html(rooms_data, total_width, total_depth, roof_type="Dos a
             // ── RECOGIDA AGUA (canalones) ─────────────────────────────────────
             const RAIN = new BABYLON.Color3(0.1, 0.6, 0.3);
             const gutY = WALL_H + 0.05;
+            // Canalones perimetrales — usan houseMin/Max para anclarse exactamente a la casa
             mepLine('rain_gutter_front', [
                 new BABYLON.Vector3(houseMinX - 0.2, gutY, houseMaxZ + 0.2),
                 new BABYLON.Vector3(houseMaxX + 0.2, gutY, houseMaxZ + 0.2)
             ], RAIN, MEPLayers.rainwater);
             mepLine('rain_gutter_back', [
-                new BABYLON.Vector3(houseMinX - 0.2, gutY, -0.2),
-                new BABYLON.Vector3(houseMaxX + 0.2, gutY, -0.2)
+                new BABYLON.Vector3(houseMinX - 0.2, gutY, houseMinZ - 0.2),
+                new BABYLON.Vector3(houseMaxX + 0.2, gutY, houseMinZ - 0.2)
             ], RAIN, MEPLayers.rainwater);
-            [[-0.2, houseMaxZ + 0.2],[houseMaxX + 0.2, houseMaxZ + 0.2],
-             [-0.2, -0.2],[houseMaxX + 0.2, -0.2]].forEach(([dx, dz], idx) => {{
+            // Bajantes en las 4 esquinas — coords derivadas de house bounds, nunca hardcodeadas
+            [[houseMinX - 0.2, houseMaxZ + 0.2],[houseMaxX + 0.2, houseMaxZ + 0.2],
+             [houseMinX - 0.2, houseMinZ - 0.2],[houseMaxX + 0.2, houseMinZ - 0.2]].forEach(([rx, rz], idx) => {{
                 mepLine(`rain_down_${{idx}}`, [
-                    new BABYLON.Vector3(dx, gutY, dz),
-                    new BABYLON.Vector3(dx, 0, dz)
+                    new BABYLON.Vector3(rx, gutY, rz),
+                    new BABYLON.Vector3(rx, 0, rz)
                 ], RAIN, MEPLayers.rainwater);
             }});
 
