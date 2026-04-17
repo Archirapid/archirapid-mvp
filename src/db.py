@@ -544,12 +544,14 @@ _PG_DDL = [
     )""",
     """CREATE TABLE IF NOT EXISTS ventas_proyectos (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        proyecto_id INTEGER NOT NULL, cliente_email TEXT NOT NULL,
+        proyecto_id TEXT NOT NULL, cliente_email TEXT NOT NULL,
         nombre_cliente TEXT NOT NULL, telefono TEXT, direccion TEXT,
         nif TEXT, productos_comprados TEXT,
         total_pagado REAL NOT NULL, metodo_pago TEXT,
         fecha_compra TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        stripe_session_id TEXT
+        stripe_session_id TEXT,
+        sha256_memoria TEXT,
+        sha256_planos TEXT
     )""",
     """CREATE TABLE IF NOT EXISTS service_providers (
         id TEXT PRIMARY KEY, name TEXT NOT NULL,
@@ -952,6 +954,10 @@ _PG_ALTER_MIGRATIONS = [
     "ALTER TABLE plots ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'published'",
     "ALTER TABLE plots ADD COLUMN IF NOT EXISTS comision_pct INTEGER DEFAULT 6",
     "ALTER TABLE prefab_catalog ADD COLUMN IF NOT EXISTS prefab_company_id TEXT DEFAULT NULL",
+    # ventas_proyectos: proyecto_id cambio a TEXT + columnas SHA-256
+    "ALTER TABLE ventas_proyectos ALTER COLUMN proyecto_id TYPE TEXT USING proyecto_id::TEXT",
+    "ALTER TABLE ventas_proyectos ADD COLUMN IF NOT EXISTS sha256_memoria TEXT",
+    "ALTER TABLE ventas_proyectos ADD COLUMN IF NOT EXISTS sha256_planos TEXT",
 ]
 
 
@@ -1479,6 +1485,13 @@ def ensure_tables():
             try:
                 c.execute(f"ALTER TABLE {_tbl} ADD COLUMN is_active {_is_act_def}")
             except (sqlite3.OperationalError, Exception):
+                pass
+
+        # ventas_proyectos: columnas SHA-256 (SQLite ignora el tipo, TEXT en INT column es OK)
+        for _vp_col in ("sha256_memoria", "sha256_planos"):
+            try:
+                c.execute(f"ALTER TABLE ventas_proyectos ADD COLUMN {_vp_col} TEXT")
+            except Exception:
                 pass
 
         # Índices para mejorar filtrado futuro (creación defensiva)

@@ -395,6 +395,8 @@ def _show_mls_reserva_panel(client_email: str, finca_id: str) -> None:
                     st.caption(f"{m2_p:,.0f} m² · €{price_p:,.0f}")
                     if st.button("Ver proyecto →", key=f"mls_panel_proj_{p['id']}",
                                  use_container_width=True):
+                        st.session_state["_nav_programmatic"] = True
+                        st.session_state["_goto_project_v2"] = p["id"]
                         st.query_params["selected_project_v2"] = str(p["id"])
                         st.rerun()
         else:
@@ -1175,15 +1177,39 @@ def show_selected_project_panel(client_email, project_id):
             )
             st.stop()
 
-        # Verificar si ya compró este proyecto
+        # Verificar si ya compró este proyecto — proyecto_id es TEXT en DB
         conn = db_conn()
         cursor = conn.cursor()
-        cursor.execute("SELECT id FROM ventas_proyectos WHERE proyecto_id = ? AND cliente_email = ?", (project_id, client_email))
+        cursor.execute(
+            "SELECT id FROM ventas_proyectos WHERE proyecto_id = ? AND cliente_email = ?",
+            (str(project_id), client_email)
+        )
         ya_comprado = cursor.fetchone()
         conn.close()
 
         if ya_comprado:
             st.success("✅ Ya has adquirido este proyecto")
+
+            # Mostrar SHA-256 si están registrados
+            try:
+                _conn_sha = db_conn()
+                _row_sha = _conn_sha.execute(
+                    "SELECT sha256_memoria, sha256_planos, fecha_compra, stripe_session_id "
+                    "FROM ventas_proyectos WHERE proyecto_id = ? AND cliente_email = ? "
+                    "ORDER BY fecha_compra DESC LIMIT 1",
+                    (str(project_id), client_email)
+                ).fetchone()
+                _conn_sha.close()
+                if _row_sha:
+                    with st.expander("🔐 Certificado de autenticidad", expanded=False):
+                        st.caption(f"Fecha de compra: {_row_sha[2] or '—'}")
+                        st.caption(f"Referencia Stripe: `{_row_sha[3] or '—'}`")
+                        if _row_sha[0]:
+                            st.code(f"SHA-256 Memoria PDF:\n{_row_sha[0]}", language=None)
+                        if _row_sha[1]:
+                            st.code(f"SHA-256 Planos:\n{_row_sha[1]}", language=None)
+            except Exception:
+                pass
 
             col1, col2, col3 = st.columns(3)
             with col1:
@@ -1270,7 +1296,11 @@ def show_selected_project_panel(client_email, project_id):
                     qty["copia_adicional"] = num_copias
                 return keys, qty
 
-            _base_url    = "https://archirapid.streamlit.app"
+            try:
+                from modules.stripe_utils import _get_base_url as _gbu
+                _base_url = _gbu()
+            except Exception:
+                _base_url = "https://archirapid.streamlit.app"
             _success_url = (f"{_base_url}/?selected_project_v2={project_id}"
                             f"&payment=success&stripe_session={{CHECKOUT_SESSION_ID}}")
             _cancel_url  = f"{_base_url}/?selected_project_v2={project_id}"

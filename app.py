@@ -424,8 +424,11 @@ def show_selected_project_panel_v2(client_email: str, project_id: str):
     # SISTEMA DE COMPRA
     st.header("🛒 Adquirir Proyecto Completo")
 
-    # Verificar si ya compró este proyecto
-    cursor.execute("SELECT id FROM ventas_proyectos WHERE proyecto_id = ? AND cliente_email = ?", (project_id, client_email))
+    # Verificar si ya compró este proyecto — proyecto_id es TEXT en DB
+    cursor.execute(
+        "SELECT id FROM ventas_proyectos WHERE proyecto_id = ? AND cliente_email = ?",
+        (str(project_id), client_email)
+    )
     ya_comprado = cursor.fetchone()
     conn.close()
 
@@ -947,22 +950,82 @@ if st.query_params.get("stripe_session") and st.query_params.get("payment") == "
                         st.query_params["page"] = "cliente"
                         st.rerun()
                 else:
-                    _con3 = _sq3.connect("database.db", timeout=15)
-                    _con3.execute("PRAGMA journal_mode=WAL")
+                    # ── Compra de proyecto arquitectónico ─────────────────────
+                    from modules.marketplace.utils import db_conn as _dc_vp
+                    _con3 = _dc_vp()
                     _exists3 = _con3.execute(
                         "SELECT id FROM ventas_proyectos WHERE stripe_session_id = ?", (_ss_id,)
                     ).fetchone()
                     if not _exists3:
+                        # SHA-256 de archivos del proyecto si existen
+                        import hashlib as _hl, os as _os_sha
+                        def _sha256_file(path):
+                            try:
+                                if path and _os_sha.path.exists(str(path).replace("\\","/")):
+                                    with open(str(path).replace("\\","/"), "rb") as _f:
+                                        return _hl.sha256(_f.read()).hexdigest()
+                            except Exception:
+                                pass
+                            return None
+                        # Obtener rutas de archivos del proyecto
+                        _sha_mem = _sha_pla = None
+                        try:
+                            from src.db import get_conn as _gc_sha
+                            _cs = _gc_sha()
+                            _pr = _cs.execute(
+                                "SELECT memoria_pdf, planos_pdf FROM projects WHERE id = ?",
+                                (_proj_id,)
+                            ).fetchone()
+                            _cs.close()
+                            if _pr:
+                                _sha_mem = _sha256_file(_pr[0])
+                                _sha_pla = _sha256_file(_pr[1])
+                        except Exception:
+                            pass
                         _con3.execute("""
                             INSERT INTO ventas_proyectos
                             (proyecto_id, cliente_email, nombre_cliente, productos_comprados,
-                             total_pagado, metodo_pago, fecha_compra, stripe_session_id)
-                            VALUES (?, ?, ?, ?, ?, 'Stripe', datetime('now'), ?)
-                        """, (_proj_id, _cli_mail, _cli_mail, _prods, _amount, _ss_id))
+                             total_pagado, metodo_pago, fecha_compra, stripe_session_id,
+                             sha256_memoria, sha256_planos)
+                            VALUES (?, ?, ?, ?, ?, 'Stripe', datetime('now'), ?, ?, ?)
+                        """, (_proj_id, _cli_mail, _cli_mail, _prods, _amount, _ss_id,
+                              _sha_mem, _sha_pla))
                         _con3.commit()
+                        # Telegram admin
+                        try:
+                            from modules.marketplace.email_notify import _send as _en_vp
+                            _en_vp(
+                                f"🛒 <b>VENTA PROYECTO</b>\n"
+                                f"Proyecto: {_proj_id}\nCliente: {_cli_mail}\n"
+                                f"Productos: {_prods}\nImporte: €{_amount:.2f}\n"
+                                f"Sesión Stripe: {_ss_id}"
+                            )
+                        except Exception:
+                            pass
+                        # Email confirmación al cliente via Resend (alertas)
+                        try:
+                            from modules.marketplace.alertas import _send_email as _ae_vp
+                            _ae_vp(
+                                to_email=_cli_mail,
+                                to_name=_cli_mail,
+                                subject="✅ Compra confirmada — ArchiRapid",
+                                html=(
+                                    f"<h2 style='color:#1e3a5f;'>¡Compra confirmada!</h2>"
+                                    f"<p>Tu compra del proyecto arquitectónico <b>{_proj_id}</b> "
+                                    f"ha sido procesada correctamente por un importe de <b>€{_amount:.2f}</b>.</p>"
+                                    f"<p><b>Productos adquiridos:</b> {_prods}</p>"
+                                    f"{'<p><b>SHA-256 Memoria:</b> <code>' + _sha_mem + '</code></p>' if _sha_mem else ''}"
+                                    f"{'<p><b>SHA-256 Planos:</b> <code>' + _sha_pla + '</code></p>' if _sha_pla else ''}"
+                                    f"<p>Accede a tu <a href='https://archirapid.streamlit.app/?page=cliente'>portal de cliente</a> "
+                                    f"para descargar los archivos.</p>"
+                                    f"<p style='color:#666;font-size:12px;'>— Equipo ArchiRapid</p>"
+                                ),
+                            )
+                        except Exception:
+                            pass
                     _con3.close()
                     st.session_state[f"stripe_verified_{_ss_id}"] = True
-                    st.toast("🎉 Pago completado. Ya puedes descargar tus archivos.", icon="✅")
+                    st.toast("🎉 ¡Compra confirmada! Accede a la pestaña COMPRA para descargar.", icon="✅")
                     if _cli_mail:
                         st.session_state["logged_in"]        = True
                         st.session_state["user_email"]       = _cli_mail
@@ -970,8 +1033,8 @@ if st.query_params.get("stripe_session") and st.query_params.get("payment") == "
                         st.session_state["client_logged_in"] = True
                         st.session_state["client_email"]     = _cli_mail
                         st.session_state["user_role"]        = "buyer"
-                        st.session_state["selected_page"]    = "👤 Panel de Cliente"
-                        st.session_state["_nav_radio"]       = "👤 Panel de Cliente"
+                        # Volver al proyecto, no al panel de cliente
+                        st.session_state["_nav_programmatic"] = True
         except Exception as _se:
             st.toast(f"Error verificando pago Stripe: {_se}", icon="⚠️")
     # Limpiar params de Stripe sin perder el proyecto
@@ -2021,9 +2084,15 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
                         st.markdown(f"**{title[:28]}{'…' if len(title)>28 else ''}**")
                         st.caption(f"💰 €{p.get('price',0):,.0f}  ·  📐 {p.get('area_m2',0)} m²")
                         if st.button("Ver Detalles →", key=f"proj_home_{p['id']}", width='stretch'):
-                            # Respaldo session_state + query_param para evitar lag Cloud
+                            # Atomic nav update — fix active-page state before rerun so
+                            # Sincronizador Maestro and sidebar radio don't consume this cycle
+                            st.session_state["_nav_programmatic"] = True
+                            st.session_state["current_page_sync"] = "home"
+                            st.session_state["selected_page"] = "🏠 Inicio / Marketplace"
+                            st.session_state["_nav_radio"] = "🏠 Inicio / Marketplace"
+                            # Double-path: direct param + session respaldo for Cloud race conditions
                             st.session_state["_goto_project_v2"] = p['id']
-                            st.query_params["selected_project_v2"] = p['id']
+                            st.query_params["selected_project_v2"] = str(p['id'])
                             st.rerun()
             else:
                 st.info("No hay proyectos arquitectónicos disponibles aún.")
