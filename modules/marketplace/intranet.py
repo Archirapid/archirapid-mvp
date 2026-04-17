@@ -985,12 +985,14 @@ def main():
         try:
             _db3b = db_conn()
             # Asegurar que columnas de comprador existen (migraciones antiguas)
+            # PG: si ADD COLUMN falla (columna ya existe), la transacción queda abortada;
+            # rollback() es obligatorio antes de cualquier query posterior.
             for _col_r, _def_r in [("buyer_dni","TEXT"), ("buyer_domicilio","TEXT"), ("buyer_province","TEXT")]:
                 try:
                     _db3b.execute(f"ALTER TABLE reservations ADD COLUMN {_col_r} {_def_r}")
                     _db3b.commit()
                 except Exception:
-                    pass
+                    _db3b.rollback()
             _df_res3 = _read3(
                 _db3b,
                 """SELECT r.id, r.buyer_name, r.buyer_email,
@@ -1023,6 +1025,52 @@ def main():
                     width="stretch", hide_index=True
                 )
 
+                # ── Borrado masivo ────────────────────────────────────────────
+                st.markdown("**🗑️ Borrado masivo:**")
+                _bulk_col1, _bulk_col2 = st.columns([3, 1])
+                with _bulk_col1:
+                    _ids_all = _df_res3["id"].tolist()
+                    _labels_all = [
+                        f"{str(_r['id'])[:8]}… — {_r['buyer_name']} | {_r['finca']}"
+                        for _, _r in _df_res3.iterrows()
+                    ]
+                    _sel_labels = st.multiselect(
+                        "Selecciona reservas a eliminar",
+                        options=_labels_all, key="intra_bulk_sel"
+                    )
+                    _sel_ids = [_ids_all[_labels_all.index(l)] for l in _sel_labels]
+                with _bulk_col2:
+                    if _sel_ids:
+                        with st.popover(f"🗑️ Eliminar {len(_sel_ids)} seleccionadas", width="stretch"):
+                            st.error(f"¿Eliminar {len(_sel_ids)} reserva(s)?")
+                            st.caption("Acción irreversible.")
+                            if st.button("❌ Confirmar borrado", key="intra_bulk_del_sel", type="primary", width="stretch"):
+                                try:
+                                    _db_bulk = db_conn()
+                                    for _bid in _sel_ids:
+                                        _db_bulk.execute("DELETE FROM reservations WHERE id=?", (_bid,))
+                                    _db_bulk.commit()
+                                    _db_bulk.close()
+                                    st.success(f"✅ {len(_sel_ids)} reserva(s) eliminadas.")
+                                    st.rerun()
+                                except Exception as _ebulk:
+                                    st.error(f"Error: {_ebulk}")
+
+                with st.popover("🗑️ ELIMINAR TODAS", width="stretch"):
+                    st.error(f"⚠️ ¿Eliminar las {len(_ids_all)} reservas de la tabla?")
+                    st.caption("Esto borra TODOS los registros. Acción irreversible.")
+                    if st.button("❌ Sí, borrar todo", key="intra_bulk_del_all", type="primary", width="stretch"):
+                        try:
+                            _db_all = db_conn()
+                            _db_all.execute("DELETE FROM reservations")
+                            _db_all.commit()
+                            _db_all.close()
+                            st.success("✅ Todas las reservas eliminadas.")
+                            st.rerun()
+                        except Exception as _eall:
+                            st.error(f"Error: {_eall}")
+
+                st.markdown("---")
                 # Fichas detalladas de cada comprador
                 st.markdown("**👤 Ficha detallada por comprador:**")
                 for _, _rrow in _df_res3.iterrows():
