@@ -285,6 +285,29 @@ class FloorPlanSVG:
                 ha='center', va='center',
                 fontsize=8, color='#888888', style='italic')
 
+        # ── Pre-pass: detectar adyacencia bano_suite ↔ dormitorio_principal ──────
+        # architect_layout coloca bano_suite DESPUÉS (a la derecha) del dorm principal.
+        # La pared compartida está en x = dorm.x + dorm.width = suite.x.
+        _SNAP = 0.4  # tolerancia metros
+        _suite_items = {}         # item['x'] → item para bano_suite
+        _dorm_principal_items = {}  # (item['x'] + item['width']) → item para dorm_principal
+        for _it in layout:
+            _c = _it['room'].room_type.code.lower()
+            if 'bano' in _c and 'suite' in _c:
+                _suite_items[round(_it['x'], 3)] = _it
+            if 'dormitorio' in _c and 'principal' in _c:
+                _dorm_principal_items[round(_it['x'] + _it['width'], 3)] = _it
+
+        _suite_adj_xs = set()   # item['x'] de bano_suite con dorm_principal a la izquierda
+        _dorm_suite_xs = set()  # item['x'] de dorm_principal con bano_suite a la derecha
+        for _sx, _sit in _suite_items.items():
+            for _drx, _dit in _dorm_principal_items.items():
+                if abs(_sx - _drx) < _SNAP and abs(_sit['y'] - _dit['y']) < _SNAP:
+                    _suite_adj_xs.add(_sx)
+                    _dorm_suite_xs.add(round(_dit['x'], 3))
+                    break
+        # ─────────────────────────────────────────────────────────────────────
+
         for item in layout:
             room = item['room']
             code = room.room_type.code.lower()
@@ -399,8 +422,46 @@ class FloorPlanSVG:
             door_r = min(pw, ph) * 0.18
             door_r = min(door_r, 18)
             theta = np.linspace(0, np.pi / 2, 20)
+            _item_x = round(item['x'], 3)
 
-            if any(x in code for x in ['dormitorio', 'bano', 'despacho', 'bodega']):
+            if 'bano' in code and 'suite' in code:
+                if _item_x in _suite_adj_xs:
+                    # EN-SUITE: puerta en pared IZQUIERDA — acceso desde dormitorio principal
+                    # Bisagra en esquina inferior-izquierda, arco hacia el interior
+                    door_x = px + door_r * np.sin(theta)
+                    door_y = py + door_r * np.cos(theta)
+                    ax.plot(door_x, door_y, color=wall_color, lw=1.5,
+                            linestyle='--', zorder=6)
+                    ax.plot([px, px], [py, py + door_r],
+                            color=wall_color, lw=1.5, zorder=6)
+                else:
+                    # Fallback: no adyacente, puerta superior estándar
+                    door_x = px + door_r * np.cos(theta)
+                    door_y = (py + ph) - door_r * np.sin(theta)
+                    ax.plot(door_x, door_y, color=wall_color, lw=1.2,
+                            linestyle='--', zorder=6)
+                    ax.plot([px, px + door_r], [py + ph, py + ph],
+                            color=wall_color, lw=1.2, zorder=6)
+
+            elif 'dormitorio' in code and 'principal' in code:
+                # Puerta SUPERIOR estándar — da al pasillo
+                door_x = px + door_r * np.cos(theta)
+                door_y = (py + ph) - door_r * np.sin(theta)
+                ax.plot(door_x, door_y, color=wall_color, lw=1.2,
+                        linestyle='--', zorder=6)
+                ax.plot([px, px + door_r], [py + ph, py + ph],
+                        color=wall_color, lw=1.2, zorder=6)
+                if _item_x in _dorm_suite_xs:
+                    # Puerta adicional en pared DERECHA — acceso al baño suite
+                    # Bisagra en esquina inferior-derecha, arco hacia el interior
+                    door_x2 = (px + pw) - door_r * np.sin(theta)
+                    door_y2 = py + door_r * np.cos(theta)
+                    ax.plot(door_x2, door_y2, color=wall_color, lw=1.5,
+                            linestyle='--', zorder=6)
+                    ax.plot([px + pw, px + pw], [py, py + door_r],
+                            color=wall_color, lw=1.5, zorder=6)
+
+            elif any(x in code for x in ['dormitorio', 'bano', 'despacho', 'bodega']):
                 # Pared SUPERIOR — da al pasillo (norte=privado)
                 door_x = px + door_r * np.cos(theta)
                 door_y = (py + ph) - door_r * np.sin(theta)

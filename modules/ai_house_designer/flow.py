@@ -1900,10 +1900,16 @@ def _normalize_ai_proposal(proposal: dict, energy_list: list) -> dict:
 
 
 def _enforce_bathroom_count(proposal: dict, target: int) -> dict:
-    """Garantiza exactamente `target` entradas de baño en la propuesta IA."""
+    """Garantiza exactamente `target` entradas de baño regular en la propuesta IA.
+    Los baños suite (bano_suite, ensuite…) son adicionales y no se cuentan aquí."""
     if target <= 0:
         return proposal
-    bath_keys = [k for k in proposal if any(x in k.lower() for x in ('bano', 'baño', 'aseo', 'wc'))]
+    _SUITE_KEYS = ('suite', 'ensuite', 'en_suite', 'master')
+    bath_keys = [
+        k for k in proposal
+        if any(x in k.lower() for x in ('bano', 'baño', 'aseo', 'wc'))
+        and not any(s in k.lower() for s in _SUITE_KEYS)
+    ]
     current = len(bath_keys)
     if current > target:
         # Eliminar los de menor área hasta llegar al target
@@ -2010,6 +2016,14 @@ Responde SOLO con un JSON válido (sin markdown) con habitaciones y m². Ejemplo
 
             # Enforce exact bathroom count from step 1 selection
             ai_proposal = _enforce_bathroom_count(ai_proposal, int(req.get('bathrooms', 0)))
+
+            # Always inject en-suite bathroom for master bedroom (additional to regular count)
+            _has_suite = any(
+                any(s in k.lower() for s in ('suite', 'ensuite', 'en_suite', 'master'))
+                for k in ai_proposal
+            )
+            if not _has_suite:
+                ai_proposal['bano_suite'] = 5.0
 
             # Guardar propuesta
             req["ai_room_proposal"] = ai_proposal
@@ -2133,6 +2147,7 @@ def render_step2():
         "dormitorio_principal": RoomType(code="dormitorio_principal", name="Dormitorio Principal", min_m2=12, max_m2=25, base_cost_per_m2=1600),
         "dormitorio": RoomType(code="dormitorio", name="Dormitorio", min_m2=8, max_m2=15, base_cost_per_m2=1400),
         "bano": RoomType(code="bano", name="Baño", min_m2=4, max_m2=8, base_cost_per_m2=1500),
+        "bano_suite": RoomType(code="bano_suite", name="Baño Suite (Dorm. Principal)", min_m2=4, max_m2=12, base_cost_per_m2=1500),
         "bodega": RoomType(code="bodega", name="Bodega", min_m2=6, max_m2=20, base_cost_per_m2=1000),
         "piscina": RoomType(code="piscina", name="Piscina", min_m2=20, max_m2=60, base_cost_per_m2=1200),
         "paneles_solares": RoomType(code="paneles_solares", name="Paneles Solares", min_m2=3, max_m2=15, base_cost_per_m2=350),
