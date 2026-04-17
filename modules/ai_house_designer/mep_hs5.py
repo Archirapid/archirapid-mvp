@@ -44,6 +44,33 @@ def _d_colector(ud: float) -> int:
     return 160
 
 
+# ─── Normativa CCAA ──────────────────────────────────────────────────────────
+
+def _get_ccaa_normativa(provincia_o_ccaa: str) -> Dict:
+    """
+    Devuelve la fila de normativa_fosas_ccaa para la provincia/CCAA indicada.
+    Búsqueda fuzzy: coincidencia parcial case-insensitive.
+    Retorna {} si no encuentra o si falla la consulta DB.
+    """
+    if not provincia_o_ccaa:
+        return {}
+    try:
+        import sqlite3 as _sq
+        from modules.marketplace.utils import DB_PATH as _DBP
+        conn = _sq.connect(_DBP, timeout=10)
+        conn.row_factory = _sq.Row
+        q = provincia_o_ccaa.strip().lower()
+        cur = conn.execute(
+            "SELECT * FROM normativa_fosas_ccaa WHERE LOWER(ccaa) LIKE ? OR LOWER(codigo) = ?",
+            (f"%{q}%", q[:3])
+        )
+        row = cur.fetchone()
+        conn.close()
+        return dict(row) if row else {}
+    except Exception:
+        return {}
+
+
 # ─── Motor principal ──────────────────────────────────────────────────────────
 
 def calcular_saneamiento(rooms_layout: List[Dict], req: Dict = None) -> Dict[str, Any]:
@@ -169,20 +196,28 @@ def calcular_saneamiento(rooms_layout: List[Dict], req: Dict = None) -> Dict[str
     # ── 6. Fosa séptica ───────────────────────────────────────────────────────
     # Volumen mínimo: 200 L/hab/día × 3 días de retención = 600 L/hab
     vol_calc = habitantes * 600
+
+    # Leer normativa CCAA si está disponible
+    ccaa_norm = _get_ccaa_normativa(req.get("provincia") or req.get("ccaa") or "")
+    vol_minimo_ccaa = ccaa_norm.get("vol_minimo_l", 2000) if ccaa_norm else 2000
+    vol_base = max(vol_calc, vol_minimo_ccaa)
+
     for tam_comercial in [2000, 3000, 4000, 6000, 8000, 10000]:
-        if vol_calc <= tam_comercial:
+        if vol_base <= tam_comercial:
             vol_com = tam_comercial
             break
     else:
-        vol_com = vol_calc
+        vol_com = vol_base
 
     fosa = {
-        "habitantes":         habitantes,
-        "vol_calc_litros":    vol_calc,
-        "vol_comercial_litros": vol_com,
-        "tipo":               "Fosa séptica prefabricada PE/fibra vidrio",
-        "diametro_est_m":     round(0.8 + vol_com / 10000, 1),
-        "longitud_est_m":     round(0.8 + vol_com / 6000, 1),
+        "habitantes":             habitantes,
+        "vol_calc_litros":        vol_calc,
+        "vol_comercial_litros":   vol_com,
+        "vol_minimo_ccaa_litros": vol_minimo_ccaa,
+        "tipo":                   "Fosa séptica prefabricada PE/fibra vidrio",
+        "diametro_est_m":         round(0.8 + vol_com / 10000, 1),
+        "longitud_est_m":         round(0.8 + vol_com / 6000, 1),
+        "ccaa_norm":              ccaa_norm,
     }
 
     # ── 7. Presupuesto orientativo ────────────────────────────────────────────
@@ -367,15 +402,21 @@ def render_mep_hs5_panel(rooms_layout: List[Dict], req: Dict = None) -> None:
         st.markdown("**🪣 Fosa séptica**")
         fosa = calc["fosa"]
         if fosa:
+            _ccaa = fosa.get("ccaa_norm") or {}
+            _ccaa_row = f"| Mín. CCAA ({_ccaa.get('ccaa','—')}) | {_ccaa.get('vol_minimo_l','—')} L |\n" if _ccaa else ""
+            _decreto_row = f"| Decreto | {_ccaa.get('decreto','—')} |\n" if _ccaa else ""
+            _bio_row = f"| Biodigestor requerido | {'Sí ⚠️' if _ccaa.get('requiere_biodigestor') else 'No'} |\n" if _ccaa else ""
             st.markdown(f"""
 | Parámetro | Valor |
 |-----------|-------|
 | Habitantes | {fosa.get('habitantes')} |
-| Volumen calc. | {fosa.get('vol_calc_litros')} L |
-| **Volumen comercial** | **{fosa.get('vol_comercial_litros')} L** |
-| Tipo | {fosa.get('tipo')} |
+| Volumen calc. (CTE) | {fosa.get('vol_calc_litros')} L |
+{_ccaa_row}| **Volumen comercial** | **{fosa.get('vol_comercial_litros')} L** |
+{_decreto_row}{_bio_row}| Tipo | {fosa.get('tipo')} |
 | Dimensiones aprox. | Ø{fosa.get('diametro_est_m')}m × {fosa.get('longitud_est_m')}m |
 """)
+            if _ccaa.get("nota"):
+                st.caption(f"📋 {_ccaa['nota']}")
 
     # Presupuesto
     st.markdown("---")

@@ -814,6 +814,19 @@ _PG_DDL = [
         telefono TEXT,
         created_at TEXT
     )""",
+    # ── Normativa fosas sépticas por CCAA (CTE HS-5 + decretos autonómicos) ──
+    """CREATE TABLE IF NOT EXISTS normativa_fosas_ccaa (
+        ccaa                     TEXT PRIMARY KEY,
+        codigo                   TEXT,
+        decreto                  TEXT,
+        vol_minimo_l             INTEGER,
+        distancia_min_edificio_m INTEGER DEFAULT 5,
+        distancia_min_pozo_m     INTEGER DEFAULT 25,
+        profundidad_max_m        REAL,
+        requiere_biodigestor     INTEGER DEFAULT 0,
+        nota                     TEXT,
+        updated_at               TEXT
+    )""",
 ]
 
 _PG_INDEXES = [
@@ -867,6 +880,28 @@ _PG_PREFAB_SEED = [
     ("Modular Familiar 110",110, 4, 3, 2, "Modular acero",   128000,  "4 dormitorios, 3 baños, garaje integrado. Instalación en 2 semanas.",                              "assets/branding/logo.png"),
     ("Premium Hormigón 130",130, 4, 3, 2, "Hormigón prefab", 154000,  "Paneles de hormigón arquitectónico. Máxima durabilidad y aislamiento acústico.",                  "assets/branding/logo.png"),
     ("Villa Modular 160",  160,  5, 3, 2, "Mixto",           194000,  "5 dormitorios, piscina opcional, domótica integrada. Villa de lujo prefabricada.",                 "assets/branding/logo.png"),
+]
+
+# Seed normativa fosas sépticas por CCAA (17 comunidades autónomas)
+_PG_CCAA_FOSAS_SEED = [
+    # (ccaa, codigo, decreto, vol_minimo_l, dist_edif, dist_pozo, prof_max, biodigestor, nota)
+    ("Andalucía",           "AND", "Decreto 36/2008 BOJA",          2000, 5, 25, 3.5, 0, "Prohibida en suelo urbano con red saneamiento"),
+    ("Aragón",              "ARA", "Decreto 38/2011 BOA",            2000, 5, 30, 4.0, 0, "Requiere estudio geotécnico en arcillas expansivas"),
+    ("Asturias",            "AST", "BOPA — Plan Rector Saneamiento", 2000, 5, 25, 3.5, 0, "Zona costera: distancia al mar mínimo 100m"),
+    ("Baleares",            "BAL", "Ley 6/1997 CAIB",               3000, 7, 35, 3.0, 1, "Biodigestor obligatorio en zonas sensibles ZEPA/ZEEC"),
+    ("Canarias",            "CAN", "Decreto 174/1994 BOC",           2000, 5, 25, 3.5, 0, "Revisión periódica cada 5 años obligatoria"),
+    ("Cantabria",           "CTB", "Decreto 17/2007 BOC",            2000, 5, 30, 4.0, 0, "Vedado a menos de 200m de embalses"),
+    ("Castilla-La Mancha",  "CLM", "Decreto 68/2006 DOCM",           2000, 5, 25, 3.5, 0, "Capacidad mínima 300 L/habitante·día"),
+    ("Castilla y León",     "CYL", "Decreto 109/2015 BOCYL",         2000, 6, 30, 4.0, 0, "Drenaje por zanja filtrante obligatorio si suelo lo permite"),
+    ("Cataluña",            "CAT", "Decret 130/2003 DOGC",           3000, 8, 35, 3.5, 1, "Depuradora compacta si >10 habitantes equivalentes"),
+    ("Comunidad Valenciana","VAL", "Orden 4/1989 DOGV",              2000, 5, 25, 3.0, 0, "Instalación autorizada por CHJ/CHS según cuenca"),
+    ("Extremadura",         "EXT", "Decreto 202/2007 DOE",           2000, 5, 25, 3.5, 0, "Zona de Interés Regional: informe previo Consejería"),
+    ("Galicia",             "GAL", "Decreto 8/2014 DOG",             2000, 5, 25, 4.0, 0, "Alta pluviometría: impermeabilización reforzada"),
+    ("La Rioja",            "LRI", "Decreto 48/2003 BOLR",           2000, 5, 25, 3.5, 0, "Comarca Vinícola: distancia mínima a viñedos 15m"),
+    ("Madrid",              "MAD", "Decreto 170/1998 BOCM",          2000, 5, 30, 3.5, 0, "Acuífero del Manzanares: distancia mínima 50m"),
+    ("Murcia",              "MUR", "Decreto 16/1999 BORM",           2000, 5, 30, 3.5, 0, "Zona semiárida: campo absorbente mínimo 30m²"),
+    ("Navarra",             "NAV", "Decreto Foral 82/1990 BON",      2000, 5, 25, 4.0, 0, "Plan de Residuos de Navarra: registro obligatorio"),
+    ("País Vasco",          "PVA", "Decreto 199/2006 BOPV",          3000, 7, 35, 3.5, 1, "URA: autorización previa de vertido siempre exigible"),
 ]
 
 
@@ -968,6 +1003,20 @@ def _ensure_tables_postgres():
                     )
         except Exception as e:
             print(f"[PG seed] prefab_catalog: {e}")
+        # Seed normativa_fosas_ccaa si está vacía
+        try:
+            import datetime as _dt_seed
+            cur2 = conn.execute("SELECT COUNT(*) as n FROM normativa_fosas_ccaa")
+            row2 = cur2.fetchone()
+            if (row2['n'] if row2 else 0) == 0:
+                _seed_now = _dt_seed.datetime.now().isoformat()
+                for _r in _PG_CCAA_FOSAS_SEED:
+                    conn.execute(
+                        "INSERT INTO normativa_fosas_ccaa (ccaa, codigo, decreto, vol_minimo_l, distancia_min_edificio_m, distancia_min_pozo_m, profundidad_max_m, requiere_biodigestor, nota, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                        (*_r, _seed_now)
+                    )
+        except Exception as e:
+            print(f"[PG seed] normativa_fosas_ccaa: {e}")
         conn.commit()
     finally:
         conn.close()
@@ -1978,6 +2027,49 @@ def ensure_tables():
             c.execute("CREATE INDEX IF NOT EXISTS idx_invitaciones_estado ON invitaciones(estado)")
         except Exception:
             pass
+
+        # ── Normativa fosas sépticas por CCAA (CTE HS-5 + decretos autonómicos) ─
+        c.execute("""CREATE TABLE IF NOT EXISTS normativa_fosas_ccaa (
+            ccaa                     TEXT PRIMARY KEY,
+            codigo                   TEXT,
+            decreto                  TEXT,
+            vol_minimo_l             INTEGER,
+            distancia_min_edificio_m INTEGER DEFAULT 5,
+            distancia_min_pozo_m     INTEGER DEFAULT 25,
+            profundidad_max_m        REAL,
+            requiere_biodigestor     INTEGER DEFAULT 0,
+            nota                     TEXT,
+            updated_at               TEXT
+        )""")
+        # Seed 17 CCAA — solo si vacía
+        c.execute("SELECT COUNT(*) FROM normativa_fosas_ccaa")
+        if c.fetchone()[0] == 0:
+            import datetime as _dtnow
+            _now = _dtnow.datetime.now().isoformat()
+            _ccaa_rows = [
+                # (ccaa, codigo, decreto, vol_minimo_l, dist_edif, dist_pozo, prof_max, biodigestor, nota)
+                ("Andalucía",           "AND", "Decreto 36/2008 BOJA",          2000, 5, 25, 3.5, 0, "Prohibida en suelo urbano con red saneamiento"),
+                ("Aragón",              "ARA", "Decreto 38/2011 BOA",            2000, 5, 30, 4.0, 0, "Requiere estudio geotécnico en arcillas expansivas"),
+                ("Asturias",            "AST", "BOPA — Plan Rector Saneamiento", 2000, 5, 25, 3.5, 0, "Zona costera: distancia al mar mínimo 100m"),
+                ("Baleares",            "BAL", "Ley 6/1997 CAIB",               3000, 7, 35, 3.0, 1, "Biodigestor obligatorio en zonas sensibles ZEPA/ZEEC"),
+                ("Canarias",            "CAN", "Decreto 174/1994 BOC",           2000, 5, 25, 3.5, 0, "Revisión periódica cada 5 años obligatoria"),
+                ("Cantabria",           "CTB", "Decreto 17/2007 BOC",            2000, 5, 30, 4.0, 0, "Vedado a menos de 200m de embalses"),
+                ("Castilla-La Mancha",  "CLM", "Decreto 68/2006 DOCM",           2000, 5, 25, 3.5, 0, "Capacidad mínima 300 L/habitante·día"),
+                ("Castilla y León",     "CYL", "Decreto 109/2015 BOCYL",         2000, 6, 30, 4.0, 0, "Drenaje por zanja filtrante obligatorio si suelo lo permite"),
+                ("Cataluña",            "CAT", "Decret 130/2003 DOGC",           3000, 8, 35, 3.5, 1, "Depuradora compacta si >10 habitantes equivalentes"),
+                ("Comunidad Valenciana","VAL", "Orden 4/1989 DOGV",              2000, 5, 25, 3.0, 0, "Instalación autorizada por CHJ/CHS según cuenca"),
+                ("Extremadura",         "EXT", "Decreto 202/2007 DOE",           2000, 5, 25, 3.5, 0, "Zona de Interés Regional: informe previo Consejería"),
+                ("Galicia",             "GAL", "Decreto 8/2014 DOG",             2000, 5, 25, 4.0, 0, "Alta pluviometría: impermeabilización reforzada"),
+                ("La Rioja",            "LRI", "Decreto 48/2003 BOLR",           2000, 5, 25, 3.5, 0, "Comarca Vinícola: distancia mínima a viñedos 15m"),
+                ("Madrid",              "MAD", "Decreto 170/1998 BOCM",          2000, 5, 30, 3.5, 0, "Acuífero del Manzanares: distancia mínima 50m"),
+                ("Murcia",              "MUR", "Decreto 16/1999 BORM",           2000, 5, 30, 3.5, 0, "Zona semiárida: campo absorbente mínimo 30m²"),
+                ("Navarra",             "NAV", "Decreto Foral 82/1990 BON",      2000, 5, 25, 4.0, 0, "Plan de Residuos de Navarra: registro obligatorio"),
+                ("País Vasco",          "PVA", "Decreto 199/2006 BOPV",          3000, 7, 35, 3.5, 1, "URA: autorización previa de vertido siempre exigible"),
+            ]
+            c.executemany(
+                "INSERT INTO normativa_fosas_ccaa (ccaa, codigo, decreto, vol_minimo_l, distancia_min_edificio_m, distancia_min_pozo_m, profundidad_max_m, requiere_biodigestor, nota, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                [(*r, _now) for r in _ccaa_rows]
+            )
 
     _tables_initialized = True
 
