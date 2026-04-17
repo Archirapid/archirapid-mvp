@@ -2736,16 +2736,22 @@ def render_step3_editor():
         # — áreas con sliders aplicados
         # — extras desmarcados ya removidos por design.rooms.pop()
         _bodega_ext_door = req_sync.get("extras", {}).get("bodega_has_exterior_door", False)
+        design = st.session_state.get('current_design')
         rooms_data = []
-        for _room in design.rooms:
-            _room_entry = {
-                'code': _room.room_type.code,
-                'name': _room.room_type.name,
-                'area_m2': float(_room.area_m2),
-            }
-            if 'bodega' in _room.room_type.code.lower():
-                _room_entry['wants_bodega_exterior_door'] = bool(_bodega_ext_door)
-            rooms_data.append(_room_entry)
+        if design is not None:
+            for _room in design.rooms:
+                _room_entry = {
+                    'code': _room.room_type.code,
+                    'name': _room.room_type.name,
+                    'area_m2': float(_room.area_m2),
+                }
+                if 'bodega' in _room.room_type.code.lower():
+                    _room_entry['wants_bodega_exterior_door'] = bool(_bodega_ext_door)
+                rooms_data.append(_room_entry)
+        else:
+            # Fallback: design no generado aún, usar ai_room_proposal
+            for _code, _area in req_sync.get("ai_room_proposal", {}).items():
+                rooms_data.append({'code': _code, 'name': _code, 'area_m2': float(_area)})
 
         layout_result = generate_layout(rooms_data, house_shape)
 
