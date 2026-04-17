@@ -1899,6 +1899,36 @@ def _normalize_ai_proposal(proposal: dict, energy_list: list) -> dict:
     return proposal
 
 
+def _enforce_bathroom_count(proposal: dict, target: int) -> dict:
+    """Garantiza exactamente `target` entradas de baño en la propuesta IA."""
+    if target <= 0:
+        return proposal
+    bath_keys = [k for k in proposal if any(x in k.lower() for x in ('bano', 'baño', 'aseo', 'wc'))]
+    current = len(bath_keys)
+    if current > target:
+        # Eliminar los de menor área hasta llegar al target
+        bath_keys.sort(key=lambda k: float(proposal.get(k, 0)))
+        for k in bath_keys[: current - target]:
+            proposal.pop(k, None)
+    elif current < target:
+        # Añadir entradas faltantes
+        existing_nums = set()
+        for k in bath_keys:
+            try:
+                num = int(''.join(filter(str.isdigit, k)) or '1')
+                existing_nums.add(num)
+            except ValueError:
+                pass
+        n = 2
+        for _ in range(target - current):
+            while n in existing_nums:
+                n += 1
+            proposal[f'bano_{n}'] = 5.0
+            existing_nums.add(n)
+            n += 1
+    return proposal
+
+
 def _generate_ai_proposal(req):
     """Genera propuesta de distribución con IA"""
     with st.spinner("🤖 La IA está diseñando tu casa..."):
@@ -1977,7 +2007,10 @@ Responde SOLO con un JSON válido (sin markdown) con habitaciones y m². Ejemplo
 
             # Normalizar resultados y asegurar paneles solares
             ai_proposal = _normalize_ai_proposal(ai_proposal, energy_list)
-            
+
+            # Enforce exact bathroom count from step 1 selection
+            ai_proposal = _enforce_bathroom_count(ai_proposal, int(req.get('bathrooms', 0)))
+
             # Guardar propuesta
             req["ai_room_proposal"] = ai_proposal
             st.session_state["ai_house_requirements"] = req
