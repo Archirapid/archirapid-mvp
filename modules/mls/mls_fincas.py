@@ -301,34 +301,19 @@ def ui_subir_finca(inmo: dict) -> None:
         key="mls_subir_comision_total",
     )
 
-    # Calcular split sugerido
+    # Calcular rangos del slider de colaboradora
     canal = round(comision_total_pct - 1.0, 10)
     col_sugerida_min = round(canal * 0.30, 1)
     col_sugerida_max = round(canal * 0.70, 1)
     col_sugerida_def = round(canal * 0.50, 1)
 
-    # Mostrar tabla de split automático
-    try:
-        split_preview = calcular_split_sugerido(precio, comision_total_pct)
-        col_a, col_b, col_c = st.columns(3)
-        with col_a:
-            st.metric("ArchiRapid (fijo)", f"{split_preview['archirapid_pct']}%",
-                      f"€{split_preview['archirapid_eur']:,.0f}")
-        with col_b:
-            st.metric("Para colaboradora", f"{split_preview['colaboradora_pct']}%",
-                      f"€{split_preview['colaboradora_eur']:,.0f}")
-        with col_c:
-            st.metric("Te quedas tú", f"{split_preview['listante_pct']}%",
-                      f"€{split_preview['listante_eur']:,.0f}")
-    except Exception:
-        pass
-
-    # Slider de colaboradora (rango 30-70% del canal)
     step_col = 0.5
     min_col = max(step_col, round(col_sugerida_min / step_col) * step_col)
     max_col = max(min_col + step_col, round(col_sugerida_max / step_col) * step_col)
     def_col = min(max_col, max(min_col, round(col_sugerida_def / step_col) * step_col))
 
+    # Slider de colaboradora — se renderiza ANTES de los metrics para que
+    # su valor esté disponible en el mismo ciclo de renderizado
     colaboradora_pct = st.slider(
         "Comisión que ofreces a la colaboradora (%)",
         min_value=min_col,
@@ -340,13 +325,23 @@ def ui_subir_finca(inmo: dict) -> None:
         key="mls_subir_colab_pct",
     )
 
-    # Actualizar tabla con valor personalizado del colaboradora_pct
+    # Metrics con los valores REALES del slider (no sugeridos fijos)
     try:
         split_custom = calcular_split(precio, comision_total_pct, colaboradora_pct)
-        listante_pct  = split_custom["listante_pct"]
-        listante_eur  = split_custom["listante_eur"]
-        colab_eur     = split_custom["colaboradora_eur"]
-        arch_eur      = split_custom["archirapid_eur"]
+        listante_pct = split_custom["listante_pct"]
+        listante_eur = split_custom["listante_eur"]
+        colab_eur    = split_custom["colaboradora_eur"]
+        arch_eur     = split_custom["archirapid_eur"]
+        col_a, col_b, col_c = st.columns(3)
+        with col_a:
+            st.metric("ArchiRapid (fijo)", f"{split_custom['archirapid_pct']}%",
+                      f"€{arch_eur:,.0f}")
+        with col_b:
+            st.metric("Para colaboradora", f"{split_custom['colaboradora_pct']}%",
+                      f"€{colab_eur:,.0f}")
+        with col_c:
+            st.metric("Te quedas tú", f"{split_custom['listante_pct']}%",
+                      f"€{listante_eur:,.0f}")
         st.caption(
             f"Con este split: ArchiRapid **€{arch_eur:,.0f}** · "
             f"Colaboradora **€{colab_eur:,.0f}** · "
