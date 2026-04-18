@@ -386,9 +386,14 @@ def _render_dashboard(company: dict):
         _plan_info = _PLANES.get(_plan_key, _PLANES["starter"])
         st.caption(f"Plan: {_plan_info['emoji']} **{_plan_info['label']}** | Email: {company['email']}")
     with _co2:
-        if st.button("🚪 Salir", key="pref_logout"):
+        if st.button("← Volver", key="pref_logout", use_container_width=True):
+            st.session_state["selected_page"] = "🏠 Inicio / Marketplace"
             st.session_state.pop("prefab_company", None)
-            st.rerun()
+            try:
+                del st.query_params["page"]
+            except Exception:
+                pass
+            st.stop()
 
     # Banner estado plan
     _plan = company.get("plan") or "starter"

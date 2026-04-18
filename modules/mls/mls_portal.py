@@ -628,9 +628,14 @@ def ui_espera_aprobacion(inmo: dict) -> None:
     if st.button("🔄 Verificar estado", use_container_width=True):
         st.rerun()
 
-    if st.button("Cerrar sesión", type="secondary"):
-        _logout_inmo()
-        st.rerun()
+    if st.button("← Volver", type="secondary", use_container_width=True):
+        st.session_state["selected_page"] = "🏠 Inicio / Marketplace"
+        st.session_state.pop(_SESSION_KEY, None)
+        try:
+            del st.query_params["page"]
+        except Exception:
+            pass
+        st.stop()
 
 
 # ── UI: Planes de suscripción ─────────────────────────────────────────────────
@@ -755,9 +760,14 @@ def ui_planes(inmo: dict) -> None:
         "ArchiRapid cobra el 1% fijo sobre el precio final de cada operación cerrada."
     )
 
-    if st.button("Cerrar sesión", type="secondary"):
-        _logout_inmo()
-        st.rerun()
+    if st.button("← Volver", type="secondary", use_container_width=True):
+        st.session_state["selected_page"] = "🏠 Inicio / Marketplace"
+        st.session_state.pop(_SESSION_KEY, None)
+        try:
+            del st.query_params["page"]
+        except Exception:
+            pass
+        st.stop()
 
 
 def _iniciar_checkout_plan(plan_key: str, inmo: dict) -> None:
@@ -814,9 +824,14 @@ def ui_trial_expirado(inmo: dict) -> None:
         st.rerun()
     st.link_button("Contactar soporte", "mailto:hola@archirapid.com")
     st.divider()
-    if st.button("Cerrar sesión", type="secondary", key="mls_trial_exp_logout"):
-        _logout_inmo()
-        st.rerun()
+    if st.button("← Volver", type="secondary", key="mls_trial_exp_logout", use_container_width=True):
+        st.session_state["selected_page"] = "🏠 Inicio / Marketplace"
+        st.session_state.pop(_SESSION_KEY, None)
+        try:
+            del st.query_params["page"]
+        except Exception:
+            pass
+        st.stop()
 
 
 def _check_trial_expiry_alerts(inmo: dict) -> None:
@@ -1130,11 +1145,14 @@ def ui_portal_operativo(inmo: dict) -> None:
             unsafe_allow_html=True,
         )
     with _col_logout:
-        if st.button("🚪 Salir", key="mls_header_logout", help="Cerrar sesión MLS"):
+        if st.button("← Volver", key="mls_header_logout", use_container_width=True):
+            st.session_state["selected_page"] = "🏠 Inicio / Marketplace"
             st.session_state.pop(_SESSION_KEY, None)
-            st.session_state.pop("selected_page", None)
-            st.query_params.clear()
-            st.rerun()
+            try:
+                del st.query_params["page"]
+            except Exception:
+                pass
+            st.stop()
     # ── Vista directa desde pin del mapa (o navegación interna):
     #    ficha / reservar / contacto → pantalla completa sin tabs
     #    mercado → pantalla completa sin tabs si el usuario vino por pin
@@ -1362,9 +1380,14 @@ def _ui_mi_cuenta(inmo: dict) -> None:
                     st.success("Contraseña actualizada correctamente.")
 
     st.divider()
-    if st.button("🚪 Cerrar sesión", type="secondary"):
-        _logout_inmo()
-        st.rerun()
+    if st.button("← Volver", type="secondary", use_container_width=True):
+        st.session_state["selected_page"] = "🏠 Inicio / Marketplace"
+        st.session_state.pop(_SESSION_KEY, None)
+        try:
+            del st.query_params["page"]
+        except Exception:
+            pass
+        st.stop()
 
 
 # ── Password reset MLS ────────────────────────────────────────────────────────
@@ -1684,9 +1707,14 @@ def main() -> None:
         if firmado:
             # Refrescar sesión y redirigir al portal
             st.rerun()
-        if st.button("Cerrar sesión", type="secondary"):
-            _logout_inmo()
-            st.rerun()
+        if st.button("← Volver", type="secondary", use_container_width=True):
+            st.session_state["selected_page"] = "🏠 Inicio / Marketplace"
+            st.session_state.pop(_SESSION_KEY, None)
+            try:
+                del st.query_params["page"]
+            except Exception:
+                pass
+            st.stop()
 
     elif estado == "trial_expirado":
         ui_trial_expirado(inmo)

@@ -1,0 +1,84 @@
+Respuesta completa, precisa:
+
+A1 — ¿Movimiento en parcela = movimiento de meshes?
+SÍ. Confirmado. No existe houseRoot. Cada mesh se mueve de forma independiente en _applyHouseOffset:for (const [nm, base] of Object.entries(_basePosByName)) {
+    const m = scene.getMeshByName(nm);
+    if (m) { m.position.x = base.x + dx; ... continue; }
+    const tn = scene.getTransformNodeByName(nm);
+    if (tn) { tn.position.x = base.x + dx; ... }
+}
+Consecuencia directa: cualquier mesh/node que no esté en _basePosByName no se mueve. MEP (tubes, fosa séptica) no está ahí — se queda anclado al origen.
+
+A2 — Doble fuente de verdad: CONFIRMADO. Son en realidad TRES capas de offset
+Capa	Dónde	Qué hace	¿roomsData la sabe?
+1	flow.py líneas 2750-2756	Python aplica session_state["house_offset_x/z"] al layout antes de generar HTML	SÍ — es el input inicial
+2	generateLayoutJS (JS)	Normaliza: añade max(0,-minX)+2 a TODAS las x,z. Mínimo +2m siempre	SÍ — rebuildScene actualiza roomsData con estas coords
+3	_applyHouseOffset (slider)	Mueve meshes visualmente. _houseOffsetX/Z = estado actual	NO — roomsData.x/z nunca se actualiza con el slider
+Resultado: roomsData.x/z = capas 1+2. Meshes visibles = capas 1+2+3. buildMEPLayers(roomsData) usa capa 1+2 → MEP se queda en la posición sin slider.
+La capa 1 en práctica siempre es 0 (session_state nunca recibe feedback del iframe JS), así que en flujo normal son dos capas reales: normalización fija + slider.
+
+A3 — saveChanges(): ¿qué coordenadas guarda?
+
+x: parseFloat(b.minimumWorld.x.toFixed(2)),  // boundingBox WORLD
+z: parseFloat(b.minimumWorld.z.toFixed(2)),
+
+Guarda coordenadas world absolutas del bounding box del suelo — incluye normalización + slider. Son las coordenadas visuales exactas en pantalla.
+
+Pero roomsData.x/z NO se actualiza con el slider. Por tanto hay divergencia interna: saveChanges guarda la posición real, pero el objeto JS roomsData tiene la posición base (sin slider). Si algo interna mente lee roomsData después, ve la posición incorrecta. Esto afecta directamente a buildMEPLayers (que usa r.x, r.z de roomsData en las líneas 1561-1592).
+
+A4 — ¿Existe houseRoot TransformNode?
+NO existe. Busqué en todo el archivo. No hay nada similar.
+
+A5 — ¿Layout Python incluye porche/piscina/huerto/caseta como "rooms"?
+SÍ — el layout pasa todos los rooms al HTML sin filtrar. Cada función los filtra internamente:
+
+buildRoof: filtra por interiorZones = ['day','night','wet','circ','service']
+buildMEPLayers: filtra por zone !== 'garden' && zone !== 'exterior' + lista _GARDEN_CODES
+buildSolarPanels: filtra paneles solares específicamente
+
+A6 — Street View: ¿mira hacia dónde?
+Mira hacia el norte. La cámara se posiciona en Z negativo (sur) mirando al centro de la casa:// "Vista desde la calle (sur) a altura de persona mirando la fachada principal"
+camera.setPosition(new BABYLON.Vector3(totalWidth/2, WALL_H*0.9, totalDepth/2 - dist));
+// Z negativo = sur (detrás del player, mirando hacia +Z = norte)
+
+En Babylon.js el eje +Z apunta al norte (hacia el fondo de la escena). Cámara alpha inicial = Math.PI/4 = noreste. Fachada principal = sur (Z mínimo de la casa).
+
+A7 — Funciones exactas (estado actual en el archivo)
+_storeBaseMeshPositions (línea 874): function _storeBaseMeshPositions() {
+    // Always overwrite — called after generateLayoutJS normalization
+    scene.meshes.forEach(m => {
+        if (_ENV_NAMES.has(m.name) || m.name.startsWith('border_')) return;
+        _basePosByName[m.name] = { x: m.position.x, z: m.position.z };
+    });
+    scene.transformNodes.forEach(n => {
+        if (n.name.startsWith('lbl_node_')) {
+            _basePosByName[n.name] = { x: n.position.x, z: n.position.z };
+        }
+    });
+}
+
+_applyHouseOffset (línea 887)
+Dispose roof → snapshot nuevos meshes → for-loop mueve meshes+transformNodes → rebuild roof+paneles.
+
+buildMEPLayers(rooms) (línea 1510)
+CRÍTICO: usa r.x, r.z, r.width, r.depth de roomsData directamente (líneas 1561-1592). No lee posiciones world de los meshes. MEP no sigue el offset del slider.
+
+toggleRoof (línea 2222)
+OFF: dispose roofMesh + solarMeshes → roofActive = false
+ON: buildRoof(_houseOffsetX, _houseOffsetZ) → roofActive = true → buildSolarPanels(_houseOffsetX, _houseOffsetZ)
+buildRoof(ox, oz) (línea 1946)
+Lee posición REAL de los suelos via scene.getMeshByName('floor_'+idx).position. Ya no usa roomsData.x/z. Parámetros ox/oz recibidos pero no usados (floor positions ya los incluyen).
+
+saveChanges() (línea 1394)
+Lee getBoundingInfo().boundingBox.minimumWorld → guarda coords world absolutas (con slider offset). Descarga JSON.
+
+resetLayout() (línea 1838)
+Restaura roomsData desde initialRoomsData → llama rebuildScene(generateLayoutJS(roomsData)). No resetea _houseOffsetX/Z ni los sliders. Bug: los sliders quedan en posición anterior pero _basePosByName tiene las nuevas bases → desync.
+
+rebuildScene(newLayout) (línea 1213)
+Actualiza roomsData.x/z/width/depth con newLayout → recrea rooms → llama _storeBaseMeshPositions() → si offset ≠ 0, llama _applyHouseOffset(_houseOffsetX, _houseOffsetZ).
+
+Bugs en pie tras mis últimos fixes
+MEP no sigue el slider — usa roomsData.x/z en lugar de posiciones world de los floors. Necesita igual solución que buildRoof: leer bounding boxes reales.
+resetLayout no resetea sliders — _houseOffsetX/Z quedan sucios tras reset.
+roomsData.x/z nunca refleja el slider — divergencia permanente entre datos y visual.

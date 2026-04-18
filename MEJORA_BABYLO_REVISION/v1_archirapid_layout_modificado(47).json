@@ -1,0 +1,142 @@
+[
+  {
+    "index": 0,
+    "name": "office",
+    "original_area": 8,
+    "x": 2.02,
+    "z": 2.02,
+    "width": 2.95,
+    "depth": 4.45,
+    "new_area": 13.13
+  },
+  {
+    "index": 1,
+    "name": "cocina",
+    "original_area": 12,
+    "x": 5.03,
+    "z": 2.02,
+    "width": 3.05,
+    "depth": 4.45,
+    "new_area": 13.57
+  },
+  {
+    "index": 2,
+    "name": "salon",
+    "original_area": 18,
+    "x": 8.13,
+    "z": 2.02,
+    "width": 3.75,
+    "depth": 4.45,
+    "new_area": 16.69
+  },
+  {
+    "index": 3,
+    "name": "garaje",
+    "original_area": 15,
+    "x": 11.92,
+    "z": 2.02,
+    "width": 3.45,
+    "depth": 4.45,
+    "new_area": 15.35
+  },
+  {
+    "index": 4,
+    "name": "Distribuidor",
+    "original_area": 16.08,
+    "x": 2.02,
+    "z": 6.52,
+    "width": 13.35,
+    "depth": 1.15,
+    "new_area": 15.35
+  },
+  {
+    "index": 5,
+    "name": "bano",
+    "original_area": 5,
+    "x": 2.02,
+    "z": 7.72,
+    "width": 1.45,
+    "depth": 3.45,
+    "new_area": 5
+  },
+  {
+    "index": 6,
+    "name": "dormitorio_principal",
+    "original_area": 16,
+    "x": 3.53,
+    "z": 7.72,
+    "width": 4.55,
+    "depth": 3.45,
+    "new_area": 15.7
+  },
+  {
+    "index": 7,
+    "name": "bano_2",
+    "original_area": 5,
+    "x": 8.13,
+    "z": 7.72,
+    "width": 1.45,
+    "depth": 3.45,
+    "new_area": 5
+  },
+  {
+    "index": 8,
+    "name": "dormitorio",
+    "original_area": 10,
+    "x": 9.63,
+    "z": 7.72,
+    "width": 2.85,
+    "depth": 3.45,
+    "new_area": 9.83
+  },
+  {
+    "index": 9,
+    "name": "dormitorio_2",
+    "original_area": 10,
+    "x": 12.52,
+    "z": 7.72,
+    "width": 2.85,
+    "depth": 3.45,
+    "new_area": 9.83
+  },
+  {
+    "index": 10,
+    "name": "porche",
+    "original_area": 10,
+    "x": 2.02,
+    "z": 11.22,
+    "width": 13.35,
+    "depth": 1.95,
+    "new_area": 26.03
+  },
+  {
+    "index": 11,
+    "name": "huerto",
+    "original_area": 10,
+    "x": 18.43,
+    "z": 2.03,
+    "width": 3.55,
+    "depth": 2.75,
+    "new_area": 9.76
+  },
+  {
+    "index": 12,
+    "name": "caseta",
+    "original_area": 5,
+    "x": 18.42,
+    "z": 5.83,
+    "width": 2.45,
+    "depth": 1.95,
+    "new_area": 4.78
+  },
+  {
+    "index": 13,
+    "name": "paneles_solares",
+    "original_area": 3,
+    "x": 18.42,
+    "z": 8.83,
+    "width": 1.95,
+    "depth": 1.45,
+    "new_area": 2.83
+  }
+]

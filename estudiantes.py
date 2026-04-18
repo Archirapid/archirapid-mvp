@@ -399,10 +399,15 @@ def _mostrar_pendiente_aprobacion(estudiante: dict):
         "En breve recibirás confirmación."
     )
     st.caption(f"Registrado el: {str(estudiante.get('created_at', ''))[:10]}")
-    if st.button("Cerrar sesión", key="est_logout_pending"):
+    if st.button("← Volver", key="est_logout_pending", use_container_width=True):
+        st.session_state["selected_page"] = "🏠 Inicio / Marketplace"
         st.session_state.pop("est_session_logged", None)
         st.session_state.pop("est_session_email", None)
-        st.rerun()
+        try:
+            del st.query_params["page"]
+        except Exception:
+            pass
+        st.stop()
 
 
 def _mostrar_rechazado(estudiante: dict):
@@ -410,10 +415,15 @@ def _mostrar_rechazado(estudiante: dict):
         "❌ Tu solicitud no ha sido aprobada en esta ocasión. "
         "Contacta con soporte@archirapid.com para más información."
     )
-    if st.button("Cerrar sesión", key="est_logout_rechazado"):
+    if st.button("← Volver", key="est_logout_rechazado", use_container_width=True):
+        st.session_state["selected_page"] = "🏠 Inicio / Marketplace"
         st.session_state.pop("est_session_logged", None)
         st.session_state.pop("est_session_email", None)
-        st.rerun()
+        try:
+            del st.query_params["page"]
+        except Exception:
+            pass
+        st.stop()
 
 
 # ─── PANEL ESTUDIANTE APROBADO ────────────────────────────────────────────────
@@ -423,10 +433,15 @@ def _mostrar_panel_estudiante(estudiante: dict):
     with col_w:
         st.success(f"✅ Bienvenido/a, {estudiante['nombre_completo']}")
     with col_out:
-        if st.button("Cerrar sesión", key="est_logout_panel"):
+        if st.button("← Volver", key="est_logout_panel", use_container_width=True):
+            st.session_state["selected_page"] = "🏠 Inicio / Marketplace"
             st.session_state.pop("est_session_logged", None)
             st.session_state.pop("est_session_email", None)
-            st.rerun()
+            try:
+                del st.query_params["page"]
+            except Exception:
+                pass
+            st.stop()
 
     tab1, tab2, tab3 = st.tabs([
         "📁 Mis proyectos",

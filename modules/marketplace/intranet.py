@@ -444,14 +444,14 @@ def main():
         with _col_info:
             st.success("✅ Acceso autorizado a Intranet (sesión activa)")
         with _col_exit:
-            if st.button("🚪 Salir", key="intranet_logout", help="Cerrar sesión Admin"):
+            if st.button("← Volver", key="intranet_logout", use_container_width=True):
+                st.session_state["selected_page"] = "🏠 Inicio / Marketplace"
                 st.session_state.pop("rol", None)
-                st.session_state.pop("selected_page", None)
                 try:
                     del st.query_params["admin_token"]
                 except Exception:
                     pass
-                st.rerun()
+                st.stop()
     else:
         # SOLO ACCESO CON CONTRASEÑA DE ADMIN
         password = st.text_input("Contraseña de Acceso Administrativo", type="password")
