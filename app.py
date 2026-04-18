@@ -1205,19 +1205,27 @@ if "selected_prefab" in st.query_params and not page_from_query:
         st.error(f"Error mostrando detalle de prefabricada: {e}")
     st.stop()
 
-# Respaldo: si session_state tiene proyecto pendiente y el param no llegó, lo inyectamos
-_ss_goto = st.session_state.pop("_goto_project_v2", None)
-if _ss_goto and "selected_project_v2" not in st.query_params:
-    st.query_params["selected_project_v2"] = _ss_goto
-    st.rerun()
-
+# === PROYECTO ARQUITECTÓNICO — verificar session_state PRIMERO (sin esperar query_params) ===
+# Flujo robusto: session_state es source of truth, query_params es fallback
 if "selected_project_v2" in st.query_params and not page_from_query:
     try:
         project_id = st.query_params["selected_project_v2"]
         detalles_proyecto_v2(project_id)
     except Exception as e:
         st.error(f"Error mostrando detalles del proyecto v2: {e}")
-    st.stop()  # Detener la ejecución para no mostrar el resto de la app
+    st.stop()
+
+# Si session_state tiene proyecto pero query_params NO (race condition en asignación)
+# renderizar DIRECTAMENTE sin esperar otro rerun
+_ss_goto = st.session_state.get("_goto_project_v2")
+if _ss_goto and "selected_project_v2" not in st.query_params:
+    try:
+        detalles_proyecto_v2(_ss_goto)
+        st.session_state.pop("_goto_project_v2", None)
+    except Exception as e:
+        st.error(f"Error mostrando detalles del proyecto v2 (via session): {e}")
+    st.stop()
+
 
 if "selected_plot" in st.query_params and not page_from_query:
     try:

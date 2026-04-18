@@ -421,9 +421,10 @@ def show_project_detail_page(project_id: str):
                                 else:
                                     st.warning(f"⚠️ Necesita parcela ≥ {proyecto['m2_parcela_minima']} m²")
                             
-                            # Botón de detalles
+                            # Botón de detalles — atomic nav update usando session_state
                             if st.button("Ver Detalles", key=f"similar_detail_{proyecto['id']}", width='stretch'):
-                                st.query_params["selected_project"] = proyecto['id']
+                                st.session_state["_goto_project_v2"] = proyecto['id']
+                                st.query_params["selected_project_v2"] = str(proyecto['id'])
                                 st.rerun()
                             
                             st.markdown("---")
@@ -733,9 +734,10 @@ def show_advanced_project_search(client_email=None):
                         else:
                             st.warning(f"⚠️ Necesita parcela ≥ {proyecto['m2_parcela_minima']} m²")
                     
-                    # Botón de detalles
+                    # Botón de detalles — atomic nav update usando session_state
                     if st.button("Ver Detalles", key=f"search_detail_{proyecto['id']}", width='stretch'):
-                        st.query_params["selected_project"] = proyecto['id']
+                        st.session_state["_goto_project_v2"] = proyecto['id']
+                        st.query_params["selected_project_v2"] = str(proyecto['id'])
                         st.rerun()
                     
                     st.markdown("---")

@@ -1483,9 +1483,10 @@ def show_selected_project_panel(client_email, project_id):
                             else:
                                 st.warning(f"⚠️ Necesita parcela ≥ {proyecto['m2_parcela_minima']} m²")
 
-                        # Botón de detalles
+                        # Botón de detalles — atomic nav update usando session_state
                         if st.button("Ver Detalles", key=f"similar_detail_{proyecto['id']}", use_container_width=True):
-                            st.query_params["selected_project"] = proyecto['id']
+                            st.session_state["_goto_project_v2"] = proyecto['id']
+                            st.query_params["selected_project_v2"] = str(proyecto['id'])
                             st.rerun()
 
                         st.markdown("---")
@@ -1532,9 +1533,10 @@ def show_client_interests(client_email):
                 st.markdown(f"**📏 Superficie:** {m2} m²" if m2 else "**📏 Superficie:** N/D")
                 st.markdown(f"**💰 Precio:** €{price:,.0f}" if price else "**💰 Precio:** N/D")
                 st.markdown(f"**📅 Guardado:** {saved_at}")
-                
+
                 if st.button("Ver Detalles", key=f"view_interest_{project_id}"):
-                    st.query_params["selected_project"] = project_id
+                    st.session_state["_goto_project_v2"] = project_id
+                    st.query_params["selected_project_v2"] = str(project_id)
                     st.rerun()
 
 def show_client_transactions(client_email):
@@ -3160,9 +3162,10 @@ def show_advanced_project_search(client_email):
                         else:
                             st.warning(f"⚠️ Necesita parcela ≥ {proyecto['m2_parcela_minima']} m²")
                     
-                    # Botón de detalles
+                    # Botón de detalles — atomic nav update usando session_state
                     if st.button("Ver Detalles", key=f"search_detail_{proyecto['id']}", use_container_width=True):
-                        st.query_params["selected_project"] = proyecto['id']
+                        st.session_state["_goto_project_v2"] = proyecto['id']
+                        st.query_params["selected_project_v2"] = str(proyecto['id'])
                         st.rerun()
                     
                     st.markdown("---")
