@@ -1135,6 +1135,27 @@ if st.query_params.get("pago") == "ok" and st.query_params.get("page") in ("dise
         except Exception:
             # Stripe no disponible en local — simular pago confirmado
             st.session_state["pago_completado"] = True
+
+    # Si viene desde nueva pestaña (Stripe redirect), recuperar proyecto de BD
+    if not st.session_state.get("ai_house_requirements"):
+        try:
+            import sqlite3 as _sq6_recover, json as _js6_recover
+            from modules.marketplace.utils import DB_PATH as _DBP6_recover
+            _conn6_r = _sq6_recover.connect(_DBP6_recover, timeout=15)
+            _conn6_r.execute("PRAGMA journal_mode=WAL")
+            _client_email_r = st.session_state.get("client_email") or st.session_state.get("user_email") or ""
+            if _client_email_r:
+                _cur6_r = _conn6_r.cursor()
+                _cur6_r.execute(
+                    "SELECT req_json FROM ai_projects WHERE client_email=? ORDER BY created_at DESC LIMIT 1",
+                    (_client_email_r,))
+                _row6_r = _cur6_r.fetchone()
+                if _row6_r and _row6_r[0]:
+                    st.session_state["ai_house_requirements"] = _js6_recover.loads(_row6_r[0])
+            _conn6_r.close()
+        except Exception:
+            pass
+
     # Redirigir al diseñador (Step 6) donde están todos los descargables
     st.session_state["selected_page"]  = "Diseñador de Vivienda"
     st.session_state["_nav_radio"]     = "Diseñador de Vivienda"

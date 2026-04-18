@@ -5278,6 +5278,28 @@ def render_step6_pago():
         # Crear sesión Stripe sólo una vez (almacenada en session_state)
         if _stripe_key_ok and _all_items_6 and not st.session_state.get("stripe_session_id_s6"):
             try:
+                # ── Guardar proyecto en BD ANTES de Stripe (para recuperar si viene del redirect) ───
+                import sqlite3 as _sq6_pre, json as _js6_pre, datetime as _dt6_pre
+                from modules.marketplace.utils import DB_PATH as _DBP6_pre
+                _conn6_pre = _sq6_pre.connect(_DBP6_pre, timeout=15)
+                _conn6_pre.execute("PRAGMA journal_mode=WAL")
+                _req_pre_json = _js6_pre.dumps(st.session_state.get("ai_house_requirements") or {})
+                _conn6_pre.execute("""
+                    INSERT OR REPLACE INTO ai_projects
+                    (client_email, project_name, total_area, total_cost, services_json, style,
+                     energy_label, created_at, status, req_json)
+                    VALUES (?,?,?,?,?,?,?,?,?,?)""",
+                    (st.session_state.get("client_email",""),
+                     req.get("nombre_proyecto","Proyecto ArchiRapid"),
+                     float(total_area), float(total_cost),
+                     _js6_pre.dumps({"doc": _doc_detail_6, "svc": _svc_detail_6, "total_iva": _total_iva_6}),
+                     style, energy_label, _dt6_pre.datetime.now().isoformat(),
+                     "pendiente_pago", _req_pre_json))
+                _conn6_pre.commit(); _conn6_pre.close()
+            except Exception:
+                pass
+
+            try:
                 from modules.stripe_utils import create_custom_session as _ccs6, _get_base_url as _gbu6
                 _base6 = _gbu6()
                 _stripe_items_6 = [
