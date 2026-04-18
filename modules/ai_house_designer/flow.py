@@ -5175,6 +5175,7 @@ def render_step6_pago():
 </table>""", unsafe_allow_html=True)
     else:
         st.info("No has seleccionado documentación ni servicios en el paso anterior. Vuelve a Servicios para seleccionarlos.")
+        st.stop()
 
     st.caption("⚠️ Aviso MVP: Los importes mostrados son orientativos. El IVA real puede variar. "
                "Este documento no tiene validez fiscal.")
