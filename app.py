@@ -1153,8 +1153,9 @@ if st.query_params.get("pago") == "ok" and st.query_params.get("page") in ("dise
                 if _row6_r and _row6_r[0]:
                     st.session_state["ai_house_requirements"] = _js6_recover.loads(_row6_r[0])
             _conn6_r.close()
-        except Exception:
-            pass
+        except Exception as _ex6_recover:
+            import streamlit as _st_err_recover
+            _st_err_recover.error(f"🔴 Error recuperando proyecto: {str(_ex6_recover)[:200]}")
 
     # Redirigir al diseñador (Step 6) donde están todos los descargables
     st.session_state["selected_page"]  = "Diseñador de Vivienda"

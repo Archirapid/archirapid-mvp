@@ -5296,8 +5296,8 @@ def render_step6_pago():
                      style, energy_label, _dt6_pre.datetime.now().isoformat(),
                      "pendiente_pago", _req_pre_json))
                 _conn6_pre.commit(); _conn6_pre.close()
-            except Exception:
-                pass
+            except Exception as _ex6_pre:
+                st.warning(f"⚠️ Error guardando proyecto: {str(_ex6_pre)[:150]}")
 
             try:
                 from modules.stripe_utils import create_custom_session as _ccs6, _get_base_url as _gbu6
