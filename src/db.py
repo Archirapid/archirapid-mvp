@@ -958,6 +958,13 @@ _PG_ALTER_MIGRATIONS = [
     "ALTER TABLE ventas_proyectos ALTER COLUMN proyecto_id TYPE TEXT USING proyecto_id::TEXT",
     "ALTER TABLE ventas_proyectos ADD COLUMN IF NOT EXISTS sha256_memoria TEXT",
     "ALTER TABLE ventas_proyectos ADD COLUMN IF NOT EXISTS sha256_planos TEXT",
+    # Documentación técnica completa (CTE/LOE) — projects y proyectos_tfg
+    "ALTER TABLE projects ADD COLUMN IF NOT EXISTS presupuesto_pdf TEXT",
+    "ALTER TABLE projects ADD COLUMN IF NOT EXISTS estudio_seguridad_pdf TEXT",
+    "ALTER TABLE projects ADD COLUMN IF NOT EXISTS especificaciones_pdf TEXT",
+    "ALTER TABLE proyectos_tfg ADD COLUMN IF NOT EXISTS presupuesto_pdf TEXT",
+    "ALTER TABLE proyectos_tfg ADD COLUMN IF NOT EXISTS estudio_seguridad_pdf TEXT",
+    "ALTER TABLE proyectos_tfg ADD COLUMN IF NOT EXISTS especificaciones_pdf TEXT",
 ]
 
 
@@ -1468,6 +1475,18 @@ def ensure_tables():
             c.execute("ALTER TABLE projects ADD COLUMN status TEXT DEFAULT 'activo'")
         except sqlite3.OperationalError:
             pass
+
+        # ── Documentación técnica completa (CTE/LOE) ──────────────────────────
+        for _col in ("presupuesto_pdf", "estudio_seguridad_pdf", "especificaciones_pdf"):
+            try:
+                c.execute(f"ALTER TABLE projects ADD COLUMN {_col} TEXT")
+            except sqlite3.OperationalError:
+                pass
+        for _col in ("presupuesto_pdf", "estudio_seguridad_pdf", "especificaciones_pdf"):
+            try:
+                c.execute(f"ALTER TABLE proyectos_tfg ADD COLUMN {_col} TEXT")
+            except sqlite3.OperationalError:
+                pass
 
         # ── Migraciones para intranet: status e is_active en todas las tablas ─────
         for _tbl, _status_def, _is_act_def in [

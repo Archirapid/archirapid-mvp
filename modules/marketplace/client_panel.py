@@ -856,9 +856,10 @@ def show_selected_project_panel(client_email, project_id):
     conn = db_conn()
     cursor = conn.cursor()
     cursor.execute("""
-        SELECT id, architect_id, title, description, area_m2, price, 
-               foto_principal, galeria_fotos, memoria_pdf, planos_pdf, 
-               planos_dwg, modelo_3d_glb, vr_tour, ocr_text, created_at
+        SELECT id, architect_id, title, description, area_m2, price,
+               foto_principal, galeria_fotos, memoria_pdf, planos_pdf,
+               planos_dwg, modelo_3d_glb, vr_tour, ocr_text, created_at,
+               presupuesto_pdf, estudio_seguridad_pdf, especificaciones_pdf
         FROM projects
         WHERE id = ?
     """, (project_id,))
@@ -880,6 +881,13 @@ def show_selected_project_panel(client_email, project_id):
                 galeria_fotos = row[7]
         except:
             galeria_fotos = []
+
+    # Helper para acceso seguro a índices (sin len() que falla con _CompatRow de Supabase)
+    def _safe_row_get(idx, default=None):
+        try:
+            return row[idx]
+        except (IndexError, KeyError, TypeError):
+            return default
 
     # Convertir a dict con todos los campos (mapeando a los nombres esperados)
     project = {
@@ -905,8 +913,13 @@ def show_selected_project_panel(client_email, project_id):
         'galeria_fotos': galeria_fotos,
         'memoria_pdf': row[8],
         'planos_pdf': row[9],
+        'planos_dwg': row[10],
         'modelo_3d_glb': row[11],
         'vr_tour': row[12],
+        # Documentación técnica CTE/LOE — acceso seguro
+        'presupuesto_pdf':       _safe_row_get(15),
+        'estudio_seguridad_pdf': _safe_row_get(16),
+        'especificaciones_pdf':  _safe_row_get(17),
         'property_type': 'Residencial',
         'estimated_cost': row[5] * 0.8 if row[5] else 0,
         'price_memoria': 1800,
@@ -997,6 +1010,16 @@ def show_selected_project_panel(client_email, project_id):
     # Arquitecto
     if project['architect_name']:
         st.write(f"**Arquitecto:** {project['architect_name']}")
+
+    # Badge documentación incluida en el proyecto
+    _docs_disponibles = []
+    if project.get('memoria_pdf'):           _docs_disponibles.append("📄 Memoria PDF")
+    if project.get('planos_dwg'):                _docs_disponibles.append("📐 Planos editables DWG")
+    if project.get('presupuesto_pdf'):       _docs_disponibles.append("💶 Presupuesto y mediciones")
+    if project.get('estudio_seguridad_pdf'): _docs_disponibles.append("🦺 Estudio de seguridad y salud")
+    if project.get('especificaciones_pdf'):  _docs_disponibles.append("📋 Especificaciones técnicas NNEE")
+    if _docs_disponibles:
+        st.info(f"**📎 Documentación técnica incluida en este proyecto:** {' · '.join(_docs_disponibles)}")
 
     st.markdown("---")
 
@@ -1260,6 +1283,81 @@ def show_selected_project_panel(client_email, project_id):
                 else:
                     st.button("🏗️ Modelo 3D", disabled=True, use_container_width=True,
                               help="Archivo no disponible")
+
+            # ── Documentación técnica CTE/LOE ────────────────────────────────
+            _cte_docs = [
+                ("planos_dwg",            "📐 Planos editables DWG",          "application/octet-stream"),
+                ("presupuesto_pdf",       "💶 Presupuesto y mediciones",       "application/pdf"),
+                ("estudio_seguridad_pdf", "🦺 Estudio seguridad y salud",      "application/pdf"),
+                ("especificaciones_pdf",  "📋 Especificaciones técnicas NNEE", "application/pdf"),
+            ]
+            # Filtrar solo docs que existen y tienen valor
+            _cte_disponibles = [(k, lbl, mime) for k, lbl, mime in _cte_docs
+                               if project.get(k) and str(project.get(k)).strip()]
+            if _cte_disponibles:
+                st.markdown("**📎 Documentación técnica CTE/LOE incluida:**")
+                _cte_cols = st.columns(len(_cte_disponibles))
+                for _ci, (field, label, mime) in enumerate(_cte_disponibles):
+                    _doc_val = str(project[field]).replace('\\', '/')
+                    with _cte_cols[_ci]:
+                        if _doc_val.startswith(('http://', 'https://')):
+                            # URL Supabase: enlace directo de descarga
+                            st.link_button(label, url=_doc_val, use_container_width=True)
+                        elif os.path.exists(_doc_val):
+                            with open(_doc_val, "rb") as _df:
+                                st.download_button(label, data=_df,
+                                    file_name=os.path.basename(_doc_val),
+                                    mime=mime, use_container_width=True,
+                                    key=f"dl_cte_{field}_{project['id']}")
+                        else:
+                            st.button(label, disabled=True, use_container_width=True,
+                                      help="Archivo no disponible")
+            else:
+                st.caption("⚠️ Este proyecto incluye Memoria PDF, Planos CAD y Modelo 3D. Documentación técnica adicional (Presupuesto, ESS, NNEE) no disponible en esta versión.")
+
+            # ── Información completa de qué contiene el proyecto ──────────────
+            st.markdown("---")
+            with st.expander("📋 ¿Qué contiene este proyecto? — Descripción completa de documentación", expanded=False):
+                st.markdown(f"""
+## 📦 Contenido del Proyecto: {project.get('title', 'Proyecto')}
+
+**Descripción:** {project.get('description', 'Sin descripción')}
+
+---
+
+### 📄 Documentación Incluida
+
+| Documento | Descripción | Estado |
+|-----------|-------------|--------|
+| 📄 **Memoria PDF** | Documentación técnica descriptiva del proyecto | {'✅ Incluido' if project.get('memoria_pdf') else '❌ No disponible'} |
+| 📐 **Planos editables DWG** | Archivos CAD completos para edición técnica | {'✅ Incluido' if project.get('planos_dwg') else '❌ No disponible'} |
+| 🏗️ **Modelo 3D** | Modelo 3D interactivo del proyecto | {'✅ Incluido' if project.get('modelo_3d_glb') else '❌ No disponible'} |
+| 💶 **Presupuesto y mediciones** | Presupuesto detallado por capítulos de obra | {'✅ Incluido' if project.get('presupuesto_pdf') else '❌ No disponible'} |
+| 🦺 **Estudio básico de seguridad y salud** | ESS según RD 1627/1997 | {'✅ Incluido' if project.get('estudio_seguridad_pdf') else '❌ No disponible'} |
+| 📋 **Especificaciones técnicas NNEE** | Pliego de condiciones y especificaciones técnicas | {'✅ Incluido' if project.get('especificaciones_pdf') else '❌ No disponible'} |
+
+---
+
+### 💡 Notas Importantes
+
+- ✅ **Proyecto completo (PDF + CAD):** Incluye memoria, planos editables DWG, modelo 3D y documentación técnica
+- 📋 **Documentación técnica CTE/LOE:** Presupuesto, ESS y especificaciones según normativa española
+- 🔒 **Certificación:** Cada descarga incluye hash SHA-256 para autenticidad
+- ⚙️ **Compatibilidad:** Los archivos DWG son editable con AutoCAD, LibreCAD, etc.
+
+### ⚠️ Consideraciones Legales
+
+Este es un proyecto orientativo. Cualquier uso constructivo requiere:
+- ✅ Visado de arquitecto colegiado
+- ✅ Dirección técnica/facultativa
+- ✅ Adaptación a normativa local y municipal
+- ✅ Estudios técnicos adicionales si es necesario (geotecnia, acústica, etc.)
+
+---
+
+**Descargas disponibles arriba ↑**
+                """)
+
         else:
             st.info("💳 Selecciona el producto que deseas adquirir:")
 

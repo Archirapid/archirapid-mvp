@@ -597,6 +597,25 @@ def _mostrar_form_subir_proyecto(estudiante: dict):
             "Paquete completo ZIP (si prefieres subir todo junto)", type=["zip"]
         )
 
+        st.markdown("**📋 Documentación Técnica CTE/LOE (opcional)**")
+        st.caption("Añadir presupuesto, ESS y NNEE aumenta el valor del proyecto y facilita la revisión.")
+        doc_col1, doc_col2, doc_col3 = st.columns(3)
+        with doc_col1:
+            archivo_presupuesto = st.file_uploader(
+                "Presupuesto y mediciones (PDF)", type=["pdf"], key="est_presupuesto",
+                help="Presupuesto detallado por capítulos"
+            )
+        with doc_col2:
+            archivo_estudio_seg = st.file_uploader(
+                "Estudio básico seg. y salud (PDF)", type=["pdf"], key="est_seguridad",
+                help="ESS según RD 1627/1997"
+            )
+        with doc_col3:
+            archivo_specs = st.file_uploader(
+                "Especificaciones técnicas NNEE (PDF)", type=["pdf"], key="est_specs",
+                help="Pliego de condiciones / especificaciones técnicas"
+            )
+
         st.markdown("---")
         acepta = st.checkbox(
             "Confirmo que este proyecto ha sido presentado y evaluado "
@@ -619,6 +638,7 @@ def _mostrar_form_subir_proyecto(estudiante: dict):
             imagen_portada, fotos_extra,
             archivo_planos, archivo_memoria,
             archivo_cad, archivo_vr, archivo_zip,
+            archivo_presupuesto, archivo_estudio_seg, archivo_specs,
         )
 
 
@@ -629,6 +649,7 @@ def _procesar_subida_proyecto(
     imagen_portada, fotos_extra,
     archivo_planos, archivo_memoria,
     archivo_cad, archivo_vr, archivo_zip,
+    archivo_presupuesto=None, archivo_estudio_seg=None, archivo_specs=None,
 ):
     with st.spinner("Subiendo archivos... puede tardar unos segundos."):
         try:
@@ -639,6 +660,9 @@ def _procesar_subida_proyecto(
             url_cad     = save_upload(archivo_cad,     prefix="cad_tfg")     if archivo_cad     else None
             url_vr      = save_upload(archivo_vr,      prefix="vr_tfg")      if archivo_vr      else None
             url_zip     = save_upload(archivo_zip,     prefix="zip_tfg")     if archivo_zip     else None
+            url_presupuesto = save_upload(archivo_presupuesto, prefix="ppto_tfg")  if archivo_presupuesto else None
+            url_estudio_seg = save_upload(archivo_estudio_seg, prefix="seg_tfg")   if archivo_estudio_seg else None
+            url_specs       = save_upload(archivo_specs,       prefix="specs_tfg") if archivo_specs       else None
 
             # Fotos extra (lista)
             fotos_list = []
@@ -667,9 +691,10 @@ def _procesar_subida_proyecto(
              provincia, ciudad, archivo_planos_url, archivo_memoria_url,
              archivo_renders_url, imagen_portada_url, hash_documento,
              estado, activo, comision_archirapid, comision_estudiante,
-             ejecutable, validado, archivo_cad_url, archivo_vr_url, fotos_urls)
+             ejecutable, validado, archivo_cad_url, archivo_vr_url, fotos_urls,
+             presupuesto_pdf, estudio_seguridad_pdf, especificaciones_pdf)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pendiente', 0,
-                    40.0, 60.0, ?, 0, ?, ?, ?)
+                    40.0, 60.0, ?, 0, ?, ?, ?, ?, ?, ?)
         """, (
             estudiante["id"], estudiante["email"], titulo, descripcion,
             superficie, tipologia, precio, modalidad, provincia, ciudad,
@@ -677,6 +702,7 @@ def _procesar_subida_proyecto(
             url_zip,          # archivo_renders_url reutilizado para ZIP si no hay renders separados
             url_portada, hash_doc,
             ejecutable, url_cad, url_vr, fotos_json,
+            url_presupuesto, url_estudio_seg, url_specs,
         ))
         conn.commit()
     except Exception as e:

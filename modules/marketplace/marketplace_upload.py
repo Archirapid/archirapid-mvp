@@ -32,6 +32,7 @@ import time
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime
 from .data_access import save_proyecto, get_usuario
+from .utils import save_upload
 from .documentacion import generar_memoria_constructiva, generar_presupuesto_estimado
 from src import db
 from .export_ops import generar_paquete_descarga
@@ -156,6 +157,28 @@ def show_project_upload_form(arquitecto_id: int) -> Optional[Dict]:
         with col_files2:
             planos_cad = st.file_uploader("Planos CAD (máx. 3)", type=ALLOWED_EXTENSIONS["cad"], help="DXF, DWG, SVG", accept_multiple_files=True)
             distribucion_json = st.file_uploader("Distribución (JSON)", type=['json'], help="Opcional - distribución de habitaciones")
+
+        st.markdown("**📋 Documentación Técnica CTE/LOE (opcional pero recomendado)**")
+        st.caption("Cuanta más documentación, más valor tiene el proyecto y mayor visibilidad en el catálogo.")
+        doc_col1, doc_col2, doc_col3 = st.columns(3)
+        with doc_col1:
+            presupuesto_pdf = st.file_uploader(
+                "Presupuesto y mediciones (PDF)",
+                type=["pdf"], key="up_presupuesto",
+                help="Presupuesto detallado por capítulos y mediciones"
+            )
+        with doc_col2:
+            estudio_seguridad_pdf = st.file_uploader(
+                "Estudio básico seguridad y salud (PDF)",
+                type=["pdf"], key="up_seguridad",
+                help="ESS según RD 1627/1997"
+            )
+        with doc_col3:
+            especificaciones_pdf = st.file_uploader(
+                "Especificaciones técnicas NNEE (PDF)",
+                type=["pdf"], key="up_specs",
+                help="Pliego de condiciones / especificaciones técnicas"
+            )
         
         # Características arquitectónicas
         st.markdown("---")
@@ -190,7 +213,10 @@ def show_project_upload_form(arquitecto_id: int) -> Optional[Dict]:
                     'modelo_3d': modelo_3d,
                     'renders': renders,
                     'planos_cad': planos_cad,
-                    'distribucion_json': distribucion_json
+                    'distribucion_json': distribucion_json,
+                    'presupuesto_pdf': presupuesto_pdf,
+                    'estudio_seguridad_pdf': estudio_seguridad_pdf,
+                    'especificaciones_pdf': especificaciones_pdf,
                 },
                 characteristics={
                     'habitaciones': habitaciones,
@@ -253,6 +279,13 @@ def _process_project_upload(arquitecto_id: int, title: str, description: str, pr
                 if cad_path:
                     cad_paths.append(cad_path)
 
+        # Subir documentación técnica CTE/LOE a Supabase (opcional)
+        url_presupuesto = save_upload(files.get('presupuesto_pdf'), prefix="presupuesto_arq") if files.get('presupuesto_pdf') else None
+        url_estudio_seg = save_upload(files.get('estudio_seguridad_pdf'), prefix="seguridad_arq") if files.get('estudio_seguridad_pdf') else None
+        url_specs       = save_upload(files.get('especificaciones_pdf'), prefix="specs_arq")     if files.get('especificaciones_pdf') else None
+        # planos_dwg: primer archivo CAD subido a Supabase
+        url_planos_dwg  = save_upload(files['planos_cad'][0], prefix="dwg_arq") if files.get('planos_cad') else None
+
         # Preparar datos del proyecto
         project_id = f"p_{timestamp}_{arquitecto_id}"
         
@@ -293,9 +326,14 @@ def _process_project_upload(arquitecto_id: int, title: str, description: str, pr
             # Rutas de archivos
             'memoria_pdf': saved_files['memoria_pdf_path'],
             'cad_dwg_path': json.dumps(cad_paths) if cad_paths else None,
+            'planos_dwg': url_planos_dwg,
             'imagenes_path': render_paths[0] if render_paths else None,
             # Guardar TODAS las imágenes en la galería (la primera será la principal)
             'galeria_fotos': json.dumps(render_paths),
+            # Documentación técnica CTE/LOE (Supabase)
+            'presupuesto_pdf': url_presupuesto,
+            'estudio_seguridad_pdf': url_estudio_seg,
+            'especificaciones_pdf': url_specs,
             # Datos adicionales
             'autor_tipo': 'arquitecto',
             'autor_id': arquitecto_id,

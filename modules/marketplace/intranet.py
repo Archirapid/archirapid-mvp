@@ -837,6 +837,18 @@ def main():
                                 with st.expander("Ver descripción"):
                                     st.write(proj['description'])
 
+                            # Documentación técnica CTE/LOE
+                            _doc_links = []
+                            if proj.get('memoria_pdf'):      _doc_links.append(f"[📄 Memoria]({proj['memoria_pdf']})")
+                            if proj.get('planos_dwg'):       _doc_links.append(f"[📐 Planos DWG]({proj['planos_dwg']})")
+                            if proj.get('presupuesto_pdf'):  _doc_links.append(f"[💶 Presupuesto]({proj['presupuesto_pdf']})")
+                            if proj.get('estudio_seguridad_pdf'): _doc_links.append(f"[🦺 ESS]({proj['estudio_seguridad_pdf']})")
+                            if proj.get('especificaciones_pdf'):  _doc_links.append(f"[📋 NNEE]({proj['especificaciones_pdf']})")
+                            if _doc_links:
+                                st.markdown("**📎 Documentación CTE/LOE:** " + " · ".join(_doc_links))
+                            else:
+                                st.caption("Sin documentación técnica adicional")
+
                         with _pj2:
                             st.markdown("**⚙️ Cambiar estado**")
                             _pb1, _pb2, _pb3 = st.columns(3)
@@ -3746,7 +3758,9 @@ def _admin_proyectos_tfg():
                    p.estado, p.archivo_planos_url, p.imagen_portada_url,
                    p.hash_documento, p.created_at,
                    COALESCE(e.nombre_completo, p.email_estudiante) as nombre_est,
-                   COALESCE(e.universidad, '—') as universidad
+                   COALESCE(e.universidad, '—') as universidad,
+                   p.presupuesto_pdf, p.estudio_seguridad_pdf, p.especificaciones_pdf,
+                   p.archivo_memoria_url, p.archivo_cad_url
             FROM proyectos_tfg p
             LEFT JOIN estudiantes e ON p.email_estudiante = e.email
             ORDER BY
@@ -3762,9 +3776,15 @@ def _admin_proyectos_tfg():
 
     for r in rows:
         id_, titulo, email, precio, modalidad, tipologia, provincia, estado, \
-            url_planos, url_portada, hash_doc, fecha, nombre_est, universidad = (
+            url_planos, url_portada, hash_doc, fecha, nombre_est, universidad, \
+            url_presupuesto, url_estudio_seg, url_specs, url_memoria, url_cad = (
                 r[0], r[1], r[2], r[3], r[4], r[5], r[6],
-                r[7], r[8], r[9], r[10], r[11], r[12], r[13]
+                r[7], r[8], r[9], r[10], r[11], r[12], r[13],
+                r[14] if len(r) > 14 else None,
+                r[15] if len(r) > 15 else None,
+                r[16] if len(r) > 16 else None,
+                r[17] if len(r) > 17 else None,
+                r[18] if len(r) > 18 else None,
             )
         icono = "⏳" if estado == "pendiente" else ("✅" if estado == "aprobado" else "❌")
         with st.expander(f"{icono} {titulo} — {precio}€ ({estado}) | {nombre_est}"):
@@ -3774,8 +3794,18 @@ def _admin_proyectos_tfg():
             st.write(f"**Subido:** {str(fecha)[:10]}")
             if hash_doc:
                 st.caption(f"SHA-256: {str(hash_doc)[:32]}...")
-            if url_planos:
-                st.markdown(f"[📐 Ver planos]({url_planos})")
+            # Documentos adjuntos
+            docs = []
+            if url_planos:     docs.append(f"[📐 Planos]({url_planos})")
+            if url_memoria:    docs.append(f"[📄 Memoria]({url_memoria})")
+            if url_cad:        docs.append(f"[📎 CAD]({url_cad})")
+            if url_presupuesto: docs.append(f"[💶 Presupuesto]({url_presupuesto})")
+            if url_estudio_seg: docs.append(f"[🦺 ESS]({url_estudio_seg})")
+            if url_specs:       docs.append(f"[📋 NNEE]({url_specs})")
+            if docs:
+                st.markdown("**Documentación:** " + " · ".join(docs))
+            else:
+                st.caption("Sin documentos adjuntos")
 
             if estado == "pendiente":
                 col1, col2 = st.columns(2)
