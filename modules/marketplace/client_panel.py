@@ -890,14 +890,26 @@ def show_selected_project_panel(client_email, project_id):
         except (IndexError, KeyError, TypeError):
             return default
 
+    # Helper para conversión segura de valores numéricos
+    def _safe_float(val, default=0.0):
+        try:
+            if val is None:
+                return default
+            return float(val)
+        except (ValueError, TypeError):
+            return default
+
     # Convertir a dict con todos los campos (mapeando a los nombres esperados)
+    _price = _safe_float(row[5])
+    _area = _safe_float(row[4])
+
     project = {
         'id': row[0],
         'architect_id': row[1],
-        'title': row[2],
-        'description': row[3],
-        'area_m2': row[4],
-        'price': row[5],
+        'title': row[2] if row[2] else 'Proyecto sin título',
+        'description': row[3] if row[3] else 'Sin descripción',
+        'area_m2': _area,
+        'price': _price,
         'files': {
             'fotos': galeria_fotos,
             'memoria': row[8],
@@ -908,7 +920,7 @@ def show_selected_project_panel(client_email, project_id):
         },
         'created_at': row[14],
         # Mapeos para compatibilidad
-        'm2_construidos': row[4],  # area_m2
+        'm2_construidos': _area,  # area_m2
         'architect_name': 'Arquitecto Demo',  # Placeholder por ahora
         'foto_principal': row[6] if row[6] else (galeria_fotos[0] if galeria_fotos else None),
         'galeria_fotos': galeria_fotos,
@@ -922,7 +934,7 @@ def show_selected_project_panel(client_email, project_id):
         'estudio_seguridad_pdf': _safe_row_get(16),
         'especificaciones_pdf':  _safe_row_get(17),
         'property_type': 'Residencial',
-        'estimated_cost': row[5] * 0.8 if row[5] else 0,
+        'estimated_cost': _price * 0.8 if _price > 0 else 0,
         'price_memoria': 1800,
         'price_cad': 2500,
         'energy_rating': 'A',
@@ -931,11 +943,11 @@ def show_selected_project_panel(client_email, project_id):
         'banos': 2,
         'garaje': True,
         'plantas': 2,
-        'm2_parcela_minima': row[4] / 0.33 if row[4] else 0,
-        'm2_parcela_maxima': row[4] / 0.2 if row[4] else 0,
+        'm2_parcela_minima': _area / 0.33 if _area > 0 else 0,
+        'm2_parcela_maxima': _area / 0.2 if _area > 0 else 0,
         'certificacion_energetica': 'A',
         'tipo_proyecto': 'Residencial',
-        'nombre': row[2]  # Alias para compatibilidad
+        'nombre': row[2] if row[2] else 'Proyecto sin título'  # Alias para compatibilidad
     }
 
     # Título
@@ -1448,8 +1460,14 @@ Cobertura integral para construcción y edificación.
             precio_adicional_copias   = num_copias * 200
             precio_total_adicional    = precio_adicional_servicios + precio_adicional_copias
 
+            # Validación defensiva de precios
+            try:
+                precio_total_adicional = float(max(0, precio_total_adicional))  # No negativo
+            except (ValueError, TypeError):
+                precio_total_adicional = 0
+
             if precio_total_adicional > 0:
-                st.info(f"💰 Costo adicional total: €{precio_total_adicional:,}")
+                st.info(f"💰 Costo adicional total: €{precio_total_adicional:,.0f}")
 
             # ── Helper: construir lista de productos según selección ─────────
             def _build_products_and_qty(base_keys):
@@ -1510,47 +1528,63 @@ Cobertura integral para construcción y edificación.
             _mostrar_servicios_recomendados(_prov_sp)
 
             col1, col2 = st.columns(2)
-            with col1:
-                precio_pdf_final = 1800 + precio_total_adicional
-                if st.button(f"💳 Pagar con Stripe — Memoria PDF €{precio_pdf_final:,}",
+
+            # Validación defensiva previa al pago
+            if not client_email or '@' not in str(client_email):
+                st.warning("⚠️ Email inválido. Por favor, regístrate correctamente para realizar compras.")
+            elif not project_id:
+                st.error("⚠️ ID del proyecto inválido. Por favor, recarga la página.")
+            else:
+                with col1:
+                    precio_pdf_final = max(0, int(1800 + precio_total_adicional))
+                    if st.button(f"💳 Pagar con Stripe — Memoria PDF €{precio_pdf_final:,}",
+                                 use_container_width=True, type="primary"):
+                        try:
+                            from modules.stripe_utils import create_checkout_session as _ccs
+                            _keys, _qty = _build_products_and_qty(["pdf_proyecto"])
+                            _url, _ = _ccs(_keys, project_id, client_email, _success_url, _cancel_url, _qty,
+                                           extra_meta={"services_detail": _servicios_label()})
+                            if _url:
+                                st.session_state[_redir_key] = _url
+                                st.rerun()
+                            else:
+                                st.error("❌ No se pudo generar la sesión de pago. Intenta de nuevo.")
+                        except Exception as _e:
+                            st.error(f"❌ Error iniciando pago: {str(_e)[:100]}")
+
+                with col2:
+                    precio_cad_final = max(0, int(2500 + precio_total_adicional))
+                    if st.button(f"💳 Pagar con Stripe — Planos CAD €{precio_cad_final:,}",
+                                 use_container_width=True, type="primary"):
+                        try:
+                            from modules.stripe_utils import create_checkout_session as _ccs
+                            _keys, _qty = _build_products_and_qty(["planos_cad"])
+                            _url, _ = _ccs(_keys, project_id, client_email, _success_url, _cancel_url, _qty,
+                                           extra_meta={"services_detail": _servicios_label()})
+                            if _url:
+                                st.session_state[_redir_key] = _url
+                                st.rerun()
+                            else:
+                                st.error("❌ No se pudo generar la sesión de pago. Intenta de nuevo.")
+                        except Exception as _e:
+                            st.error(f"❌ Error iniciando pago: {str(_e)[:100]}")
+
+                st.markdown("---")
+                precio_completo_final = max(0, int(4000 + precio_total_adicional))
+                if st.button(f"🛒 Comprar Proyecto Completo — €{precio_completo_final:,}",
                              use_container_width=True, type="primary"):
                     try:
                         from modules.stripe_utils import create_checkout_session as _ccs
-                        _keys, _qty = _build_products_and_qty(["pdf_proyecto"])
+                        _keys, _qty = _build_products_and_qty(["proyecto_completo"])
                         _url, _ = _ccs(_keys, project_id, client_email, _success_url, _cancel_url, _qty,
                                        extra_meta={"services_detail": _servicios_label()})
-                        st.session_state[_redir_key] = _url
-                        st.rerun()
+                        if _url:
+                            st.session_state[_redir_key] = _url
+                            st.rerun()
+                        else:
+                            st.error("❌ No se pudo generar la sesión de pago. Intenta de nuevo.")
                     except Exception as _e:
-                        st.error(f"Error iniciando pago: {_e}")
-
-            with col2:
-                precio_cad_final = 2500 + precio_total_adicional
-                if st.button(f"💳 Pagar con Stripe — Planos CAD €{precio_cad_final:,}",
-                             use_container_width=True, type="primary"):
-                    try:
-                        from modules.stripe_utils import create_checkout_session as _ccs
-                        _keys, _qty = _build_products_and_qty(["planos_cad"])
-                        _url, _ = _ccs(_keys, project_id, client_email, _success_url, _cancel_url, _qty,
-                                       extra_meta={"services_detail": _servicios_label()})
-                        st.session_state[_redir_key] = _url
-                        st.rerun()
-                    except Exception as _e:
-                        st.error(f"Error iniciando pago: {_e}")
-
-            st.markdown("---")
-            precio_completo_final = 4000 + precio_total_adicional
-            if st.button(f"🛒 Comprar Proyecto Completo — €{precio_completo_final:,}",
-                         use_container_width=True, type="primary"):
-                try:
-                    from modules.stripe_utils import create_checkout_session as _ccs
-                    _keys, _qty = _build_products_and_qty(["proyecto_completo"])
-                    _url, _ = _ccs(_keys, project_id, client_email, _success_url, _cancel_url, _qty,
-                                   extra_meta={"services_detail": _servicios_label()})
-                    st.session_state[_redir_key] = _url
-                    st.rerun()
-                except Exception as _e:
-                    st.error(f"Error iniciando pago: {_e}")
+                        st.error(f"❌ Error iniciando pago: {str(_e)[:100]}")
 
             st.caption("🔒 Pago seguro procesado por Stripe · Tarjeta test: 4242 4242 4242 4242 · Cualquier fecha futura · CVC: 123")
 
