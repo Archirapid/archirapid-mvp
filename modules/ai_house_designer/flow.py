@@ -5306,11 +5306,14 @@ def render_step6_pago():
                     {"name": it["label"][:80], "amount_cents": int(it["precio"] * 100), "quantity": 1}
                     for it in _all_items_6
                 ]
+                # Pasar email en URL para que la nueva pestaña (post-Stripe) pueda recuperar del DB
+                import urllib.parse as _up6
+                _email_encoded_6 = _up6.quote(_client_email_6)
                 _s6_url, _s6_sid = _ccs6(
                     line_items=_stripe_items_6,
                     client_email=_client_email_6,
-                    success_url=_base6 + "/?page=disenador&pago=ok",
-                    cancel_url=_base6 + "/?page=disenador&pago=cancel",
+                    success_url=_base6 + f"/?page=disenador&pago=ok&email={_email_encoded_6}",
+                    cancel_url=_base6 + f"/?page=disenador&pago=cancel&email={_email_encoded_6}",
                     metadata={
                         "project": req.get("nombre_proyecto", "ArchiRapid Project"),
                         "total_eur": str(_total_iva_6),

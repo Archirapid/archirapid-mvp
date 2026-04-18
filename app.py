@@ -1136,14 +1136,16 @@ if st.query_params.get("pago") == "ok" and st.query_params.get("page") in ("dise
             # Stripe no disponible en local — simular pago confirmado
             st.session_state["pago_completado"] = True
 
-    # Si viene desde nueva pestaña (Stripe redirect), recuperar proyecto de BD
+    # Si viene desde nueva pestaña (Stripe redirect), recuperar proyecto de BD usando email de URL
     if not st.session_state.get("ai_house_requirements"):
         try:
-            import sqlite3 as _sq6_recover, json as _js6_recover
+            import sqlite3 as _sq6_recover, json as _js6_recover, urllib.parse as _up6_recover
             from modules.marketplace.utils import DB_PATH as _DBP6_recover
             _conn6_r = _sq6_recover.connect(_DBP6_recover, timeout=15)
             _conn6_r.execute("PRAGMA journal_mode=WAL")
-            _client_email_r = st.session_state.get("client_email") or st.session_state.get("user_email") or ""
+            # El email viene en query_params desde Stripe redirect
+            _client_email_r = _up6_recover.unquote(st.query_params.get("email", "")) or \
+                              st.session_state.get("client_email") or st.session_state.get("user_email") or ""
             if _client_email_r:
                 _cur6_r = _conn6_r.cursor()
                 _cur6_r.execute(
@@ -1152,6 +1154,7 @@ if st.query_params.get("pago") == "ok" and st.query_params.get("page") in ("dise
                 _row6_r = _cur6_r.fetchone()
                 if _row6_r and _row6_r[0]:
                     st.session_state["ai_house_requirements"] = _js6_recover.loads(_row6_r[0])
+                    st.session_state["client_email"] = _client_email_r  # También guardar email para consistencia
             _conn6_r.close()
         except Exception as _ex6_recover:
             import streamlit as _st_err_recover
