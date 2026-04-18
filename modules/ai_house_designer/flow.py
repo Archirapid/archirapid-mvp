@@ -5391,47 +5391,51 @@ def render_step6_pago():
 
         st.markdown("### 📥 Descarga Tu Proyecto Completo")
 
-    # ── Botón de descarga ZIP (siempre visible, sin muro de pago) ─────────────
-    st.markdown("""
+        # ── Botón de descarga ZIP (SOLO después de pagar) ─────────────────────
+        st.markdown("""
 <div style="background:rgba(37,99,235,0.12);border:1px solid rgba(37,99,235,0.35);
             border-radius:12px;padding:16px 20px;margin-bottom:16px;">
   <div style="font-weight:800;color:#F8FAFC;font-size:15px;margin-bottom:8px;">
-    📦 Contenido del ZIP del Proyecto
+    📦 Contenido del ZIP Completo del Proyecto
   </div>
   <ul style="color:#CBD5E1;font-size:13px;margin:0;padding-left:20px;line-height:1.9;">
-    <li>📄 Memoria descriptiva (PDF)</li>
-    <li>📊 Mediciones y presupuesto (Excel)</li>
-    <li>🗺️ Plano de planta (PNG)</li>
-    <li>🏗️ Archivo BIM/IFC (IFC2x3)</li>
-    <li>📸 Vistas 3D (si capturaste en el editor)</li>
-    <li>📋 Informe eficiencia energética</li>
+    <li>📄 Memoria descriptiva completa (PDF profesional)</li>
+    <li>📊 Mediciones, presupuesto y partidas (Excel detallado)</li>
+    <li>🗺️ Planos de planta 2D (PNG escala)</li>
+    <li>🏗️ Planos de cimientos y estructural</li>
+    <li>📐 Planos de MEP (fontanería, electricidad, saneamiento)</li>
+    <li>🧊 Modelo 3D completo (GLB/GLTF)</li>
+    <li>📸 Vistas 3D y renders (PNG)</li>
+    <li>📋 Informe completo de eficiencia energética</li>
     <li>🌿 Estimación huella de carbono</li>
+    <li>💎 Gemelo digital (JSON layout Babylon + materiales)</li>
+    <li>📋 Partidas presupuestarias detalladas</li>
   </ul>
 </div>""", unsafe_allow_html=True)
 
-    try:
-        _plot_data = st.session_state.get("design_plot_data", {})
-        _design_d  = f["design_data"]
-        _zip_bytes, _zip_filename, _zip_sha256_s6 = generar_zip_proyecto(
-            req=req,
-            design_data=_design_d,
-            plot_data=_plot_data,
-            partidas=[(p[0], p[1], p[2], p[3]) for p in partidas],
-            subsidy_total=subsidy_total,
-            energy_label=energy_label,
-        )
-        st.download_button(
-            label="📦 DESCARGAR TODO EL PROYECTO (ZIP)",
-            data=_zip_bytes,
-            file_name=_zip_filename,
-            mime="application/zip",
-            type="primary",
-            width='stretch',
-        )
-        st.caption("Incluye: Memoria descriptiva · Mediciones Excel · Plano 2D · Datos catastro · Layout 3D")
+        try:
+            _plot_data = st.session_state.get("design_plot_data", {})
+            _design_d  = f["design_data"]
+            _zip_bytes, _zip_filename, _zip_sha256_s6 = generar_zip_proyecto(
+                req=req,
+                design_data=_design_d,
+                plot_data=_plot_data,
+                partidas=[(p[0], p[1], p[2], p[3]) for p in partidas],
+                subsidy_total=subsidy_total,
+                energy_label=energy_label,
+            )
+            st.download_button(
+                label="📦 DESCARGAR TODO EL PROYECTO COMPLETO (ZIP)",
+                data=_zip_bytes,
+                file_name=_zip_filename,
+                mime="application/zip",
+                type="primary",
+                width='stretch',
+            )
+            st.caption("✅ Descarga procesada • Memoria · Presupuesto · Planos · CAD · 3D · MEP · Materiales · Todo incluido")
 
-        # ── Certificado SHA-256 visible al cliente ────────────────────────────
-        st.markdown(f"""
+            # ── Certificado SHA-256 visible al cliente ────────────────────────────
+            st.markdown(f"""
 <div style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.3);
             border-radius:8px;padding:10px 14px;margin-top:8px;font-family:monospace;">
   <span style="color:#10B981;font-weight:700;font-size:12px;">🔐 CERTIFICADO DE INTEGRIDAD SHA-256</span><br>
@@ -5439,69 +5443,69 @@ def render_step6_pago():
   <span style="color:#64748B;font-size:10px;">Incluido también dentro del ZIP en CERTIFICADO_INTEGRIDAD.txt</span>
 </div>""", unsafe_allow_html=True)
 
-        # Certificación blockchain del ZIP
+            # Certificación blockchain del ZIP
+            try:
+                from modules.marketplace.blockchain_cert import certify, cert_badge_html
+                _cert6 = certify(
+                    zip_bytes=_zip_bytes,
+                    doc_name=_zip_filename,
+                    user_email=st.session_state.get("client_email", ""),
+                    plot_id=str(st.session_state.get("design_plot_data", {}).get("id", ""))
+                )
+                st.markdown(cert_badge_html(_cert6), unsafe_allow_html=True)
+            except Exception:
+                pass
+
+        except Exception as _ez:
+            st.error(f"Error generando ZIP: {_ez}")
+
+        # ── IFC / Gemelo Digital ──────────────────────────────────────────────────
         try:
-            from modules.marketplace.blockchain_cert import certify, cert_badge_html
-            _cert6 = certify(
-                zip_bytes=_zip_bytes,
-                doc_name=_zip_filename,
-                user_email=st.session_state.get("client_email", ""),
-                plot_id=str(st.session_state.get("design_plot_data", {}).get("id", ""))
+            from modules.ai_house_designer.ifc_export import generate_ifc
+            _rooms_ifc = (
+                f["design_data"].get("rooms") or
+                [{"name": k, "area": float(v)}
+                 for k, v in req.get("ai_room_proposal", {}).items()
+                 if isinstance(v, (int, float))]
             )
-            st.markdown(cert_badge_html(_cert6), unsafe_allow_html=True)
-        except Exception:
-            pass
-
-    except Exception as _ez:
-        st.error(f"Error generando ZIP: {_ez}")
-
-    # ── IFC / Gemelo Digital ──────────────────────────────────────────────────
-    try:
-        from modules.ai_house_designer.ifc_export import generate_ifc
-        _rooms_ifc = (
-            f["design_data"].get("rooms") or
-            [{"name": k, "area": float(v)}
-             for k, v in req.get("ai_room_proposal", {}).items()
-             if isinstance(v, (int, float))]
-        )
-        if _rooms_ifc:
-            _pname_ifc = (req.get("nombre_proyecto") or "ArchiRapid_Proyecto").replace(" ", "_")
-            _ifc_bytes = generate_ifc(_rooms_ifc, project_name=_pname_ifc)
-            st.markdown("---")
-            st.markdown("""
+            if _rooms_ifc:
+                _pname_ifc = (req.get("nombre_proyecto") or "ArchiRapid_Proyecto").replace(" ", "_")
+                _ifc_bytes = generate_ifc(_rooms_ifc, project_name=_pname_ifc)
+                st.markdown("---")
+                st.markdown("""
 <div style="background:linear-gradient(135deg,rgba(30,58,95,0.6),rgba(13,27,42,0.8));
             border:1px solid rgba(245,158,11,0.35);border-radius:12px;
             padding:16px 20px;margin-bottom:12px;">
   <div style="font-size:15px;font-weight:800;color:#F8FAFC;margin-bottom:4px;">
-    🏗️ Gemelo Digital BIM/IFC
+    🏗️ Gemelo Digital BIM/IFC — Incluido en ZIP
   </div>
   <div style="font-size:12px;color:#94A3B8;">
-    Formato IFC2x3 · FreeCAD · Archicad · Revit · Navisworks · BIMvision
+    Formato IFC2x3 · Compatible FreeCAD · Archicad · Revit · Navisworks · BIMvision
   </div>
   <div style="margin-top:8px;font-size:11px;color:#64748B;">
     ✅ Subvencionable UE (BIM Mandate) · Cada habitación = objeto IFC certificado
   </div>
 </div>""", unsafe_allow_html=True)
-            st.download_button(
-                label="📐 Descargar Gemelo Digital (.ifc)",
-                data=_ifc_bytes,
-                file_name=f"{_pname_ifc}.ifc",
-                mime="application/x-step",
-                width='stretch',
-            )
-    except Exception:
-        pass
+                st.download_button(
+                    label="📐 Descargar Gemelo Digital Independiente (.ifc)",
+                    data=_ifc_bytes,
+                    file_name=f"{_pname_ifc}.ifc",
+                    mime="application/x-step",
+                    width='stretch',
+                )
+        except Exception:
+            pass
 
-    # ── Tablón de Obras ───────────────────────────────────────────────────────
-    try:
-        st.markdown("---")
-        st.markdown("### 🏗️ ¿Quieres recibir ofertas de constructores?")
-        _tab_key = f"tablon_published_s6_{req.get('nombre_proyecto','')}"
-        if st.session_state.get(_tab_key):
-            st.success("✅ Publicado en el Tablón. Los constructores de tu zona ya pueden enviarte ofertas.")
-            st.info("Consulta las ofertas en tu **Panel de Cliente → Ofertas de Construcción**.")
-        else:
-            st.markdown("""
+        # ── Tablón de Obras (SOLO después de pagar) ───────────────────────────
+        try:
+            st.markdown("---")
+            st.markdown("### 🏗️ ¿Quieres recibir ofertas de constructores?")
+            _tab_key = f"tablon_published_s6_{req.get('nombre_proyecto','')}"
+            if st.session_state.get(_tab_key):
+                st.success("✅ Publicado en el Tablón. Los constructores de tu zona ya pueden enviarte ofertas.")
+                st.info("Consulta las ofertas en tu **Panel de Cliente → Ofertas de Construcción**.")
+            else:
+                st.markdown("""
 <div style="background:rgba(34,197,94,0.07);border:1px solid rgba(34,197,94,0.25);
             border-radius:10px;padding:14px 18px;margin-bottom:12px;">
   <div style="font-weight:700;color:#F8FAFC;font-size:14px;">🏗️ Red de constructores ArchiRapid</div>
@@ -5510,46 +5514,46 @@ def render_step6_pago():
     ofertas con precio, plazo y garantía. Tú comparas. Sin compromiso.
   </div>
 </div>""", unsafe_allow_html=True)
-            _prov_t  = (req.get("province") or
-                        st.session_state.get("design_plot_data", {}).get("province") or "")
-            _cmail   = (st.session_state.get("user_email") or
-                        st.session_state.get("client_email") or "")
-            _cname   = (st.session_state.get("user_name") or
-                        st.session_state.get("client_name") or "Cliente")
-            _pname_t = req.get("nombre_proyecto") or "Mi proyecto ArchiRapid"
-            from modules.marketplace.service_providers import _ESP_LABELS as _ESP_L6
-            _parts_sel6 = st.multiselect(
-                "¿Qué partidas quieres contratar? (deja vacío = obra completa)",
-                options=list(_ESP_L6.keys()),
-                format_func=lambda x: _ESP_L6.get(x, x),
-                key="tablon_partidas_sel_s6",
-                help="Solo recibirás ofertas de profesionales con esas especialidades.",
-            )
-            if st.button("🏗️ Publicar en Tablón de Obras — Recibir ofertas",
-                         type="primary", width='stretch', key="btn_tablon_s6"):
-                try:
-                    from modules.marketplace.service_providers import publish_to_tablon
-                    _tid = publish_to_tablon(
-                        client_email=_cmail, client_name=_cname,
-                        project_name=_pname_t, province=_prov_t, style=style,
-                        total_area=float(total_area), total_cost=float(total_cost),
-                        partidas_list=[(p[0], p[1], p[2], p[3]) for p in partidas],
-                        partidas_solicitadas=_parts_sel6 if _parts_sel6 else None,
-                    )
-                    st.session_state[_tab_key] = True
+                _prov_t  = (req.get("province") or
+                            st.session_state.get("design_plot_data", {}).get("province") or "")
+                _cmail   = (st.session_state.get("user_email") or
+                            st.session_state.get("client_email") or "")
+                _cname   = (st.session_state.get("user_name") or
+                            st.session_state.get("client_name") or "Cliente")
+                _pname_t = req.get("nombre_proyecto") or "Mi proyecto ArchiRapid"
+                from modules.marketplace.service_providers import _ESP_LABELS as _ESP_L6
+                _parts_sel6 = st.multiselect(
+                    "¿Qué partidas quieres contratar? (deja vacío = obra completa)",
+                    options=list(_ESP_L6.keys()),
+                    format_func=lambda x: _ESP_L6.get(x, x),
+                    key="tablon_partidas_sel_s6",
+                    help="Solo recibirás ofertas de profesionales con esas especialidades.",
+                )
+                if st.button("🏗️ Publicar en Tablón de Obras — Recibir ofertas",
+                             type="primary", width='stretch', key="btn_tablon_s6"):
                     try:
-                        from modules.marketplace.email_notify import _send
-                        _parts_s = ", ".join(_parts_sel6) if _parts_sel6 else "obra completa"
-                        _send(f"🏗️ Nuevo Tablón\nID:{_tid}\n{_cname} ({_cmail})\n"
-                              f"{_pname_t} · {total_area:.0f}m² · €{total_cost:,}\nPartidas: {_parts_s}")
-                    except Exception:
-                        pass
-                    st.success("✅ Publicado. Los constructores ya pueden enviarte ofertas.")
-                    st.rerun()
-                except Exception as _etab:
-                    st.error(f"Error publicando: {_etab}")
-    except Exception:
-        pass
+                        from modules.marketplace.service_providers import publish_to_tablon
+                        _tid = publish_to_tablon(
+                            client_email=_cmail, client_name=_cname,
+                            project_name=_pname_t, province=_prov_t, style=style,
+                            total_area=float(total_area), total_cost=float(total_cost),
+                            partidas_list=[(p[0], p[1], p[2], p[3]) for p in partidas],
+                            partidas_solicitadas=_parts_sel6 if _parts_sel6 else None,
+                        )
+                        st.session_state[_tab_key] = True
+                        try:
+                            from modules.marketplace.email_notify import _send
+                            _parts_s = ", ".join(_parts_sel6) if _parts_sel6 else "obra completa"
+                            _send(f"🏗️ Nuevo Tablón\nID:{_tid}\n{_cname} ({_cmail})\n"
+                                  f"{_pname_t} · {total_area:.0f}m² · €{total_cost:,}\nPartidas: {_parts_s}")
+                        except Exception:
+                            pass
+                        st.success("✅ Publicado. Los constructores ya pueden enviarte ofertas.")
+                        st.rerun()
+                    except Exception as _etab:
+                        st.error(f"Error publicando: {_etab}")
+        except Exception:
+            pass
 
     st.markdown("---")
     _cb6, _ = st.columns(2)
