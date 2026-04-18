@@ -4446,6 +4446,7 @@ def render_step4_resumen():
                 st.session_state["babylon_captures"] = _caps_new
                 st.rerun()
             elif st.session_state.get("babylon_modified_layout"):
+                st.session_state.pop("babylon_modified_layout", None)  # Limpiar flag para evitar bucle
                 st.rerun()
     st.markdown("---")
 
