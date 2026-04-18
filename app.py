@@ -2084,13 +2084,11 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
                         st.markdown(f"**{title[:28]}{'…' if len(title)>28 else ''}**")
                         st.caption(f"💰 €{p.get('price',0):,.0f}  ·  📐 {p.get('area_m2',0)} m²")
                         if st.button("Ver Detalles →", key=f"proj_home_{p['id']}", width='stretch'):
-                            # Atomic nav update — fix active-page state before rerun so
-                            # Sincronizador Maestro and sidebar radio don't consume this cycle
+                            # Atomic nav update — variables seguras sin widget asociado
                             st.session_state["_nav_programmatic"] = True
                             st.session_state["current_page_sync"] = "home"
                             st.session_state["selected_page"] = "🏠 Inicio / Marketplace"
-                            st.session_state["_nav_radio"] = "🏠 Inicio / Marketplace"
-                            # Double-path: direct param + session respaldo for Cloud race conditions
+                            # NO modificar _nav_radio aquí — ya tiene widget st.radio() renderizado
                             st.session_state["_goto_project_v2"] = p['id']
                             st.query_params["selected_project_v2"] = str(p['id'])
                             st.rerun()
