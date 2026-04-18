@@ -1177,8 +1177,16 @@ def show_selected_project_panel(client_email, project_id):
         if st.session_state.get(_redir_key):
             _checkout_url = st.session_state.pop(_redir_key)
             st.info("🔄 Redirigiendo a Stripe para procesar el pago de forma segura...")
+            st.link_button(
+                "💳 Ir a Stripe para pagar →",
+                url=_checkout_url,
+                type="primary",
+                use_container_width=True,
+            )
+            # Intento de auto-redirect (funciona si el iframe no está sandboxed)
             st.components.v1.html(
-                f'<script>window.top.location.href="{_checkout_url}";</script>', height=0
+                f'<script>window.parent.location.href="{_checkout_url}";</script>',
+                height=0,
             )
             st.stop()
 
