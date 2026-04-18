@@ -15,6 +15,7 @@ except ImportError:
         return db_module.get_conn()
 from modules.marketplace.compatibilidad import get_proyectos_compatibles
 from modules.ai_house_designer import flow as ai_house_flow
+from modules.marketplace.hipoteca import render_calculadora as render_hipoteca
 try:
     from matching_engine import get_ofertas_para_proyecto as _get_ofertas_matching
 except ImportError:
@@ -1361,8 +1362,60 @@ Este es un proyecto orientativo. Cualquier uso constructivo requiere:
         else:
             st.info("💳 Selecciona el producto que deseas adquirir:")
 
+            # ── SECCIÓN DE FINANCIACIÓN ────────────────────────────────────────
+            with st.expander("📊 Estudio de Viabilidad Financiera — Simulación Hipotecaria", expanded=True):
+                # Calculadora pre-cargada con el coste de ejecución del proyecto
+                coste_obra_estimado = project.get('estimated_cost', 0) or (project.get('price', 0) * 0.8)
+                render_hipoteca(
+                    precio_terreno=0.0,  # El cliente proporciona su terreno
+                    coste_construccion=coste_obra_estimado,
+                    key_prefix=f"project_{project['id']}"
+                )
+                st.info("ℹ️ *Esta simulación es puramente orientativa. El tipo de interés y las condiciones finales están sujetos a la aprobación y políticas de riesgo de la entidad bancaria correspondiente.*")
+
+            # ── BANNERS DE PARTNERS ────────────────────────────────────────────
+            st.markdown("### 🤝 Soluciones de Financiación y Protección")
+            partner_col1, partner_col2 = st.columns(2)
+
+            with partner_col1:
+                st.info("""
+🏦 **BANCO PARTNER — Hipoteca con Condiciones Exclusivas**
+
+Accede a financiación especial para clientes de ArchiRapid.
+- ✅ Tasas competitivas
+- ✅ Tramitación rápida
+- ✅ Asesoramiento personalizado
+
+*[Espacio reservado para logo bancario]*
+                """)
+
+            with partner_col2:
+                st.warning("""
+🛡️ **SEGURO DE OBRA — Protege tu Inversión Inmobiliaria**
+
+Cobertura integral para construcción y edificación.
+- ✅ Póliza Todo Riesgo Construcción
+- ✅ Responsabilidad Civil profesional
+- ✅ Tramitamos nosotros por ti
+
+*[Espacio reservado para logo aseguradora]*
+                """)
+
+            # ── SERVICIOS EXTRA DE FINANCIACIÓN ────────────────────────────────
+            st.markdown("### 💼 Servicios de Gestión")
+            gestion_hipoteca = st.checkbox(
+                "📋 Solicitar Gestión de Hipoteca Autopromotor con ARCHIRAPID (+199€ fee de gestión)",
+                value=False,
+                help="Nos encargamos de la tramitación y negociación con entidades bancarias"
+            )
+            gestion_seguro = st.checkbox(
+                "🛡️ Solicitar Información y Presupuesto de Seguro de Obra (+99€ gestión)",
+                value=False,
+                help="Te ofrecemos presupuesto de seguros especializados en construcción"
+            )
+
             # Opciones adicionales de servicios
-            st.markdown("### 🔧 Servicios Adicionales")
+            st.markdown("### 🔧 Servicios Técnicos Adicionales")
             col_serv1, col_serv2 = st.columns(2)
 
             with col_serv1:
@@ -1389,6 +1442,8 @@ Este es un proyecto orientativo. Cualquier uso constructivo requiere:
             if seguro_tr:        precio_adicional_servicios += 400
             if resp_civil:       precio_adicional_servicios += 250
             if seguro_integral:  precio_adicional_servicios += 600
+            if gestion_hipoteca: precio_adicional_servicios += 199
+            if gestion_seguro:   precio_adicional_servicios += 99
 
             precio_adicional_copias   = num_copias * 200
             precio_total_adicional    = precio_adicional_servicios + precio_adicional_copias
@@ -1422,6 +1477,8 @@ Este es un proyecto orientativo. Cualquier uso constructivo requiere:
                 if seguro_tr:       items.append("Seguro TR €400")
                 if resp_civil:      items.append("RC €250")
                 if seguro_integral: items.append("Seguro Integral €600")
+                if gestion_hipoteca: items.append("Gestion Hipoteca €199")
+                if gestion_seguro:  items.append("Gestion Seguro €99")
                 if num_copias > 0:  items.append(f"{num_copias} copia(s) €{num_copias*200}")
                 return ", ".join(items) if items else "Ninguno"
 
