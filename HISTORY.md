@@ -1,5 +1,17 @@
 # LOG DE DESARROLLO — ARCHIRAPID MVP 2026
 
+## [SESIÓN: 2026-04-18 (CONTINUACIÓN)] ✅ FIX €0 PAYMENT + CLEANUP PENDIENTE
+
+### 🎯 Bug Fix Completado
+
+#### 6. **Prevención de Pago €0 — Flujo Paso 6 (Pago y Descarga)**
+- ✅ Added `st.stop()` after "No has seleccionado" info message (line 5178, flow.py)
+- ✅ Garantiza que usuarios DEBEN seleccionar al menos 1 servicio/documento
+- ✅ Impide fallback button que procesaba €0 sin validación Stripe
+- ✅ Commit: `a9ed3d0` — "fix: Prevenir pago €0"
+
+---
+
 ## [SESIÓN: 2026-04-18] ✅ PROYECTOS DISPONIBLES PORTAL CLIENTE — CERRADO
 
 ### 🎯 Objetivos Completados
