@@ -1120,6 +1120,7 @@ if st.query_params.get("sp_comision_ok") == "1" and st.query_params.get("sp_sess
 # success_url usa /?page=disenador&pago=ok → capturar aquí
 if st.query_params.get("pago") == "ok" and st.query_params.get("page") in ("disenador", None, ""):
     _s6_sid = st.session_state.get("stripe_session_id_s6")
+    # Si NO hay stripe_session_id (nueva pestaña desde Stripe redirect), el pago será verificado/recuperado de BD más abajo
     if _s6_sid and not st.session_state.get(f"s6_verified_{_s6_sid}"):
         try:
             from modules.stripe_utils import verify_session as _vs6a
@@ -1133,8 +1134,8 @@ if st.query_params.get("pago") == "ok" and st.query_params.get("page") in ("dise
                 st.session_state.pop("stripe_checkout_url_s6", None)
                 st.toast("🎉 Pago confirmado. Descargando tu proyecto...", icon="✅")
         except Exception:
-            # Stripe no disponible en local — simular pago confirmado
-            st.session_state["pago_completado"] = True
+            # Stripe no disponible en local o error temporal — se verificará por BD recovery abajo
+            pass
 
     # Si viene desde nueva pestaña (Stripe redirect), recuperar proyecto de BD usando email de URL
     if not st.session_state.get("ai_house_requirements"):
@@ -1167,8 +1168,13 @@ if st.query_params.get("pago") == "ok" and st.query_params.get("page") in ("dise
                         _svc_obj = _js6_recover.loads(_services_json_6)
                         st.session_state["doc_detail_s5"] = _svc_obj.get("doc", [])
                         st.session_state["svc_detail_s5"] = _svc_obj.get("svc", [])
+                        # FIX: Recuperar total_iva desde services_json si está disponible
+                        if "total_iva" in _svc_obj and st.query_params.get("pago") == "ok":
+                            st.session_state["total_pagado"] = _svc_obj.get("total_iva", 0)
                     st.session_state["client_email"] = _client_email_r
+                    # CRITICAL: Si pago=ok y hemos recuperado el proyecto, marcar como pagado
                     if st.query_params.get("pago") == "ok":
+                        st.session_state["pago_completado"] = True
                         st.success(f"✅ Proyecto recuperado de BD para: {_client_email_r}")
                 else:
                     if st.query_params.get("pago") == "ok":
