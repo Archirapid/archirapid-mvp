@@ -5158,6 +5158,13 @@ def render_step6_pago():
     _svc_detail_6 = st.session_state.get("svc_detail_s5", [])
     _coste_doc_6  = st.session_state.get("coste_doc_s5", 0)
     _coste_svc_6  = st.session_state.get("coste_servicios_s5", 0)
+
+    # Si los costes no se recuperaron pero tenemos items, calcularlos dinámicamente
+    if not _coste_doc_6 and _doc_detail_6:
+        _coste_doc_6 = sum(int(it.get("precio", 0)) for it in _doc_detail_6)
+    if not _coste_svc_6 and _svc_detail_6:
+        _coste_svc_6 = sum(int(it.get("precio", 0)) for it in _svc_detail_6)
+
     _subtotal_6   = _coste_doc_6 + _coste_svc_6
     _iva_6        = int(_subtotal_6 * 0.21)
     _total_iva_6  = _subtotal_6 + _iva_6
