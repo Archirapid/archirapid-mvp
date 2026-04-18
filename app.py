@@ -1143,10 +1143,7 @@ if st.query_params.get("pago") == "ok" and st.query_params.get("page") in ("dise
         del st.query_params["pago"]
     except Exception:
         pass
-    try:
-        del st.query_params["page"]
-    except Exception:
-        pass
+    # NO borrar "page" — mantener /?page=disenador para que el router no resetee a HOME
     st.rerun()
 
 # === STRIPE: retorno pago plan prefabricadas ===

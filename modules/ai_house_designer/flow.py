@@ -5627,9 +5627,24 @@ def render_step6_pago():
             pass
 
     st.markdown("---")
-    _cb6, _ = st.columns(2)
-    with _cb6:
-        if st.button("← Volver a Servicios", width='stretch', key="s6_back"):
-            st.session_state["ai_house_step"] = 5
+    if st.session_state.get("pago_completado"):
+        # Botón "Volver a Inicio" solo disponible una vez pagado
+        st.warning("⚠️ Si cierras esta página puedes volver a tu documentación en cualquier momento desde el **Portal Cliente** en el menú de inicio con tus credenciales.")
+        if st.button("🏠 Cerrar y Volver al Inicio", width='stretch', key="s6_goto_home"):
+            for _k in ("pago_completado", "ai_house_step", "stripe_session_id_s6",
+                       "stripe_checkout_url_s6", "total_pagado"):
+                st.session_state.pop(_k, None)
+            st.session_state["selected_page"] = "🏠 Inicio / Marketplace"
+            st.session_state["_nav_radio"]    = "🏠 Inicio / Marketplace"
+            try:
+                st.query_params.clear()
+            except Exception:
+                pass
             st.rerun()
-    st.info("📬 Proyecto guardado en tu **Panel de Cliente**. Accede desde el menú para consultarlo, modificarlo o contactar con nosotros.")
+    else:
+        _cb6, _ = st.columns(2)
+        with _cb6:
+            if st.button("← Volver a Servicios", width='stretch', key="s6_back"):
+                st.session_state["ai_house_step"] = 5
+                st.rerun()
+    st.info("📬 Proyecto guardado en tu **Panel de Cliente**. Accede desde el menú de inicio con tus credenciales para consultarlo en cualquier momento.")
