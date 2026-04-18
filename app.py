@@ -1154,12 +1154,19 @@ if st.query_params.get("pago") == "ok" and st.query_params.get("page") in ("dise
 
             if _client_email_r:
                 _cur6_r = _conn6_r.cursor()
+                # Recuperar AMBAS: req_json (proyecto) Y services_json (servicios seleccionados)
                 _cur6_r.execute(
-                    "SELECT req_json FROM ai_projects WHERE client_email=? ORDER BY created_at DESC LIMIT 1",
+                    "SELECT req_json, services_json FROM ai_projects WHERE client_email=? ORDER BY created_at DESC LIMIT 1",
                     (_client_email_r,))
                 _row6_r = _cur6_r.fetchone()
-                if _row6_r and _row6_r[0]:
-                    st.session_state["ai_house_requirements"] = _js6_recover.loads(_row6_r[0])
+                if _row6_r:
+                    _req_json_6, _services_json_6 = _row6_r[0], _row6_r[1]
+                    if _req_json_6:
+                        st.session_state["ai_house_requirements"] = _js6_recover.loads(_req_json_6)
+                    if _services_json_6:
+                        _svc_obj = _js6_recover.loads(_services_json_6)
+                        st.session_state["doc_detail_s5"] = _svc_obj.get("doc", [])
+                        st.session_state["svc_detail_s5"] = _svc_obj.get("svc", [])
                     st.session_state["client_email"] = _client_email_r
                     if st.query_params.get("pago") == "ok":
                         st.success(f"✅ Proyecto recuperado de BD para: {_client_email_r}")
