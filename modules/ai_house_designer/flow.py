@@ -799,6 +799,24 @@ sistema y servir de base de trabajo para el arquitecto que desarrolle el proyect
             zf.writestr(f"{proyecto_nombre}/06_Layout_3D_Editable.json",
                 json.dumps(babylon_layout, ensure_ascii=False, indent=2))
 
+        # 6b. PLANOS TÉCNICOS — Cimentación y MEP
+        _cim_png = _st.session_state.get("cimentacion_plan_png")
+        if _cim_png:
+            zf.writestr(f"{proyecto_nombre}/Planos_Tecnicos/06b_Plano_Cimentacion.png", _cim_png)
+
+        _mep_plans = _st.session_state.get("mep_plans_png", {})
+        if _mep_plans:
+            _mep_map = {
+                "sewage": "06c_Plano_Saneamiento.png",
+                "water": "06d_Plano_Agua.png",
+                "electrical": "06e_Plano_Electrico.png",
+                "rainwater": "06f_Plano_Canalones.png",
+                "domotics": "06g_Plano_Domotica.png",
+            }
+            for _mep_id, _mep_png in _mep_plans.items():
+                if _mep_id in _mep_map:
+                    zf.writestr(f"{proyecto_nombre}/Planos_Tecnicos/{_mep_map[_mep_id]}", _mep_png)
+
         # 7. ANÁLISIS DEL ARQUITECTO IA (generado en Paso 2)
         _analisis_ia = _st.session_state.get("analisis_arquitecto_ia", "")
         if _analisis_ia:
@@ -828,7 +846,10 @@ CONTENIDO:
   02_Mediciones_Presupuesto.xlsx   — Mediciones y partidas presupuestarias
   03_Datos_Proyecto.json           — Datos completos (catastro, vivienda, costes)
   04_Plano_2D.png                  — Plano distribución en planta
-  05_Layout_3D.json                — Modelo 3D editable (si fue modificado)
+  05_Vistas_3D/                    — Perspectivas (si fueron capturadas)
+  06_Layout_3D_Editable.json       — Modelo 3D editable (si fue modificado)
+  06b-06g_Plano_*.png              — Planos técnicos (cimentación, MEP: agua, eléctrico, saneamiento, etc.)
+  07_Opinion_Arquitecto_IA.txt     — Análisis técnico generado por IA
 
 PRÓXIMOS PASOS:
   1. Arquitecto colegiado para visado
@@ -2954,6 +2975,8 @@ def render_step3_editor():
 
                 if _cim_png:
                     st.image(_cim_png, width='stretch', caption=f"Plano de Cimentación — {_cim_type.capitalize()}")
+                    # GUARDAR EN SESSION_STATE para incluir en ZIP
+                    st.session_state["cimentacion_plan_png"] = _cim_png
                     with _cim_col2:
                         st.download_button(
                             "⬇️ Descargar PNG",
@@ -2998,6 +3021,10 @@ def render_step3_editor():
                             _png = _gen_mep(_mep_rooms, _lid, _tw, _td)
                             if _png:
                                 st.image(_png, width='stretch')
+                                # GUARDAR EN SESSION_STATE para incluir en ZIP
+                                if "mep_plans_png" not in st.session_state:
+                                    st.session_state["mep_plans_png"] = {}
+                                st.session_state["mep_plans_png"][_lid] = _png
                                 st.download_button(
                                     f"⬇️ {_lbl}", _png,
                                     file_name=f"plano_mep_{_lid}.png",
