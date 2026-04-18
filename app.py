@@ -1146,6 +1146,12 @@ if st.query_params.get("pago") == "ok" and st.query_params.get("page") in ("dise
             # El email viene en query_params desde Stripe redirect
             _client_email_r = _up6_recover.unquote(st.query_params.get("email", "")) or \
                               st.session_state.get("client_email") or st.session_state.get("user_email") or ""
+
+            # DEBUG: mostrar qué email se está usando
+            if st.query_params.get("pago") == "ok":
+                st.warning(f"🔍 DEBUG - Email desde URL: '{st.query_params.get('email', 'VACÍO')}'")
+                st.warning(f"🔍 DEBUG - Email decodificado: '{_client_email_r}'")
+
             if _client_email_r:
                 _cur6_r = _conn6_r.cursor()
                 _cur6_r.execute(
@@ -1154,11 +1160,19 @@ if st.query_params.get("pago") == "ok" and st.query_params.get("page") in ("dise
                 _row6_r = _cur6_r.fetchone()
                 if _row6_r and _row6_r[0]:
                     st.session_state["ai_house_requirements"] = _js6_recover.loads(_row6_r[0])
-                    st.session_state["client_email"] = _client_email_r  # También guardar email para consistencia
+                    st.session_state["client_email"] = _client_email_r
+                    if st.query_params.get("pago") == "ok":
+                        st.success(f"✅ Proyecto recuperado de BD para: {_client_email_r}")
+                else:
+                    if st.query_params.get("pago") == "ok":
+                        st.error(f"❌ No encontrado en BD: {_client_email_r}")
+            else:
+                if st.query_params.get("pago") == "ok":
+                    st.error("❌ Email VACÍO - no se puede recuperar de BD")
             _conn6_r.close()
         except Exception as _ex6_recover:
-            import streamlit as _st_err_recover
-            _st_err_recover.error(f"🔴 Error recuperando proyecto: {str(_ex6_recover)[:200]}")
+            if st.query_params.get("pago") == "ok":
+                st.error(f"🔴 Excepción: {str(_ex6_recover)[:300]}")
 
     # Redirigir al diseñador (Step 6) donde están todos los descargables
     st.session_state["selected_page"]  = "Diseñador de Vivienda"

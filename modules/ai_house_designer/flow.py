@@ -5267,6 +5267,12 @@ def render_step6_pago():
         # ── Stripe Checkout ───────────────────────────────────────────────────
         _client_email_6 = (st.session_state.get("user_email") or
                            st.session_state.get("client_email") or "")
+
+        # VALIDAR EMAIL antes de Stripe
+        if not _client_email_6:
+            st.error("⚠️ Debes estar registrado/logueado para pagar. Falta email de cliente.")
+            st.stop()
+
         _stripe_key_ok  = bool(os.getenv("STRIPE_SECRET_KEY", ""))
         try:
             import streamlit as _stk6
