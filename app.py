@@ -994,10 +994,13 @@ if st.query_params.get("stripe_session") and st.query_params.get("payment") == "
                         # Telegram admin
                         try:
                             from modules.marketplace.email_notify import _send as _en_vp
+                            _services_detail = _meta.get("services_detail", "")
                             _en_vp(
                                 f"🛒 <b>VENTA PROYECTO</b>\n"
                                 f"Proyecto: {_proj_id}\nCliente: {_cli_mail}\n"
-                                f"Productos: {_prods}\nImporte: €{_amount:.2f}\n"
+                                f"Productos base: {_prods}\n"
+                                f"Servicios contratados: {_services_detail if _services_detail else 'Solo proyecto'}\n"
+                                f"Importe total: €{_amount:.2f}\n"
                                 f"Sesión Stripe: {_ss_id}"
                             )
                         except Exception:

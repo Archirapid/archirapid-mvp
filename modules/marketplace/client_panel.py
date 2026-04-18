@@ -1258,14 +1258,17 @@ def show_selected_project_panel(client_email, project_id):
             # Opciones adicionales de servicios
             st.markdown("### 🔧 Servicios Adicionales")
             col_serv1, col_serv2 = st.columns(2)
-            
+
             with col_serv1:
-                visado_proyecto = st.checkbox("🏛️ Visado del Proyecto - €500", value=False)
-                direccion_obra = st.checkbox("👷 Dirección de Obra - €800", value=False)
-            
+                visado_proyecto  = st.checkbox("🏛️ Visado del Proyecto — €500",                           value=False)
+                direccion_obra   = st.checkbox("👷 Dirección de Obra (facultativa) — €3.000",              value=False)
+                supervision_cte  = st.checkbox("🔍 Supervisión/Revisión previa CTE + Asunción resp. — €2.000", value=False)
+                deo_css          = st.checkbox("📋 Dirección de Ejecución DEO + CSS — €3.500",            value=False)
+
             with col_serv2:
-                construccion = st.checkbox("🏗️ Construcción Completa - €1500", value=False)
-                supervision = st.checkbox("👁️ Supervisión Técnica - €300", value=False)
+                seguro_tr        = st.checkbox("🛡️ Seguro Todo Riesgo Construcción — €400/año",           value=False)
+                resp_civil       = st.checkbox("📄 Responsabilidad Civil profesional — €250",              value=False)
+                seguro_integral  = st.checkbox("🔒 Seguro Integral (TR + RC) — €600",                     value=False)
 
             # Número de copias adicionales
             st.markdown("### 📋 Número de Copias Adicionales")
@@ -1273,20 +1276,19 @@ def show_selected_project_panel(client_email, project_id):
 
             # Calcular precios adicionales
             precio_adicional_servicios = 0
-            if visado_proyecto:
-                precio_adicional_servicios += 500
-            if direccion_obra:
-                precio_adicional_servicios += 800
-            if construccion:
-                precio_adicional_servicios += 1500
-            if supervision:
-                precio_adicional_servicios += 300
-            
-            precio_adicional_copias = num_copias * 200
-            precio_total_adicional = precio_adicional_servicios + precio_adicional_copias
+            if visado_proyecto:  precio_adicional_servicios += 500
+            if direccion_obra:   precio_adicional_servicios += 3000
+            if supervision_cte:  precio_adicional_servicios += 2000
+            if deo_css:          precio_adicional_servicios += 3500
+            if seguro_tr:        precio_adicional_servicios += 400
+            if resp_civil:       precio_adicional_servicios += 250
+            if seguro_integral:  precio_adicional_servicios += 600
+
+            precio_adicional_copias   = num_copias * 200
+            precio_total_adicional    = precio_adicional_servicios + precio_adicional_copias
 
             if precio_total_adicional > 0:
-                st.info(f"💰 Costo adicional total: €{precio_total_adicional}")
+                st.info(f"💰 Costo adicional total: €{precio_total_adicional:,}")
 
             # ── Helper: construir lista de productos según selección ─────────
             def _build_products_and_qty(base_keys):
@@ -1294,12 +1296,28 @@ def show_selected_project_panel(client_email, project_id):
                 qty  = {}
                 if visado_proyecto: keys.append("visado_proyecto")
                 if direccion_obra:  keys.append("direccion_obra")
-                if construccion:    keys.append("construccion")
-                if supervision:     keys.append("supervision")
+                if supervision_cte: keys.append("supervision_cte")
+                if deo_css:         keys.append("deo_css")
+                if seguro_tr:       keys.append("seguro_tr")
+                if resp_civil:      keys.append("resp_civil")
+                if seguro_integral: keys.append("seguro_integral")
                 if num_copias > 0:
                     keys.append("copia_adicional")
                     qty["copia_adicional"] = num_copias
                 return keys, qty
+
+            # ── Resumen legible de servicios para notificación admin ─────────
+            def _servicios_label():
+                items = []
+                if visado_proyecto: items.append("Visado €500")
+                if direccion_obra:  items.append("Dirección Obra €3000")
+                if supervision_cte: items.append("Supervisión CTE €2000")
+                if deo_css:         items.append("DEO+CSS €3500")
+                if seguro_tr:       items.append("Seguro TR €400")
+                if resp_civil:      items.append("RC €250")
+                if seguro_integral: items.append("Seguro Integral €600")
+                if num_copias > 0:  items.append(f"{num_copias} copia(s) €{num_copias*200}")
+                return ", ".join(items) if items else "Ninguno"
 
             try:
                 from modules.stripe_utils import _get_base_url as _gbu
@@ -1336,7 +1354,8 @@ def show_selected_project_panel(client_email, project_id):
                     try:
                         from modules.stripe_utils import create_checkout_session as _ccs
                         _keys, _qty = _build_products_and_qty(["pdf_proyecto"])
-                        _url, _ = _ccs(_keys, project_id, client_email, _success_url, _cancel_url, _qty)
+                        _url, _ = _ccs(_keys, project_id, client_email, _success_url, _cancel_url, _qty,
+                                       extra_meta={"services_detail": _servicios_label()})
                         st.session_state[_redir_key] = _url
                         st.rerun()
                     except Exception as _e:
@@ -1349,7 +1368,8 @@ def show_selected_project_panel(client_email, project_id):
                     try:
                         from modules.stripe_utils import create_checkout_session as _ccs
                         _keys, _qty = _build_products_and_qty(["planos_cad"])
-                        _url, _ = _ccs(_keys, project_id, client_email, _success_url, _cancel_url, _qty)
+                        _url, _ = _ccs(_keys, project_id, client_email, _success_url, _cancel_url, _qty,
+                                       extra_meta={"services_detail": _servicios_label()})
                         st.session_state[_redir_key] = _url
                         st.rerun()
                     except Exception as _e:
@@ -1362,7 +1382,8 @@ def show_selected_project_panel(client_email, project_id):
                 try:
                     from modules.stripe_utils import create_checkout_session as _ccs
                     _keys, _qty = _build_products_and_qty(["proyecto_completo"])
-                    _url, _ = _ccs(_keys, project_id, client_email, _success_url, _cancel_url, _qty)
+                    _url, _ = _ccs(_keys, project_id, client_email, _success_url, _cancel_url, _qty,
+                                   extra_meta={"services_detail": _servicios_label()})
                     st.session_state[_redir_key] = _url
                     st.rerun()
                 except Exception as _e:

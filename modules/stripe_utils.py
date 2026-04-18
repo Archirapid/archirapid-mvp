@@ -13,11 +13,14 @@ PRODUCTS = {
     "bim_ifc":            {"name": "Modelo BIM/IFC",                "amount": 14900},   # €149
     "blockchain_cert":    {"name": "Certificado Blockchain",        "amount":  9900},   # €99
     # Servicios adicionales
-    "visado_proyecto":    {"name": "Visado del Proyecto",           "amount": 50000},   # €500
-    "direccion_obra":     {"name": "Dirección de Obra",             "amount": 80000},   # €800
-    "construccion":       {"name": "Construcción Completa",         "amount": 150000},  # €1.500
-    "supervision":        {"name": "Supervisión Técnica",           "amount": 30000},   # €300
-    "copia_adicional":    {"name": "Copia Adicional",               "amount": 20000},   # €200
+    "visado_proyecto":    {"name": "Visado del Proyecto",                              "amount":  50000},  # €500
+    "direccion_obra":     {"name": "Dirección de Obra (dirección facultativa)",        "amount": 300000},  # €3.000
+    "supervision_cte":    {"name": "Supervisión/Revisión previa CTE + Asunción resp.", "amount": 200000},  # €2.000
+    "deo_css":            {"name": "Dirección de Ejecución (DEO) + CSS",               "amount": 350000},  # €3.500
+    "seguro_tr":          {"name": "Seguro Todo Riesgo Construcción (anual)",          "amount":  40000},  # €400
+    "resp_civil":         {"name": "Responsabilidad Civil profesional",                "amount":  25000},  # €250
+    "seguro_integral":    {"name": "Seguro Integral (TR + RC)",                        "amount":  60000},  # €600
+    "copia_adicional":    {"name": "Copia Adicional",                                  "amount":  20000},  # €200
     # Modo Estudio (arquitectos)
     "estudio_download":   {"name": "Descarga Proyecto Modo Estudio", "amount":  1900},   # €19
     # Suscripciones de arquitectos (pago mensual recurrente — modo payment para MVP)
@@ -59,11 +62,13 @@ def _get_base_url() -> str:
 
 def create_checkout_session(product_keys: list, project_id: str, client_email: str,
                              success_url: str, cancel_url: str,
-                             extra_quantities: dict = None) -> tuple:
+                             extra_quantities: dict = None,
+                             extra_meta: dict = None) -> tuple:
     """
     Crea una sesión de Stripe Checkout.
     Devuelve (checkout_url, session_id).
     extra_quantities: {product_key: quantity} para copias adicionales, etc.
+    extra_meta: campos adicionales que se añaden a metadata (ej. services_detail).
     """
     _stripe.api_key = _get_key()
     line_items = []
@@ -80,6 +85,16 @@ def create_checkout_session(product_keys: list, project_id: str, client_email: s
             "quantity": qty,
         })
 
+    _meta = {
+        "project_id": str(project_id),
+        "client_email": str(client_email),
+        "products": ",".join(product_keys),
+    }
+    if extra_meta:
+        # Stripe metadata values must be strings ≤500 chars
+        for k, v in extra_meta.items():
+            _meta[str(k)[:40]] = str(v)[:500]
+
     session = _stripe.checkout.Session.create(
         payment_method_types=["card"],
         line_items=line_items,
@@ -87,11 +102,7 @@ def create_checkout_session(product_keys: list, project_id: str, client_email: s
         customer_email=client_email or None,
         success_url=success_url,
         cancel_url=cancel_url,
-        metadata={
-            "project_id": str(project_id),
-            "client_email": str(client_email),
-            "products": ",".join(product_keys),
-        },
+        metadata=_meta,
     )
     return session.url, session.id
 
