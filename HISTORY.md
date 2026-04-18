@@ -1,5 +1,79 @@
 # LOG DE DESARROLLO — ARCHIRAPID MVP 2026
 
+## [SESIÓN: 2026-04-18 (CONTINUACIÓN 2)] ✅ FLUJO PAGO BLINDADO — ZIP SOLO POST-PAGO
+
+### 🎯 Implementación Completa
+
+#### Fix: €0 Payment + ZIP Post-Pago
+- ✅ `st.stop()` si no selecciona servicios (línea 5178, flow.py)
+- ✅ ZIP/IFC/Tablón SOLO dentro de `if pago_completado:` (líneas 5391-5556)
+- ✅ Recibo detallado con total ANTES de pagar (tabla HTML líneas 5146-5175)
+- ✅ Admin ve `services_json` con doc_detail + svc_detail + total_iva (línea 5372)
+- ✅ Commit: `09a5c5b` — "fix: ZIP y descarga SOLO después de pagar Stripe"
+
+### 🔐 REGLA DE ORO IMPLEMENTADA: "Nunca sin pago"
+
+**Garantías de seguridad:**
+1. NO hay pago €0 → `st.stop()` si lista vacía
+2. NO hay bypass de Stripe → condición en línea 5257: `if _stripe_key_ok and _all_items_6`
+3. NO hay descarga sin pago → ZIP dentro del `if pago_completado:`
+4. Admin ve TODO → `services_json` con itemización completa
+
+**Flujo de cliente:**
+```
+Paso 5 (Servicios)
+  ↓
+Si selecciona algo → pasa
+Si NO selecciona nada → st.stop() ❌ BLOQUEADO
+  ↓
+Paso 6 (Pago)
+  ↓
+Recibo visible:
+  - PDF (€1.800) si seleccionó
+  - CAD (€2.500) si seleccionó
+  - Servicios opcionales (suma)
+  - TOTAL + IVA
+  ↓
+Stripe obligatorio
+  ↓
+Si pago_completado = True:
+  - Descarga ZIP COMPLETO (memoria, planos, MEP, cimientos, 3D, etc.)
+  - Descarga IFC independiente
+  - Acceso Tablón de Obras
+Si NO pagó:
+  - Botones navegación para reintentar
+```
+
+### 📊 Contenido ZIP (COMPLETO SIEMPRE)
+
+✅ Incluye TODO lo que haya en pasos anteriores:
+- 📄 Memoria descriptiva (PDF profesional)
+- 📊 Mediciones, presupuesto, partidas (Excel)
+- 🗺️ Planos 2D de planta
+- 🏗️ Planos cimientos y estructura
+- 📐 Planos MEP completos (fontanería, electricidad, saneamiento)
+- 🧊 Modelo 3D (GLB/GLTF)
+- 📸 Vistas 3D y renders
+- 📋 Eficiencia energética
+- 🌿 Huella carbono
+- 💎 Gemelo digital (JSON Babylon + materiales)
+- 📋 Partidas presupuestarias detalladas
+
+### 📌 Admin/Intranet sincronizado
+
+Tabla `ai_projects` guarda:
+```json
+{
+  "doc": [{"label": "📄 Documentación PDF ×N", "precio": 1800}],
+  "svc": [{"label": "📋 Visado del Proyecto", "precio": X}],
+  "total_iva": MONTO_PAGADO
+}
+```
+
+Admin ve exactamente qué seleccionó y pagó cliente.
+
+---
+
 ## [SESIÓN: 2026-04-18 (CONTINUACIÓN)] ✅ FIX €0 PAYMENT + CLEANUP PENDIENTE
 
 ### 🎯 Bug Fix Completado
