@@ -207,16 +207,6 @@ def _detectar_plan_desde_session(sess) -> str | None:
 # ── UI: Login / Registro ──────────────────────────────────────────────────────
 
 def ui_login_registro() -> None:
-    # Botón volver al mapa/home (útil si un visitante llega aquí por error)
-    if st.button("← Volver al marketplace", key="mls_login_volver"):
-        st.session_state["selected_page"] = "🏠 Inicio / Marketplace"
-        try:
-            del st.query_params["page"]
-        except Exception:
-            pass
-        st.stop()
-        st.rerun()
-
     st.markdown("## 🏢 ArchiRapid MLS — Portal Inmobiliario")
     st.caption("Bolsa de colaboración entre inmobiliarias. Listantes + colaboradoras.")
 

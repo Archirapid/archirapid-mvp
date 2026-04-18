@@ -1728,11 +1728,16 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
             with _hcol1:
                 st.header(_login_header)
             with _hcol2:
-                if st.button("✕ Cerrar", key="btn_close_login"):
+                if st.button("← Volver", key="btn_close_login", use_container_width=True):
+                    st.session_state["selected_page"] = "🏠 Inicio / Marketplace"
                     st.session_state['viewing_login'] = False
                     st.session_state['login_role'] = None
                     st.session_state['_login_show_registro'] = False
-                    st.rerun()
+                    try:
+                        del st.query_params["page"]
+                    except Exception:
+                        pass
+                    st.stop()
 
             _show_registro = st.session_state.get('_login_show_registro', False)
             if _login_role == 'services' and not _show_registro:
