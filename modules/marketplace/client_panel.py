@@ -436,12 +436,17 @@ def show_buyer_panel_mls(client_email: str, finca_id: str) -> None:
     # ── Sidebar: warning + logout (igual que panel azul) ─────────────────
     with st.sidebar:
         st.info("💡 Puedes volver a acceder a tu portal en cualquier momento desde la página de inicio con tu email.")
-        if st.button("🚪 Cerrar Sesión", key="mls_logout_btn"):
+        if st.button("← Volver", key="mls_logout_btn", use_container_width=True):
+            st.session_state["selected_page"] = "🏠 Inicio / Marketplace"
             for _k in ["logged_in", "user_email", "role", "user_name", "mls_reserva_finca_id",
                        "mls_show_project_search", "mls_show_prefab_config", "mls_show_transacciones",
                        "mls_show_documentacion", "mls_show_construccion_offers"]:
                 st.session_state.pop(_k, None)
-            st.rerun()
+            try:
+                del st.query_params["page"]
+            except Exception:
+                pass
+            st.stop()
 
     finca = mls_db.get_finca_sin_identidad_listante(finca_id)
 
