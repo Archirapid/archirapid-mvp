@@ -799,7 +799,27 @@ sistema y servir de base de trabajo para el arquitecto que desarrolle el proyect
             zf.writestr(f"{proyecto_nombre}/06_Layout_3D_Editable.json",
                 json.dumps(babylon_layout, ensure_ascii=False, indent=2))
 
-        # 6. README (sin hash — se añade después de cerrar el ZIP)
+        # 7. ANÁLISIS DEL ARQUITECTO IA (generado en Paso 2)
+        _analisis_ia = _st.session_state.get("analisis_arquitecto_ia", "")
+        if _analisis_ia:
+            zf.writestr(
+                f"{proyecto_nombre}/07_Opinion_Arquitecto_IA.txt",
+                f"""ANÁLISIS DEL ARQUITECTO IA — ArchiRapid
+========================================
+Proyecto: {proyecto_nombre}
+Fecha: {fecha}
+
+EVALUACIÓN TÉCNICA PROFESIONAL (Generada por IA):
+{_analisis_ia}
+
+========================================
+AVISO LEGAL: Este análisis es generado automáticamente por IA como orientación.
+Requiere validación y firma de arquitecto técnico colegiado para tener validez legal.
+ArchiRapid | hola@archirapid.com
+"""
+            )
+
+        # README (sin hash — se añade después de cerrar el ZIP)
         zf.writestr(f"{proyecto_nombre}/LEEME.txt", f"""PAQUETE DOCUMENTAL — {proyecto_nombre}
 ArchiRapid | {fecha}
 
@@ -2703,6 +2723,8 @@ Máximo 200 palabras. Usa: ✅ para correcto, ⚠️ para mejorable, ❌ para pr
                     )
                     
                     st.markdown(response.choices[0].message.content)
+                    # Guardar para incluir en ZIP de descarga
+                    st.session_state["analisis_arquitecto_ia"] = response.choices[0].message.content
                 
                 except Exception as e:
                     st.warning(f"Análisis IA no disponible: {e}")
@@ -5265,8 +5287,8 @@ def render_step6_pago():
                 _s6_url, _s6_sid = _ccs6(
                     line_items=_stripe_items_6,
                     client_email=_client_email_6,
-                    success_url=_base6 + "/?pago=ok",
-                    cancel_url=_base6 + "/?pago=cancel",
+                    success_url=_base6 + "/?page=disenador&pago=ok",
+                    cancel_url=_base6 + "/?page=disenador&pago=cancel",
                     metadata={
                         "project": req.get("nombre_proyecto", "ArchiRapid Project"),
                         "total_eur": str(_total_iva_6),
@@ -5373,6 +5395,55 @@ def render_step6_pago():
                  style, energy_label,
                  _dt6.datetime.now().isoformat(), "pagado", _req_json_val))
             _conn6.commit(); _conn6.close()
+        except Exception:
+            pass  # nunca interrumpe el flujo
+
+        # ── Registrar transacción en ventas_proyectos (SQLite + Supabase) ─────
+        try:
+            import sqlite3 as _sq6v, json as _js6v, datetime as _dt6v, uuid as _uuid6v
+            from modules.marketplace.utils import DB_PATH as _DBP6v
+            _venta_id      = str(_uuid6v.uuid4())
+            _venta_email   = st.session_state.get("client_email") or st.session_state.get("user_email") or ""
+            _venta_nombre  = st.session_state.get("user_name") or st.session_state.get("client_name") or ""
+            _venta_prods   = _js6v.dumps({"doc": _doc_detail_6, "svc": _svc_detail_6})
+            _venta_total   = float(_total_iva_6)
+            _venta_sid     = st.session_state.get(f"s6_verified_sid") or ""
+            _venta_fecha   = _dt6v.datetime.now().isoformat()
+            _venta_proyecto= req.get("nombre_proyecto", "Proyecto ArchiRapid")
+
+            # SQLite
+            _cv = _sq6v.connect(_DBP6v, timeout=15)
+            _cv.execute("PRAGMA journal_mode=WAL")
+            _cv.execute("""
+                INSERT OR IGNORE INTO ventas_proyectos
+                (proyecto_id, cliente_email, nombre_cliente, productos_comprados,
+                 total_pagado, metodo_pago, fecha_compra, stripe_session_id)
+                VALUES (?,?,?,?,?,?,?,?)""",
+                (_venta_proyecto, _venta_email, _venta_nombre, _venta_prods,
+                 _venta_total, "stripe", _venta_fecha, _venta_sid))
+            _cv.commit(); _cv.close()
+
+            # Supabase sync
+            try:
+                import os as _os6v
+                _sb_url6 = _os6v.getenv("SUPABASE_URL", "")
+                _sb_key6 = _os6v.getenv("SUPABASE_SERVICE_KEY", "") or _os6v.getenv("SUPABASE_KEY", "")
+                if _sb_url6 and _sb_key6:
+                    from supabase import create_client as _sb_create6
+                    _sb6 = _sb_create6(_sb_url6, _sb_key6)
+                    _sb6.table("ventas_proyectos").insert({
+                        "proyecto_id":        _venta_proyecto,
+                        "cliente_email":      _venta_email,
+                        "nombre_cliente":     _venta_nombre,
+                        "productos_comprados":_venta_prods,
+                        "total_pagado":       _venta_total,
+                        "metodo_pago":        "stripe",
+                        "fecha_compra":       _venta_fecha,
+                        "stripe_session_id":  _venta_sid,
+                    }).execute()
+            except Exception:
+                pass  # Supabase falla silencioso — SQLite es la copia de seguridad
+
         except Exception:
             pass  # nunca interrumpe el flujo
 

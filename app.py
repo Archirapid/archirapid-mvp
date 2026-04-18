@@ -1117,8 +1117,8 @@ if st.query_params.get("sp_comision_ok") == "1" and st.query_params.get("sp_sess
         pass
 
 # FIX 2026-04-05 Bug #8a: retorno pago Diseñador de Vivienda → redirige a descarga (Step 6)
-# success_url en flow.py usa /?pago=ok (sin page param) → capturar aquí
-if st.query_params.get("pago") == "ok" and not st.query_params.get("page"):
+# success_url usa /?page=disenador&pago=ok → capturar aquí
+if st.query_params.get("pago") == "ok" and st.query_params.get("page") in ("disenador", None, ""):
     _s6_sid = st.session_state.get("stripe_session_id_s6")
     if _s6_sid and not st.session_state.get(f"s6_verified_{_s6_sid}"):
         try:
@@ -1141,6 +1141,10 @@ if st.query_params.get("pago") == "ok" and not st.query_params.get("page"):
     st.session_state["ai_house_step"]  = 6
     try:
         del st.query_params["pago"]
+    except Exception:
+        pass
+    try:
+        del st.query_params["page"]
     except Exception:
         pass
     st.rerun()
