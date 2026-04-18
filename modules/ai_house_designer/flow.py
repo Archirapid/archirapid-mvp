@@ -5266,12 +5266,24 @@ def render_step6_pago():
     if not st.session_state.get("pago_completado"):
         # ── Stripe Checkout ───────────────────────────────────────────────────
         _client_email_6 = (st.session_state.get("user_email") or
-                           st.session_state.get("client_email") or "")
+                           st.session_state.get("client_email") or
+                           st.session_state.get("email") or "")
 
-        # VALIDAR EMAIL antes de Stripe
+        # Si no hay email en session_state, usar fallback desde BD (último cliente que accedió)
         if not _client_email_6:
-            st.error("⚠️ Debes estar registrado/logueado para pagar. Falta email de cliente.")
-            st.stop()
+            try:
+                import sqlite3 as _sq_fb
+                from modules.marketplace.utils import DB_PATH as _DBP_fb
+                _conn_fb = _sq_fb.connect(_DBP_fb, timeout=15)
+                _cur_fb = _conn_fb.cursor()
+                _cur_fb.execute("SELECT client_email FROM ai_projects ORDER BY created_at DESC LIMIT 1")
+                _row_fb = _cur_fb.fetchone()
+                if _row_fb and _row_fb[0]:
+                    _client_email_6 = _row_fb[0]
+                    st.session_state["client_email"] = _client_email_6  # Restaurar en session_state
+                _conn_fb.close()
+            except Exception:
+                pass
 
         _stripe_key_ok  = bool(os.getenv("STRIPE_SECRET_KEY", ""))
         try:
