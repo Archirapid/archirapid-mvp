@@ -1737,7 +1737,7 @@ if st.session_state.get('selected_page') == "🏠 Inicio / Marketplace":
                         del st.query_params["page"]
                     except Exception:
                         pass
-                    st.stop()
+                    st.rerun()
 
             _show_registro = st.session_state.get('_login_show_registro', False)
             if _login_role == 'services' and not _show_registro:
