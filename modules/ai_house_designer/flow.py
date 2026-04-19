@@ -5143,12 +5143,12 @@ def _render_estudio_download():
     st.info(f"Proyecto diseñado por **{arch_name}**")
 
     st.markdown("""
-<div style="background:rgba(37,99,235,0.12);border:1px solid rgba(37,99,235,0.35);
+<div style="background:#1E40AF;border:1px solid #1E40AF;
             border-radius:12px;padding:16px 20px;margin-bottom:16px;">
-  <div style="font-weight:800;color:#F8FAFC;font-size:15px;margin-bottom:8px;">
+  <div style="font-weight:800;color:#FFFFFF;font-size:15px;margin-bottom:8px;">
     📦 Contenido del ZIP del Proyecto
   </div>
-  <ul style="color:#CBD5E1;font-size:13px;margin:0;padding-left:20px;line-height:1.9;">
+  <ul style="color:#E2E8F0;font-size:13px;margin:0;padding-left:20px;line-height:1.9;">
     <li>📄 Memoria descriptiva (PDF)</li>
     <li>📊 Mediciones y presupuesto (Excel)</li>
     <li>🗺️ Plano de planta (PNG)</li>
@@ -5630,12 +5630,12 @@ def render_step6_pago():
 
         # ── Botón de descarga ZIP (SOLO después de pagar) ─────────────────────
         st.markdown("""
-<div style="background:rgba(37,99,235,0.12);border:1px solid rgba(37,99,235,0.35);
+<div style="background:#1E40AF;border:1px solid #1E40AF;
             border-radius:12px;padding:16px 20px;margin-bottom:16px;">
-  <div style="font-weight:800;color:#F8FAFC;font-size:15px;margin-bottom:8px;">
+  <div style="font-weight:800;color:#FFFFFF;font-size:15px;margin-bottom:8px;">
     📦 Contenido del ZIP Completo del Proyecto
   </div>
-  <ul style="color:#CBD5E1;font-size:13px;margin:0;padding-left:20px;line-height:1.9;">
+  <ul style="color:#E2E8F0;font-size:13px;margin:0;padding-left:20px;line-height:1.9;">
     <li>📄 Memoria descriptiva completa (PDF profesional)</li>
     <li>📊 Mediciones, presupuesto y partidas (Excel detallado)</li>
     <li>🗺️ Planos de planta 2D (PNG escala)</li>
