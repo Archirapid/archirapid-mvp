@@ -41,9 +41,62 @@ def generar_zip_proyecto(req, design_data, plot_data, partidas, subsidy_total, e
     _STYLE_CHIMNEY_ZIP = {'Montaña': 4500, 'Rural': 4500, 'Clásico': 3500}
     total_cost += _STYLE_CHIMNEY_ZIP.get(style, 0)
 
-    # ----------------------------------------
-    # GENERAR MEMORIA COMPLETA CON GROQ
-    # ----------------------------------------
+    # ────────────────────────────────────────────────────────────────────────
+    # RECUPERAR/REGENERAR DATOS FALTANTES (post-pago en nueva pestaña)
+    # ────────────────────────────────────────────────────────────────────────
+    import streamlit as _st
+
+    # Análisis IA (NO regenerable, dejar si existe)
+    _analisis_ia_zip = _st.session_state.get("analisis_arquitecto_ia", "")
+
+    # Plano 2D: intentar obtener, si no regenerar
+    _plano_2d_zip = _st.session_state.get('current_floor_plan') or _st.session_state.get('final_floor_plan')
+    if not _plano_2d_zip:
+        try:
+            from .floor_plan_svg import FloorPlanSVG
+            _layout_for_plan = (_st.session_state.get("babylon_modified_layout") or
+                               _st.session_state.get("babylon_initial_layout"))
+            if _layout_for_plan:
+                planner = FloorPlanSVG(_st.session_state.get('current_design') or design_data)
+                _plano_2d_zip = planner.generate()
+        except Exception:
+            _plano_2d_zip = None
+
+    # Captura 3D (si no existen, dejar vacío)
+    _babylon_captures_zip = _st.session_state.get('babylon_captures', {})
+
+    # Layout 3D: usar modified o initial
+    _babylon_layout_zip = (_st.session_state.get("babylon_modified_layout") or
+                           _st.session_state.get("babylon_initial_layout"))
+
+    # Plano cimentación: recuperar, si no regenerar
+    _cim_png_zip = _st.session_state.get("cimentacion_plan_png")
+    if not _cim_png_zip and _babylon_layout_zip:
+        try:
+            from .floor_plan_svg import generate_cimentacion_plan_png
+            _tw = _st.session_state.get("babylon_total_width", 10)
+            _td = _st.session_state.get("babylon_total_depth", 10)
+            _cim_png_zip = generate_cimentacion_plan_png(_babylon_layout_zip, "zapatas", _tw, _td)
+        except Exception:
+            _cim_png_zip = None
+
+    # Planos MEP: recuperar, si no regenerar
+    _mep_plans_zip = _st.session_state.get("mep_plans_png", {})
+    if not _mep_plans_zip and _babylon_layout_zip:
+        try:
+            from .floor_plan_svg import generate_mep_plan_png
+            _tw = _st.session_state.get("babylon_total_width", 10)
+            _td = _st.session_state.get("babylon_total_depth", 10)
+            _mep_layers = ["sewage", "water", "electrical", "rainwater", "domotics"]
+            for _lid in _mep_layers:
+                try:
+                    _png = generate_mep_plan_png(_babylon_layout_zip, _lid, _tw, _td)
+                    if _png:
+                        _mep_plans_zip[_lid] = _png
+                except Exception:
+                    pass
+        except Exception:
+            pass
     memoria_ia = ""
     try:
         from groq import Groq as _Groq
@@ -754,12 +807,12 @@ sistema y servir de base de trabajo para el arquitecto que desarrolle el proyect
 
         # 4. PLANO PNG
         import streamlit as _st
-        plano = _st.session_state.get('current_floor_plan') or _st.session_state.get('final_floor_plan')
+        plano = _plano_2d_zip
         if plano:
             zf.writestr(f"{proyecto_nombre}/04_Plano_2D.png", plano)
 
         # 5. VISTAS 3D BABYLON — capturas de perspectivas
-        vistas_3d = _st.session_state.get('babylon_captures', {})
+        vistas_3d = _babylon_captures_zip
         if vistas_3d:
             nombres_legibles = {
                 'sur_fachada_principal': '05a_Vista_Sur_Fachada_Principal.png',
@@ -794,17 +847,17 @@ sistema y servir de base de trabajo para el arquitecto que desarrolle el proyect
             )
 
         # 6. LAYOUT BABYLON JSON
-        babylon_layout = _st.session_state.get('babylon_modified_layout')
+        babylon_layout = _babylon_layout_zip
         if babylon_layout:
             zf.writestr(f"{proyecto_nombre}/06_Layout_3D_Editable.json",
                 json.dumps(babylon_layout, ensure_ascii=False, indent=2))
 
         # 6b. PLANOS TÉCNICOS — Cimentación y MEP
-        _cim_png = _st.session_state.get("cimentacion_plan_png")
+        _cim_png = _cim_png_zip
         if _cim_png:
             zf.writestr(f"{proyecto_nombre}/Planos_Tecnicos/06b_Plano_Cimentacion.png", _cim_png)
 
-        _mep_plans = _st.session_state.get("mep_plans_png", {})
+        _mep_plans = _mep_plans_zip
         if _mep_plans:
             _mep_map = {
                 "sewage": "06c_Plano_Saneamiento.png",
@@ -818,7 +871,7 @@ sistema y servir de base de trabajo para el arquitecto que desarrolle el proyect
                     zf.writestr(f"{proyecto_nombre}/Planos_Tecnicos/{_mep_map[_mep_id]}", _mep_png)
 
         # 7. ANÁLISIS DEL ARQUITECTO IA (generado en Paso 2)
-        _analisis_ia = _st.session_state.get("analisis_arquitecto_ia", "")
+        _analisis_ia = _analisis_ia_zip
         if _analisis_ia:
             zf.writestr(
                 f"{proyecto_nombre}/07_Opinion_Arquitecto_IA.txt",
