@@ -49,47 +49,76 @@ def generar_zip_proyecto(req, design_data, plot_data, partidas, subsidy_total, e
     # Análisis IA (NO regenerable, dejar si existe)
     _analisis_ia_zip = _st.session_state.get("analisis_arquitecto_ia", "")
 
-    # Plano 2D: intentar obtener, si no regenerar
-    _plano_2d_zip = _st.session_state.get('current_floor_plan') or _st.session_state.get('final_floor_plan')
-    if not _plano_2d_zip:
+    # Captura 3D (si no existen, dejar vacío — requiere acción manual del usuario)
+    _babylon_captures_zip = _st.session_state.get('babylon_captures', {})
+
+    # ── LAYOUT BASE: fuente única de verdad con coords x,z,width,depth ───────
+    # Prioridad: modified (editado por usuario) > initial (generado en paso 3)
+    # Si ninguno existe (nueva pestaña post-Stripe), generar desde ai_room_proposal
+    _babylon_layout_zip = (_st.session_state.get("babylon_modified_layout") or
+                           _st.session_state.get("babylon_initial_layout"))
+
+    if not _babylon_layout_zip:
+        # session_state vacío (nueva pestaña): regenerar layout completo con coords
         try:
-            from .floor_plan_svg import FloorPlanSVG
-            _layout_for_plan = (_st.session_state.get("babylon_modified_layout") or
-                               _st.session_state.get("babylon_initial_layout"))
-            if _layout_for_plan:
-                planner = FloorPlanSVG(_st.session_state.get('current_design') or design_data)
-                _plano_2d_zip = planner.generate()
+            from .architect_layout import generate_layout as _gen_layout_zip
+            _rooms_for_layout = []
+            for _r in design_data.get("rooms", []):
+                if isinstance(_r, dict):
+                    _rooms_for_layout.append({
+                        'code': _r.get('code', _r.get('name', 'generic')),
+                        'name': _r.get('name', _r.get('code', 'Espacio')),
+                        'area_m2': max(float(_r.get('area_m2', 10)), 1.0),
+                    })
+            if not _rooms_for_layout:
+                # Último fallback: ai_room_proposal del req
+                for _code, _area in req.get("ai_room_proposal", {}).items():
+                    _rooms_for_layout.append({
+                        'code': _code, 'name': _code,
+                        'area_m2': max(float(_area), 1.0),
+                    })
+            if _rooms_for_layout:
+                _house_shape_zip = req.get('house_shape', 'Rectangular (más común)')
+                _babylon_layout_zip = _gen_layout_zip(_rooms_for_layout, _house_shape_zip)
+        except Exception:
+            _babylon_layout_zip = None
+
+    # Calcular dimensiones reales desde el layout (fallback 10m si no hay layout)
+    if _babylon_layout_zip:
+        try:
+            _tw = max(r.get('x', 0) + r.get('width', 0) for r in _babylon_layout_zip) or 10
+            _td = max(r.get('z', 0) + r.get('depth', 0) for r in _babylon_layout_zip) or 10
+        except Exception:
+            _tw = _st.session_state.get("babylon_total_width", 10)
+            _td = _st.session_state.get("babylon_total_depth", 10)
+    else:
+        _tw = _st.session_state.get("babylon_total_width", 10)
+        _td = _st.session_state.get("babylon_total_depth", 10)
+
+    # Plano 2D: intentar obtener, si no regenerar desde layout base
+    _plano_2d_zip = _st.session_state.get('current_floor_plan') or _st.session_state.get('final_floor_plan')
+    if not _plano_2d_zip and _babylon_layout_zip:
+        try:
+            from .floor_plan_svg import generate_from_babylon_layout as _gen_plan2d
+            _plano_2d_zip = _gen_plan2d(_babylon_layout_zip)
         except Exception:
             _plano_2d_zip = None
 
-    # Captura 3D (si no existen, dejar vacío)
-    _babylon_captures_zip = _st.session_state.get('babylon_captures', {})
-
-    # Layout 3D: usar modified o initial, fallback a design_data.rooms si session_state vacío
-    _babylon_layout_zip = (_st.session_state.get("babylon_modified_layout") or
-                           _st.session_state.get("babylon_initial_layout") or
-                           design_data.get("rooms"))
-
-    # Plano cimentación: recuperar, si no regenerar
+    # Plano cimentación: recuperar, si no regenerar desde layout base
     _cim_png_zip = _st.session_state.get("cimentacion_plan_png")
     if not _cim_png_zip and _babylon_layout_zip:
         try:
             from .floor_plan_svg import generate_cimentacion_plan_png
-            _tw = _st.session_state.get("babylon_total_width", 10)
-            _td = _st.session_state.get("babylon_total_depth", 10)
-            _cim_png_zip = generate_cimentacion_plan_png(_babylon_layout_zip, "zapatas", _tw, _td)
+            _cim_png_zip = generate_cimentacion_plan_png(_babylon_layout_zip, None, _tw, _td)
         except Exception:
             _cim_png_zip = None
 
-    # Planos MEP: recuperar, si no regenerar
+    # Planos MEP: recuperar, si no regenerar las 5 capas desde layout base
     _mep_plans_zip = _st.session_state.get("mep_plans_png", {})
     if not _mep_plans_zip and _babylon_layout_zip:
         try:
             from .floor_plan_svg import generate_mep_plan_png
-            _tw = _st.session_state.get("babylon_total_width", 10)
-            _td = _st.session_state.get("babylon_total_depth", 10)
-            _mep_layers = ["sewage", "water", "electrical", "rainwater", "domotics"]
-            for _lid in _mep_layers:
+            for _lid in ["sewage", "water", "electrical", "rainwater", "domotics"]:
                 try:
                     _png = generate_mep_plan_png(_babylon_layout_zip, _lid, _tw, _td)
                     if _png:
