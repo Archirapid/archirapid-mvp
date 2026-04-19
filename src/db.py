@@ -447,7 +447,8 @@ _PG_DDL = [
         avg_project_price REAL, origen_registro TEXT, password_hash TEXT,
         fee_pct REAL DEFAULT 8.0,
         expenses_pct REAL DEFAULT 5.0,
-        iva_pct REAL DEFAULT 10.0
+        iva_pct REAL DEFAULT 10.0,
+        stripe_account_id TEXT
     )""",
     """CREATE TABLE IF NOT EXISTS ai_projects (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -558,7 +559,8 @@ _PG_DDL = [
         email TEXT UNIQUE NOT NULL, nif TEXT, specialty TEXT,
         company TEXT, phone TEXT, address TEXT,
         certifications TEXT, experience_years INTEGER,
-        service_area TEXT, created_at TEXT
+        service_area TEXT, created_at TEXT,
+        stripe_account_id TEXT
     )""",
     """CREATE TABLE IF NOT EXISTS users (
         id TEXT PRIMARY KEY, email TEXT UNIQUE,
@@ -638,7 +640,8 @@ _PG_DDL = [
         email_login TEXT,
         trial_start_date TEXT DEFAULT NULL,
         trial_active INTEGER DEFAULT 0,
-        trial_expired INTEGER DEFAULT 0
+        trial_expired INTEGER DEFAULT 0,
+        stripe_account_id TEXT
     )""",
     """CREATE TABLE IF NOT EXISTS fincas_mls (
         id TEXT PRIMARY KEY,
@@ -1260,6 +1263,7 @@ def ensure_tables():
             "ALTER TABLE architects ADD COLUMN fee_pct REAL DEFAULT 8.0",
             "ALTER TABLE architects ADD COLUMN expenses_pct REAL DEFAULT 5.0",
             "ALTER TABLE architects ADD COLUMN iva_pct REAL DEFAULT 10.0",
+            "ALTER TABLE architects ADD COLUMN stripe_account_id TEXT",
             "ALTER TABLE plots ADD COLUMN tour_360_b64 TEXT",
             "ALTER TABLE plots ADD COLUMN buildable_m2 REAL",
             "ALTER TABLE plots ADD COLUMN ai_verification_cache TEXT",
@@ -1720,6 +1724,8 @@ def ensure_tables():
             "ALTER TABLE inmobiliarias ADD COLUMN trial_start_date TEXT DEFAULT NULL",
             "ALTER TABLE inmobiliarias ADD COLUMN trial_active INTEGER DEFAULT 0",
             "ALTER TABLE inmobiliarias ADD COLUMN trial_expired INTEGER DEFAULT 0",
+            # Stripe Connect
+            "ALTER TABLE inmobiliarias ADD COLUMN stripe_account_id TEXT",
         ]:
             try:
                 c.execute(_mls_col)
@@ -2009,6 +2015,12 @@ def ensure_tables():
         # service_providers: cobertura por provincias
         try:
             c.execute("ALTER TABLE service_providers ADD COLUMN provincias_cobertura TEXT DEFAULT '[]'")
+        except Exception:
+            pass
+
+        # service_providers: Stripe Connect
+        try:
+            c.execute("ALTER TABLE service_providers ADD COLUMN stripe_account_id TEXT")
         except Exception:
             pass
 

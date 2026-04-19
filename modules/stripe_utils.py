@@ -257,6 +257,204 @@ def list_recent_sessions(limit: int = 50):
     return _stripe.checkout.Session.list(limit=limit)
 
 
+# ══════════════════════════════════════════════════════════════════════
+# STRIPE CONNECT EXPRESS — Onboarding + Split automático
+# ══════════════════════════════════════════════════════════════════════
+
+def _get_connect_key():
+    """Obtiene STRIPE_SECRET_KEY para Connect (misma key test)."""
+    return _get_key()
+
+
+def create_connect_onboarding_link(account_id: str,
+                                    return_url: str,
+                                    refresh_url: str) -> str:
+    """
+    Genera link de onboarding Express para que un profesional
+    conecte su cuenta Stripe.
+    Devuelve la URL del formulario alojado por Stripe.
+    """
+    _stripe.api_key = _get_connect_key()
+    link = _stripe.AccountLink.create(
+        account=account_id,
+        refresh_url=refresh_url,
+        return_url=return_url,
+        type="account_onboarding",
+    )
+    return link.url
+
+
+def create_express_account(email: str,
+                            nombre: str,
+                            tipo: str = "arquitecto") -> str:
+    """
+    Crea una cuenta Express de Stripe para un profesional.
+    tipo: "arquitecto", "inmobiliaria", "constructor"
+    Devuelve el account_id (acct_XXXXXXXX).
+    """
+    _stripe.api_key = _get_connect_key()
+    account = _stripe.Account.create(
+        type="express",
+        country="ES",
+        email=email,
+        capabilities={
+            "card_payments": {"requested": True},
+            "transfers": {"requested": True},
+        },
+        business_profile={
+            "name": nombre[:50],
+            "product_description": f"Profesional ArchiRapid — {tipo}",
+            "url": "https://archirapid.com",
+        },
+        metadata={
+            "tipo": tipo,
+            "plataforma": "archirapid",
+        }
+    )
+    return account.id
+
+
+def create_checkout_session_connect(
+        product_keys: list,
+        project_id: str,
+        client_email: str,
+        success_url: str,
+        cancel_url: str,
+        stripe_account_id: str,
+        fee_percent: float = 0.10,
+        extra_meta: dict = None) -> tuple:
+    """
+    Crea sesión Checkout con split automático via Connect.
+    fee_percent: porcentaje que se queda ArchiRapid (default 10%)
+    El profesional recibe el resto automáticamente.
+    Devuelve (checkout_url, session_id).
+    """
+    _stripe.api_key = _get_connect_key()
+    line_items = []
+    total_cents = 0
+    for pk in product_keys:
+        if pk not in PRODUCTS:
+            continue
+        line_items.append({
+            "price_data": {
+                "currency": "eur",
+                "product_data": {"name": PRODUCTS[pk]["name"]},
+                "unit_amount": PRODUCTS[pk]["amount"],
+            },
+            "quantity": 1,
+        })
+        total_cents += PRODUCTS[pk]["amount"]
+
+    # IVA 21% incluido en el precio (precios ya con IVA)
+    # application_fee = lo que se queda ArchiRapid
+    fee_cents = int(total_cents * fee_percent)
+
+    _meta = {
+        "project_id": str(project_id),
+        "client_email": str(client_email),
+        "products": ",".join(product_keys),
+        "stripe_account_id": str(stripe_account_id),
+        "fee_percent": str(fee_percent),
+    }
+    if extra_meta:
+        for k, v in extra_meta.items():
+            _meta[str(k)[:40]] = str(v)[:500]
+
+    session = _stripe.checkout.Session.create(
+        payment_method_types=["card"],
+        line_items=line_items,
+        mode="payment",
+        customer_email=client_email or None,
+        success_url=success_url,
+        cancel_url=cancel_url,
+        payment_intent_data={
+            "application_fee_amount": fee_cents,
+            "transfer_data": {
+                "destination": stripe_account_id,
+            },
+        },
+        metadata=_meta,
+    )
+    return session.url, session.id
+
+
+def create_mls_reserva_connect(
+        finca_id: str,
+        inmo_listante_account_id: str,
+        precio_venta_cents: int,
+        split_colaboradora_pct: float,
+        buyer_email: str,
+        success_url: str,
+        cancel_url: str) -> tuple:
+    """
+    Crea sesión MLS con split automático:
+    - ArchiRapid: 1% del precio de venta
+    - Inmobiliaria listante: resto después del split colaboradora
+    El split con colaboradora se gestiona manualmente post-venta.
+    Devuelve (checkout_url, session_id).
+    """
+    _stripe.api_key = _get_connect_key()
+
+    # Reserva = 10% del precio de venta
+    reserva_cents = int(precio_venta_cents * 0.10)
+    # Fee ArchiRapid = 1% del precio de venta
+    fee_cents = int(precio_venta_cents * 0.01)
+    # Fee no puede superar el importe de la reserva
+    fee_cents = min(fee_cents, reserva_cents)
+
+    session = _stripe.checkout.Session.create(
+        payment_method_types=["card"],
+        line_items=[{
+            "price_data": {
+                "currency": "eur",
+                "product_data": {
+                    "name": f"Reserva MLS — Finca {finca_id[:40]}"
+                },
+                "unit_amount": reserva_cents,
+            },
+            "quantity": 1,
+        }],
+        mode="payment",
+        customer_email=buyer_email or None,
+        success_url=success_url,
+        cancel_url=cancel_url,
+        payment_intent_data={
+            "application_fee_amount": fee_cents,
+            "transfer_data": {
+                "destination": inmo_listante_account_id,
+            },
+        },
+        metadata={
+            "type": "mls_reserva_connect",
+            "finca_id": str(finca_id)[:100],
+            "precio_venta_cents": str(precio_venta_cents),
+            "split_colaboradora_pct": str(split_colaboradora_pct),
+            "buyer_email": str(buyer_email)[:100],
+            "fee_cents": str(fee_cents),
+        },
+    )
+    return session.url, session.id
+
+
+def get_connect_account(account_id: str) -> dict:
+    """
+    Recupera datos de una cuenta Express conectada.
+    Útil para verificar si el onboarding está completo.
+    """
+    _stripe.api_key = _get_connect_key()
+    try:
+        account = _stripe.Account.retrieve(account_id)
+        return {
+            "id": account.id,
+            "charges_enabled": account.charges_enabled,
+            "payouts_enabled": account.payouts_enabled,
+            "details_submitted": account.details_submitted,
+            "email": account.get("email", ""),
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
 # ACTIVAR STRIPE LIVE EN MLS (sin cambios de código):
 # 1. Añadir en Streamlit Cloud secrets:
 #    STRIPE_SECRET_KEY_LIVE = sk_live_...
