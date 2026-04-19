@@ -2206,6 +2206,7 @@ def render_step2():
     with col2:
         if st.button("Paso 3: Editor 3D →", key="go_to_3", type="primary", width='stretch'):
             # ── Constraint Solver S1 ──────────────────────────────────────────
+            _cs_ok = True
             try:
                 from .constraint_solver import validate_design, show_constraint_results
                 _rooms_cs = st.session_state.get("ai_house_requirements", {}).get("room_layout") or []
@@ -2218,10 +2219,11 @@ def render_step2():
                     ]
                 _plot_cs = st.session_state.get("design_plot_data", {})
                 _cs_result = validate_design(_rooms_cs, _plot_cs)
-                if not show_constraint_results(_cs_result):
-                    st.stop()
+                _cs_ok = show_constraint_results(_cs_result)
             except Exception:
-                pass  # constraint solver nunca bloquea por error técnico
+                pass  # error técnico del solver no bloquea el flujo
+            if not _cs_ok:
+                st.stop()
             st.session_state["ai_house_step"] = 3
             st.rerun()
     
@@ -2621,6 +2623,7 @@ def render_step2():
         with col2:
             if st.button("Paso 3 →", type="primary", width='stretch'):
                 # ── Constraint Solver S1 ──────────────────────────────────────
+                _cs_ok2 = True
                 try:
                     from .constraint_solver import validate_design, show_constraint_results
                     _rooms_cs2 = st.session_state.get("ai_house_requirements", {}).get("room_layout") or []
@@ -2633,10 +2636,11 @@ def render_step2():
                         ]
                     _plot_cs2 = st.session_state.get("design_plot_data", {})
                     _cs_result2 = validate_design(_rooms_cs2, _plot_cs2)
-                    if not show_constraint_results(_cs_result2):
-                        st.stop()
+                    _cs_ok2 = show_constraint_results(_cs_result2)
                 except Exception:
-                    pass  # constraint solver nunca bloquea por error técnico
+                    pass  # error técnico del solver no bloquea el flujo
+                if not _cs_ok2:
+                    st.stop()
                 st.session_state["ai_house_step"] = 3
                 st.rerun()
     
@@ -5389,9 +5393,8 @@ def render_step6_pago():
         # Si no hay email en session_state, usar fallback desde BD (último cliente que accedió)
         if not _client_email_6:
             try:
-                import sqlite3 as _sq_fb
-                from modules.marketplace.utils import DB_PATH as _DBP_fb
-                _conn_fb = _sq_fb.connect(_DBP_fb, timeout=15)
+                from modules.marketplace.utils import db_conn as _db_fb
+                _conn_fb = _db_fb()
                 _cur_fb = _conn_fb.cursor()
                 _cur_fb.execute("SELECT client_email FROM ai_projects ORDER BY created_at DESC LIMIT 1")
                 _row_fb = _cur_fb.fetchone()
@@ -5414,10 +5417,9 @@ def render_step6_pago():
         if _stripe_key_ok and _all_items_6 and not st.session_state.get("stripe_session_id_s6"):
             try:
                 # ── Guardar proyecto en BD ANTES de Stripe (para recuperar si viene del redirect) ───
-                import sqlite3 as _sq6_pre, json as _js6_pre, datetime as _dt6_pre
-                from modules.marketplace.utils import DB_PATH as _DBP6_pre
-                _conn6_pre = _sq6_pre.connect(_DBP6_pre, timeout=15)
-                _conn6_pre.execute("PRAGMA journal_mode=WAL")
+                import json as _js6_pre, datetime as _dt6_pre
+                from modules.marketplace.utils import db_conn as _db6_pre
+                _conn6_pre = _db6_pre()
                 _req_pre_json = _js6_pre.dumps(st.session_state.get("ai_house_requirements") or {})
                 _conn6_pre.execute("""
                     INSERT OR REPLACE INTO ai_projects
@@ -5447,7 +5449,7 @@ def render_step6_pago():
                 _s6_url, _s6_sid = _ccs6(
                     line_items=_stripe_items_6,
                     client_email=_client_email_6,
-                    success_url=_base6 + f"/?page=disenador&pago=ok&email={_email_encoded_6}",
+                    success_url=_base6 + f"/?page=disenador&pago=ok&email={_email_encoded_6}&sid={{CHECKOUT_SESSION_ID}}",
                     cancel_url=_base6 + f"/?page=disenador&pago=cancel&email={_email_encoded_6}",
                     metadata={
                         "project": req.get("nombre_proyecto", "ArchiRapid Project"),

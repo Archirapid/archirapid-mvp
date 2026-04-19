@@ -231,8 +231,7 @@ st.components.v1.html("""
 </script>
 """, height=0)
 
-# HARDCODE DE ROL PARA PRUEBA
-if st.session_state.get('email') == 'asdfg@lkj.com': st.session_state['role'] = 'owner'
+# HARDCODE DE ROL PARA PRUEBA — ELIMINADO (backdoor)
 
 # 🛡️ BLINDAJE ABSOLUTO OWNER
 if st.session_state.get("role") == "owner":
@@ -1140,18 +1139,12 @@ if st.query_params.get("pago") == "ok" and st.query_params.get("page") in ("dise
     # Si viene desde nueva pestaña (Stripe redirect), recuperar proyecto de BD usando email de URL
     if not st.session_state.get("ai_house_requirements"):
         try:
-            import sqlite3 as _sq6_recover, json as _js6_recover, urllib.parse as _up6_recover
-            from modules.marketplace.utils import DB_PATH as _DBP6_recover
-            _conn6_r = _sq6_recover.connect(_DBP6_recover, timeout=15)
-            _conn6_r.execute("PRAGMA journal_mode=WAL")
+            import json as _js6_recover, urllib.parse as _up6_recover
+            from modules.marketplace.utils import db_conn as _db6_recover
+            _conn6_r = _db6_recover()
             # El email viene en query_params desde Stripe redirect
             _client_email_r = _up6_recover.unquote(st.query_params.get("email", "")) or \
                               st.session_state.get("client_email") or st.session_state.get("user_email") or ""
-
-            # DEBUG: mostrar qué email se está usando
-            if st.query_params.get("pago") == "ok":
-                st.warning(f"🔍 DEBUG - Email desde URL: '{st.query_params.get('email', 'VACÍO')}'")
-                st.warning(f"🔍 DEBUG - Email decodificado: '{_client_email_r}'")
 
             if _client_email_r:
                 _cur6_r = _conn6_r.cursor()
@@ -1172,10 +1165,21 @@ if st.query_params.get("pago") == "ok" and st.query_params.get("page") in ("dise
                         if "total_iva" in _svc_obj and st.query_params.get("pago") == "ok":
                             st.session_state["total_pagado"] = _svc_obj.get("total_iva", 0)
                     st.session_state["client_email"] = _client_email_r
-                    # CRITICAL: Si pago=ok y hemos recuperado el proyecto, marcar como pagado
+                    # Marcar como pagado: verificar sid de Stripe si viene en URL
                     if st.query_params.get("pago") == "ok":
-                        st.session_state["pago_completado"] = True
-                        st.success(f"✅ Proyecto recuperado de BD para: {_client_email_r}")
+                        _sid_url_r = st.query_params.get("sid", "")
+                        _pago_verificado_r = True  # fallback: confiar en redirect de Stripe
+                        if _sid_url_r and not st.session_state.get(f"s6_verified_{_sid_url_r}"):
+                            try:
+                                from modules.stripe_utils import verify_session as _vs6r
+                                _sess6r = _vs6r(_sid_url_r)
+                                _pago_verificado_r = (_sess6r.payment_status == "paid")
+                                if _pago_verificado_r:
+                                    st.session_state[f"s6_verified_{_sid_url_r}"] = True
+                            except Exception:
+                                pass  # Stripe no disponible: mantener fallback True
+                        if _pago_verificado_r:
+                            st.session_state["pago_completado"] = True
                 else:
                     if st.query_params.get("pago") == "ok":
                         st.error(f"❌ No encontrado en BD: {_client_email_r}")
