@@ -5393,8 +5393,10 @@ def render_step6_pago():
         # Si no hay email en session_state, usar fallback desde BD (último cliente que accedió)
         if not _client_email_6:
             try:
-                from modules.marketplace.utils import db_conn as _db_fb
-                _conn_fb = _db_fb()
+                import sqlite3 as _sq_fb
+                from modules.marketplace.utils import DB_PATH as _DBP_fb
+                _conn_fb = _sq_fb.connect(_DBP_fb, timeout=15)
+                _conn_fb.execute("PRAGMA journal_mode=WAL")
                 _cur_fb = _conn_fb.cursor()
                 _cur_fb.execute("SELECT client_email FROM ai_projects ORDER BY created_at DESC LIMIT 1")
                 _row_fb = _cur_fb.fetchone()
@@ -5417,9 +5419,10 @@ def render_step6_pago():
         if _stripe_key_ok and _all_items_6 and not st.session_state.get("stripe_session_id_s6"):
             try:
                 # ── Guardar proyecto en BD ANTES de Stripe (para recuperar si viene del redirect) ───
-                import json as _js6_pre, datetime as _dt6_pre
-                from modules.marketplace.utils import db_conn as _db6_pre
-                _conn6_pre = _db6_pre()
+                import sqlite3 as _sq6_pre, json as _js6_pre, datetime as _dt6_pre
+                from modules.marketplace.utils import DB_PATH as _DBP6_pre
+                _conn6_pre = _sq6_pre.connect(_DBP6_pre, timeout=15)
+                _conn6_pre.execute("PRAGMA journal_mode=WAL")
                 _req_pre_json = _js6_pre.dumps(st.session_state.get("ai_house_requirements") or {})
                 _conn6_pre.execute("""
                     INSERT OR REPLACE INTO ai_projects
@@ -5434,7 +5437,7 @@ def render_step6_pago():
                      "pendiente_pago", _req_pre_json))
                 _conn6_pre.commit(); _conn6_pre.close()
             except Exception as _ex6_pre:
-                st.warning(f"⚠️ Error guardando proyecto: {str(_ex6_pre)[:150]}")
+                pass  # pre-save falla silencioso — no interrumpe el flujo de pago
 
             try:
                 from modules.stripe_utils import create_custom_session as _ccs6, _get_base_url as _gbu6

@@ -1139,9 +1139,10 @@ if st.query_params.get("pago") == "ok" and st.query_params.get("page") in ("dise
     # Si viene desde nueva pestaña (Stripe redirect), recuperar proyecto de BD usando email de URL
     if not st.session_state.get("ai_house_requirements"):
         try:
-            import json as _js6_recover, urllib.parse as _up6_recover
-            from modules.marketplace.utils import db_conn as _db6_recover
-            _conn6_r = _db6_recover()
+            import sqlite3 as _sq6_recover, json as _js6_recover, urllib.parse as _up6_recover
+            from modules.marketplace.utils import DB_PATH as _DBP6_recover
+            _conn6_r = _sq6_recover.connect(_DBP6_recover, timeout=15)
+            _conn6_r.execute("PRAGMA journal_mode=WAL")
             # El email viene en query_params desde Stripe redirect
             _client_email_r = _up6_recover.unquote(st.query_params.get("email", "")) or \
                               st.session_state.get("client_email") or st.session_state.get("user_email") or ""
