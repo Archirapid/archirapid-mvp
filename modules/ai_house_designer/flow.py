@@ -5288,31 +5288,32 @@ def render_step6_pago():
     _all_items_6 = _doc_detail_6 + _svc_detail_6
     if _all_items_6:
         _rows_html = "".join(
-            f"<tr><td style='padding:6px 12px;color:#CBD5E1;'>{it['label']}</td>"
-            f"<td style='padding:6px 12px;text-align:right;color:#F8FAFC;font-weight:600;'>€{it['precio']:,}</td></tr>"
+            f"<tr style='border-bottom:1px solid #2D4A6E;'>"
+            f"<td style='padding:9px 14px;color:#E2E8F0;font-size:14px;'>{it['label']}</td>"
+            f"<td style='padding:9px 14px;text-align:right;color:#FFFFFF;font-weight:700;font-size:14px;'>€{it['precio']:,}</td></tr>"
             for it in _all_items_6
         )
         st.markdown(f"""
-<table style='width:100%;border-collapse:collapse;background:rgba(30,58,95,0.3);border-radius:10px;overflow:hidden;'>
+<table style='width:100%;border-collapse:collapse;background:#1E3A5F;border-radius:10px;overflow:hidden;font-family:sans-serif;'>
   <thead>
-    <tr style='background:rgba(37,99,235,0.4);'>
-      <th style='padding:10px 12px;text-align:left;color:#F8FAFC;'>Concepto</th>
-      <th style='padding:10px 12px;text-align:right;color:#F8FAFC;'>Importe</th>
+    <tr style='background:#1E40AF;'>
+      <th style='padding:12px 14px;text-align:left;color:#FFFFFF;font-size:15px;letter-spacing:0.5px;'>Concepto</th>
+      <th style='padding:12px 14px;text-align:right;color:#FFFFFF;font-size:15px;letter-spacing:0.5px;'>Importe</th>
     </tr>
   </thead>
   <tbody>
     {_rows_html}
-    <tr style='background:rgba(0,0,0,0.2);border-top:1px solid rgba(255,255,255,0.1);'>
-      <td style='padding:8px 12px;color:#94A3B8;'>Subtotal (sin IVA)</td>
-      <td style='padding:8px 12px;text-align:right;color:#94A3B8;'>€{_subtotal_6:,}</td>
+    <tr style='background:#152A45;border-top:1px solid #2D4A6E;'>
+      <td style='padding:10px 14px;color:#94A3B8;font-size:13px;'>Subtotal (sin IVA)</td>
+      <td style='padding:10px 14px;text-align:right;color:#CBD5E1;font-size:13px;'>€{_subtotal_6:,}</td>
     </tr>
-    <tr style='background:rgba(0,0,0,0.2);'>
-      <td style='padding:8px 12px;color:#94A3B8;'>IVA 21%</td>
-      <td style='padding:8px 12px;text-align:right;color:#94A3B8;'>€{_iva_6:,}</td>
+    <tr style='background:#152A45;'>
+      <td style='padding:10px 14px;color:#94A3B8;font-size:13px;'>IVA 21%</td>
+      <td style='padding:10px 14px;text-align:right;color:#CBD5E1;font-size:13px;'>€{_iva_6:,}</td>
     </tr>
-    <tr style='background:rgba(39,174,96,0.2);border-top:2px solid #27AE60;'>
-      <td style='padding:12px;color:#F8FAFC;font-weight:800;font-size:15px;'>TOTAL CON IVA</td>
-      <td style='padding:12px;text-align:right;color:#27AE60;font-weight:800;font-size:18px;'>€{_total_iva_6:,}</td>
+    <tr style='background:#14532D;border-top:2px solid #22C55E;'>
+      <td style='padding:14px;color:#FFFFFF;font-weight:800;font-size:16px;'>TOTAL CON IVA</td>
+      <td style='padding:14px;text-align:right;color:#4ADE80;font-weight:800;font-size:20px;'>€{_total_iva_6:,}</td>
     </tr>
   </tbody>
 </table>""", unsafe_allow_html=True)
