@@ -65,9 +65,10 @@ def generar_zip_proyecto(req, design_data, plot_data, partidas, subsidy_total, e
     # Captura 3D (si no existen, dejar vacío)
     _babylon_captures_zip = _st.session_state.get('babylon_captures', {})
 
-    # Layout 3D: usar modified o initial
+    # Layout 3D: usar modified o initial, fallback a design_data.rooms si session_state vacío
     _babylon_layout_zip = (_st.session_state.get("babylon_modified_layout") or
-                           _st.session_state.get("babylon_initial_layout"))
+                           _st.session_state.get("babylon_initial_layout") or
+                           design_data.get("rooms"))
 
     # Plano cimentación: recuperar, si no regenerar
     _cim_png_zip = _st.session_state.get("cimentacion_plan_png")
